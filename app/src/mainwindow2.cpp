@@ -114,9 +114,11 @@ MainWindow2::MainWindow2(QWidget* parent) :
 {
     ui->setupUi(this);
 
-    // Dark immersive backdrop around the rounded paper (plain QWidget needs
-    // its own stylesheet to reliably paint a background)
-    ui->centralWidget->setStyleSheet("background-color: #0D0D0F;");
+    // Friction-style workspace backdrop: vertical gradient, near-black on
+    // top easing into subtle grey towards the bottom, around the scene paper
+    ui->centralWidget->setStyleSheet(
+        "background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        " stop:0 #0E0F11, stop:0.68 #151617, stop:1 #26282C);");
 
     // Initialize order
     // 1. editor 2. object 3. scribble area 4. other widgets
