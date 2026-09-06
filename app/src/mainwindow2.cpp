@@ -115,10 +115,6 @@ MainWindow2::MainWindow2(QWidget* parent) :
 {
     ui->setupUi(this);
 
-    // Friction-style workspace backdrop (drawWorkspaceBackdrop port):
-    // vertical gradient + faint world grid, painted manually in eventFilter
-    ui->centralWidget->setAttribute(Qt::WA_OpaquePaintEvent);
-    ui->centralWidget->installEventFilter(this);
 
     // Initialize order
     // 1. editor 2. object 3. scribble area 4. other widgets
@@ -1613,33 +1609,6 @@ bool MainWindow2::event(QEvent* event)
     return QMainWindow::event(event);
 }
 
-bool MainWindow2::eventFilter(QObject* obj, QEvent* ev)
-{
-    // Friction-style workspace backdrop, ported from Canvas::drawWorkspaceBackdrop:
-    // near-black vertical gradient easing into grey, with a faint fine grid
-    if (obj == ui->centralWidget && ev->type() == QEvent::Paint)
-    {
-        QWidget* w = ui->centralWidget;
-        QPainter painter(w);
-        const QRect r = w->rect();
-
-        QLinearGradient grad(QPointF(0, 0), QPointF(0, r.height()));
-        grad.setColorAt(0.0,  QColor(0x0E, 0x0F, 0x11)); // base.darker(220)
-        grad.setColorAt(0.68, QColor(0x15, 0x16, 0x17)); // base.darker(150)
-        grad.setColorAt(1.0,  QColor(0x26, 0x28, 0x2C)); // base.lighter(118)
-        painter.fillRect(r, grad);
-
-        // decorative fine grid (fixed #262626 line, friction default)
-        painter.setPen(QPen(QColor(0x26, 0x26, 0x26), 1.0));
-        const int spacing = 16;
-        for (int x = 0; x <= r.width(); x += spacing)
-            painter.drawLine(x, 0, x, r.height());
-        for (int y = 0; y <= r.height(); y += spacing)
-            painter.drawLine(0, y, r.width(), y);
-        return true;
-    }
-    return QMainWindow::eventFilter(obj, ev);
-}
 
 void MainWindow2::onFocusRequested(QWidget *widget)
 {

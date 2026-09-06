@@ -69,12 +69,24 @@ void BackgroundWidget::settingUpdated(SETTING setting)
 
 void BackgroundWidget::paintEvent(QPaintEvent* event)
 {
-    QStyleOption opt;
-    opt.initFrom(this);
     QPainter painter(this);
     painter.setClipRect(event->rect());
 
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &painter, this);
+    // Friction-style workspace backdrop fills the whole canvas area:
+    // vertical gradient easing into grey, with a faint fine grid
+    const QRect r = rect();
+    QLinearGradient grad(QPointF(0, 0), QPointF(0, r.height()));
+    grad.setColorAt(0.0,  QColor(0x0E, 0x0F, 0x11));
+    grad.setColorAt(0.68, QColor(0x15, 0x16, 0x17));
+    grad.setColorAt(1.0,  QColor(0x26, 0x28, 0x2C));
+    painter.fillRect(r, grad);
+
+    painter.setPen(QPen(QColor(0x26, 0x26, 0x26), 1.0));
+    const int spacing = 16;
+    for (int x = 0; x <= r.width(); x += spacing)
+        painter.drawLine(x, 0, x, r.height());
+    for (int y = 0; y <= r.height(); y += spacing)
+        painter.drawLine(0, y, r.width(), y);
 
     if (mHasShadow)
         drawShadow(painter);
@@ -82,37 +94,10 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
 
 void BackgroundWidget::loadBackgroundStyle()
 {
-    QString bgName = mPrefs->getString(SETTING::BACKGROUND_STYLE);
-    mStyle = "background-color:white;";
-
-    if ( bgName == "white" )
-    {
-        mStyle = "background-color:white;";
-    }
-    else if ( bgName == "grey" )
-    {
-        mStyle = "background-color:#4B4B4B;";
-    }
-    else if ( bgName == "checkerboard" )
-    {
-        mStyle = "background-image: url(:background/checkerboard.png); background-repeat: repeat-xy;";
-    }
-    else if ( bgName == "dots" )
-    {
-        mStyle = "background-image: url(:background/dots.png); background-repeat: repeat-xy;";
-    }
-    else if ( bgName == "weave" )
-    {
-        mStyle = "background-image: url(:background/weave.jpg); background-repeat: repeat-xy;";
-    }
-    else if ( bgName == "grid" )
-    {
-        mStyle = "background-image: url(:background/grid.jpg); background-repeat: repeat-xy;";
-    }
-
-    mStyle = QString("BackgroundWidget { %1 }").arg(mStyle);
-
-    setStyleSheet(mStyle);
+    // background is now fully custom-painted (gradient + grid);
+    // no stylesheet background anymore, keep the entry point for the
+    // preference-change notification chain
+    setStyleSheet("");
 }
 
 void BackgroundWidget::drawShadow(QPainter& painter)

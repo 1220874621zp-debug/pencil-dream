@@ -116,7 +116,6 @@ protected:
     void tabletEvent(QTabletEvent*) override;
     void closeEvent(QCloseEvent*) override;
     bool event(QEvent*) override;
-    bool eventFilter(QObject* obj, QEvent* ev) override;
 
 private slots:
     void updateCopyCutPasteEnabled();
