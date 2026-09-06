@@ -86,7 +86,7 @@ void PreferenceManager::loadPrefs()
     set(SETTING::SHOW_STATUS_BAR,          settings.value(SETTING_SHOW_STATUS_BAR,        true).toBool());
     set(SETTING::CURVE_SMOOTHING,          settings.value(SETTING_CURVE_SMOOTHING,        20).toInt());
 
-    set(SETTING::BACKGROUND_STYLE,         settings.value(SETTING_BACKGROUND_STYLE,       "white").toString());
+    set(SETTING::BACKGROUND_STYLE,         settings.value(SETTING_BACKGROUND_STYLE,       "grey").toString());
 
     set(SETTING::LAYOUT_LOCK,              settings.value(SETTING_LAYOUT_LOCK,            false).toBool());
     set(SETTING::FRAME_POOL_SIZE,          settings.value(SETTING_FRAME_POOL_SIZE,        1024).toInt());
