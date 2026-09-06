@@ -247,8 +247,8 @@ TEST_CASE("FileManager Load PCLX")
         REQUIRE(o != nullptr);
         if (o)
         {
-            // file has 2 bitmap layers, 1 vector layers and 1 cam layers
-            REQUIRE(o->getLayerCount() == 4);
+            // file has 1 bitmap, 1 sound, 1 camera layer (vector layer is skipped)
+            REQUIRE(o->getLayerCount() == 3);
         }
         delete o;
     }
@@ -262,8 +262,8 @@ TEST_CASE("FileManager Load PCLX")
         REQUIRE(o != nullptr);
         if (o)
         {
-            // file has 2 bitmap layers, 1 vector layers and 1 cam layers
-            REQUIRE(o->getLayerCount() == 4);
+            // file has 1 bitmap, 1 sound, 1 camera layer (vector layer is skipped)
+            REQUIRE(o->getLayerCount() == 2);
         }
         delete o;
     }
@@ -277,8 +277,8 @@ TEST_CASE("FileManager Load PCLX")
         REQUIRE(o != nullptr);
         if (o)
         {
-            // file has 2 bitmap layers, 1 vector layers and 1 cam layers
-            REQUIRE(o->getLayerCount() == 4);
+            // file has 1 bitmap, 1 sound, 1 camera layer (vector layer is skipped)
+            REQUIRE(o->getLayerCount() == 2);
         }
         delete o;
     }
@@ -292,8 +292,8 @@ TEST_CASE("FileManager Load PCLX")
         REQUIRE(o != nullptr);
         if (o)
         {
-            // file has 2 bitmap layers, 1 vector layers and 1 cam layers
-            REQUIRE(o->getLayerCount() == 4);
+            // file has 1 bitmap, 1 sound, 1 camera layer (vector layer is skipped)
+            REQUIRE(o->getLayerCount() == 2);
         }
         delete o;
     }
@@ -310,10 +310,9 @@ TEST_CASE("FileManager File-saving")
         Object* o1 = new Object;
         o1->init();
         o1->addNewCameraLayer();
-        o1->addNewVectorLayer();
         o1->addNewBitmapLayer();
 
-        LayerBitmap* layer = dynamic_cast<LayerBitmap*>(o1->getLayer(2));
+        LayerBitmap* layer = dynamic_cast<LayerBitmap*>(o1->getLayer(1));
         REQUIRE(layer->addNewKeyFrameAt(2));
 
         BitmapImage* b1 = layer->getBitmapImageAtFrame(2);
@@ -326,7 +325,7 @@ TEST_CASE("FileManager File-saving")
 
         // 2. load the animation, and then clear the red frame, save it.
         Object* o2 = fm.load(animationPath);
-        layer = dynamic_cast<LayerBitmap*>(o2->getLayer(2));
+        layer = dynamic_cast<LayerBitmap*>(o2->getLayer(1));
 
         BitmapImage* b2 = layer->getBitmapImageAtFrame(2);
         b2->clear();
@@ -336,7 +335,7 @@ TEST_CASE("FileManager File-saving")
 
         // 3. load the animation again, check whether it's an empty frame
         Object* o3 = fm.load(animationPath);
-        layer = dynamic_cast<LayerBitmap*>(o3->getLayer(2));
+        layer = dynamic_cast<LayerBitmap*>(o3->getLayer(1));
 
         BitmapImage* b3 = layer->getBitmapImageAtFrame(2);
         REQUIRE(b3->bounds().isEmpty());
@@ -353,10 +352,9 @@ TEST_CASE("FileManager File-saving")
         Object* o1 = new Object;
         o1->init();
         o1->addNewCameraLayer();
-        o1->addNewVectorLayer();
         o1->addNewBitmapLayer();
 
-        LayerBitmap* layer = dynamic_cast<LayerBitmap*>(o1->getLayer(2));
+        LayerBitmap* layer = dynamic_cast<LayerBitmap*>(o1->getLayer(1));
         for (int i = 100; i < 150; ++i)
         {
             layer->addNewKeyFrameAt(i);
@@ -373,7 +371,7 @@ TEST_CASE("FileManager File-saving")
         Object* o2 = fm.load(animationPath);
         o2->setActiveFramePoolSize(20);
 
-        layer = dynamic_cast<LayerBitmap*>(o2->getLayer(2));
+        layer = dynamic_cast<LayerBitmap*>(o2->getLayer(1));
         for (int i = 1; i < 150; ++i)
             o2->updateActiveFrames(i);
 
@@ -387,7 +385,7 @@ TEST_CASE("FileManager File-saving")
 
         // 4. Check no lost frames
         Object* o3 = fm.load(animationPath);
-        layer = dynamic_cast<LayerBitmap*>(o3->getLayer(2));
+        layer = dynamic_cast<LayerBitmap*>(o3->getLayer(1));
         for (int i = 2; i < 150; ++i)
         {
             auto bitmap = layer->getBitmapImageAtFrame(i);

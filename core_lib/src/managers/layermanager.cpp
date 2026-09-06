@@ -22,7 +22,6 @@ GNU General Public License for more details.
 
 #include "layersound.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layercamera.h"
 
 LayerManager::LayerManager(Editor* editor) : BaseManager(editor, __FUNCTION__)
@@ -191,9 +190,6 @@ Layer* LayerManager::createLayer(Layer::LAYER_TYPE type, const QString& strLayer
     case Layer::BITMAP:
         layer = object()->addNewBitmapLayer();
         break;
-    case Layer::VECTOR:
-        layer = object()->addNewVectorLayer();
-        break;
     case Layer::SOUND:
         layer = object()->addNewSoundLayer();
         break;
@@ -215,17 +211,6 @@ Layer* LayerManager::createLayer(Layer::LAYER_TYPE type, const QString& strLayer
 LayerBitmap* LayerManager::createBitmapLayer(const QString& strLayerName)
 {
     LayerBitmap* layer = object()->addNewBitmapLayer();
-    layer->setName(strLayerName);
-
-    emit layerCountChanged(count());
-    setCurrentLayer(getLastLayerIndex());
-
-    return layer;
-}
-
-LayerVector* LayerManager::createVectorLayer(const QString& strLayerName)
-{
-    LayerVector* layer = object()->addNewVectorLayer();
     layer->setName(strLayerName);
 
     emit layerCountChanged(count());

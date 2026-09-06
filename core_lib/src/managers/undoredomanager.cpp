@@ -34,12 +34,10 @@ GNU General Public License for more details.
 #include "legacybackupelement.h"
 
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layersound.h"
 
 
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "soundclip.h"
 
 UndoRedoManager::UndoRedoManager(Editor* editor) : BaseManager(editor, "UndoRedoManager")
@@ -197,8 +195,6 @@ void UndoRedoManager::replaceKeyFrame(const UndoSaveState& undoState, const QStr
 {
     if (undoState.layerType == Layer::BITMAP) {
         replaceBitmap(undoState, description);
-    } else if (undoState.layerType == Layer::VECTOR) {
-        replaceVector(undoState, description);
     } else {
         // Implement other cases
     }
@@ -237,27 +233,6 @@ void UndoRedoManager::replaceBitmap(const UndoSaveState& undoState, const QStrin
     pushCommand(element);
 }
 
-void UndoRedoManager::replaceVector(const UndoSaveState& undoState, const QString& description)
-{
-    if (undoState.keyframe == nullptr || undoState.layerType != Layer::VECTOR) { return; }
-    VectorReplaceCommand* element = new VectorReplaceCommand(static_cast<VectorImage*>(undoState.keyframe.get()),
-                                                 undoState.layerId,
-                                                 description,
-                                                 editor());
-
-    const SelectionSaveState& selectionState = undoState.selectionState;
-    new TransformCommand(selectionState.bounds,
-                         selectionState.translation,
-                         selectionState.rotationAngle,
-                         selectionState.scaleX,
-                         selectionState.scaleY,
-                         selectionState.anchor,
-                         false, // Round pixels
-                         description,
-                         editor(), element);
-    pushCommand(element);
-}
-
 SAVESTATE_ID UndoRedoManager::createState(UndoRedoRecordType recordType)
 {
     int saveStateId = mSaveStateId;
@@ -284,7 +259,7 @@ void UndoRedoManager::initCommonKeyFrameState(UndoSaveState* undoSaveState) cons
     undoSaveState->layerId = layer->id();
     undoSaveState->currentFrameIndex = editor()->currentFrame();
 
-    if (layer->type() == Layer::BITMAP || layer->type() == Layer::VECTOR) {
+    if (layer->type() == Layer::BITMAP) {
         auto selectMan = editor()->select();
         undoSaveState->selectionState = SelectionSaveState(
             selectMan->mySelectionRect(),
@@ -504,31 +479,6 @@ bool UndoRedoManager::legacyBackup(int backupLayer, int backupFrame, const QStri
                 return false;
             }
         }
-        else if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = static_cast<VectorImage*>(layer->getLastKeyFrameAtPosition(backupFrame));
-            if (vectorImage != nullptr)
-            {
-                BackupLegacyVectorElement* element = new BackupLegacyVectorElement(vectorImage);
-                element->layerId = layer->id();
-                element->layer = backupLayer;
-                element->frame = vectorImage->pos();
-                element->undoText = undoText;
-                element->somethingSelected = editor()->select()->somethingSelected();
-                element->mySelection = editor()->select()->mySelectionRect();
-                element->rotationAngle = editor()->select()->myRotation();
-                element->scaleX = editor()->select()->myScaleX();
-                element->scaleY = editor()->select()->myScaleY();
-                element->translation = editor()->select()->myTranslation();
-                element->selectionAnchor = editor()->select()->currentTransformAnchor();
-                mLegacyBackupList.append(element);
-                mLegacyBackupIndex++;
-            }
-            else
-            {
-                return false;
-            }
-        }
         else if (layer->type() == Layer::SOUND)
         {
             int previous = layer->getPreviousKeyFramePosition(backupFrame);
@@ -577,7 +527,6 @@ void UndoRedoManager::sanitizeLegacyBackupElementsAfterLayerDeletion(int layerIn
     {
         LegacyBackupElement *backupElement = mLegacyBackupList[i];
         BackupLegacyBitmapElement *bitmapElement;
-        BackupLegacyVectorElement *vectorElement;
         BackupLegacySoundElement *soundElement;
         switch (backupElement->type())
         {
@@ -590,19 +539,6 @@ void UndoRedoManager::sanitizeLegacyBackupElementsAfterLayerDeletion(int layerIn
                 continue;
             }
             else if (bitmapElement->layer != layerIndex)
-            {
-                continue;
-            }
-            break;
-        case LegacyBackupElement::VECTOR_MODIF:
-            vectorElement = qobject_cast<BackupLegacyVectorElement*>(backupElement);
-            Q_ASSERT(vectorElement);
-            if (vectorElement->layer > layerIndex)
-            {
-                vectorElement->layer--;
-                continue;
-            }
-            else if (vectorElement->layer != layerIndex)
             {
                 continue;
             }
@@ -653,16 +589,6 @@ void UndoRedoManager::restoreLegacyKey()
         dynamic_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(frame)->paste(&lastBackupBitmapElement->bitmapImage);
         editor()->setModified(layerIndex, frame);
     }
-    if (lastBackupElement->type() == LegacyBackupElement::VECTOR_MODIF)
-    {
-        BackupLegacyVectorElement* lastBackupVectorElement = static_cast<BackupLegacyVectorElement*>(lastBackupElement);
-        layerIndex = lastBackupVectorElement->layer;
-        frame = lastBackupVectorElement->frame;
-        layer = object()->findLayerById(layerIndex);
-        editor()->addKeyFrame(layerIndex, frame);
-        dynamic_cast<LayerVector*>(layer)->getVectorImageAtFrame(frame)->paste(lastBackupVectorElement->vectorImage);
-        editor()->setModified(layerIndex, frame);
-    }
     if (lastBackupElement->type() == LegacyBackupElement::SOUND_MODIF)
     {
         QString strSoundFile;
@@ -698,14 +624,6 @@ void UndoRedoManager::legacyUndo()
             {
                 BackupLegacyBitmapElement* lastBackupBitmapElement = static_cast<BackupLegacyBitmapElement*>(lastBackupElement);
                 if (legacyBackup(lastBackupBitmapElement->layer, lastBackupBitmapElement->frame, "NoOp"))
-                {
-                    mLegacyBackupIndex--;
-                }
-            }
-            if (lastBackupElement->type() == LegacyBackupElement::VECTOR_MODIF)
-            {
-                BackupLegacyVectorElement* lastBackupVectorElement = static_cast<BackupLegacyVectorElement*>(lastBackupElement);
-                if (legacyBackup(lastBackupVectorElement->layer, lastBackupVectorElement->frame, "NoOp"))
                 {
                     mLegacyBackupIndex--;
                 }

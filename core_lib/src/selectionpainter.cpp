@@ -44,12 +44,6 @@ void SelectionPainter::paint(QPainter& painter,
         // Draw current selection
         painter.drawPolygon(projectedSelectionPolygon.toPolygon());
     }
-    if (layer->type() == Layer::VECTOR)
-    {
-        painter.setBrush(QColor(0, 0, 0, 20));
-        painter.setPen(Qt::gray);
-        painter.drawPolygon(projectedSelectionPolygon);
-    }
 
     painter.setPen(Qt::SolidLine);
     painter.setBrush(QBrush(Qt::gray));

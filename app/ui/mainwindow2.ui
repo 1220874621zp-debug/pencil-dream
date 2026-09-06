@@ -213,9 +213,6 @@
     <addaction name="menuOnion_Skin"/>
     <addaction name="menuLayer_Visibility"/>
     <addaction name="separator"/>
-    <addaction name="actionShowInvisibleLines"/>
-    <addaction name="actionShowOutlinesOnly"/>
-    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuAnimation">
     <property name="title">
@@ -283,7 +280,6 @@
      <addaction name="actionChangeLineColorAll_keyframes_on_layer"/>
     </widget>
     <addaction name="actionNew_Bitmap_Layer"/>
-    <addaction name="actionNew_Vector_Layer"/>
     <addaction name="actionNew_Sound_Layer"/>
     <addaction name="actionNew_Camera_Layer"/>
     <addaction name="separator"/>
@@ -778,15 +774,6 @@
     <string>New Bitmap Layer</string>
    </property>
   </action>
-  <action name="actionNew_Vector_Layer">
-   <property name="icon">
-    <iconset resource="../data/app.qrc">
-     <normaloff>:/icons/themes/playful/timeline/cell-vector.svg</normaloff>:/icons/themes/playful/timeline/cell-vector.svg</iconset>
-   </property>
-   <property name="text">
-    <string>New Vector Layer</string>
-   </property>
-  </action>
   <action name="actionNew_Sound_Layer">
    <property name="icon">
     <iconset resource="../data/app.qrc">
@@ -1111,30 +1098,6 @@
    </property>
    <property name="toolTip">
     <string>Paste from Previous Keyframe</string>
-   </property>
-  </action>
-  <action name="actionShowInvisibleLines">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../data/app.qrc">
-     <normaloff>:/icons/themes/playful/display/lines-invisible.svg</normaloff>:/icons/themes/playful/display/lines-invisible.svg</iconset>
-   </property>
-   <property name="text">
-    <string>Show Invisible Lines</string>
-   </property>
-  </action>
-  <action name="actionShowOutlinesOnly">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../data/app.qrc">
-     <normaloff>:/icons/themes/playful/display/lines-outline.svg</normaloff>:/icons/themes/playful/display/lines-outline.svg</iconset>
-   </property>
-   <property name="text">
-    <string>Show Outlines Only</string>
    </property>
   </action>
   <action name="actionCenter">

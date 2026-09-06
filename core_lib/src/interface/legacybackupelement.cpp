@@ -20,7 +20,6 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "layer.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "object.h"
 #include "selectionmanager.h"
 #include "layermanager.h"
@@ -62,56 +61,6 @@ void BackupLegacyBitmapElement::restore(Editor* editor)
     selectMan->calculateSelectionTransformation();
 
     emit editor->frameModified(this->frame);
-}
-
-void BackupLegacyVectorElement::restore(Editor* editor)
-{
-    Layer* layer = editor->object()->findLayerById(this->layerId);
-    for (int i = 0; i < editor->object()->getLayerCount(); i++)
-    {
-        Layer* layer = editor->object()->getLayer(i);
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getVectorImageAtFrame(this->frame);
-            if (vectorImage != nullptr)
-            {
-                vectorImage->modification();
-            }
-        }
-    }
-
-    if (editor->currentFrame() != this->frame) {
-        editor->scrubTo(this->frame);
-    }
-
-    editor->layers()->setCurrentLayer(layer);
-
-    if (this->frame > 0 && layer->getKeyFrameAt(this->frame) == nullptr)
-    {
-        editor->undoRedo()->restoreLegacyKey();
-    }
-    else
-    {
-        if (layer != nullptr)
-        {
-            if (layer->type() == Layer::VECTOR)
-            {
-                auto pVectorImage = static_cast<LayerVector*>(layer);
-                *pVectorImage->getLastVectorImageAtFrame(this->frame) = this->vectorImage;  // restore the image
-            }
-        }
-    }
-
-    auto selectMan = editor->select();
-    selectMan->setSelection(mySelection, false);
-    selectMan->setTransformAnchor(selectionAnchor);
-    selectMan->setRotation(rotationAngle);
-    selectMan->setScale(scaleX, scaleY);
-    selectMan->setTranslation(translation);
-    selectMan->calculateSelectionTransformation();
-
-    emit editor->frameModified(this->frame);
-
 }
 
 void BackupLegacySoundElement::restore(Editor* editor)

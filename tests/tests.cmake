@@ -14,7 +14,6 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layercamera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layermanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layersound.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layervector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_object.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_filemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_bitmapimage.cpp
@@ -22,7 +21,6 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_propertyinfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_qminiz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_toolsettings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_vectorimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_viewmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_util.cpp
 )

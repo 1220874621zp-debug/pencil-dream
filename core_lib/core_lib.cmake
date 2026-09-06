@@ -14,12 +14,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/bezierarea.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/beziercurve.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/colorref.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vectorimage.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vectorselection.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vertexref.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/backgroundwidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/editor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/flowlayout.h
@@ -55,7 +50,6 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layerbitmap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layervector.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/object.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.h
@@ -110,12 +104,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/bezierarea.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/beziercurve.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/colorref.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vectorimage.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vectorselection.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/vertexref.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/backgroundwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/editor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/flowlayout.cpp
@@ -151,7 +140,6 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layerbitmap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layervector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/object.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.cpp

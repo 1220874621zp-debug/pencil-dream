@@ -69,10 +69,8 @@ void StrokeTool::loadSettings()
     info[StrokeToolProperties::FEATHER_VALUE] = { FEATHER_MIN, FEATHER_MAX, 48.0 };
     info[StrokeToolProperties::FEATHER_ENABLED] = false;
     info[StrokeToolProperties::PRESSURE_ENABLED] = false;
-    info[StrokeToolProperties::INVISIBILITY_ENABLED] = false;
     info[StrokeToolProperties::STABILIZATION_VALUE] = { StabilizationLevel::NONE, StabilizationLevel::STRONG, StabilizationLevel::STRONG };
     info[StrokeToolProperties::ANTI_ALIASING_ENABLED] = false;
-    info[StrokeToolProperties::FILLCONTOUR_ENABLED] = false;
 
     toolProperties().insertProperties(info);
     toolProperties().loadFrom(typeName(), pencilSettings);
@@ -418,20 +416,8 @@ void StrokeTool::setPressureEnabled(bool enabled)
     emit pressureEnabledChanged(enabled);
 }
 
-void StrokeTool::setFillContourEnabled(bool enabled)
-{
-    toolProperties().setBaseValue(StrokeToolProperties::FILLCONTOUR_ENABLED, enabled);
-    emit fillContourEnabledChanged(enabled);
-}
-
 void StrokeTool::setAntiAliasingEnabled(bool enabled)
 {
     toolProperties().setBaseValue(StrokeToolProperties::ANTI_ALIASING_ENABLED, enabled);
     emit antiAliasingEnabledChanged(enabled);
-}
-
-void StrokeTool::setStrokeInvisibleEnabled(bool enabled)
-{
-    toolProperties().setBaseValue(StrokeToolProperties::INVISIBILITY_ENABLED, enabled);
-    emit invisibleStrokeEnabledChanged(enabled);
 }

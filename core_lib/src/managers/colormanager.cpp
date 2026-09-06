@@ -48,22 +48,10 @@ Status ColorManager::save(Object* o)
     return Status::OK;
 }
 
-void ColorManager::workingLayerChanged(Layer* layer)
-{
-    mIsWorkingOnVectorLayer = (layer->type() == Layer::VECTOR);
-    if (mIsWorkingOnVectorLayer)
-    {
-        mCurrentFrontColor = object()->getColor(mCurrentColorIndex).color;
-        emit colorChanged(mCurrentFrontColor, mCurrentColorIndex);
-    }
-}
-
 QColor ColorManager::frontColor(bool useIndexedColor)
 {
-    if (mIsWorkingOnVectorLayer && useIndexedColor)
-        return object()->getColor(mCurrentColorIndex).color;
-    else
-        return mCurrentFrontColor;
+    Q_UNUSED(useIndexedColor)
+    return mCurrentFrontColor;
 }
 
 void ColorManager::setColorNumber(int n)

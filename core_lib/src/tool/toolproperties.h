@@ -401,10 +401,8 @@ struct StrokeToolProperties: public ToolPropertiesBase
         FEATHER_VALUE       = 101,
         STABILIZATION_VALUE = 102,
         PRESSURE_ENABLED         = 103,
-        INVISIBILITY_ENABLED     = 104,
         FEATHER_ENABLED          = 105,
         ANTI_ALIASING_ENABLED    = 106,
-        FILLCONTOUR_ENABLED      = 107,
 
         END                 = 199,
     };
@@ -418,9 +416,7 @@ struct StrokeToolProperties: public ToolPropertiesBase
             { FEATHER_ENABLED,       "FeatherEnabled" },
             { STABILIZATION_VALUE,   "LineStabilization" },
             { PRESSURE_ENABLED,      "PressureEnabled" },
-            { INVISIBILITY_ENABLED,  "InvisibilityEnabled" },
-            { ANTI_ALIASING_ENABLED, "AntiAliasingEnabled"},
-            { FILLCONTOUR_ENABLED,   "FillContourEnabled" }
+            { ANTI_ALIASING_ENABLED, "AntiAliasingEnabled"}
         });
     }
 
@@ -438,10 +434,8 @@ struct StrokeToolProperties: public ToolPropertiesBase
     qreal feather() const { return getInfo(FEATHER_VALUE).realValue(); }
     int stabilizerLevel() const { return getInfo(STABILIZATION_VALUE).intValue(); }
     bool pressureEnabled() const { return getInfo(PRESSURE_ENABLED).boolValue(); }
-    bool invisibilityEnabled() const { return getInfo(INVISIBILITY_ENABLED).boolValue(); }
     bool featherEnabled() const { return getInfo(FEATHER_ENABLED).boolValue(); }
     bool AntiAliasingEnabled() const { return getInfo(ANTI_ALIASING_ENABLED).boolValue(); }
-    bool fillContourEnabled() const { return getInfo(FILLCONTOUR_ENABLED).boolValue(); }
 
 private:
     ToolProperties mToolProperties;
@@ -490,7 +484,6 @@ struct BucketToolProperties: public ToolPropertiesBase
 {
     enum Type {
         START                           = 300,
-        FILLTHICKNESS_VALUE             = START,
 
         COLORTOLERANCE_VALUE            = 301,
         FILLEXPAND_VALUE                = 302,
@@ -506,7 +499,6 @@ struct BucketToolProperties: public ToolPropertiesBase
         mToolProperties.setRanges({ { START, END } });
 
         mToolProperties.insertIdentifiers({
-            { FILLTHICKNESS_VALUE,          "FillThickness"},
             { COLORTOLERANCE_VALUE,         "ColorTolerance"},
             { COLORTOLERANCE_ENABLED,       "ColorToleranceEnabled"},
             { FILLEXPAND_VALUE,             "FillExpand"},
@@ -523,7 +515,6 @@ struct BucketToolProperties: public ToolPropertiesBase
         return mToolProperties.getInfo(rawPropertyType);
     }
 
-    qreal fillThickness() const { return getInfo(FILLTHICKNESS_VALUE).realValue(); }
     int tolerance() const { return getInfo(COLORTOLERANCE_VALUE).intValue(); }
     int fillExpandAmount() const { return getInfo(FILLEXPAND_VALUE).intValue(); }
     int fillReferenceMode() const { return getInfo(FILLLAYERREFERENCEMODE_VALUE).intValue(); }

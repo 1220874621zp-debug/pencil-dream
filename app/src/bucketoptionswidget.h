@@ -42,7 +42,6 @@ public:
     void initUI() override;
     void updateUI() override;
 
-    void setStrokeWidth(qreal value);
     void setColorToleranceEnabled(bool enabled);
     void setFillExpandEnabled(bool enabled);
     void setFillExpand(int value);

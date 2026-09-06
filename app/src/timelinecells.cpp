@@ -398,7 +398,6 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     QColor col;
     // Color each track according to the layer type
     if (layer->type() == Layer::BITMAP) col = QColor(51, 155, 252);
-    if (layer->type() == Layer::VECTOR) col = QColor(70, 205, 123);
     if (layer->type() == Layer::SOUND) col = QColor(255, 141, 112);
     if (layer->type() == Layer::CAMERA) col = QColor(253, 202, 92);
     // Dim invisible layers
@@ -606,7 +605,6 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg"));
-    if (layer->type() == Layer::VECTOR) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-vector.svg"));
     if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-sound.svg"));
     if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-camera.svg"));
 

@@ -356,7 +356,6 @@ static QString getHumanReadableShortcutName(const QString& cmdName)
         {CMD_NEW_CAMERA_LAYER, ShortcutsPage::tr("New Camera Layer", "Shortcut")},
         {CMD_NEW_FILE, ShortcutsPage::tr("New File", "Shortcut")},
         {CMD_NEW_SOUND_LAYER, ShortcutsPage::tr("New Sound Layer", "Shortcut")},
-        {CMD_NEW_VECTOR_LAYER, ShortcutsPage::tr("New Vector Layer", "Shortcut")},
         {CMD_ONIONSKIN_NEXT, ShortcutsPage::tr("Toggle Next Onion Skin", "Shortcut")},
         {CMD_ONIONSKIN_PREV, ShortcutsPage::tr("Toggle Previous Onion Skin", "Shortcut")},
         {CMD_OPEN_FILE, ShortcutsPage::tr("Open File", "Shortcut")},

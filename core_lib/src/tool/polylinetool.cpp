@@ -18,18 +18,94 @@ GNU General Public License for more details.
 #include "polylinetool.h"
 
 #include <QSettings>
+#include <QPainterPath>
 #include "editor.h"
 #include "scribblearea.h"
 
 #include "layermanager.h"
 #include "colormanager.h"
-#include "viewmanager.h"
 #include "undoredomanager.h"
 #include "pointerevent.h"
-#include "layervector.h"
 #include "layerbitmap.h"
-#include "vectorimage.h"
 
+
+namespace
+{
+    // The following helpers build the polyline preview path geometry.
+
+    QPainterPath straightPathFromPoints(const QList<QPointF>& points)
+    {
+        QPainterPath path;
+        path.moveTo(points.first());
+        for (int i = 1; i < points.size(); i++)
+        {
+            path.lineTo(points.at(i));
+        }
+        return path;
+    }
+
+    QPainterPath smoothPathFromPoints(const QList<QPointF>& points)
+    {
+        QPainterPath path;
+        path.moveTo(points.first());
+
+        QList<QPointF> c1;
+        QList<QPointF> c2;
+        QList<QPointF> vertex;
+        for (int i = 1; i < points.size(); i++)
+        {
+            c1.append(points.at(i));
+            c2.append(points.at(i));
+            vertex.append(points.at(i));
+        }
+
+        const int n = vertex.size();
+        QPointF c2old;
+        for (int p = 0; p < n - 1; p++)
+        {
+            QPointF D = vertex.at(p);
+            QPointF Dprev = (p == 0) ? points.first() : vertex.at(p - 1);
+            QPointF Dnext = vertex.at(p + 1);
+            qreal L1 = qAbs(D.x() - Dprev.x()) + qAbs(D.y() - Dprev.y());
+            qreal L2 = qAbs(D.x() - Dnext.x()) + qAbs(D.y() - Dnext.y());
+
+            QPointF tangentVec = 0.4 * (Dnext - Dprev);
+            QPointF c1Point, c2Point;
+            if (((D - Dprev).x() * (D - Dnext).x() + (D - Dprev).y() * (D - Dnext).y()) / (1.0 * L1 * L2) < 0)
+            {
+                // smooth point
+                c1Point = D - tangentVec * (L1 + 0.0) / (L1 + L2);
+                c2Point = D + tangentVec * (L2 + 0.0) / (L1 + L2);
+            }
+            else
+            {
+                // sharp point
+                c1Point = 0.6 * D + 0.4 * Dprev;
+                c2Point = 0.6 * D + 0.4 * Dnext;
+            }
+
+            if (p == 0)
+            {
+                c2old = 0.5 * (vertex.at(0) + c1Point);
+            }
+
+            c1[p] = c2old;
+            c2[p] = c1Point;
+            c2old = c2Point;
+        }
+        if (n > 2)
+        {
+            c1[n - 1] = c2old;
+            c2[n - 1] = 0.5 * (c2old + vertex.at(n - 1));
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            path.cubicTo(c1.at(i), c2.at(i), vertex.at(i));
+        }
+        return path;
+    }
+}
 
 PolylineTool::PolylineTool(QObject* parent) : StrokeTool(parent)
 {
@@ -44,8 +120,8 @@ void PolylineTool::loadSettings()
 {
     StrokeTool::loadSettings();
 
-    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP, Layer::VECTOR };
-    mPropertyUsed[PolylineToolProperties::CLOSEDPATH_ENABLED] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[PolylineToolProperties::CLOSEDPATH_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[PolylineToolProperties::BEZIERPATH_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
 
@@ -119,20 +195,10 @@ void PolylineTool::pointerPressEvent(PointerEvent* event)
 
     if (event->button() == Qt::LeftButton)
     {
-        if (layer->type() == Layer::BITMAP || layer->type() == Layer::VECTOR)
+        if (layer->type() == Layer::BITMAP)
         {
             mScribbleArea->handleDrawingOnEmptyFrame();
 
-            if (layer->type() == Layer::VECTOR)
-            {
-                VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-                Q_CHECK_PTR(vectorImage);
-                vectorImage->deselectAll();
-                if (mScribbleArea->makeInvisible() && !mEditor->preference()->isOn(SETTING::INVISIBLE_LINES))
-                {
-                    mScribbleArea->toggleThinLines();
-                }
-            }
             mPoints << getCurrentPoint();
             emit isActiveChanged(POLYLINE, true);
         }
@@ -149,7 +215,7 @@ void PolylineTool::pointerMoveEvent(PointerEvent* event)
     }
 
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP || layer->type() == Layer::VECTOR)
+    if (layer->type() == Layer::BITMAP)
     {
         drawPolyline(mPoints, getCurrentPoint());
     }
@@ -266,17 +332,15 @@ void PolylineTool::drawPolyline(QList<QPointF> points, QPointF endPoint)
                  Qt::SolidLine,
                  Qt::RoundCap,
                  Qt::RoundJoin);
-        Layer* layer = mEditor->layers()->currentLayer();
 
-        // Bitmap by default
         QPainterPath tempPath;
         if (mSettings.bezierPathEnabled())
         {
-            tempPath = BezierCurve(points).getSimplePath();
+            tempPath = smoothPathFromPoints(points);
         }
         else
         {
-            tempPath = BezierCurve(points).getStraightPath();
+            tempPath = straightPathFromPoints(points);
         }
         tempPath.lineTo(endPoint);
 
@@ -284,23 +348,6 @@ void PolylineTool::drawPolyline(QList<QPointF> points, QPointF endPoint)
         if ((mSettings.closedPathEnabled() == !mClosedPathOverrideEnabled) && points.size() > 1)
         {
             tempPath.closeSubpath();
-        }
-
-        // Vector otherwise
-        if (layer->type() == Layer::VECTOR)
-        {
-            if (mEditor->layers()->currentLayer()->type() == Layer::VECTOR)
-            {
-                if (mScribbleArea->makeInvisible() == true)
-                {
-                    pen.setWidth(0);
-                    pen.setStyle(Qt::DotLine);
-                }
-                else
-                {
-                    pen.setWidth(mSettings.width());
-                }
-            }
         }
 
         mScribbleArea->drawPolyline(tempPath, pen, mSettings.AntiAliasingEnabled());
@@ -317,25 +364,6 @@ void PolylineTool::endPolyline(QList<QPointF> points)
 {
     Layer* layer = mEditor->layers()->currentLayer();
 
-    if (layer->type() == Layer::VECTOR)
-    {
-        BezierCurve curve = BezierCurve(points, mSettings.bezierPathEnabled());
-        if (mScribbleArea->makeInvisible() == true)
-        {
-            curve.setWidth(0);
-        }
-        else
-        {
-            curve.setWidth(mSettings.width());
-        }
-        curve.setColorNumber(mEditor->color()->frontColorNumber());
-        curve.setVariableWidth(false);
-        curve.setInvisibility(mScribbleArea->makeInvisible());
-
-        VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-        if (vectorImage == nullptr) { return; } // Can happen if the first frame is deleted while drawing
-        vectorImage->addCurve(curve, mEditor->view()->scaling());
-    }
     if (layer->type() == Layer::BITMAP)
     {
         drawPolyline(points, points.last());

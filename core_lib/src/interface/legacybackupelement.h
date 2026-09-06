@@ -19,7 +19,6 @@ GNU General Public License for more details.
 #define LEGACYBACKUPELEMENT_H
 
 #include <QObject>
-#include "vectorimage.h"
 #include "bitmapimage.h"
 #include "soundclip.h"
 
@@ -29,7 +28,7 @@ class LegacyBackupElement : public QObject
 {
     Q_OBJECT
 public:
-    enum types { UNDEFINED, BITMAP_MODIF, VECTOR_MODIF, SOUND_MODIF };
+    enum types { UNDEFINED, BITMAP_MODIF, SOUND_MODIF };
 
     QString undoText;
     bool somethingSelected = false;
@@ -56,21 +55,6 @@ public:
     int frame = 0;
     BitmapImage bitmapImage;
     int type() override { return LegacyBackupElement::BITMAP_MODIF; }
-    void restore(Editor*) override;
-};
-
-class BackupLegacyVectorElement : public LegacyBackupElement
-{
-    Q_OBJECT
-public:
-    explicit BackupLegacyVectorElement(VectorImage* vi) { vectorImage = *vi; }
-    int layerId = 0;
-
-    int layer = 0;
-    int frame = 0;
-    VectorImage vectorImage;
-
-    int type() override { return LegacyBackupElement::VECTOR_MODIF; }
     void restore(Editor*) override;
 };
 

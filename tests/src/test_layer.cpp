@@ -17,7 +17,6 @@ GNU General Public License for more details.
 
 #include "layer.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layercamera.h"
 #include "layersound.h"
 #include "bitmapimage.h"
@@ -31,12 +30,6 @@ TEST_CASE("LayerType")
         Layer* bitmapLayer = new LayerBitmap(1);
         REQUIRE(bitmapLayer->type() == Layer::BITMAP);
         delete bitmapLayer;
-    }
-    SECTION("Vector Layer")
-    {
-        Layer* vecLayer = new LayerVector(2);
-        REQUIRE(vecLayer->type() == Layer::VECTOR);
-        delete vecLayer;
     }
     SECTION("Camera Layer")
     {
@@ -83,27 +76,6 @@ SCENARIO("Add key frames into a Layer", "[Layer]")
                 REQUIRE(layer->getMaxKeyFramePosition() == 3);
                 REQUIRE(layer->getKeyFrameAt(3) != nullptr);
                 REQUIRE(layer->keyFrameCount() == 2);
-            }
-        }
-        delete layer;
-    }
-
-    GIVEN("A Vector Layer")
-    {
-        Layer* layer = new LayerVector(2);
-
-        REQUIRE(layer->addNewKeyFrameAt(0) == false); // first key position is 1.
-        REQUIRE(layer->keyFrameCount() == 0);
-
-        WHEN("Add a keyframe")
-        {
-            REQUIRE(layer->addNewKeyFrameAt(1) == true);
-
-            THEN("keyframe can be found in the layer")
-            {
-                REQUIRE(layer->getMaxKeyFramePosition() == 1);
-                REQUIRE(layer->keyFrameCount() == 1);
-                REQUIRE(layer->getKeyFrameAt(1) != nullptr);
             }
         }
         delete layer;
@@ -327,7 +299,7 @@ TEST_CASE("Layer::getPreviousFrameNumber()")
     Object* obj = new Object;
     SECTION("KeyFrame 1")
     {
-        Layer* layer = obj->addNewVectorLayer();
+        Layer* layer = obj->addNewBitmapLayer();
         REQUIRE(layer->getPreviousFrameNumber(1, true) == -1); // couldn't find previous frame
 
         REQUIRE(layer->getPreviousFrameNumber(3, true) == 1);

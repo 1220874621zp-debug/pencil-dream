@@ -20,20 +20,18 @@ GNU General Public License for more details.
 #include <cmath>
 #include <QGuiApplication>
 #include <QMessageBox>
+#include <QPainterPath>
 #include <QPixmapCache>
 #include <QTimer>
 
 #include "basetool.h"
 #include "transformtool.h"
 #include "pointerevent.h"
-#include "beziercurve.h"
 #include "object.h"
 #include "editor.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layercamera.h"
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "blitrect.h"
 #include "tile.h"
 
@@ -85,8 +83,6 @@ bool ScribbleArea::init()
 
     const int curveSmoothingLevel = mPrefs->getInt(SETTING::CURVE_SMOOTHING);
     mCurveSmoothingLevel = curveSmoothingLevel / 20.0; // default value is 1.0
-
-    mMakeInvisible = false;
 
     mLayerVisibility = static_cast<LayerVisibility>(mPrefs->getInt(SETTING::LAYER_VISIBILITY));
 
@@ -141,8 +137,6 @@ void ScribbleArea::settingUpdated(SETTING setting)
     case SETTING::NEXT_ONION:
     case SETTING::ONION_BLUE:
     case SETTING::ONION_RED:
-    case SETTING::INVISIBLE_LINES:
-    case SETTING::OUTLINES:
     case SETTING::ONION_TYPE:
     case SETTING::ONION_WHILE_PLAYBACK:
         invalidateAllCache();
@@ -913,20 +907,6 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
         mCameraPainter.paintCached(event->rect());
     }
 
-    if (currentTool()->type() == MOVE)
-    {
-        Layer* layer = mEditor->layers()->currentLayer();
-        Q_CHECK_PTR(layer);
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = currentVectorImage(layer);
-            if (vectorImage != nullptr)
-            {
-                vectorImage->setModified(true);
-            }
-        }
-    }
-
     QPainter painter(this);
 
     // paints the canvas
@@ -942,79 +922,6 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
 
     if (!editor()->playback()->isPlaying())    // we don't need to display the following when the animation is playing
     {
-        Layer* layer = mEditor->layers()->currentLayer();
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = currentVectorImage(layer);
-            if (vectorImage != nullptr)
-            {
-                switch (currentTool()->type())
-                {
-                case SMUDGE:
-                case HAND:
-                {
-                    auto selectMan = mEditor->select();
-                    painter.save();
-                    painter.setWorldMatrixEnabled(false);
-                    painter.setRenderHint(QPainter::Antialiasing, false);
-                    // ----- paints the edited elements
-                    QPen pen2(Qt::black, 0.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-                    painter.setPen(pen2);
-                    QColor color;
-                    // ------------ vertices of the edited curves
-                    color = QColor(200, 200, 200);
-                    painter.setBrush(color);
-                    VectorSelection vectorSelection = selectMan->vectorSelection;
-                    for (int k = 0; k < vectorSelection.curve.size(); k++)
-                    {
-                        int curveNumber = vectorSelection.curve.at(k);
-
-                        for (int vertexNumber = -1; vertexNumber < vectorImage->getCurveSize(curveNumber); vertexNumber++)
-                        {
-                            QPointF vertexPoint = vectorImage->getVertex(curveNumber, vertexNumber);
-                            QRectF rectangle(mEditor->view()->mapCanvasToScreen(vertexPoint) - QPointF(3.0, 3.0), QSizeF(7, 7));
-                            if (rect().contains(mEditor->view()->mapCanvasToScreen(vertexPoint).toPoint()))
-                            {
-                                painter.drawRect(rectangle);
-                            }
-                        }
-                    }
-                    // ------------ selected vertices of the edited curves
-                    color = QColor(100, 100, 255);
-                    painter.setBrush(color);
-                    for (int k = 0; k < vectorSelection.vertex.size(); k++)
-                    {
-                        VertexRef vertexRef = vectorSelection.vertex.at(k);
-                        QPointF vertexPoint = vectorImage->getVertex(vertexRef);
-                        QRectF rectangle0 = QRectF(mEditor->view()->mapCanvasToScreen(vertexPoint) - QPointF(3.0, 3.0), QSizeF(7, 7));
-                        painter.drawRect(rectangle0);
-                    }
-                    // ----- paints the closest vertices
-                    color = QColor(255, 0, 0);
-                    painter.setBrush(color);
-                    QList<VertexRef> closestVertices = selectMan->closestVertices();
-                    if (vectorSelection.curve.size() > 0)
-                    {
-                        for (int k = 0; k < closestVertices.size(); k++)
-                        {
-                            VertexRef vertexRef = closestVertices.at(k);
-                            QPointF vertexPoint = vectorImage->getVertex(vertexRef);
-
-                            QRectF rectangle = QRectF(mEditor->view()->mapCanvasToScreen(vertexPoint) - QPointF(3.0, 3.0), QSizeF(7, 7));
-                            painter.drawRect(rectangle);
-                        }
-                    }
-                    painter.restore();
-                    break;
-                }
-                default:
-                {
-                    break;
-                }
-                } // end switch
-            }
-        }
-
         mOverlayPainter.paint(painter, rect());
 
         // paints the selection outline
@@ -1060,13 +967,6 @@ BitmapImage* ScribbleArea::currentBitmapImage(Layer* layer) const
     return bitmapLayer->getLastBitmapImageAtFrame(mEditor->currentFrame());
 }
 
-VectorImage* ScribbleArea::currentVectorImage(Layer* layer) const
-{
-    Q_ASSERT(layer->type() == Layer::VECTOR);
-    auto vectorLayer = static_cast<LayerVector*>(layer);
-    return vectorLayer->getLastVectorImageAtFrame(mEditor->currentFrame());
-}
-
 void ScribbleArea::prepCameraPainter(int frame)
 {
     Object* object = mEditor->object();
@@ -1103,8 +1003,6 @@ void ScribbleArea::prepCanvas(int frame)
     CanvasPainterOptions o;
     o.bOnionSkinMultiLayer = mPrefs->isOn(SETTING::ONION_MUTLIPLE_LAYERS);
     o.bAntiAlias = mPrefs->isOn(SETTING::ANTIALIAS);
-    o.bThinLines = mPrefs->isOn(SETTING::INVISIBLE_LINES);
-    o.bOutlines = mPrefs->isOn(SETTING::OUTLINES);
     o.eLayerVisibility = mLayerVisibility;
     o.fLayerVisibilityThreshold = mPrefs->getFloat(SETTING::LAYER_VISIBILITY_THRESHOLD);
     o.scaling = mEditor->view()->scaling();
@@ -1368,16 +1266,6 @@ void ScribbleArea::applyTransformedSelection()
             bitmapImage->clear(selectMan->mySelectionRect());
             bitmapImage->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
         }
-        else if (layer->type() == Layer::VECTOR)
-        {
-            // Unfortunately this doesn't work right currently so vector transforms
-            // will always be applied on the previous keyframe when on an empty frame
-            //handleDrawingOnEmptyFrame();
-            VectorImage* vectorImage = currentVectorImage(layer);
-            if (vectorImage == nullptr) { return; }
-
-            vectorImage->applySelectionTransformation();
-        }
 
         mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
     }
@@ -1395,15 +1283,6 @@ void ScribbleArea::cancelTransformedSelection()
         Layer* layer = mEditor->layers()->currentLayer();
         if (layer == nullptr) { return; }
 
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = currentVectorImage(layer);
-            if (vectorImage != nullptr)
-            {
-                vectorImage->setSelectionTransformation(QTransform());
-            }
-        }
-
         mEditor->select()->setSelection(selectMan->mySelectionRect(), false);
 
         selectMan->resetSelectionProperties();
@@ -1412,12 +1291,6 @@ void ScribbleArea::cancelTransformedSelection()
         mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
         updateFrame();
     }
-}
-
-void ScribbleArea::toggleThinLines()
-{
-    bool previousValue = mPrefs->isOn(SETTING::INVISIBLE_LINES);
-    setEffect(SETTING::INVISIBLE_LINES, !previousValue);
 }
 
 void ScribbleArea::setLayerVisibility(LayerVisibility visibility)
@@ -1464,14 +1337,7 @@ void ScribbleArea::deleteSelection()
 
         mEditor->backup(tr("Delete Selection", "Undo Step: clear the selection area."));
 
-        selectMan->clearCurves();
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = currentVectorImage(layer);
-            Q_CHECK_PTR(vectorImage);
-            vectorImage->deleteSelection();
-        }
-        else if (layer->type() == Layer::BITMAP)
+        if (layer->type() == Layer::BITMAP)
         {
             BitmapImage* bitmapImage = currentBitmapImage(layer);
             Q_CHECK_PTR(bitmapImage);
@@ -1486,19 +1352,7 @@ void ScribbleArea::clearImage()
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer == nullptr) { return; }
 
-    if (layer->type() == Layer::VECTOR)
-    {
-        mEditor->backup(tr("Clear Image", "Undo step text"));
-
-        VectorImage* vectorImage = currentVectorImage(layer);
-        if (vectorImage != nullptr)
-        {
-            vectorImage->clear();
-        }
-        mEditor->select()->clearCurves();
-        mEditor->select()->clearVertices();
-    }
-    else if (layer->type() == Layer::BITMAP)
+    if (layer->type() == Layer::BITMAP)
     {
         mEditor->backup(tr("Clear Image", "Undo step text"));
 
@@ -1516,19 +1370,6 @@ void ScribbleArea::clearImage()
 void ScribbleArea::paletteColorChanged(QColor color)
 {
     Q_UNUSED(color)
-
-    for (int i = 0; i < mEditor->layers()->count(); i++)
-    {
-        Layer* layer = mEditor->layers()->getLayer(i);
-        if (layer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getVectorImageAtFrame(mEditor->currentFrame());
-            if (vectorImage != nullptr)
-            {
-                vectorImage->modification();
-            }
-        }
-    }
 
     invalidateAllCache();
 }

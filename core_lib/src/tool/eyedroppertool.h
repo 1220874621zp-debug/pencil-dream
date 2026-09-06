@@ -21,7 +21,6 @@ GNU General Public License for more details.
 #include "basetool.h"
 
 class LayerBitmap;
-class LayerVector;
 
 class EyedropperTool : public BaseTool
 {
@@ -41,14 +40,12 @@ public:
     void pointerReleaseEvent( PointerEvent* event ) override;
     void pointerMoveEvent( PointerEvent* event ) override;
 
-    /** Updates front color for bitmap and color index for vector */
+    /** Updates front color for bitmap */
     void updateFrontColor(const QPointF& pos);
 
 private:
     /** Retrieves color of the pixel under the cursor for a bitmap layer */
     QColor getBitmapColor(LayerBitmap* layer, const QPointF& pos);
-    /** Retrieves the color index of the pixel under the cursor for a vector layer */
-    int getVectorColor(LayerVector *layer, const QPointF& pos);
 
     ToolProperties mSettings;
 };

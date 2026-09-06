@@ -22,7 +22,6 @@ GNU General Public License for more details.
 #include "layer.h"
 
 class LayerBitmap;
-class LayerVector;
 class LayerCamera;
 class LayerSound;
 
@@ -62,7 +61,6 @@ public:
     /** Returns a new Layer with the given LAYER_TYPE */
     Layer* createLayer(Layer::LAYER_TYPE type, const QString& strLayerName);
     LayerBitmap* createBitmapLayer(const QString& strLayerName);
-    LayerVector* createVectorLayer(const QString& strLayerName);
     LayerCamera* createCameraLayer(const QString& strLayerName);
     LayerSound*  createSoundLayer(const QString& strLayerName);
 

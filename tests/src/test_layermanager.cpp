@@ -34,13 +34,11 @@ TEST_CASE("LayerManager::init()")
 
         object->init();
         object->addNewCameraLayer();
-        object->addNewVectorLayer();
         object->addNewBitmapLayer();
-        REQUIRE(layerMgr->count() == 3);
+        REQUIRE(layerMgr->count() == 2);
         REQUIRE(layerMgr->currentLayerIndex() == 0);
         REQUIRE(layerMgr->getLayer(0)->type() == Layer::CAMERA);
-        REQUIRE(layerMgr->getLayer(1)->type() == Layer::VECTOR);
-        REQUIRE(layerMgr->getLayer(2)->type() == Layer::BITMAP);
+        REQUIRE(layerMgr->getLayer(1)->type() == Layer::BITMAP);
     }
     delete editor;
 }
@@ -61,7 +59,7 @@ TEST_CASE("LayerManager::deleteLayer()")
         REQUIRE(layerMgr->count() == 0);
         layerMgr->createCameraLayer("Camera1");
         REQUIRE(layerMgr->count() == 1);
-        layerMgr->createVectorLayer("Vector2");
+        layerMgr->createCameraLayer("Camera2");
         REQUIRE(layerMgr->count() == 2);
         layerMgr->createBitmapLayer("Bitmap3");
         REQUIRE(layerMgr->count() == 3);

@@ -300,14 +300,6 @@ void ColorPaletteWidget::onRowsMoved(const QModelIndex &parent, int start, int e
         endIndex = row;
 
         mObject->movePaletteColor(startIndex, endIndex);
-
-        mObject->addColor(mObject->getColor(startIndex));
-        mObject->moveVectorColor(startIndex, mObject->getColorCount() - 1);
-        for (int i = startIndex; i < endIndex; i++)
-        {
-            mObject->moveVectorColor(i + 1, i);
-        }
-        mObject->moveVectorColor(mObject->getColorCount() - 1, endIndex);
     }
     else
     {
@@ -317,17 +309,7 @@ void ColorPaletteWidget::onRowsMoved(const QModelIndex &parent, int start, int e
         endIndex = row;
 
         mObject->movePaletteColor(startIndex, endIndex);
-
-        mObject->addColor(mObject->getColor(startIndex));
-        mObject->moveVectorColor(startIndex, mObject->getColorCount() - 1);
-        for (int i = startIndex; i > endIndex; i--)
-        {
-            mObject->moveVectorColor(i - 1, i);
-        }
-        mObject->moveVectorColor(mObject->getColorCount() - 1, endIndex);
     }
-
-    mObject->removeColor(mObject->getColorCount() - 1);
 
     refreshColorList();
 }
@@ -605,20 +587,7 @@ void ColorPaletteWidget::clickRemoveColorButton()
         }
 
         bool colorRemoved = false;
-        if (mObject->isColorInUse(index))
-        {
-            bool accepted = false;
-            if (!mMultipleSelected)
-                accepted = showPaletteWarning();
-
-            if ((accepted || mMultipleSelected) && mObject->getColorCount() > 1)
-            {
-                delete item;
-                mObject->removeColor(index);
-                colorRemoved = true;
-            }
-        }
-        else if (mObject->getColorCount() > 1)
+        if (mObject->getColorCount() > 1)
         {
             delete item;
             mObject->removeColor(index);

@@ -81,7 +81,6 @@ public:
 
     // Layer
     Status addNewBitmapLayer();
-    Status addNewVectorLayer();
     Status addNewCameraLayer();
     Status addNewSoundLayer();
     Status deleteCurrentLayer();

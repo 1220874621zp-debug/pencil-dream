@@ -44,7 +44,6 @@ class QTemporaryDir;
 class Object;
 class KeyFrame;
 class BitmapImage;
-class VectorImage;
 class LayerCamera;
 class MainWindow2;
 class BaseManager;
@@ -233,15 +232,12 @@ public: //slots
 
 private:
     Status importBitmapImage(const QString&, const QTransform& importTransform);
-    Status importVectorImage(const QString&);
 
     void pasteToCanvas(BitmapImage* bitmapImage, int frameNumber);
-    void pasteToCanvas(VectorImage* vectorImage, int frameNumber);
     void pasteToFrames();
 
     bool canCopyBitmapImage(BitmapImage* bitmapImage) const;
     bool canCopyFrames(const Layer* layer) const;
-    bool canCopyVectorImage(const VectorImage* vectorImage) const;
 
     // the object to be edited by the editor
     std::unique_ptr<Object> mObject;

@@ -35,11 +35,9 @@ private:
     void setWidthValue(qreal);
     void setFeatherValue(qreal);
     void setFeatherEnabled(bool);
-    void setPenInvisibilityEnabled(bool);
     void setPressureEnabled(bool);
     void setAntiAliasingEnabled(bool);
     void setStabilizerLevel(int);
-    void setFillContourEnabled(bool);
     void setBezierPathEnabled(bool);
     void setClosedPathEnabled(bool);
 

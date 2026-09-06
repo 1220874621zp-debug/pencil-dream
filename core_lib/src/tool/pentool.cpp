@@ -19,13 +19,9 @@ GNU General Public License for more details.
 #include <QPixmap>
 #include <QSettings>
 
-#include "vectorimage.h"
-#include "layervector.h"
 #include "colormanager.h"
 #include "layermanager.h"
-#include "viewmanager.h"
 #include "undoredomanager.h"
-#include "selectionmanager.h"
 #include "editor.h"
 #include "scribblearea.h"
 #include "blitrect.h"
@@ -42,10 +38,10 @@ void PenTool::loadSettings()
 
     QSettings pencilSettings(PENCIL2D, PENCIL2D);
 
-    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP, Layer::VECTOR };
-    mPropertyUsed[StrokeToolProperties::PRESSURE_ENABLED] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[StrokeToolProperties::PRESSURE_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
-    mPropertyUsed[StrokeToolProperties::STABILIZATION_VALUE] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[StrokeToolProperties::STABILIZATION_VALUE] = { Layer::BITMAP };
 
     QHash<int, PropertyInfo> info;
 
@@ -127,8 +123,6 @@ void PenTool::pointerReleaseEvent(PointerEvent *event)
 
     mEditor->backup(typeName());
 
-    Layer* layer = mEditor->layers()->currentLayer();
-
     qreal distance = QLineF(getCurrentPoint(), mMouseDownPoint).length();
     if (distance < 1)
     {
@@ -139,9 +133,6 @@ void PenTool::pointerReleaseEvent(PointerEvent *event)
         drawStroke();
     }
 
-    if (layer->type() == Layer::VECTOR) {
-        paintVectorStroke(layer);
-    }
     endStroke();
 
     StrokeTool::pointerReleaseEvent(event);
@@ -167,7 +158,6 @@ void PenTool::paintAt(QPointF point)
 void PenTool::drawStroke()
 {
     StrokeTool::drawStroke();
-    QList<QPointF> p = mInterpolator.interpolateStroke();
 
     Layer* layer = mEditor->layers()->currentLayer();
 
@@ -202,54 +192,4 @@ void PenTool::drawStroke()
             }
         }
     }
-    else if (layer->type() == Layer::VECTOR)
-    {
-        qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
-        qreal brushWidth = mSettings.width() * pressure;
-
-        QPen pen(mEditor->color()->frontColor(),
-                 brushWidth,
-                 Qt::SolidLine,
-                 Qt::RoundCap,
-                 Qt::RoundJoin);
-
-        if (p.size() == 4)
-        {
-            QPainterPath path(p[0]);
-            path.cubicTo(p[1], p[2], p[3]);
-            mScribbleArea->drawPath(path, pen, Qt::NoBrush, QPainter::CompositionMode_Source);
-        }
-    }
-}
-
-void PenTool::paintVectorStroke(Layer* layer)
-{
-    if (mStrokePoints.empty())
-        return;
-
-    // Clear the temporary pixel path
-    mScribbleArea->clearDrawingBuffer();
-    qreal tol = mScribbleArea->getCurveSmoothing() / mEditor->view()->scaling();
-
-    BezierCurve curve(mStrokePoints, mStrokePressures, tol);
-    curve.setWidth(mSettings.width());
-    curve.setFeather(mSettings.feather());
-    curve.setFilled(false);
-    curve.setInvisibility(mSettings.invisibilityEnabled());
-    curve.setVariableWidth(mSettings.pressureEnabled());
-    curve.setColorNumber(mEditor->color()->frontColorNumber());
-
-    auto pLayerVector = static_cast<LayerVector*>(layer);
-    VectorImage* vectorImage = pLayerVector->getLastVectorImageAtFrame(mEditor->currentFrame());
-    if (vectorImage == nullptr) { return; } // Can happen if the first frame is deleted while drawing
-    vectorImage->addCurve(curve, mEditor->view()->scaling(), false);
-
-    if (vectorImage->isAnyCurveSelected() || mEditor->select()->somethingSelected())
-    {
-        mEditor->deselectAll();
-    }
-
-    vectorImage->setSelected(vectorImage->getLastCurveNumber(), true);
-
-    mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
 }

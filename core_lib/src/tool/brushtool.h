@@ -43,7 +43,6 @@ public:
     void pointerReleaseEvent(PointerEvent*) override;
 
     void drawStroke();
-    void paintVectorStroke(Layer* layer);
     void paintAt(QPointF point);
 
 protected:

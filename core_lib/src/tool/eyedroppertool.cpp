@@ -23,15 +23,11 @@ GNU General Public License for more details.
 #include <QtMath>
 #include "pointerevent.h"
 
-#include "vectorimage.h"
-#include "layervector.h"
 #include "layerbitmap.h"
 #include "colormanager.h"
-#include "object.h"
 #include "editor.h"
 #include "layermanager.h"
 #include "scribblearea.h"
-#include "util.h"
 
 EyedropperTool::EyedropperTool(QObject* parent) : BaseTool(parent)
 {
@@ -93,18 +89,6 @@ void EyedropperTool::pointerMoveEvent(PointerEvent* event)
             mScribbleArea->setCursor(cursor());
         }
     }
-    if (layer->type() == Layer::VECTOR)
-    {
-        int pickedColor = getVectorColor(static_cast<LayerVector*>(layer), event->canvasPos());
-        if (pickedColor >= 0)
-        {
-            mScribbleArea->setCursor(cursor(mEditor->object()->getColor(pickedColor).color));
-        }
-        else
-        {
-            mScribbleArea->setCursor(cursor());
-        }
-    }
 }
 
 void EyedropperTool::pointerReleaseEvent(PointerEvent* event)
@@ -131,14 +115,6 @@ void EyedropperTool::updateFrontColor(const QPointF& pos)
             mEditor->color()->setFrontColor(pickedColor);
         }
     }
-    else if (layer->type() == Layer::VECTOR)
-    {
-        int pickedColor = getVectorColor(static_cast<LayerVector*>(layer), pos);
-        if (pickedColor >= 0)
-        {
-            mEditor->color()->setColorNumber(pickedColor);
-        }
-    }
 }
 
 QColor EyedropperTool::getBitmapColor(LayerBitmap* layer, const QPointF& pos)
@@ -153,24 +129,4 @@ QColor EyedropperTool::getBitmapColor(LayerBitmap* layer, const QPointF& pos)
 
     if (pickedColour.alpha() <= 0) pickedColour = QColor();
     return pickedColour;
-}
-
-int EyedropperTool::getVectorColor(LayerVector* layer, const QPointF& pos)
-{
-    auto vectorImage = static_cast<VectorImage*>(layer->getLastKeyFrameAtPosition(mEditor->currentFrame()));
-    if (vectorImage == nullptr) return -1;
-
-    // Check curves
-    const qreal toleranceDistance = 10.0;
-    const QList<int> closestCurves = vectorImage->getCurvesCloseTo(pos, toleranceDistance);
-    const QList<int> visibleClosestCurves = filter(closestCurves, [vectorImage](int i) { return vectorImage->isCurveVisible(i); });
-
-    if (!visibleClosestCurves.isEmpty())
-    {
-        return vectorImage->getCurvesColor(visibleClosestCurves.last());
-    }
-
-    // Check fills
-    int colorNumber = vectorImage->getColorNumber(pos);
-    return colorNumber;
 }

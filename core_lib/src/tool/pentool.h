@@ -42,7 +42,6 @@ public:
 
     void drawStroke();
     void paintAt(QPointF point);
-    void paintVectorStroke(Layer *layer);
 
 private:
     QPointF mLastBrushPoint;

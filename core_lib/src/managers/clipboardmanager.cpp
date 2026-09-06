@@ -40,8 +40,6 @@ void ClipboardManager::setFromSystemClipboard(const QPointF& pos, const Layer* l
     const QClipboard *clipboard = QGuiApplication::clipboard();
 
     // We intentially do not call resetStates here because we can only store image changes to the clipboard
-    // otherwise we break pasting for vector.
-    // Only bitmap is supported currently...
     // Only update clipboard data if it was stored by other applications
     if (layer->type() != Layer::BITMAP || clipboard->ownsClipboard()) {
         return;
@@ -68,15 +66,6 @@ void ClipboardManager::copyBitmapImage(BitmapImage* bitmapImage, QRectF selectio
     }
 
     QGuiApplication::clipboard()->setImage(*mBitmapImage.image());
-}
-
-void ClipboardManager::copyVectorImage(const VectorImage* vectorImage)
-{
-    resetStates();
-    if (vectorImage == nullptr || vectorImage->isEmpty()) { return; }
-
-    // FIXME: handle vector selections, ie. independent strokes...
-    mVectorImage = *vectorImage->clone();
 }
 
 void ClipboardManager::copySelectedFrames(const Layer* currentLayer)
@@ -117,6 +106,5 @@ void ClipboardManager::resetStates()
     mFrames.clear();
 
     mBitmapImage = BitmapImage();
-    mVectorImage = VectorImage();
     mFramesType = Layer::LAYER_TYPE::UNDEFINED;
 }

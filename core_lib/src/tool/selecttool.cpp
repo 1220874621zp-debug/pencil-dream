@@ -17,9 +17,7 @@ GNU General Public License for more details.
 #include "selecttool.h"
 #include <QSettings>
 #include "pointerevent.h"
-#include "vectorimage.h"
 #include "editor.h"
-#include "layervector.h"
 #include "scribblearea.h"
 #include "layermanager.h"
 #include "toolmanager.h"
@@ -36,7 +34,7 @@ void SelectTool::loadSettings()
 
     QHash<int, PropertyInfo> info;
 
-    mPropertyUsed[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = { Layer::BITMAP };
 
     info[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = false;
     toolProperties().insertProperties(info);
@@ -93,13 +91,6 @@ void SelectTool::beginSelection(Layer* currentLayer, const QPointF& pos)
 
     if (selectMan->somethingSelected() && mMoveMode != MoveMode::NONE) // there is something selected
     {
-        if (currentLayer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = static_cast<LayerVector*>(currentLayer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-            if (vectorImage != nullptr) {
-                vectorImage->deselectAll();
-            }
-        }
         mSelectionRect = mEditor->select()->mapToSelection(mEditor->select()->mySelectionRect()).boundingRect();
     }
     else
@@ -154,14 +145,6 @@ void SelectTool::pointerMoveEvent(PointerEvent* event)
     if (mScribbleArea->isPointerInUse())
     {
         controlOffsetOrigin(canvasPos, mAnchorOriginPoint, currentLayer->type());
-
-        if (currentLayer->type() == Layer::VECTOR)
-        {
-            VectorImage* vectorImage = static_cast<LayerVector*>(currentLayer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-            if (vectorImage != nullptr) {
-                vectorImage->select(selectMan->mapToSelection(QPolygonF(selectMan->mySelectionRect())).boundingRect());
-            }
-        }
     }
 
     mScribbleArea->updateFrame();
@@ -192,7 +175,6 @@ void SelectTool::pointerReleaseEvent(PointerEvent* event)
     else
     {
         mSelectionRect = mEditor->select()->mapToSelection(mEditor->select()->mySelectionRect()).boundingRect();
-        keepSelection(currentLayer);
     }
 
     mEditor->undoRedo()->record(mUndoStateId, typeName());
@@ -208,21 +190,6 @@ bool SelectTool::maybeDeselect(const QPointF& pos)
 {
     return ((!isSelectionPointValid(pos) && mEditor->select()->getMoveMode() == MoveMode::NONE)
             || !mEditor->select()->mySelectionRect().isValid());
-}
-
-/**
- * @brief SelectTool::keepSelection
- * Keep selection rect and normalize if invalid
- */
-void SelectTool::keepSelection(Layer* currentLayer)
-{
-    if (currentLayer->type() == Layer::VECTOR)
-    {
-        VectorImage* vectorImage = static_cast<LayerVector*>(currentLayer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-        if (vectorImage == nullptr) { return; }
-        auto selectMan = mEditor->select();
-        selectMan->setSelection(vectorImage->getSelectionRect(), false);
-    }
 }
 
 void SelectTool::controlOffsetOrigin(QPointF currentPoint, QPointF anchorPoint, Layer::LAYER_TYPE layerType)

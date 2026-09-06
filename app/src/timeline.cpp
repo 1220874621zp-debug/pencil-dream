@@ -96,13 +96,11 @@ void TimeLine::initUI()
     leftToolBar->setLayout(leftToolBarLayout);
 
     QAction* newBitmapLayerAct = new QAction(QIcon(":icons/themes/playful/timeline/cell-bitmap.svg"), tr("New Bitmap Layer"), this);
-    QAction* newVectorLayerAct = new QAction(QIcon(":icons/themes/playful/timeline/cell-vector.svg"), tr("New Vector Layer"), this);
     QAction* newSoundLayerAct = new QAction(QIcon(":icons/themes/playful/timeline/cell-sound.svg"), tr("New Sound Layer"), this);
     QAction* newCameraLayerAct = new QAction(QIcon(":icons/themes/playful/timeline/cell-camera.svg"), tr("New Camera Layer"), this);
 
     QMenu* layerMenu = new QMenu(tr("Layer", "Timeline add-layer menu"), this);
     layerMenu->addAction(newBitmapLayerAct);
-    layerMenu->addAction(newVectorLayerAct);
     layerMenu->addAction(newSoundLayerAct);
     layerMenu->addAction(newCameraLayerAct);
     addLayerButton->setMenu(layerMenu);
@@ -221,7 +219,6 @@ void TimeLine::initUI()
     connect(this, &TimeLine::fpsChanged, mTimeControls, &TimeControls::setFps);
 
     connect(newBitmapLayerAct, &QAction::triggered, this, &TimeLine::newBitmapLayer);
-    connect(newVectorLayerAct, &QAction::triggered, this, &TimeLine::newVectorLayer);
     connect(newSoundLayerAct, &QAction::triggered, this, &TimeLine::newSoundLayer);
     connect(newCameraLayerAct, &QAction::triggered, this, &TimeLine::newCameraLayer);
     connect(mLayerDeleteButton, &QPushButton::clicked, this, &TimeLine::deleteCurrentLayerClick);

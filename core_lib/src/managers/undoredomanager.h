@@ -32,7 +32,6 @@ class QAction;
 class QUndoCommand;
 
 class BitmapImage;
-class VectorImage;
 class Camera;
 class SoundClip;
 class KeyFrame;
@@ -189,7 +188,6 @@ private:
 
     void replaceKeyFrame(const UndoSaveState& undoState, const QString& description);
     void replaceBitmap(const UndoSaveState& undoState, const QString& description);
-    void replaceVector(const UndoSaveState& undoState, const QString& description);
 
     void addKeyFrame(const UndoSaveState& undoState, const QString& description);
     void removeKeyFrame(const UndoSaveState& undoState, const QString& description);

@@ -33,11 +33,10 @@ public:
     bool init() override;
     Status load(Object*) override;
     Status save(Object*) override;
-    void workingLayerChanged(Layer*) override;
 
     /** frontColor
-     * @param useIndexedColor default true, will only affect vector layer
-     * @return Latest stored color for bitmap or indexed color for vector, unless useIndexedColor is false
+     * @param useIndexedColor unused, kept for compatibility
+     * @return Latest stored color
      */
     QColor frontColor(bool useIndexedColor = true);
     void setFrontColor(const QColor& newFrontColor);
@@ -54,7 +53,6 @@ signals:
 private:
     QColor mCurrentFrontColor{ 33, 33, 33, 255 };
     int  mCurrentColorIndex = 0;
-    bool mIsWorkingOnVectorLayer = false;
 };
 
 #endif // COLORMANAGER_H

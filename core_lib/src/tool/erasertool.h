@@ -40,7 +40,6 @@ public:
 
     void drawStroke();
     void paintAt(QPointF point);
-    void removeVectorPaint();
     void updateStrokes();
 
 protected:

@@ -23,7 +23,6 @@ GNU General Public License for more details.
 #include <QRectF>
 
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "soundclip.h"
 #include "camera.h"
 #include "layer.h"
@@ -138,26 +137,6 @@ private:
 
     BitmapImage undoBitmap;
     BitmapImage redoBitmap;
-};
-
-class VectorReplaceCommand : public UndoRedoCommand
-{
-public:
-    VectorReplaceCommand(const VectorImage* undoVector,
-                     const int undoLayerId,
-                     const QString& description,
-                     Editor* editor,
-                     QUndoCommand* parent = nullptr);
-
-    void undo() override;
-    void redo() override;
-
-private:
-    int undoLayerId = 0;
-    int redoLayerId = 0;
-
-    VectorImage undoVector;
-    VectorImage redoVector;
 };
 
 class TransformCommand : public UndoRedoCommand

@@ -37,7 +37,6 @@ SOURCES += \
     src/test_layercamera.cpp \
     src/test_layermanager.cpp \
     src/test_layersound.cpp \
-    src/test_layervector.cpp \
     src/test_object.cpp \
     src/test_filemanager.cpp \
     src/test_bitmapimage.cpp \
@@ -45,7 +44,6 @@ SOURCES += \
     src/test_propertyinfo.cpp \
     src/test_qminiz.cpp \
     src/test_toolsettings.cpp \
-    src/test_vectorimage.cpp \
     src/test_viewmanager.cpp \
     src/test_util.cpp
 

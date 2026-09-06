@@ -6,8 +6,6 @@
 #include "layer.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
-#include "layervector.h"
-#include "vectorimage.h"
 
 
 LayerOpacityDialog::LayerOpacityDialog(QWidget *parent) :
@@ -59,7 +57,7 @@ void LayerOpacityDialog::updateUI()
     if (currentLayer == nullptr) { return; }
 
     ui->labLayerInfo->setText(tr("Layer: %1").arg(currentLayer->name()));
-    if (currentLayer->type() != Layer::BITMAP && currentLayer->type() != Layer::VECTOR) {
+    if (currentLayer->type() != Layer::BITMAP) {
         setCanAdjust(false, false);
         return;
     }
@@ -85,7 +83,7 @@ void LayerOpacityDialog::onObjectLoaded()
     Layer* currentLayer = mLayerManager->currentLayer();
     if (currentLayer == nullptr) { return; }
 
-    if (currentLayer->type() != Layer::BITMAP && currentLayer->type() != Layer::VECTOR) { return; }
+    if (currentLayer->type() != Layer::BITMAP) { return; }
 
     KeyFrame* keyframe = currentLayer->getLastKeyFrameAtPosition(mEditor->currentFrame());
 
@@ -103,9 +101,6 @@ qreal LayerOpacityDialog::getOpacityForKeyFrame(Layer* layer, const KeyFrame* ke
     if (layer->type() == Layer::BITMAP) {
         const BitmapImage* bitmap = static_cast<const BitmapImage*>(keyframe);
         return bitmap->getOpacity();
-    } else if (layer->type() == Layer::VECTOR) {
-        const VectorImage* vector = static_cast<const VectorImage*>(keyframe);
-        return vector->getOpacity();
     } else {
         return -1;
     }
@@ -117,10 +112,6 @@ void LayerOpacityDialog::setOpacityForKeyFrame(Layer* layer, KeyFrame* keyframe,
         BitmapImage* bitmap = static_cast<BitmapImage*>(keyframe);
         bitmap->setOpacity(opacity);
         layer->markFrameAsDirty(bitmap->pos());
-    } else if (layer->type() == Layer::VECTOR) {
-        VectorImage* vector = static_cast<VectorImage*>(keyframe);
-        vector->setOpacity(opacity);
-        layer->markFrameAsDirty(vector->pos());
     }
 }
 
@@ -144,7 +135,7 @@ void LayerOpacityDialog::fade(OpacityFadeType fadeType)
     Layer* currentLayer = mLayerManager->currentLayer();
     if (currentLayer == nullptr) { return; }
 
-    if (currentLayer->type() != Layer::BITMAP && currentLayer->type() != Layer::VECTOR) { return; }
+    if (currentLayer->type() != Layer::BITMAP) { return; }
 
     QList<int> selectedKeys = currentLayer->getSelectedFramesByPos();
 
@@ -232,7 +223,7 @@ void LayerOpacityDialog::onCurrentFrameChanged(int frame)
     Layer* currentLayer = mLayerManager->currentLayer();
     if (currentLayer == nullptr) { return; }
 
-    if (currentLayer->type() != Layer::BITMAP && currentLayer->type() != Layer::VECTOR) {
+    if (currentLayer->type() != Layer::BITMAP) {
         setCanAdjust(false, false);
         return;
     }
@@ -297,7 +288,7 @@ void LayerOpacityDialog::setOpacityForCurrentKeyframe()
     Layer* currentLayer = mLayerManager->currentLayer();
     if (currentLayer == nullptr) { return; }
 
-    if (currentLayer->type() != Layer::BITMAP && currentLayer->type() != Layer::VECTOR) { return; }
+    if (currentLayer->type() != Layer::BITMAP) { return; }
 
     KeyFrame* keyframe = currentLayer->getLastKeyFrameAtPosition(mEditor->currentFrame());
     if (keyframe == nullptr) { return; }

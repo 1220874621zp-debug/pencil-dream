@@ -32,12 +32,7 @@ HEADERS +=  \
     src/graphics/bitmap/bitmapimage.h \
     src/graphics/bitmap/tile.h \
     src/graphics/bitmap/tiledbuffer.h \
-    src/graphics/vector/bezierarea.h \
-    src/graphics/vector/beziercurve.h \
     src/graphics/vector/colorref.h \
-    src/graphics/vector/vectorimage.h \
-    src/graphics/vector/vectorselection.h \
-    src/graphics/vector/vertexref.h \
     src/interface/editor.h \
     src/interface/flowlayout.h \
     src/interface/legacybackupelement.h \
@@ -68,7 +63,6 @@ HEADERS +=  \
     src/structure/layerbitmap.h \
     src/structure/layercamera.h \
     src/structure/layersound.h \
-    src/structure/layervector.h \
     src/structure/pegbaraligner.h \
     src/structure/soundclip.h \
     src/structure/object.h \
@@ -128,12 +122,7 @@ SOURCES +=  src/graphics/bitmap/bitmapimage.cpp \
     src/graphics/bitmap/bitmapbucket.cpp \
     src/graphics/bitmap/tile.cpp \
     src/graphics/bitmap/tiledbuffer.cpp \
-    src/graphics/vector/bezierarea.cpp \
-    src/graphics/vector/beziercurve.cpp \
     src/graphics/vector/colorref.cpp \
-    src/graphics/vector/vectorimage.cpp \
-    src/graphics/vector/vectorselection.cpp \
-    src/graphics/vector/vertexref.cpp \
     src/interface/editor.cpp \
     src/interface/flowlayout.cpp \
     src/interface/legacybackupelement.cpp \
@@ -161,7 +150,6 @@ SOURCES +=  src/graphics/bitmap/bitmapimage.cpp \
     src/structure/layerbitmap.cpp \
     src/structure/layercamera.cpp \
     src/structure/layersound.cpp \
-    src/structure/layervector.cpp \
     src/structure/object.cpp \
     src/structure/pegbaraligner.cpp \
     src/structure/soundclip.cpp \

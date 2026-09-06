@@ -49,7 +49,6 @@ protected:
 
 private:
 
-    QPointF offsetFromPressPos();
     QPointF mLastBrushPoint;
 
     StrokeToolProperties mSettings;

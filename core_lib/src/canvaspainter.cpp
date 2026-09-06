@@ -20,11 +20,9 @@ GNU General Public License for more details.
 
 #include "object.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "bitmapimage.h"
 #include "tile.h"
 #include "tiledbuffer.h"
-#include "vectorimage.h"
 
 #include "painterutils.h"
 
@@ -209,7 +207,6 @@ void CanvasPainter::paintOnionSkinOnLayer(QPainter& painter, const QRect& blitRe
             switch (layer->type())
             {
             case Layer::BITMAP: { paintBitmapOnionSkinFrame(painter, blitRect, layer, onionFrameNumber, mOnionSkinPainterOptions.colorizePrevFrames); break; }
-            case Layer::VECTOR: { paintVectorOnionSkinFrame(painter, blitRect, layer, onionFrameNumber, mOnionSkinPainterOptions.colorizePrevFrames); break; }
             default: break;
             }
         }
@@ -217,7 +214,6 @@ void CanvasPainter::paintOnionSkinOnLayer(QPainter& painter, const QRect& blitRe
             switch (layer->type())
             {
             case Layer::BITMAP: { paintBitmapOnionSkinFrame(painter, blitRect, layer, onionFrameNumber, mOnionSkinPainterOptions.colorizeNextFrames); break; }
-            case Layer::VECTOR: { paintVectorOnionSkinFrame(painter, blitRect, layer, onionFrameNumber, mOnionSkinPainterOptions.colorizeNextFrames); break; }
             default: break;
             }
         }
@@ -253,21 +249,6 @@ void CanvasPainter::paintBitmapOnionSkinFrame(QPainter& painter, const QRect& bl
 
     onionSkinPainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
     paintOnionSkinFrame(painter, onionSkinPainter, nFrame, colorize, bitmapImage->getOpacity());
-}
-
-void CanvasPainter::paintVectorOnionSkinFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int nFrame, bool colorize)
-{
-    LayerVector* vectorLayer = static_cast<LayerVector*>(layer);
-
-    CANVASPAINTER_LOG("Paint Onion skin vector, Frame = %d", nFrame);
-    VectorImage* vectorImage = vectorLayer->getVectorImageAtFrame(nFrame);
-    if (vectorImage == nullptr) { return; }
-
-    QPainter onionSkinPainter;
-    initializePainter(onionSkinPainter, mOnionSkinPixmap, blitRect);
-
-    vectorImage->paintImage(onionSkinPainter, *mObject, mOptions.bOutlines, mOptions.bThinLines, mOptions.bAntiAlias);
-    paintOnionSkinFrame(painter, onionSkinPainter, nFrame, colorize, vectorImage->getOpacity());
 }
 
 void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity)
@@ -329,45 +310,6 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
     if (isCurrentLayer && mRenderTransform && !isDrawing) {
         paintTransformedSelection(currentBitmapPainter, paintedImage, mSelection);
     }
-
-    painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
-}
-
-void CanvasPainter::paintCurrentVectorFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer)
-{
-    LayerVector* vectorLayer = static_cast<LayerVector*>(layer);
-    VectorImage* vectorImage = vectorLayer->getLastVectorImageAtFrame(mFrameNumber);
-    if (vectorImage == nullptr)
-    {
-        return;
-    }
-
-    QPainter currentVectorPainter;
-    initializePainter(currentVectorPainter, mCurrentLayerPixmap, blitRect);
-
-    const bool isDrawing = mTiledBuffer->isValid();
-
-    if (mRenderTransform) {
-        vectorImage->setSelectionTransformation(mSelectionTransform);
-    }
-
-    // Paint existing vector image to the painter
-    // Remember to adjust opacity based on additional opacity value from the keyframe
-    currentVectorPainter.setOpacity(vectorImage->getOpacity() - (1.0-painter.opacity()));
-    vectorImage->paintImage(currentVectorPainter, *mObject, mOptions.bOutlines, mOptions.bThinLines, mOptions.bAntiAlias);
-
-    if (isCurrentLayer && isDrawing) {
-        currentVectorPainter.setCompositionMode(mOptions.cmBufferBlendMode);
-
-        const auto tiles = mTiledBuffer->tiles();
-        for (const Tile* tile : tiles) {
-            currentVectorPainter.drawPixmap(tile->posF(), tile->pixmap());
-        }
-    }
-
-    // Don't transform the image here as we used the viewTransform in the image output
-    painter.setWorldMatrixEnabled(false);
-    painter.setTransform(QTransform());
 
     painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
 }
@@ -434,7 +376,6 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         switch (layer->type())
         {
         case Layer::BITMAP: { paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer); break; }
-        case Layer::VECTOR: { paintCurrentVectorFrame(painter, blitRect, layer, isCurrentLayer); break; }
         default: break;
         }
     }

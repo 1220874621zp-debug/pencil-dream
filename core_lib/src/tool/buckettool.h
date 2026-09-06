@@ -24,7 +24,6 @@ GNU General Public License for more details.
 #include "bitmapbucket.h"
 
 class Layer;
-class VectorImage;
 
 class BucketTool : public BaseTool
 {
@@ -45,11 +44,7 @@ public:
     void pointerReleaseEvent(PointerEvent*) override;
 
     void paintBitmap();
-    void paintVector(Layer* layer);
 
-    void applyChanges();
-
-    void setStrokeThickness(qreal width);
     void setColorTolerance(int tolerance);
     void setColorToleranceEnabled(bool enabled);
     void setFillExpand(int fillExpandValue);
@@ -67,12 +62,10 @@ signals:
     void fillExpandChanged(int fillExpandValue);
     void toleranceEnabledChanged(bool isON);
     void toleranceChanged(int width);
-    void strokeThicknessChanged(qreal width);
 
 private:
 
     BitmapBucket mBitmapBucket;
-    VectorImage* vectorImage = nullptr;
 
     bool mFilledOnMove = false;
 

@@ -20,7 +20,6 @@ GNU General Public License for more details.
 #include "basemanager.h"
 
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "layer.h"
 
 class Editor;
@@ -48,19 +47,12 @@ public:
      */
     void copyBitmapImage(BitmapImage* image, QRectF selectionRect);
 
-    /** Copy the entire vector image to clipboard,
-     *  this operation does not yet support partial selections
-     * @param vectorImage
-     */
-    void copyVectorImage(const VectorImage* vectorImage);
-
     /** Copy selected keyframes of any given layer and remember its type.
      * @param currentLayer
      */
     void copySelectedFrames(const Layer* currentLayer);
 
     const BitmapImage& getBitmapClipboard() const { return mBitmapImage; }
-    const VectorImage& getVectorClipboard() const { return mVectorImage; }
 
     /** Return a copy of all clipboard frames keyed by their position.
      *
@@ -78,7 +70,6 @@ private:
     void resetStates();
 
     BitmapImage mBitmapImage;
-    VectorImage mVectorImage;
     std::map<int, KeyFrame*> mFrames;
     Layer::LAYER_TYPE mFramesType = Layer::LAYER_TYPE::UNDEFINED;
 };

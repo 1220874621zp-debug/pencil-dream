@@ -50,8 +50,6 @@ void PreferenceManager::loadPrefs()
 
     // Display
     set(SETTING::GRID,                     settings.value(SETTING_SHOW_GRID,              false).toBool());
-    set(SETTING::INVISIBLE_LINES,          settings.value(SETTING_INVISIBLE_LINES,        false).toBool());
-    set(SETTING::OUTLINES,                 settings.value(SETTING_OUTLINES,               false).toBool());
     set(SETTING::OVERLAY_CENTER,           settings.value(SETTING_OVERLAY_CENTER,         false).toBool());
     set(SETTING::OVERLAY_THIRDS,           settings.value(SETTING_OVERLAY_THIRDS,         false).toBool());
     set(SETTING::OVERLAY_GOLDEN,           settings.value(SETTING_OVERLAY_GOLDEN,         false).toBool());
@@ -415,12 +413,6 @@ void PreferenceManager::set(SETTING option, bool value)
         break;
     case SETTING::ONION_MUTLIPLE_LAYERS:
         settings.setValue(SETTING_MULTILAYER_ONION, value);
-        break;
-    case SETTING::INVISIBLE_LINES:
-        settings.setValue(SETTING_INVISIBLE_LINES, value);
-        break;
-    case SETTING::OUTLINES:
-        settings.setValue(SETTING_OUTLINES, value);
         break;
     case SETTING::ONION_BLUE:
         settings.setValue(SETTING_ONION_BLUE, value);

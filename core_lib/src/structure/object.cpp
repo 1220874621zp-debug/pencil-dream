@@ -30,13 +30,11 @@ GNU General Public License for more details.
 
 #include "layer.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layersound.h"
 #include "layercamera.h"
 
 #include "util.h"
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "fileformat.h"
 #include "activeframepool.h"
 
@@ -101,8 +99,8 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
             newLayer = new LayerBitmap(getUniqueLayerID());
             break;
         case Layer::VECTOR:
-            newLayer = new LayerVector(getUniqueLayerID());
-            break;
+            qWarning() << "Vector layers are not supported in this build, skipping layer:" << element.tagName();
+            continue;
         case Layer::SOUND:
             newLayer = new LayerSound(getUniqueLayerID());
             break;
@@ -126,16 +124,6 @@ LayerBitmap* Object::addNewBitmapLayer()
     layerBitmap->addNewKeyFrameAt(1);
 
     return layerBitmap;
-}
-
-LayerVector* Object::addNewVectorLayer()
-{
-    LayerVector* layerVector = new LayerVector(getUniqueLayerID());
-    mLayers.append(layerVector);
-
-    layerVector->addNewKeyFrameAt(1);
-
-    return layerVector;
 }
 
 LayerSound* Object::addNewSoundLayer()
@@ -411,53 +399,14 @@ void Object::movePaletteColor(int start, int end)
     mPalette.move(start, end);
 }
 
-void Object::moveVectorColor(int start, int end)
-{
-    for (Layer* layer : mLayers)
-    {
-        if (layer->type() == Layer::VECTOR)
-        {
-            static_cast<LayerVector*>(layer)->moveColor(start, end);
-        }
-    }
-}
-
 void Object::addColorAtIndex(int index, const ColorRef& newColor)
 {
     mPalette.insert(index, newColor);
 }
 
-bool Object::isColorInUse(int index) const
-{
-    for (Layer* layer : mLayers)
-    {
-        if (layer->type() == Layer::VECTOR)
-        {
-            LayerVector* layerVector = static_cast<LayerVector*>(layer);
-
-            if (layerVector->usesColor(index))
-            {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 void Object::removeColor(int index)
 {
-    for (Layer* layer : mLayers)
-    {
-        if (layer->type() == Layer::VECTOR)
-        {
-            LayerVector* layerVector = static_cast<LayerVector*>(layer);
-            layerVector->removeColor(index);
-        }
-    }
-
     mPalette.removeAt(index);
-
-    // update the vector pictures using that color!
 }
 
 void Object::renameColor(int i, const QString& text)
@@ -745,17 +694,6 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                 bitmap->paintImage(painter);
             }
 
-        }
-        // paints the vector images
-        if (layer->type() == Layer::VECTOR)
-        {
-            LayerVector* layerVector = static_cast<LayerVector*>(layer);
-            VectorImage* vec = layerVector->getLastVectorImageAtFrame(frameNumber);
-            if (vec)
-            {
-                painter.setOpacity(vec->getOpacity());
-                vec->paintImage(painter, *this, false, false, antialiasing);
-            }
         }
     }
 }

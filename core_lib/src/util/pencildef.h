@@ -195,7 +195,6 @@ const static int MaxFramesBound = 9999;
 #define CMD_TOOL_ERASER "CmdToolEraser"
 #define CMD_RESET_ALL_TOOLS "CmdResetAllTools"
 #define CMD_NEW_BITMAP_LAYER "CmdNewBitmapLayer"
-#define CMD_NEW_VECTOR_LAYER "CmdNewVectorLayer"
 #define CMD_NEW_SOUND_LAYER "CmdNewSoundLayer"
 #define CMD_NEW_CAMERA_LAYER "CmdNewCameraLayer"
 #define CMD_DELETE_CUR_LAYER "CmdDeleteCurrentLayer"
@@ -269,8 +268,6 @@ const static int MaxFramesBound = 9999;
 #define SETTING_MULTILAYER_ONION "MultilayerOnion"
 #define SETTING_AXIS             "Axis"
 #define SETTING_CAMERABORDER     "CameraBorder"
-#define SETTING_INVISIBLE_LINES  "InvisibleLines"
-#define SETTING_OUTLINES         "Outlines"
 #define SETTING_ONION_BLUE       "OnionBlue"
 #define SETTING_ONION_RED        "OnionRed"
 

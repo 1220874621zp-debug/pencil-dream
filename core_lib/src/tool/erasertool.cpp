@@ -26,8 +26,6 @@ GNU General Public License for more details.
 #include "layermanager.h"
 #include "viewmanager.h"
 #include "undoredomanager.h"
-#include "layervector.h"
-#include "vectorimage.h"
 #include "pointerevent.h"
 
 
@@ -48,11 +46,11 @@ void EraserTool::loadSettings()
 
     QHash<int, PropertyInfo> info;
 
-    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[StrokeToolProperties::WIDTH_VALUE] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::FEATHER_VALUE] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::FEATHER_ENABLED] = { Layer::BITMAP };
-    mPropertyUsed[StrokeToolProperties::PRESSURE_ENABLED] = { Layer::BITMAP, Layer::VECTOR };
-    mPropertyUsed[StrokeToolProperties::STABILIZATION_VALUE] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[StrokeToolProperties::PRESSURE_ENABLED] = { Layer::BITMAP };
+    mPropertyUsed[StrokeToolProperties::STABILIZATION_VALUE] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
 
     info[StrokeToolProperties::WIDTH_VALUE] = { WIDTH_MIN, WIDTH_MAX, 24.0 };
@@ -145,7 +143,6 @@ void EraserTool::pointerReleaseEvent(PointerEvent *event)
         drawStroke();
     }
 
-    removeVectorPaint();
     endStroke();
 
     StrokeTool::pointerReleaseEvent(event);
@@ -176,7 +173,6 @@ void EraserTool::paintAt(QPointF point)
 void EraserTool::drawStroke()
 {
     StrokeTool::drawStroke();
-    QList<QPointF> p = mInterpolator.interpolateStroke();
 
     Layer* layer = mEditor->layers()->currentLayer();
 
@@ -216,62 +212,13 @@ void EraserTool::drawStroke()
             }
         }
     }
-    else if (layer->type() == Layer::VECTOR)
-    {
-        mCurrentWidth = mSettings.width();
-        if (mSettings.pressureEnabled())
-        {
-            mCurrentWidth = (mCurrentWidth + (mInterpolator.getPressure() * mCurrentWidth)) * 0.5;
-        }
-        qreal brushWidth = mCurrentWidth;
-
-        QPen pen(Qt::white, brushWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-
-        if (p.size() == 4)
-        {
-            QPainterPath path(p[0]);
-            path.cubicTo(p[1],
-                         p[2],
-                         p[3]);
-            mScribbleArea->drawPath(path, pen, Qt::NoBrush, QPainter::CompositionMode_Source);
-        }
-    }
-}
-
-void EraserTool::removeVectorPaint()
-{
-    Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::VECTOR)
-    {
-        mScribbleArea->clearDrawingBuffer();
-        VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-        if (vectorImage == nullptr) { return; } // Can happen if the first frame is deleted while drawing
-        // Clear the area containing the last point
-        //vectorImage->removeArea(lastPoint);
-        // Clear the temporary pixel path
-        vectorImage->deleteSelectedPoints();
-
-        mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
-    }
 }
 
 void EraserTool::updateStrokes()
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP || layer->type() == Layer::VECTOR)
+    if (layer->type() == Layer::BITMAP)
     {
         drawStroke();
-    }
-
-    if (layer->type() == Layer::VECTOR)
-    {
-        qreal radius = mSettings.width() / 2;
-
-        VectorImage* currKey = static_cast<VectorImage*>(layer->getLastKeyFrameAtPosition(mEditor->currentFrame()));
-        QList<VertexRef> nearbyVertices = currKey->getVerticesCloseTo(getCurrentPoint(), radius);
-        for (auto nearbyVertice : nearbyVertices)
-        {
-            currKey->setSelected(nearbyVertice, true);
-        }
     }
 }

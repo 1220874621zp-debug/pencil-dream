@@ -17,7 +17,6 @@ GNU General Public License for more details.
 
 #include "movetool.h"
 
-#include <cassert>
 #include <QMessageBox>
 #include <QSettings>
 
@@ -29,11 +28,9 @@ GNU General Public License for more details.
 #include "overlaymanager.h"
 #include "undoredomanager.h"
 #include "scribblearea.h"
-#include "layervector.h"
 #include "layermanager.h"
 #include "layercamera.h"
 #include "mathutils.h"
-#include "vectorimage.h"
 
 MoveTool::MoveTool(QObject* parent) : TransformTool(parent)
 {
@@ -49,7 +46,7 @@ void MoveTool::loadSettings()
     mRotationIncrement = mEditor->preference()->getInt(SETTING::ROTATION_INCREMENT);
     QSettings pencilSettings(PENCIL2D, PENCIL2D);
 
-    mPropertyUsed[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = { Layer::BITMAP, Layer::VECTOR };
+    mPropertyUsed[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[TransformToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
     QHash<int, PropertyInfo> info;
 
@@ -159,11 +156,6 @@ void MoveTool::pointerMoveEvent(PointerEvent* event)
             mPerspMode = mEditor->overlays()->getMoveModeForPoint(event->canvasPos(), layerCam->getViewAtFrame(mEditor->currentFrame()));
         }
         mScribbleArea->updateToolCursor();
-
-        if (currentLayer->type() == Layer::VECTOR)
-        {
-            storeClosestVectorCurve(event->canvasPos(), currentLayer);
-        }
     }
     mEditor->updateFrame();
 }
@@ -241,11 +233,6 @@ void MoveTool::beginInteraction(const QPointF& pos, Qt::KeyboardModifiers keyMod
         }
     }
 
-    if (layer->type() == Layer::VECTOR)
-    {
-        createVectorSelection(pos, keyMod, layer);
-    }
-
     selectMan->setTransformAnchor(selectMan->getSelectionAnchorPoint());
     selectMan->setDragOrigin(pos);
     mOffset = selectMan->myTranslation();
@@ -253,69 +240,6 @@ void MoveTool::beginInteraction(const QPointF& pos, Qt::KeyboardModifiers keyMod
     if(selectMan->getMoveMode() == MoveMode::ROTATION) {
         mRotatedAngle = selectMan->angleFromPoint(pos, selectMan->currentTransformAnchor()) - selectMan->myRotation();
     }
-}
-
-/**
- * @brief MoveTool::createVectorSelection
- * In vector the selection rectangle is based on the bounding box of the curves
- * We can therefore create a selection just by clicking near/on a curve
- */
-void MoveTool::createVectorSelection(const QPointF& pos, Qt::KeyboardModifiers keyMod, Layer* layer)
-{
-    assert(layer->type() == Layer::VECTOR);
-    LayerVector* vecLayer = static_cast<LayerVector*>(layer);
-    VectorImage* vectorImage = vecLayer->getLastVectorImageAtFrame(mEditor->currentFrame());
-    if (vectorImage == nullptr) { return; }
-
-    if (!mEditor->select()->closestCurves().empty()) // the user clicks near a curve
-    {
-        setCurveSelected(vectorImage, keyMod);
-    }
-    else if (vectorImage->getLastAreaNumber(pos) > -1)
-    {
-        setAreaSelected(pos, vectorImage, keyMod);
-    }
-}
-
-void MoveTool::setCurveSelected(VectorImage* vectorImage, Qt::KeyboardModifiers keyMod)
-{
-    auto selectMan = mEditor->select();
-    if (!vectorImage->isSelected(selectMan->closestCurves()))
-    {
-        if (keyMod != Qt::ShiftModifier)
-        {
-            applyTransformation();
-        }
-        vectorImage->setSelected(selectMan->closestCurves(), true);
-        selectMan->setSelection(vectorImage->getSelectionRect(), false);
-    }
-}
-
-void MoveTool::setAreaSelected(const QPointF& pos, VectorImage* vectorImage, Qt::KeyboardModifiers keyMod)
-{
-    int areaNumber = vectorImage->getLastAreaNumber(pos);
-    if (!vectorImage->isAreaSelected(areaNumber))
-    {
-        if (keyMod != Qt::ShiftModifier)
-        {
-            applyTransformation();
-        }
-        vectorImage->setAreaSelected(areaNumber, true);
-        mEditor->select()->setSelection(vectorImage->getSelectionRect(), false);
-    }
-}
-
-/**
- * @brief MoveTool::storeClosestVectorCurve
- * stores the curves closest to the mouse position in mClosestCurves
- */
-void MoveTool::storeClosestVectorCurve(const QPointF& pos, Layer* layer)
-{
-    auto selectMan = mEditor->select();
-    auto layerVector = static_cast<LayerVector*>(layer);
-    VectorImage* pVecImg = layerVector->getLastVectorImageAtFrame(mEditor->currentFrame());
-    if (pVecImg == nullptr) { return; }
-    selectMan->setCurves(pVecImg->getCurvesCloseTo(pos, selectMan->selectionTolerance()));
 }
 
 void MoveTool::applyTransformation()
@@ -333,15 +257,6 @@ void MoveTool::applyTransformationAndDeselect()
 {
     // We apply transform changes upon leaving a layer and deselect all
     mScribbleArea->applyTransformedSelection();
-
-    Layer* currentLayer = mEditor->layers()->currentLayer();
-    if (currentLayer->type() == Layer::VECTOR) {
-        auto keyFrame = static_cast<VectorImage*>(currentLayer->getLastKeyFrameAtPosition(mEditor->currentFrame()));
-        if (keyFrame)
-        {
-            keyFrame->deselectAll();
-        }
-    }
 
     mEditor->select()->resetSelectionProperties();
     mRotatedAngle = 0;

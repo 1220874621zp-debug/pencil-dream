@@ -70,8 +70,6 @@ public:
     virtual void setPressureEnabled(bool enabled);
     virtual void setFeatherEnabled(bool enabled);
     virtual void setAntiAliasingEnabled(bool enabled);
-    virtual void setFillContourEnabled(bool enabled);
-    virtual void setStrokeInvisibleEnabled(bool enabled);
 
 signals:
     void widthChanged(qreal value);
@@ -79,8 +77,6 @@ signals:
     void pressureEnabledChanged(bool enabled);
     void featherEnabledChanged(bool enabled);
     void antiAliasingEnabledChanged(bool enabled);
-    void fillContourEnabledChanged(bool enabled);
-    void invisibleStrokeEnabledChanged(bool enabled);
     void stabilizationLevelChanged(int level);
 
 public slots:

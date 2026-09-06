@@ -42,7 +42,6 @@ GNU General Public License for more details.
 #include "layersound.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
-#include "vectorimage.h"
 #include "soundclip.h"
 #include "camera.h"
 
@@ -877,19 +876,6 @@ Status ActionCommands::addNewBitmapLayer()
     if (ok && !text.isEmpty())
     {
         mEditor->layers()->createBitmapLayer(text);
-    }
-    return Status::OK;
-}
-
-Status ActionCommands::addNewVectorLayer()
-{
-    bool ok;
-    QString text = QInputDialog::getText(nullptr, tr("Layer Properties"),
-                                         tr("Layer name:"), QLineEdit::Normal,
-                                         mEditor->layers()->nameSuggestLayer(tr("Vector Layer")), &ok);
-    if (ok && !text.isEmpty())
-    {
-        mEditor->layers()->createVectorLayer(text);
     }
     return Status::OK;
 }

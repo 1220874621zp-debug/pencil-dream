@@ -53,27 +53,17 @@ TEST_CASE("ColorManager set color tests")
     layerMgr->init();
 
     layerObj->init();
-    // 0 = camera, 1 = vector, 2 = bitmap
+    // 0 = camera, 1 = bitmap
     layerObj->addNewCameraLayer();
-    layerObj->addNewVectorLayer();
     layerObj->addNewBitmapLayer();
 
 
     SECTION("setColor non vector layer")
     {
-        cm->workingLayerChanged(layerObj->getLayer(2));
+        cm->workingLayerChanged(layerObj->getLayer(1));
         cm->setFrontColor(QColor(255,0,0));
         REQUIRE(cm->frontColor() == QColor(255,0,0));
     }
-
-    SECTION("setColor vector layer")
-    {
-        object->addColorAtIndex(0, QColor(255,255,255));
-        cm->workingLayerChanged(layerObj->getLayer(1));
-        cm->setIndexedColor(QColor(255,255,255));
-        REQUIRE(cm->frontColor() == QColor(255,255,255));
-    }
-
 
     delete layerEdit;
     delete editor;

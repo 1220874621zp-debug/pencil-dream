@@ -19,8 +19,6 @@ GNU General Public License for more details.
 
 #include "basemanager.h"
 #include "movemode.h"
-#include "vertexref.h"
-#include "vectorselection.h"
 
 #include <QPointF>
 #include <QRectF>
@@ -135,21 +133,9 @@ public:
     QPolygonF mapToSelection(const QPolygonF& polygon) const { return mSelectionTransform.map(polygon); }
     QPolygonF mapFromLocalSpace(const QPolygonF& polygon) const { return mSelectionTransform.inverted().map(polygon); }
 
-    // Vector selection
-    VectorSelection vectorSelection;
-
-    void setCurves(const QList<int>& curves) { mClosestCurves = curves; }
-    void setVertices(const QList<VertexRef>& vertices) { mClosestVertices = vertices; }
-
-    void clearCurves() { mClosestCurves.clear(); };
-    void clearVertices() { mClosestVertices.clear(); };
-
     /// The point from where the dragging will be based of inside the selection area.
     /// Not to be confused with the selection origin
     void setDragOrigin(const QPointF point) { mDragOrigin = point; }
-
-    const QList<int> closestCurves() const { return mClosestCurves; }
-    const QList<VertexRef> closestVertices() const { return mClosestVertices; }
 
     /// This should be called to update the selection transform
     void calculateSelectionTransformation();
@@ -177,9 +163,6 @@ private:
     qreal mScaleY;
     QPointF mTranslation;
     qreal mRotatedAngle = 0.0;
-
-    QList<int> mClosestCurves;
-    QList<VertexRef> mClosestVertices;
 
     QPointF mDragOrigin;
 

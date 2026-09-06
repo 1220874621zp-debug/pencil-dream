@@ -53,15 +53,11 @@ void BucketOptionsWidget::initUI()
 
     auto toleranceInfo = properties.getInfo(BucketToolProperties::COLORTOLERANCE_VALUE);
     auto expandInfo = properties.getInfo(BucketToolProperties::FILLEXPAND_VALUE);
-    auto thicknessInfo = properties.getInfo(BucketToolProperties::FILLTHICKNESS_VALUE);
 
     ui->colorToleranceSlider->init(tr("Color tolerance"), SpinSlider::GROWTH_TYPE::LINEAR, toleranceInfo.minInt(), toleranceInfo.maxInt());
     ui->expandSlider->init(tr("Expand fill"), SpinSlider::GROWTH_TYPE::LINEAR, expandInfo.minInt(), expandInfo.maxInt());
-    ui->strokeThicknessSlider->init(tr("Stroke thickness"), SpinSlider::GROWTH_TYPE::LOG, thicknessInfo.minReal(), thicknessInfo.maxReal());
 
     ui->expandSpinBox->setMaximum(expandInfo.maxInt());
-    ui->strokeThicknessSpinBox->setMaximum(thicknessInfo.maxReal());
-    ui->strokeThicknessSpinBox->setMinimum(thicknessInfo.minReal());
     ui->colorToleranceSpinbox->setMaximum(toleranceInfo.maxInt());
 
     ui->referenceLayerComboBox->addItem(tr("Current layer", "Reference Layer Options"), 0);
@@ -87,10 +83,6 @@ void BucketOptionsWidget::updateUI()
     updatePropertyVisibility();
 
     BucketToolProperties properties = mBucketTool->settings();
-
-    if (mBucketTool->isPropertyEnabled(BucketToolProperties::FILLTHICKNESS_VALUE)) {
-        mBucketTool->setStrokeThickness(properties.fillThickness());
-    }
 
     if (mBucketTool->isPropertyEnabled(BucketToolProperties::FILLEXPAND_ENABLED)) {
         mBucketTool->setFillExpandEnabled(properties.fillExpandEnabled());
@@ -142,10 +134,6 @@ void BucketOptionsWidget::makeConnectionsFromModelToUI()
     connect(mBucketTool, &BucketTool::fillModeChanged, this, [=](int value) {
        setFillMode(value);
     });
-
-    connect(mBucketTool, &BucketTool::strokeThicknessChanged, this, [=](qreal value) {
-       setStrokeWidth(value);
-    });
 }
 
 void BucketOptionsWidget::makeConnectionsFromUIToModel()
@@ -180,20 +168,10 @@ void BucketOptionsWidget::makeConnectionsFromUIToModel()
     connect(ui->blendModeComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), [=](int value) {
         mBucketTool->setFillMode(value);
     });
-
-    connect(ui->strokeThicknessSlider, &SpinSlider::valueChanged, [=](qreal value) {
-        mBucketTool->setStrokeThickness(value);
-    });
-
-    connect(ui->strokeThicknessSpinBox, static_cast<void (QDoubleSpinBox::*)(qreal)>(&QDoubleSpinBox::valueChanged), [=](qreal value) {
-        mBucketTool->setStrokeThickness(value);
-    });
 }
 
 void BucketOptionsWidget::updatePropertyVisibility()
 {
-    ui->strokeThicknessSlider->setVisible(mBucketTool->isPropertyEnabled(BucketToolProperties::FILLTHICKNESS_VALUE));
-    ui->strokeThicknessSpinBox->setVisible(mBucketTool->isPropertyEnabled(BucketToolProperties::FILLTHICKNESS_VALUE));
     ui->colorToleranceCheckbox->setVisible(mBucketTool->isPropertyEnabled(BucketToolProperties::COLORTOLERANCE_ENABLED));
     ui->colorToleranceSlider->setVisible(mBucketTool->isPropertyEnabled(BucketToolProperties::COLORTOLERANCE_VALUE));
     ui->colorToleranceSpinbox->setVisible(mBucketTool->isPropertyEnabled(BucketToolProperties::COLORTOLERANCE_VALUE));
@@ -251,13 +229,4 @@ void BucketOptionsWidget::setFillReferenceMode(int referenceMode)
 {
     QSignalBlocker b(ui->referenceLayerComboBox);
     ui->referenceLayerComboBox->setCurrentIndex(referenceMode);
-}
-
-void BucketOptionsWidget::setStrokeWidth(qreal value)
-{
-    QSignalBlocker b(ui->strokeThicknessSlider);
-    ui->strokeThicknessSlider->setValue(value);
-
-    QSignalBlocker b2(ui->strokeThicknessSpinBox);
-    ui->strokeThicknessSpinBox->setValue(value);
 }

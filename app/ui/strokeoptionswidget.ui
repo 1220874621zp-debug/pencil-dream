@@ -159,16 +159,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="fillContourBox">
-       <property name="toolTip">
-        <string>Contour will be filled</string>
-       </property>
-       <property name="text">
-        <string>Fill Contour</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QCheckBox" name="useClosedPathBox">
        <property name="toolTip">
         <string>Close Polyline path (hold Ctrl to temporarily invert)</string>
@@ -205,16 +195,6 @@
        </property>
        <property name="text">
         <string comment="Brush AA">Anti-Aliasing</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="makeInvisibleBox">
-       <property name="toolTip">
-        <string>Make invisible</string>
-       </property>
-       <property name="text">
-        <string comment="Tool options">Invisible</string>
        </property>
       </widget>
      </item>

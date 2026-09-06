@@ -17,8 +17,6 @@ GNU General Public License for more details.
 #include "selectionmanager.h"
 #include "editor.h"
 
-#include "vectorimage.h"
-
 #include "mathutils.h"
 
 #include <QVector2D>

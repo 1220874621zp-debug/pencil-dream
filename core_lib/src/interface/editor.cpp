@@ -23,12 +23,10 @@ GNU General Public License for more details.
 #include <QTemporaryDir>
 
 #include "object.h"
-#include "vectorimage.h"
 #include "bitmapimage.h"
 #include "soundclip.h"
 #include "camera.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layercamera.h"
 #include "undoredocommand.h"
 
@@ -197,9 +195,6 @@ void Editor::copy()
     } else if (currentLayer->type() == Layer::BITMAP) {
         BitmapImage* bitmapImage = static_cast<BitmapImage*>(currentLayer->getLastKeyFrameAtPosition(currentFrame()));
         clipboards()->copyBitmapImage(bitmapImage, select()->mySelectionRect());
-    } else if (currentLayer->type() == Layer::VECTOR) {
-        VectorImage* vectorImage = static_cast<VectorImage*>(currentLayer->getLastKeyFrameAtPosition(currentFrame()));
-        clipboards()->copyVectorImage(vectorImage);
     }
 }
 
@@ -218,7 +213,7 @@ void Editor::copyAndCut()
         return;
     }
 
-    if (currentLayer->type() == Layer::BITMAP || currentLayer->type() == Layer::VECTOR) {
+    if (currentLayer->type() == Layer::BITMAP) {
         mScribbleArea->deleteSelection();
         deselectAll();
     }
@@ -246,12 +241,6 @@ void Editor::pasteFromPreviousFrame()
         {
             pasteToCanvas(bitmapImage, mFrame);
         }
-    }
-    else if (currentLayer->type() == Layer::VECTOR)
-    {
-        backup(tr("Paste from Previous Keyframe"));
-        VectorImage* vectorImage = static_cast<VectorImage*>(currentLayer->getKeyFrameAt(prevFrame));
-        pasteToCanvas(vectorImage, mFrame);
     }
 }
 
@@ -282,20 +271,6 @@ void Editor::pasteToCanvas(BitmapImage* bitmapImage, int frameNumber)
     // TODO: currently we don't support placing an image without already pasting it on an already existing
     // image, this should be reworked such that a hovering selection could be shown, before applying it...
     select()->setSelection(bitmapImage->bounds());
-    emit frameModified(frameNumber);
-}
-
-void Editor::pasteToCanvas(VectorImage* vectorImage, int frameNumber)
-{
-    Layer* currentLayer = layers()->currentLayer();
-
-    Q_ASSERT(currentLayer->type() == Layer::VECTOR);
-
-    deselectAll();
-    mScribbleArea->handleDrawingOnEmptyFrame();
-    VectorImage* canvasImage = static_cast<VectorImage*>(currentLayer->getLastKeyFrameAtPosition(frameNumber));
-    canvasImage->paste(*vectorImage);
-    select()->setSelection(vectorImage->getSelectionRect());
     emit frameModified(frameNumber);
 }
 
@@ -354,11 +329,8 @@ void Editor::paste()
         clipboards()->setFromSystemClipboard(mScribbleArea->getCentralPoint(), currentLayer);
 
         BitmapImage clipboardImage = clipboards()->getBitmapClipboard();
-        VectorImage clipboardVectorImage = clipboards()->getVectorClipboard();
         if (currentLayer->type() == Layer::BITMAP && clipboardImage.isLoaded()) {
             pasteToCanvas(&clipboardImage, mFrame);
-        } else if (currentLayer->type() == Layer::VECTOR && !clipboardVectorImage.isEmpty()) {
-            pasteToCanvas(&clipboardVectorImage, mFrame);
         }
     } else {
         // TODO: implement undo/redo
@@ -637,40 +609,6 @@ Status Editor::importBitmapImage(const QString& filePath, const QTransform& impo
     return status;
 }
 
-Status Editor::importVectorImage(const QString& filePath)
-{
-    Q_ASSERT(layers()->currentLayer()->type() == Layer::VECTOR);
-
-    auto layer = static_cast<LayerVector*>(layers()->currentLayer());
-
-    Status status = Status::OK;
-    DebugDetails dd;
-    dd << QString("Raw file path: %1").arg(filePath);
-
-    VectorImage* vectorImage = layer->getVectorImageAtFrame(currentFrame());
-    if (vectorImage == nullptr)
-    {
-        addNewKey();
-        vectorImage = layer->getVectorImageAtFrame(currentFrame());
-    }
-
-    VectorImage importedVectorImage;
-    bool ok = importedVectorImage.read(filePath);
-    if (ok)
-    {
-        importedVectorImage.selectAll();
-        vectorImage->paste(importedVectorImage);
-        emit frameModified(importedVectorImage.pos());
-
-        backup(tr("Import Image"));
-    }
-    else {
-        status = Status(Status::FAIL, dd, tr("Import failed"), tr("You cannot import images into a vector layer."));
-    }
-
-    return status;
-}
-
 Status Editor::importImage(const QString& filePath, const ImportImageConfig importConfig)
 {
     Layer* layer = layers()->currentLayer();
@@ -709,9 +647,6 @@ Status Editor::importImage(const QString& filePath, const ImportImageConfig impo
     {
     case Layer::BITMAP:
         return importBitmapImage(filePath, transform);
-
-    case Layer::VECTOR:
-        return importVectorImage(filePath);
 
     default:
         dd << QString("Current layer: %1").arg(layer->type());
@@ -805,15 +740,6 @@ void Editor::selectAll() const
 
         rect = bitmapImage->bounds();
     }
-    else if (layer->type() == Layer::VECTOR)
-    {
-        VectorImage *vectorImage = static_cast<VectorImage*>(layer->getLastKeyFrameAtPosition(mFrame));
-        if (vectorImage != nullptr)
-        {
-            vectorImage->selectAll();
-            rect = vectorImage->getSelectionRect();
-        }
-    }
     select()->setSelection(rect, false);
 }
 
@@ -823,15 +749,6 @@ void Editor::deselectAll() const
 
     Layer* layer = layers()->currentLayer();
     if (layer == nullptr) { return; }
-
-    if (layer->type() == Layer::VECTOR)
-    {
-        VectorImage *vectorImage = static_cast<VectorImage*>(layer->getLastKeyFrameAtPosition(mFrame));
-        if (vectorImage != nullptr)
-        {
-            vectorImage->deselectAll();
-        }
-    }
 
     if (layer->hasAnySelectedFrames()) {
         layer->deselectAll();
@@ -1044,8 +961,6 @@ bool Editor::canCopy() const
         return canCopyFrames(layer);
     case Layer::BITMAP:
         return canCopyBitmapImage(static_cast<BitmapImage*>(keyframe)) || canCopyFrames(layer);
-    case Layer::VECTOR:
-        return canCopyVectorImage(static_cast<VectorImage*>(keyframe)) || canCopyFrames(layer);
     default:
         Q_UNREACHABLE();
     }
@@ -1058,8 +973,7 @@ bool Editor::canPaste() const
     auto layerType = layer->type();
 
     return (layerType == clipboardMan->framesLayerType() && !clipboardMan->framesIsEmpty()) ||
-           (layerType == Layer::BITMAP && clipboardMan->getBitmapClipboard().isLoaded()) ||
-           (layerType == Layer::VECTOR && !clipboardMan->getVectorClipboard().isEmpty());
+           (layerType == Layer::BITMAP && clipboardMan->getBitmapClipboard().isLoaded());
 }
 
 bool Editor::canCopyFrames(const Layer* layer) const
@@ -1071,11 +985,6 @@ bool Editor::canCopyFrames(const Layer* layer) const
 bool Editor::canCopyBitmapImage(BitmapImage* bitmapImage) const
 {
     return bitmapImage != nullptr && bitmapImage->isLoaded() && !bitmapImage->bounds().isEmpty();
-}
-
-bool Editor::canCopyVectorImage(const VectorImage* vectorImage) const
-{
-    return vectorImage != nullptr && !vectorImage->isEmpty();
 }
 
 void Editor::backup(const QString &undoText)

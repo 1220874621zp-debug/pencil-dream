@@ -27,7 +27,6 @@ GNU General Public License for more details.
 #include "soundmanager.h"
 #include "layer.h"
 #include "layersound.h"
-#include "layervector.h"
 #include "soundclip.h"
 
 
@@ -84,8 +83,6 @@ void ImportLayersDialog::importLayers()
     int currentFrame = mEditor->currentFrame();
     Q_ASSERT(ui->lwLayers->count() == mImportObject->getLayerCount());
 
-    QMap<int, int> importedColors;
-
     for (const QListWidgetItem* item : ui->lwLayers->selectedItems())
     {
         mImportLayer = mImportObject->takeLayer(item->data(Qt::UserRole).toInt());
@@ -93,24 +90,6 @@ void ImportLayersDialog::importLayers()
         loadKeyFrames(mImportLayer); // all keyframes of this layer must be in memory
 
         object->addLayer(mImportLayer);
-
-        if (mImportLayer->type() == Layer::VECTOR)
-        {
-            LayerVector* layerVector = static_cast<LayerVector*>(mImportLayer);
-            for (int i = 0; i < mImportObject->getColorCount(); i++) {
-                if (!layerVector->usesColor(i)) {
-                    continue;
-                }
-
-                if (!importedColors.contains(i)) {
-                    const ColorRef color = mImportObject->getColor(i);
-                    object->addColor(color);
-                    importedColors[i] = object->getColorCount() - 1;
-                }
-
-                layerVector->moveColor(i, importedColors[i]);
-            }
-        }
 
         if (mImportLayer->type() == Layer::SOUND)
         {

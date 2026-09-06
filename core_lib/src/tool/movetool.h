@@ -24,7 +24,6 @@ GNU General Public License for more details.
 #include "undoredomanager.h"
 
 class Layer;
-class VectorImage;
 
 
 class MoveTool : public TransformTool
@@ -54,12 +53,7 @@ private:
     void updateSettings(const SETTING setting);
 
     void beginInteraction(const QPointF& pos, Qt::KeyboardModifiers keyMod, Layer* layer);
-    void createVectorSelection(const QPointF& pos, Qt::KeyboardModifiers keyMod, Layer* layer);
     void transformSelection(const QPointF& pos, Qt::KeyboardModifiers keyMod);
-    void storeClosestVectorCurve(const QPointF& pos, Layer* layer);
-
-    void setCurveSelected(VectorImage* vectorImage, Qt::KeyboardModifiers keyMod);
-    void setAreaSelected(const QPointF& pos, VectorImage* vectorImage, Qt::KeyboardModifiers keyMod);
 
     Layer* currentPaintableLayer();
 

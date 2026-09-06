@@ -302,7 +302,6 @@ void MainWindow2::createMenus()
 
     //--- Layer Menu ---
     connect(ui->actionNew_Bitmap_Layer, &QAction::triggered, mCommands, &ActionCommands::addNewBitmapLayer);
-    connect(ui->actionNew_Vector_Layer, &QAction::triggered, mCommands, &ActionCommands::addNewVectorLayer);
     connect(ui->actionNew_Sound_Layer, &QAction::triggered, mCommands, &ActionCommands::addNewSoundLayer);
     connect(ui->actionNew_Camera_Layer, &QAction::triggered, mCommands, &ActionCommands::addNewCameraLayer);
     connect(ui->actionDelete_Current_Layer, &QAction::triggered, mCommands, &ActionCommands::deleteCurrentLayer);
@@ -355,8 +354,6 @@ void MainWindow2::createMenus()
     bindPreferenceSetting(ui->actionThirds, prefs, SETTING::OVERLAY_THIRDS);
     bindPreferenceSetting(ui->actionCenter, prefs, SETTING::OVERLAY_CENTER);
     bindPreferenceSetting(ui->actionGrid, prefs, SETTING::GRID);
-    bindPreferenceSetting(ui->actionShowOutlinesOnly, prefs, SETTING::OUTLINES);
-    bindPreferenceSetting(ui->actionShowInvisibleLines, prefs, SETTING::INVISIBLE_LINES);
     bindPreferenceSetting(ui->actionOnionPrev, prefs, SETTING::PREV_ONION);
     bindPreferenceSetting(ui->actionOnionNext, prefs, SETTING::NEXT_ONION);
 
@@ -640,10 +637,6 @@ void MainWindow2::currentLayerChanged()
 {
     bool isBitmap = (mEditor->layers()->currentLayer()->type() == Layer::BITMAP);
     ui->menuChange_line_color->setEnabled(isBitmap);
-
-    bool isVector = (mEditor->layers()->currentLayer()->type() == Layer::VECTOR);
-    ui->actionShowInvisibleLines->setEnabled(isVector);
-    ui->actionShowOutlinesOnly->setEnabled(isVector);
 }
 
 void MainWindow2::selectionChanged()
@@ -1361,7 +1354,6 @@ void MainWindow2::setupKeyboardShortcuts()
 
     // Layer menu
     ui->actionNew_Bitmap_Layer->setShortcut(cmdKeySeq(CMD_NEW_BITMAP_LAYER));
-    ui->actionNew_Vector_Layer->setShortcut(cmdKeySeq(CMD_NEW_VECTOR_LAYER));
     ui->actionNew_Camera_Layer->setShortcut(cmdKeySeq(CMD_NEW_CAMERA_LAYER));
     ui->actionNew_Sound_Layer->setShortcut(cmdKeySeq(CMD_NEW_SOUND_LAYER));
     ui->actionDelete_Current_Layer->setShortcut(cmdKeySeq(CMD_DELETE_CUR_LAYER));
@@ -1417,25 +1409,6 @@ void MainWindow2::importPalette()
 
 void MainWindow2::openPalette()
 {
-    for (int i = 0; i < mEditor->object()->getColorCount(); i++)
-    {
-        if (!mEditor->object()->isColorInUse(i))
-        {
-            continue;
-        }
-
-        QMessageBox msgBox;
-        msgBox.setText(tr("Opening a palette will replace the old palette.\n"
-                          "Color(s) in strokes will be altered by this action!"));
-        msgBox.addButton(tr("Open Palette"), QMessageBox::AcceptRole);
-        msgBox.addButton(QMessageBox::Cancel);
-
-        if (msgBox.exec() == QMessageBox::Cancel) {
-            return;
-        }
-        break;
-    }
-
     QString filePath = FileDialog::getOpenFileName(this, FileType::PALETTE);
     if (filePath.isEmpty())
     {
@@ -1504,7 +1477,6 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     connect(pTimeline, &TimeLine::removeKeyClick, mCommands, &ActionCommands::removeKey);
 
     connect(pTimeline, &TimeLine::newBitmapLayer, mCommands, &ActionCommands::addNewBitmapLayer);
-    connect(pTimeline, &TimeLine::newVectorLayer, mCommands, &ActionCommands::addNewVectorLayer);
     connect(pTimeline, &TimeLine::newSoundLayer, mCommands, &ActionCommands::addNewSoundLayer);
     connect(pTimeline, &TimeLine::newCameraLayer, mCommands, &ActionCommands::addNewCameraLayer);
     connect(mTimeLine, &TimeLine::playButtonTriggered, mCommands, &ActionCommands::PlayStop);
@@ -1734,9 +1706,6 @@ void MainWindow2::createToolbars()
     mViewToolbar->addSeparator();
     mViewToolbar->addAction(ui->actionHorizontal_Flip);
     mViewToolbar->addAction(ui->actionVertical_Flip);
-    mViewToolbar->addSeparator();
-    mViewToolbar->addAction(ui->actionShowInvisibleLines);
-    mViewToolbar->addAction(ui->actionShowOutlinesOnly);
 
     mOverlayToolbar = addToolBar(tr("Overlay Toolbar"));
     mOverlayToolbar->setObjectName("mOverlayToolbar");

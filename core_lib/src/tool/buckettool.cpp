@@ -22,14 +22,12 @@ GNU General Public License for more details.
 #include "pointerevent.h"
 
 #include "layer.h"
-#include "layervector.h"
 #include "layerbitmap.h"
 #include "layercamera.h"
 #include "layermanager.h"
 #include "colormanager.h"
 #include "toolmanager.h"
 #include "viewmanager.h"
-#include "vectorimage.h"
 #include "editor.h"
 #include "scribblearea.h"
 
@@ -40,7 +38,6 @@ BucketTool::BucketTool(QObject* parent) : BaseTool(parent)
 
 void BucketTool::loadSettings()
 {
-    mPropertyUsed[BucketToolProperties::FILLTHICKNESS_VALUE] = { Layer::VECTOR };
     mPropertyUsed[BucketToolProperties::COLORTOLERANCE_VALUE] = { Layer::BITMAP };
     mPropertyUsed[BucketToolProperties::COLORTOLERANCE_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[BucketToolProperties::FILLEXPAND_VALUE] = { Layer::BITMAP };
@@ -52,7 +49,6 @@ void BucketTool::loadSettings()
 
     QHash<int, PropertyInfo> info;
 
-    info[BucketToolProperties::FILLTHICKNESS_VALUE] = { 1.0, 100.0, 4.0 };
     info[BucketToolProperties::COLORTOLERANCE_VALUE] = { 1, 100, 32 };
     info[BucketToolProperties::COLORTOLERANCE_ENABLED] = false;
     info[BucketToolProperties::FILLEXPAND_VALUE] = { 1, 25, 2 };
@@ -64,7 +60,6 @@ void BucketTool::loadSettings()
     toolProperties().loadFrom(typeName(), pencilSettings);
 
     if (toolProperties().requireMigration(pencilSettings, ToolProperties::VERSION_1)) {
-        toolProperties().setBaseValue(BucketToolProperties::FILLTHICKNESS_VALUE, pencilSettings.value("fillThickness", 4.0).toReal());
         toolProperties().setBaseValue(BucketToolProperties::COLORTOLERANCE_VALUE, pencilSettings.value("Tolerance", 32).toInt());
         toolProperties().setBaseValue(BucketToolProperties::COLORTOLERANCE_ENABLED, pencilSettings.value("BucketToleranceEnabled", false).toBool());
         toolProperties().setBaseValue(BucketToolProperties::FILLEXPAND_VALUE, pencilSettings.value("BucketFillExpand", 2).toInt());
@@ -72,7 +67,6 @@ void BucketTool::loadSettings()
         toolProperties().setBaseValue(BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE, pencilSettings.value("BucketFillReferenceMode", 0).toInt());
         toolProperties().setBaseValue(BucketToolProperties::FILLMODE_VALUE, pencilSettings.value("FillMode", 0).toInt());
 
-        pencilSettings.remove("fillThickness");
         pencilSettings.remove("Tolerance");
         pencilSettings.remove("BucketToleranceEnabled");
         pencilSettings.remove("BucketFillExpand");
@@ -141,11 +135,7 @@ void BucketTool::pointerReleaseEvent(PointerEvent* event)
     if (event->button() == Qt::LeftButton)
     {
         // Backup of bitmap image is more complicated now and has therefore been moved to bitmap code
-        if (layer->type() == Layer::VECTOR) {
-            mEditor->backup(typeName());
-            paintVector(layer);
-        }
-        else if (layer->type() == Layer::BITMAP && !mFilledOnMove)
+        if (layer->type() == Layer::BITMAP && !mFilledOnMove)
         {
             paintBitmap();
         }
@@ -167,38 +157,6 @@ void BucketTool::paintBitmap()
             mEditor->setModified(layerIndex, frameIndex);
         }
     });
-}
-
-void BucketTool::paintVector(Layer* layer)
-{
-    mScribbleArea->clearDrawingBuffer();
-
-    VectorImage* vectorImage = static_cast<LayerVector*>(layer)->getLastVectorImageAtFrame(mEditor->currentFrame());
-    if (vectorImage == nullptr) { return; } // Can happen if the first frame is deleted while drawing
-
-    if (!vectorImage->isPathFilled())
-    {
-        vectorImage->fillSelectedPath(mEditor->color()->frontColorNumber());
-    }
-
-    vectorImage->applyWidthToSelection(mSettings.fillThickness());
-    vectorImage->applyColorToSelectedCurve(mEditor->color()->frontColorNumber());
-    vectorImage->applyColorToSelectedArea(mEditor->color()->frontColorNumber());
-
-    applyChanges();
-
-    mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
-}
-
-void BucketTool::applyChanges()
-{
-    mScribbleArea->applyTransformedSelection();
-}
-
-void BucketTool::setStrokeThickness(qreal width)
-{
-    toolProperties().setBaseValue(BucketToolProperties::FILLTHICKNESS_VALUE, width);
-    emit strokeThicknessChanged(width);
 }
 
 void BucketTool::setColorTolerance(int tolerance)

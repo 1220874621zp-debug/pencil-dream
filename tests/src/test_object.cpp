@@ -22,9 +22,9 @@ GNU General Public License for more details.
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include "filemanager.h"
+#include "layercamera.h"
 #include "object.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layersound.h"
 
 
@@ -46,15 +46,6 @@ TEST_CASE("Object::addXXXLayer()")
         REQUIRE(obj->getLayerCount() == 1);
 
         REQUIRE(obj->getLayer(0)->type() == Layer::BITMAP);
-    }
-
-    SECTION("Add a vector layer")
-    {
-        REQUIRE(obj->getLayerCount() == 0);
-        obj->addNewVectorLayer();
-        REQUIRE(obj->getLayerCount() == 1);
-
-        REQUIRE(obj->getLayer(0)->type() == Layer::VECTOR);
     }
 
     SECTION("Add a camera layer")
@@ -116,8 +107,8 @@ TEST_CASE("Object::getUniqueLayerID()")
         REQUIRE(bitmapLayer->id() == 1);
         REQUIRE(obj->getUniqueLayerID() == 2);
 
-        Layer* vectorLayer = obj->addNewVectorLayer();
-        REQUIRE(vectorLayer->id() == 2);
+        auto* cameraLayer = obj->addNewCameraLayer();
+        REQUIRE(cameraLayer->id() == 2);
         REQUIRE(obj->getUniqueLayerID() == 3);
     }
 }
@@ -206,7 +197,7 @@ void TestObject::testMoveLayer()
     std::unique_ptr< Object > obj( new Object );
 
     obj->addNewBitmapLayer();
-    obj->addNewVectorLayer();
+    obj->addNewBitmapLayer();
     QCOMPARE( obj->getLayer( 0 )->id(), 1 );
     QCOMPARE( obj->getLayer( 1 )->id(), 2 );
 

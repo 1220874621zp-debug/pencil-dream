@@ -897,7 +897,7 @@ bool FileManager::isProjectRecoverable(const QString& projectFolder)
     Q_ASSERT(ok);
 
     QStringList nameFiler;
-    nameFiler << "*.png" << "*.vec" << "*.xml";
+    nameFiler << "*.png" << "*.xml";
     QStringList entries = dir.entryList(nameFiler, QDir::Files);
 
     return (entries.size() > 0);
@@ -968,13 +968,13 @@ Status FileManager::recoverObject(Object* object)
     return ok ? Status::OK : Status::FAIL;
 }
 
-/** Create a new main.xml based on the png/vec filenames left in the data folder */
+/** Create a new main.xml based on the png filenames left in the data folder */
 Status FileManager::rebuildMainXML(Object* object)
 {
     QDir dataDir(object->dataDir());
 
     QStringList nameFiler;
-    nameFiler << "*.png" << "*.vec";
+    nameFiler << "*.png";
     const QStringList entries = dataDir.entryList(nameFiler, QDir::Files | QDir::Readable, QDir::Name);
 
     QMap<int, QStringList> keyFrameGroups;
@@ -1026,8 +1026,8 @@ Status FileManager::rebuildMainXML(Object* object)
 /**
  *  Rebuild a layer xml tag. example:
  *  @code{.xml}
- *    <layer id="2" type="2" visibility="1" name="Vector Layer">
- *      <image src="002.001.vec" frame="1"/>
+ *    <layer id="2" type="1" visibility="1" name="Bitmap Layer 2">
+ *      <image src="002.001.png" frame="1"/>
  *    </layer>
  *  @endcode
  */
@@ -1038,7 +1038,7 @@ Status FileManager::rebuildLayerXmlTag(QDomDocument& doc,
 {
     Q_ASSERT(frames.length() > 0);
 
-    Layer::LAYER_TYPE type = frames[0].endsWith(".png") ? Layer::BITMAP : Layer::VECTOR;
+    Layer::LAYER_TYPE type = Layer::BITMAP;
 
     QDomElement elemLayer = doc.createElement("layer");
     elemLayer.setAttribute("id", layerIndex + 1); // starts from 1, not 0.
@@ -1056,13 +1056,10 @@ Status FileManager::rebuildLayerXmlTag(QDomDocument& doc,
         elemFrame.setAttribute("frame", framePos);
         elemFrame.setAttribute("src", s);
 
-        if (type == Layer::BITMAP)
-        {
-            // Since we have no way to know the original img position
-            // Put it at the top left corner of the default camera
-            elemFrame.setAttribute("topLeftX", -800);
-            elemFrame.setAttribute("topLeftY", -600);
-        }
+        // Since we have no way to know the original img position
+        // Put it at the top left corner of the default camera
+        elemFrame.setAttribute("topLeftX", -800);
+        elemFrame.setAttribute("topLeftY", -600);
         elemLayer.appendChild(elemFrame);
     }
     return Status::OK;
@@ -1074,8 +1071,6 @@ QString FileManager::recoverLayerName(Layer::LAYER_TYPE type, int index)
     {
     case Layer::BITMAP:
         return tr("Bitmap Layer %1").arg(index);
-    case Layer::VECTOR:
-        return tr("Vector Layer %1").arg(index);
     case Layer::SOUND:
         return tr("Sound Layer %1").arg(index);
     default:
@@ -1086,7 +1081,7 @@ QString FileManager::recoverLayerName(Layer::LAYER_TYPE type, int index)
 
 int FileManager::layerIndexFromFilename(const QString& filename)
 {
-    const QStringList tokens = filename.split("."); // e.g., 001.019.png or 012.132.vec
+    const QStringList tokens = filename.split("."); // e.g., 001.019.png
     if (tokens.length() >= 3) // a correct file name must have 3 tokens
     {
         return tokens[0].toInt();
@@ -1096,7 +1091,7 @@ int FileManager::layerIndexFromFilename(const QString& filename)
 
 int FileManager::framePosFromFilename(const QString& filename)
 {
-    const QStringList tokens = filename.split("."); // e.g., 001.019.png or 012.132.vec
+    const QStringList tokens = filename.split("."); // e.g., 001.019.png
     if (tokens.length() >= 3) // a correct file name must have 3 tokens
     {
         return tokens[1].toInt();

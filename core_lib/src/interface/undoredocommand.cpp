@@ -23,7 +23,6 @@ GNU General Public License for more details.
 
 #include "layersound.h"
 #include "layerbitmap.h"
-#include "layervector.h"
 #include "layer.h"
 
 #include "editor.h"
@@ -252,54 +251,6 @@ void BitmapReplaceCommand::redo()
     static_cast<LayerBitmap*>(layer)->replaceKeyFrame(&redoBitmap);
 
     editor()->scrubTo(redoBitmap.pos());
-}
-
-VectorReplaceCommand::VectorReplaceCommand(const VectorImage* undoVector,
-                                   const int undoLayerId,
-                                   const QString& description,
-                                   Editor* editor,
-                                   QUndoCommand* parent) : UndoRedoCommand(editor, parent)
-{
-
-    this->undoVector = *undoVector;
-    this->undoLayerId = undoLayerId;
-    Layer* layer = editor->layers()->currentLayer();
-    redoLayerId = layer->id();
-    redoVector = *static_cast<LayerVector*>(layer)->
-            getLastVectorImageAtFrame(editor->currentFrame());
-
-    setText(description);
-}
-
-void VectorReplaceCommand::undo()
-{
-    Layer* layer = editor()->layers()->findLayerById(undoLayerId);
-    if (!layer) {
-        return setObsolete(true);
-    }
-
-    UndoRedoCommand::undo();
-
-    static_cast<LayerVector*>(layer)->replaceKeyFrame(&undoVector);
-
-    editor()->scrubTo(undoVector.pos());
-}
-
-void VectorReplaceCommand::redo()
-{
-    Layer* layer = editor()->layers()->findLayerById(redoLayerId);
-    if (!layer) {
-        return setObsolete(true);
-    }
-
-    UndoRedoCommand::redo();
-
-    // Ignore automatic redo when added to undo stack
-    if (isFirstRedo()) { setFirstRedo(false); return; }
-
-    static_cast<LayerVector*>(layer)->replaceKeyFrame(&redoVector);
-
-    editor()->scrubTo(redoVector.pos());
 }
 
 TransformCommand::TransformCommand(const QRectF& undoSelectionRect,

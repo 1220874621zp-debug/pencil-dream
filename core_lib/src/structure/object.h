@@ -31,7 +31,6 @@ GNU General Public License for more details.
 class QProgressDialog;
 class QFile;
 class LayerBitmap;
-class LayerVector;
 class LayerCamera;
 class LayerSound;
 class ObjectData;
@@ -78,12 +77,10 @@ public:
     void setColor(int index, const QColor& newColor);
     void setColorRef(int index, const ColorRef& newColorRef);
     void movePaletteColor(int start, int end);
-    void moveVectorColor(int start, int end);
 
     void addColor(const ColorRef& newColor) { mPalette.append(newColor); }
     void addColorAtIndex(int index, const ColorRef& newColor);
     void removeColor(int index);
-    bool isColorInUse(int index) const;
     void renameColor(int i, const QString& text);
     int getColorCount() { return mPalette.size(); }
     bool importPalette(const QString& filePath);
@@ -99,7 +96,6 @@ public:
     void loadDefaultPalette();
 
     LayerBitmap* addNewBitmapLayer();
-    LayerVector* addNewVectorLayer();
     LayerSound* addNewSoundLayer();
     LayerCamera* addNewCameraLayer();
 
@@ -171,7 +167,7 @@ private:
 
     QString mFilePath;       //< where this object come from. (empty if new project)
     QString mWorkingDirPath; //< the folder that pclx will uncompress to.
-    QString mDataDirPath;    //< the folder which contains all bitmap & vector image & sound files.
+    QString mDataDirPath;    //< the folder which contains all bitmap image & sound files.
     QString mMainXMLFile;    //< the location of main.xml
 
     QList<Layer*> mLayers;
