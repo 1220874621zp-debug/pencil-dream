@@ -216,7 +216,10 @@ void TimeLineCells::drawContent()
 {
     if (mCache == nullptr)
     {
-        mCache = new QPixmap(size());
+        // allocate at physical resolution so text stays sharp on high-DPI displays
+        const qreal dpr = devicePixelRatioF();
+        mCache = new QPixmap(size() * dpr);
+        mCache->setDevicePixelRatio(dpr);
         if (mCache->isNull())
         {
             // fail to create cache
