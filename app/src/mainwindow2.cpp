@@ -121,6 +121,9 @@ MainWindow2::MainWindow2(QWidget* parent) :
     mEditor = new Editor(this);
     mEditor->setScribbleArea(ui->scribbleArea);
     mEditor->init();
+    ui->background->setEditor(mEditor);
+    // paper follows the camera frame: repaint whenever the view zooms/pans
+    connect(mEditor->view(), &ViewManager::viewChanged, ui->background, qOverload<>(&QWidget::update));
 
     newObject();
 

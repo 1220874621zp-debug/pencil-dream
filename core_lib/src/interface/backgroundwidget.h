@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include <QWidget>
 #include "preferencemanager.h"
 
+class Editor;
 
 class BackgroundWidget : public QWidget
 {
@@ -30,6 +31,7 @@ public:
     ~BackgroundWidget() override;
 
     void init(PreferenceManager* prefs);
+    void setEditor(Editor* editor) { mEditor = editor; }
 
 public slots:
 
@@ -48,6 +50,7 @@ private:
     void loadBackgroundStyle();
 
     PreferenceManager* mPrefs = nullptr;
+    Editor* mEditor = nullptr;
 
     QString mStyle;
     bool mHasShadow = false;

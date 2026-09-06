@@ -21,6 +21,11 @@ GNU General Public License for more details.
 #include <QPainter>
 #include <QPaintEvent>
 
+#include "editor.h"
+#include "layermanager.h"
+#include "viewmanager.h"
+#include "layercamera.h"
+
 
 BackgroundWidget::BackgroundWidget(QWidget* parent) : QWidget(parent)
 {
@@ -81,9 +86,26 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     grad.setColorAt(1.0,  QColor(0x26, 0x28, 0x2C));
     painter.fillRect(r, grad);
 
-    const int margin = 24;
+    // Paper follows the camera frame: the camera rect in document space,
+    // mapped through the camera transform and the view transform, so it
+    // scales/pans together with the camera border instead of staying fixed.
+    QPolygonF paperPoly;
+    bool havePaper = false;
+    if (mEditor != nullptr && mEditor->layers() != nullptr)
+    {
+        LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
+        if (cam != nullptr)
+        {
+            const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
+            const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
+            for (const QPointF& pnt : camPoly)
+                paperPoly << mEditor->view()->mapCanvasToScreen(pnt);
+            havePaper = paperPoly.size() == 4;
+        }
+    }
+    const QRect paper = havePaper ? paperPoly.boundingRect().toAlignedRect()
+                                  : r.adjusted(24, 24, -24, -24);
     const QRect workspace = r;
-    const QRect paper = r.adjusted(margin, margin, -margin, -margin);
 
     painter.setClipRegion(QRegion(workspace).subtracted(QRegion(paper)));
     painter.setPen(QPen(QColor(0x26, 0x26, 0x26), 1.0));
@@ -93,12 +115,28 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
 
-    // clean light paper for drawing (strokes stay readable on it), rounded
+    // clean light paper for drawing (strokes stay readable on it)
     painter.setClipRect(event->rect());
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
-    painter.drawRoundedRect(paper, 12.0, 12.0);
+    if (havePaper)
+    {
+        const QRectF b = paperPoly.boundingRect();
+        const bool axisAligned = paperPoly.size() == 4
+            && qFuzzyCompare(paperPoly.at(0).x(), b.left()) && qFuzzyCompare(paperPoly.at(0).y(), b.top())
+            && qFuzzyCompare(paperPoly.at(1).x(), b.right()) && qFuzzyCompare(paperPoly.at(1).y(), b.top())
+            && qFuzzyCompare(paperPoly.at(2).x(), b.right()) && qFuzzyCompare(paperPoly.at(2).y(), b.bottom())
+            && qFuzzyCompare(paperPoly.at(3).x(), b.left()) && qFuzzyCompare(paperPoly.at(3).y(), b.bottom());
+        if (axisAligned)
+            painter.drawRoundedRect(b, 12.0, 12.0);
+        else
+            painter.drawPolygon(paperPoly);
+    }
+    else
+    {
+        painter.drawRoundedRect(paper, 12.0, 12.0);
+    }
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     if (mHasShadow)
