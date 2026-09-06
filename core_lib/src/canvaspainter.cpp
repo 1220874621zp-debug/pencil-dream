@@ -281,7 +281,8 @@ void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPa
 void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer)
 {
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
-    BitmapImage* paintedImage = bitmapLayer->getLastBitmapImageAtFrame(mFrameNumber);
+    // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing
+    BitmapImage* paintedImage = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(mFrameNumber));
 
     if (paintedImage == nullptr) { return; }
     paintedImage->loadFile(); // Critical! force the BitmapImage to load the image

@@ -113,6 +113,15 @@ public:
     bool keyExistsWhichCovers(int frameNumber);
     KeyFrame *getKeyFrameWhichCovers(int frameNumber) const;
 
+    /** Returns the exclusive end position of the exposure block of the given keyframe.
+     *  Auto-length frames hold until the next keyframe; explicit (trimmed) frames stop
+     *  after their length. Returns -1 when the block is open-ended (last keyframe, auto length). */
+    int getBlockEnd(const KeyFrame* key) const;
+
+    /** Removes the keyframe at the given position and transfers ownership to the caller
+     *  (unlike removeKeyFrame, the frame is not deleted and the last-frame restriction does not apply). */
+    KeyFrame* takeKeyFrame(int position);
+
     void foreachKeyFrame(std::function<void(KeyFrame*)>) const;
 
     void setModified(int position, bool isModified) const;

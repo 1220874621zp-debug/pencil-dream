@@ -97,6 +97,14 @@ private:
     int getFrameX(int frameNumber) const;
     int getFrameNumber(int x) const;
 
+    // Dreams-style block helpers
+    /** Width of the exposure block of the given keyframe, in frames (trim preview aware). */
+    int blockLengthFor(const Layer* layer, const KeyFrame* key) const;
+    /** Returns the keyframe pos whose block's right edge is under the given position, or -1. */
+    int hitTestTrimHandle(const QPoint& pos) const;
+    /** Move the selected frames of the source layer to the target layer (same type only). */
+    void moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex);
+
     void onDidLeaveWidget();
 
     bool trackScrubber();
@@ -157,6 +165,19 @@ private:
 
     bool mCanMoveFrame   = false;
     bool mMovingFrames   = false;
+
+    // Dreams-style trim (drag block right edge)
+    bool mTrimming = false;
+    int mTrimKeyPos = -1;
+    int mTrimOriginalLength = 1;
+    int mTrimPreviewLength = 1;
+
+    // Whole-layer grab (Ctrl + drag a block moves every frame of the layer)
+    bool mWholeLayerMode = false;
+
+    // Cross-layer drag & drop
+    int mDropTargetLayer = -1;
+    int mDropShiftFrames = 0;
 
     bool mCanBoxSelect   = false;
     bool mBoxSelecting   = false;

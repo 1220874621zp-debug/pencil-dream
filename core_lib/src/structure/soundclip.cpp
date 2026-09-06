@@ -24,6 +24,8 @@ GNU General Public License for more details.
 
 SoundClip::SoundClip()
 {
+    // Sound clips always cover exactly their own length
+    setLengthExplicit(true);
 }
 
 SoundClip::SoundClip(const SoundClip& s2) : KeyFrame(s2)

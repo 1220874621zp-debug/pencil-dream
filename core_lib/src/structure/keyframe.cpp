@@ -26,6 +26,7 @@ KeyFrame::KeyFrame(const KeyFrame& k2)
 {
     mFrame = k2.mFrame;
     mLength = k2.mLength;
+    mLengthExplicit = k2.mLengthExplicit;
     mIsModified = k2.mIsModified;
     mAttachedFileName = k2.mAttachedFileName;
     // intentionally not copying event listeners
@@ -48,10 +49,11 @@ KeyFrame& KeyFrame::operator=(const KeyFrame& k2)
 
 	mFrame = k2.mFrame;
 	mLength = k2.mLength;
+	mLengthExplicit = k2.mLengthExplicit;
 	mIsModified = k2.mIsModified;
 	mAttachedFileName = k2.mAttachedFileName;
-    // intentionally not copying event listeners
-    return *this;
+	// intentionally not copying event listeners
+	return *this;
 }
 
 void KeyFrame::addEventListener(KeyFrameEventListener* listener)

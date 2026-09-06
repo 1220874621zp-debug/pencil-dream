@@ -34,6 +34,8 @@ GNU General Public License for more details.
 #include "object.h"
 #include "playbackmanager.h"
 #include "preferencemanager.h"
+#include "soundclip.h"
+#include "soundmanager.h"
 #include "undoredomanager.h"
 #include "timeline.h"
 
@@ -440,6 +442,20 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     painter.restore();
 }
 
+int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
+{
+    if (mTrimming && key->pos() == mTrimKeyPos)
+    {
+        return mTrimPreviewLength;
+    }
+    const int end = layer->getBlockEnd(key);
+    if (end < 0)
+    {
+        return 1; // open-ended hold (last keyframe, auto length): single cell
+    }
+    return qMax(1, end - key->pos());
+}
+
 void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const
 {
     painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -450,28 +466,50 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     int recHeight = height - 4;
 
     const QList<int> selectedFrames = layer->getSelectedFramesByPos();
+
+    if (layer->type() == Layer::CAMERA)
+    {
+        // Camera keyframes are interpolated: keep the classic single-cell look
+        layer->foreachKeyFrame([&](KeyFrame* key)
+        {
+            int framePos = key->pos();
+            int recWidth = standardWidth;
+            int recLeft = getFrameX(framePos) - recWidth;
+
+            if (selectedFrames.contains(framePos)) {
+                return;
+            }
+
+            if (selected)
+            {
+                painter.setBrush(QColor(trackCol.red(), trackCol.green(), trackCol.blue(), 150));
+            }
+            else
+            {
+                painter.setBrush(Theme::TimelineFrameFill);
+            }
+
+            painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
+        });
+        return;
+    }
+
+    // Bitmap & sound layers render Dreams-style exposure blocks:
+    // the block spans from the keyframe position to the start of the next keyframe
+    // (auto length) or exactly its trimmed length (explicit).
     layer->foreachKeyFrame([&](KeyFrame* key)
     {
         int framePos = key->pos();
-        int recWidth = standardWidth;
-        int recLeft = getFrameX(framePos) - recWidth;
+        int recLeft = getFrameX(framePos) - standardWidth;
 
         // Selected frames are painted separately
         if (selectedFrames.contains(framePos)) {
             return;
         }
 
-        if (key->length() > 1)
-        {
-            // This is especially for sound clips.
-            // Sound clips are the only type of KeyFrame with variable frame length.
-            recWidth = frameSize * key->length();
-        }
+        int blockLen = blockLengthFor(layer, key);
+        int recWidth = standardWidth + (blockLen - 1) * frameSize;
 
-        // Paint the frame border
-        painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-
-        // Paint the frame contents
         if (selected)
         {
             painter.setBrush(QColor(trackCol.red(), trackCol.green(), trackCol.blue(), 150));
@@ -482,6 +520,12 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         }
 
         painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
+
+        // Keyframe marker at the block start
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(trackCol);
+        painter.drawEllipse(QRectF(recLeft + 3.0, recTop + recHeight / 2.0 - 2.0, 4.0, 4.0));
+        painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     });
 }
 
@@ -526,39 +570,82 @@ void TimeLineCells::paintHighlightedFrame(QPainter& painter, int framePos, int r
 
 void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, const int layerIndex) const
 {
-    int mouseX = mMouseMoveX;
-    int posUnderCursor = getFrameNumber(mMousePressX);
-    int standardWidth = mFrameSize - 2;
-    int recWidth = standardWidth;
-    int recHeight = mLayerHeight - 4;
-    int recTop = getLayerY(layerIndex) + 1;
+    const QList<int> selectedFrames = layer->getSelectedFramesByPos();
+    if (selectedFrames.isEmpty()) { return; }
 
-    painter.save();
-    for (int framePos : layer->getSelectedFramesByPos()) {
+    const int standardWidth = mFrameSize - 2;
+    const int recHeight = mLayerHeight - 4;
 
-        KeyFrame* key = layer->getKeyFrameAt(framePos);
-        if (key->length() > 1)
+    // The moving preview follows the drag: normally on this row, on the drop row for cross-layer drags
+    bool previewing = mMovingFrames && layerIndex == mCurrentLayerNumber;
+    int previewRow = layerIndex;
+    if (previewing && mDropTargetLayer != -1)
+    {
+        previewRow = mDropTargetLayer;
+    }
+    const int recTop = getLayerY(previewRow) + 1;
+    const int lift = previewing ? -4 : 0;
+
+    // Horizontal offset (in frames) of the preview position
+    int dx = 0;
+    if (previewing)
+    {
+        const int posUnderCursor = getFrameNumber(mMousePressX);
+        dx = mFramePosMoveX - posUnderCursor;
+        if (mDropTargetLayer != -1)
         {
-            // This is a special case for sound clip.
-            // Sound clip is the only type of KeyFrame that has variable frame length.
-            recWidth = mFrameSize * key->length();
-        }
-
-        painter.setBrush(Theme::TimelineSelectedFrameFill);
-        painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-
-        int frameX = getFrameX(framePos);
-        if (mMovingFrames) {
-            int offset = (framePos - posUnderCursor) + mFrameOffset;
-            int newFrameX = getFrameX(getFrameNumber(getFrameX(offset)+mouseX)) - standardWidth;
-            // Paint as frames are hovering
-            painter.drawRect(newFrameX, recTop-4, recWidth, recHeight);
-
-        } else {
-            int currentFrameX = frameX - standardWidth;
-            painter.drawRect(currentFrameX, recTop, recWidth, recHeight);
+            dx += mDropShiftFrames;
         }
     }
+
+    painter.save();
+    painter.setBrush(Theme::TimelineSelectedFrameFill);
+    painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+
+    // Merge consecutive blocks (block end == next selected start) into one rounded run
+    int i = 0;
+    while (i < selectedFrames.count())
+    {
+        const int runStart = selectedFrames[i];
+        int runEndExclusive = runStart + 1;
+
+        while (i < selectedFrames.count())
+        {
+            const int pos = selectedFrames[i];
+            const KeyFrame* key = layer->getKeyFrameAt(pos);
+            const int len = (layer->type() == Layer::CAMERA || key == nullptr) ? 1 : blockLengthFor(layer, key);
+            runEndExclusive = pos + len;
+            if (i + 1 < selectedFrames.count() && selectedFrames[i + 1] == runEndExclusive)
+            {
+                ++i; // contiguous block, extend the run
+            }
+            else
+            {
+                break;
+            }
+        }
+        ++i;
+
+        const int blockLen = runEndExclusive - runStart;
+        const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
+        const int recLeft = getFrameX(runStart + dx) - standardWidth;
+        painter.drawRoundedRect(QRectF(recLeft, recTop + lift, recWidth, recHeight), 3.0, 3.0);
+
+        // One marker dot per selected keyframe inside the run
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Theme::Accent);
+        for (int framePos : selectedFrames)
+        {
+            if (framePos >= runStart && framePos < runEndExclusive)
+            {
+                painter.drawEllipse(QRectF(getFrameX(framePos + dx) - standardWidth + 3.0,
+                                           recTop + lift + recHeight / 2.0 - 2.0, 4.0, 4.0));
+            }
+        }
+        painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Theme::TimelineSelectedFrameFill);
+    }
+
     painter.restore();
 }
 
@@ -745,7 +832,8 @@ void TimeLineCells::paintEvent(QPaintEvent*)
         KeyFrame* keyFrame = currentLayer->getKeyFrameWhichCovers(currentFrame);
         if (keyFrame != nullptr)
         {
-            int recWidth = keyFrame->length() == 1 ? mFrameSize - 2 : mFrameSize * keyFrame->length();
+            int blockLen = (currentLayer->type() == Layer::CAMERA) ? 1 : blockLengthFor(currentLayer, keyFrame);
+            int recWidth = mFrameSize - 2 + (blockLen - 1) * mFrameSize;
             int recLeft = getFrameX(keyFrame->pos()) - (mFrameSize - 2);
             paintCurrentFrameBorder(painter, recLeft, getLayerY(mEditor->currentLayerIndex()) + 1, recWidth, mLayerHeight - 4);
         }
@@ -847,6 +935,12 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 
     mClickSelecting = false;
 
+    mWholeLayerMode = false;
+    mDropTargetLayer = -1;
+    mDropShiftFrames = 0;
+    mTrimming = false;
+    mTrimKeyPos = -1;
+
     primaryButton = event->button();
 
     switch (mType)
@@ -883,6 +977,33 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         else
         {
+            // Dreams-style trim: grabbing the right edge of a bitmap block adjusts its length
+            if (event->button() == Qt::LeftButton && layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
+            {
+                int trimPos = hitTestTrimHandle(event->pos());
+                if (trimPos > 0)
+                {
+                    Layer* trimLayer = mEditor->object()->getLayer(layerNumber);
+                    KeyFrame* trimKey = trimLayer->getKeyFrameAt(trimPos);
+                    if (trimKey != nullptr)
+                    {
+                        if (mEditor->currentLayerIndex() != layerNumber)
+                        {
+                            mEditor->layers()->currentLayer()->deselectAll();
+                            mEditor->layers()->setCurrentLayer(layerNumber);
+                            emit mEditor->selectedFramesChanged();
+                        }
+                        mTrimming = true;
+                        mTrimKeyPos = trimPos;
+                        int trimEnd = trimLayer->getBlockEnd(trimKey);
+                        mTrimOriginalLength = (trimEnd > 0) ? (trimEnd - trimPos) : 1;
+                        mTrimPreviewLength = mTrimOriginalLength;
+                        updateContent();
+                        break;
+                    }
+                }
+            }
+
             if (frameNumber == mEditor->currentFrame() && mStartY < 20)
             {
                 if (mEditor->playback()->isPlaying())
@@ -1011,6 +1132,23 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
     }
     else if (mType == TIMELINE_CELL_TYPE::Tracks)
     {
+        if (mTrimming)
+        {
+            Layer* layer = mEditor->layers()->getLayer(mCurrentLayerNumber);
+            KeyFrame* key = (layer != nullptr) ? layer->getKeyFrameAt(mTrimKeyPos) : nullptr;
+            if (key != nullptr)
+            {
+                // The block cannot swallow the next keyframe
+                int nextPos = layer->getNextKeyFramePosition(mTrimKeyPos);
+                int maxLen = (nextPos > mTrimKeyPos) ? (nextPos - mTrimKeyPos)
+                                                     : (mFrameLength - mTrimKeyPos + 1);
+                int newLen = mFramePosMoveX - mTrimKeyPos + 1;
+                mTrimPreviewLength = qBound(1, newLen, maxLen);
+                updateContent();
+            }
+            return;
+        }
+
         if (primaryButton == Qt::MiddleButton)
         {
             mFrameOffset = qMin(qMax(0, mFrameLength - width() / getFrameSize()), qMax(0, mFrameOffset + mLastFrameNumber - mFramePosMoveX));
@@ -1038,8 +1176,45 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                         // Check if the frame we clicked was selected
                         if (mCanMoveFrame) {
 
+                            // Ctrl + drag = Dreams-style whole-track grab: every frame of the layer follows
+                            if ((event->modifiers() & Qt::ControlModifier) && !mWholeLayerMode)
+                            {
+                                mWholeLayerMode = true;
+                                currentLayer->selectAllFramesAfter(currentLayer->firstKeyFramePosition());
+                                emit mEditor->selectedFramesChanged();
+                            }
+
                             // If it is the case, we move the selected frames in the layer
                             mMovingFrames = true;
+
+                            // Vertical drag onto another row of the same type = cross-layer move
+                            mDropTargetLayer = -1;
+                            mDropShiftFrames = 0;
+                            if (mLayerPosMoveY >= 0 && mLayerPosMoveY < mEditor->object()->getLayerCount()
+                                && mLayerPosMoveY != mCurrentLayerNumber)
+                            {
+                                Layer* srcLayer = mEditor->object()->getLayer(mCurrentLayerNumber);
+                                Layer* tgtLayer = mEditor->object()->getLayer(mLayerPosMoveY);
+                                if (srcLayer != nullptr && tgtLayer != nullptr && srcLayer->type() == tgtLayer->type())
+                                {
+                                    mDropTargetLayer = mLayerPosMoveY;
+
+                                    // Find the smallest shift so the whole selection lands on free spots
+                                    const QList<int> sel = srcLayer->selectedKeyFramesPositions();
+                                    const int posUnderCursor = getFrameNumber(mMousePressX);
+                                    const int dx = mFramePosMoveX - posUnderCursor;
+                                    int shift = 0;
+                                    auto collides = [&sel, tgtLayer, dx](int s) {
+                                        for (int p : sel) {
+                                            int np = p + dx + s;
+                                            if (np < 1 || tgtLayer->keyExists(np)) { return true; }
+                                        }
+                                        return false;
+                                    };
+                                    while (collides(shift) && shift < mFrameLength) { shift++; }
+                                    mDropShiftFrames = shift;
+                                }
+                            }
                         }
                         else if (mCanBoxSelect)
                         {
@@ -1053,6 +1228,18 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                         }
                         mLastFrameNumber = mFramePosMoveX;
                         updateContent();
+                    }
+                }
+                else if (event->buttons() == Qt::NoButton)
+                {
+                    // Hover feedback: resize cursor over a block edge
+                    if (hitTestTrimHandle(event->pos()) > 0)
+                    {
+                        setCursor(Qt::SizeHorCursor);
+                    }
+                    else
+                    {
+                        setCursor(Qt::ArrowCursor);
                     }
                 }
                 update();
@@ -1075,7 +1262,35 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         Layer* currentLayer = mEditor->layers()->getLayer(mCurrentLayerNumber);
         Q_ASSERT(currentLayer);
 
-        if (mMovingFrames)
+        if (mTrimming)
+        {
+            mTrimming = false;
+            KeyFrame* trimKey = currentLayer->getKeyFrameAt(mTrimKeyPos);
+            if (trimKey != nullptr && mTrimPreviewLength != mTrimOriginalLength)
+            {
+                // BitmapReplaceCommand snapshots the redo state at the current frame,
+                // so the scrubber must sit on the trimmed block before recording
+                mEditor->scrubTo(mTrimKeyPos);
+                SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+                trimKey->setLength(mTrimPreviewLength);
+                trimKey->setLengthExplicit(true);
+                currentLayer->markFrameAsDirty(mTrimKeyPos);
+                mEditor->undoRedo()->record(saveStateId, tr("Trim Frame"));
+            }
+            mTrimKeyPos = -1;
+            mEditor->layers()->notifyAnimationLengthChanged();
+            emit mEditor->framesModified();
+            updateContent();
+        }
+        else if (mMovingFrames && mDropTargetLayer != -1 && mDropTargetLayer != mCurrentLayerNumber)
+        {
+            // Vertical drag onto another track: carry the selected frames over
+            moveSelectedFramesAcrossLayers(mCurrentLayerNumber, mDropTargetLayer);
+            mEditor->layers()->notifyAnimationLengthChanged();
+            emit mEditor->framesModified();
+            updateContent();
+        }
+        else if (mMovingFrames)
         {
             int posUnderCursor = getFrameNumber(mMousePressX);
             int offset = frameNumber - posUnderCursor;
@@ -1132,6 +1347,9 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
     mEndY = mStartY;
     mTimeLine->scrubbing = false;
     mMovingFrames = false;
+    mWholeLayerMode = false;
+    mDropTargetLayer = -1;
+    mDropShiftFrames = 0;
 }
 
 void TimeLineCells::mouseDoubleClickEvent(QMouseEvent* event)
@@ -1225,6 +1443,84 @@ void TimeLineCells::hScrollChange(int x)
 {
     mFrameOffset = x;
     updateContent();
+}
+
+int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
+{
+    if (mType != TIMELINE_CELL_TYPE::Tracks) { return -1; }
+
+    const int layerNumber = getLayerNumber(pos.y());
+    if (layerNumber < 0 || layerNumber >= mEditor->object()->getLayerCount()) { return -1; }
+
+    Layer* layer = mEditor->object()->getLayer(layerNumber);
+    if (layer == nullptr || layer->type() != Layer::BITMAP) { return -1; }
+
+    const int frameNumber = getFrameNumber(pos.x());
+    KeyFrame* key = layer->getKeyFrameWhichCovers(frameNumber);
+    if (key == nullptr) { return -1; }
+
+    int blockEnd = layer->getBlockEnd(key);
+    if (blockEnd < 0) { blockEnd = key->pos() + 1; } // open-ended hold: single-cell block
+
+    // The visual right edge of the block is the right border of its last frame cell
+    const int edgeX = getFrameX(blockEnd - 1);
+    return (qAbs(pos.x() - edgeX) <= 4) ? key->pos() : -1;
+}
+
+void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
+{
+    Layer* source = mEditor->layers()->getLayer(sourceIndex);
+    Layer* target = mEditor->layers()->getLayer(targetIndex);
+    if (source == nullptr || target == nullptr || source == target) { return; }
+    if (source->type() != target->type()) { return; }
+
+    const QList<int> positions = source->selectedKeyFramesPositions();
+    if (positions.isEmpty()) { return; }
+
+    mEditor->backup(tr("Move Frames to Layer"));
+
+    const int posUnderCursor = getFrameNumber(mMousePressX);
+    int dx = mFramePosMoveX - posUnderCursor + mDropShiftFrames;
+
+    // Keep every frame inside the timeline
+    const int minPos = positions.first();
+    if (minPos + dx < 1) { dx = 1 - minPos; }
+
+    target->deselectAll();
+
+    // Take the selected frames out of the source layer; ownership travels with them
+    QVector<QPair<int, KeyFrame*>> taken;
+    for (int pos : positions)
+    {
+        KeyFrame* key = source->takeKeyFrame(pos);
+        if (key != nullptr)
+        {
+            taken.append(qMakePair(pos, key));
+        }
+    }
+
+    for (const auto& pair : taken)
+    {
+        const int newPos = pair.first + dx;
+        KeyFrame* key = pair.second;
+
+        if (target->keyExists(newPos))
+        {
+            // Should not happen (shift avoided collisions); put it back as a fallback
+            source->addKeyFrame(pair.first, key);
+            continue;
+        }
+
+        target->addKeyFrame(newPos, key);
+        if (target->type() == Layer::SOUND)
+        {
+            auto soundClip = static_cast<SoundClip*>(key);
+            mEditor->sound()->loadSound(soundClip, soundClip->fileName());
+        }
+        target->setFrameSelected(newPos, true);
+    }
+
+    source->deselectAll();
 }
 
 void TimeLineCells::vScrollChange(int x)

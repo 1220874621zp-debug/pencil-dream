@@ -41,6 +41,12 @@ public:
     int length() const { return mLength; }
     void setLength(int len) { mLength = len; }
 
+    /** Whether the frame length was set explicitly by the user (trimmed).
+     *  When false the frame holds/exposes until the next keyframe (classic behaviour).
+     *  Sound clips are always explicit. */
+    bool isLengthExplicit() const { return mLengthExplicit; }
+    void setLengthExplicit(bool b) { mLengthExplicit = b; }
+
     void modification() { mIsModified = true; }
     void setModified(bool b) { mIsModified = b; }
     bool isModified() const { return mIsModified; }
@@ -68,6 +74,7 @@ public:
 private:
     int mFrame = -1;
     int mLength = 1;
+    bool mLengthExplicit = false;
     bool mIsModified = true;
     QString mAttachedFileName;
 

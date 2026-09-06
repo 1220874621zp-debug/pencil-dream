@@ -687,7 +687,7 @@ void Object::paintImage(QPainter& painter,int frameNumber,
         {
 
             LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
-            BitmapImage* bitmap = layerBitmap->getLastBitmapImageAtFrame(frameNumber);
+            BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
             if (bitmap)
             {
                 painter.setOpacity(bitmap->getOpacity());

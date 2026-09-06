@@ -685,12 +685,59 @@ KeyFrame* Layer::getKeyFrameWhichCovers(int frameNumber) const
     auto keyFrame = getLastKeyFrameAtPosition(frameNumber);
     if (keyFrame != nullptr)
     {
-        if (keyFrame->pos() + keyFrame->length() > frameNumber)
+        // Auto-length frames hold until the next keyframe; explicit ones stop after their length
+        const int cover = keyFrame->isLengthExplicit() ? keyFrame->length() : INT_MAX;
+        if (keyFrame->pos() + cover > frameNumber)
         {
             return keyFrame;
         }
     }
     return nullptr;
+}
+
+int Layer::getBlockEnd(const KeyFrame* key) const
+{
+    if (key == nullptr) { return -1; }
+
+    // mKeyFrames is sorted descending (greater<int>): larger positions sit towards begin()
+    auto it = mKeyFrames.find(key->pos());
+    if (it == mKeyFrames.end()) { return -1; }
+
+    bool hasNextKeyframe = (it != mKeyFrames.begin());
+    int nextKeyframePos = -1;
+    if (hasNextKeyframe)
+    {
+        auto nextIt = it;
+        --nextIt; // the following keyframe has a larger position
+        nextKeyframePos = nextIt->first;
+    }
+
+    if (key->isLengthExplicit())
+    {
+        int end = key->pos() + key->length();
+        if (hasNextKeyframe && nextKeyframePos < end)
+        {
+            end = nextKeyframePos;
+        }
+        return end; // exclusive end
+    }
+
+    // Auto length: the block holds until the next keyframe, if any
+    return hasNextKeyframe ? nextKeyframePos : -1;
+}
+
+KeyFrame* Layer::takeKeyFrame(int position)
+{
+    auto it = mKeyFrames.find(position);
+    if (it == mKeyFrames.end())
+    {
+        return nullptr;
+    }
+    KeyFrame* key = it->second;
+    mKeyFrames.erase(it);
+    removeFromSelectionList(position);
+    markFrameAsDirty(position);
+    return key;
 }
 
 QDomElement Layer::createBaseDomElement(QDomDocument& doc) const

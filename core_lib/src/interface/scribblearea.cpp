@@ -777,7 +777,7 @@ void ScribbleArea::paintBitmapBuffer()
 
     // If there is no keyframe at or before the current position,
     // just return (since we have nothing to paint on).
-    if (layer->getLastKeyFrameAtPosition(frameNumber) == nullptr)
+    if (layer->getKeyFrameWhichCovers(frameNumber) == nullptr)
     {
         updateFrame();
         return;
@@ -833,7 +833,7 @@ void ScribbleArea::handleDrawingOnEmptyFrame()
 
     // Drawing on an empty frame; take action based on preference.
     int action = mPrefs->getInt(SETTING::DRAW_ON_EMPTY_FRAME_ACTION);
-    auto previousKeyFrame = layer->getLastKeyFrameAtPosition(frameNumber);
+    auto previousKeyFrame = layer->getKeyFrameWhichCovers(frameNumber);
     switch (action)
     {
     case KEEP_DRAWING_ON_PREVIOUS_KEY:
@@ -964,7 +964,7 @@ BitmapImage* ScribbleArea::currentBitmapImage(Layer* layer) const
 {
     Q_ASSERT(layer->type() == Layer::BITMAP);
     auto bitmapLayer = static_cast<LayerBitmap*>(layer);
-    return bitmapLayer->getLastBitmapImageAtFrame(mEditor->currentFrame());
+    return static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(mEditor->currentFrame()));
 }
 
 void ScribbleArea::prepCameraPainter(int frame)
