@@ -71,6 +71,7 @@ GNU General Public License for more details.
 #include "onionskinwidget.h"
 #include "pegbaralignmentdialog.h"
 #include "addtransparencytopaperdialog.h"
+#include "gapfilldialog.h"
 #include "repositionframesdialog.h"
 
 #include "errordialog.h"
@@ -311,6 +312,7 @@ void MainWindow2::createMenus()
     connect(ui->actionChangeLineColorCurrent_keyframe, &QAction::triggered, mCommands, &ActionCommands::changeKeyframeLineColor);
     connect(ui->actionChangeLineColorAll_keyframes_on_layer, &QAction::triggered, mCommands, &ActionCommands::changeallKeyframeLineColor);
     connect(ui->actionChangeLayerOpacity, &QAction::triggered, this, &MainWindow2::openLayerOpacityDialog);
+    connect(ui->actionGapFill, &QAction::triggered, this, &MainWindow2::openGapFillDialog);
 
     QList<QAction*> visibilityActions = ui->menuLayer_Visibility->actions();
     auto visibilityGroup = new QActionGroup(this);
@@ -603,6 +605,27 @@ void MainWindow2::openAddTranspToPaperDialog()
         mAddTranspToPaper->deleteLater();
         mAddTranspToPaper = nullptr;
     });
+}
+
+void MainWindow2::openGapFillDialog()
+{
+    if (mGapFillDialog != nullptr)
+    {
+        mGapFillDialog->activateWindow();
+        mGapFillDialog->raise();
+        return;
+    }
+
+    mGapFillDialog = new GapFillDialog(this);
+    mGapFillDialog->setAttribute(Qt::WA_DeleteOnClose);
+    mGapFillDialog->setWindowFlags(mGapFillDialog->windowFlags() | Qt::WindowStaysOnTopHint);
+    mGapFillDialog->setCore(mEditor);
+    mGapFillDialog->initUI();
+    connect(mGapFillDialog, &GapFillDialog::finished, this, [this]()
+    {
+        mGapFillDialog = nullptr;
+    });
+    mGapFillDialog->show();
 }
 
 void MainWindow2::openRepositionDialog()

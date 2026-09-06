@@ -7,6 +7,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/gapfilldialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app_util.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app-pch.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/appearance.h
@@ -67,6 +68,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/gapfilldialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/basedockwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/basewidget.cpp
@@ -126,6 +128,7 @@ set(APP_SOURCES
 set(APP_FORMS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/aboutdialog.ui
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/addtransparencytopaperdialog.ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/gapfilldialog.ui
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/bucketoptionswidget.ui
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/cameraoptionswidget.ui
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/camerapropertiesdialog.ui

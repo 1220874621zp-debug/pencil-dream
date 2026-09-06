@@ -14,6 +14,16 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/onnxbackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/candidate_context.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/gap_detection.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/image_types.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/owner_regions.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/settings.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/smart_gap_propagation.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/gap_color_predictor.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/onnx_predictor_stub.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/rule_based_predictor.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/colorref.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/backgroundwidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/editor.h
@@ -104,6 +114,15 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/onnxbackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/candidate_context.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/gap_detection.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/owner_regions.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/settings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/core/smart_gap_propagation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/gap_color_predictor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/onnx_predictor_stub.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill/predictors/rule_based_predictor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/colorref.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/backgroundwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/editor.cpp
@@ -199,6 +218,7 @@ set(CORE_LIB_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/gapfill
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure

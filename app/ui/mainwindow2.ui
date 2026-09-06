@@ -310,6 +310,7 @@
     <addaction name="separator"/>
     <addaction name="actionChangeLayerOpacity"/>
     <addaction name="separator"/>
+    <addaction name="actionGapFill"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -1053,6 +1054,11 @@
   <action name="actionChangeLayerOpacity">
    <property name="text">
     <string>Layer / Keyframe opacity</string>
+   </property>
+  </action>
+  <action name="actionGapFill">
+   <property name="text">
+    <string>间隙填充…</string>
    </property>
   </action>
   <action name="actionOpen_Temporary_Directory">
