@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QGridLayout>
+#include <QToolButton>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -43,9 +44,11 @@ StatusBar::StatusBar(QWidget *parent) : QStatusBar(parent)
     mToolIcon = new QLabel(this);
     addWidget(mToolIcon);
 
-    QPushButton* debugLogButton = new QPushButton(tr("Debug Log"), this);
+    QToolButton* debugLogButton = new QToolButton(this);
+    debugLogButton->setIcon(QIcon(":/icons/themes/playful/misc/search-log.svg"));
     debugLogButton->setToolTip(tr("View and copy the recent debug log"));
-    connect(debugLogButton, &QPushButton::clicked, this, &StatusBar::showDebugLog);
+    debugLogButton->setAutoRaise(true);
+    connect(debugLogButton, &QToolButton::clicked, this, &StatusBar::showDebugLog);
     addWidget(debugLogButton);
     mToolLabel = new ElidedLabel(this);
     mToolLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);

@@ -685,12 +685,21 @@ KeyFrame* Layer::getKeyFrameWhichCovers(int frameNumber) const
     auto keyFrame = getLastKeyFrameAtPosition(frameNumber);
     if (keyFrame != nullptr)
     {
-        // Auto-length frames hold until the next keyframe; explicit ones stop after their length
-        const int cover = keyFrame->isLengthExplicit() ? keyFrame->length() : INT_MAX;
-        if (keyFrame->pos() + cover > frameNumber)
+        // Auto-length frames hold until the next keyframe; explicit ones stop
+        // after their length. Guard against zero/negative explicit lengths
+        // (treated as auto) so a corrupted length can never blank drawing.
+        const int len = keyFrame->length();
+        const int cover = (keyFrame->isLengthExplicit() && len > 0) ? len : INT_MAX;
+        // qint64: pos + INT_MAX overflows int and flips negative, which made
+        // every auto-length keyframe miss and blanked the canvas
+        if (static_cast<qint64>(keyFrame->pos()) + cover > frameNumber)
         {
             return keyFrame;
         }
+        qDebug() << "[covers] miss: layer-key pos=" << keyFrame->pos()
+                 << " len=" << len
+                 << " explicit=" << keyFrame->isLengthExplicit()
+                 << " frame=" << frameNumber;
     }
     return nullptr;
 }

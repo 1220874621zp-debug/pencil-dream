@@ -93,9 +93,13 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
 
-    // clean light paper for drawing (strokes stay readable on it)
+    // clean light paper for drawing (strokes stay readable on it), rounded
     painter.setClipRect(event->rect());
-    painter.fillRect(paper, QColor(0xFF, 0xFF, 0xFF));
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
+    painter.drawRoundedRect(paper, 12.0, 12.0);
+    painter.setRenderHint(QPainter::Antialiasing, false);
 
     if (mHasShadow)
         drawShadow(painter);
