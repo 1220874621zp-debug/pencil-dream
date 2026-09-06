@@ -26,6 +26,7 @@ GNU General Public License for more details.
 #include <QDebug>
 
 #include "camerapropertiesdialog.h"
+#include "theme.h"
 #include "editor.h"
 #include "keyframe.h"
 #include "layermanager.h"
@@ -385,7 +386,7 @@ void TimeLineCells::paintTicks(QPainter& painter, const QPalette& palette) const
         if (i == 0 || i % fps == fps - 1)
         {
             int incr = (i < 9) ? 4 : 0; // poor man’s text centering
-            painter.drawText(QPoint(lineX + incr, 15), QString::number(i + 1));
+            painter.drawText(QPoint(lineX + incr, 17), QString::number(i + 1));
         }
     }
 }
@@ -397,16 +398,16 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     const QPalette palette = QApplication::palette();
     QColor col;
     // Color each track according to the layer type
-    if (layer->type() == Layer::BITMAP) col = QColor(51, 155, 252);
-    if (layer->type() == Layer::SOUND) col = QColor(255, 141, 112);
-    if (layer->type() == Layer::CAMERA) col = QColor(253, 202, 92);
+    if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
+    if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
     // Dim invisible layers
     if (!layer->visible()) col.setAlpha(64);
 
     painter.save();
     painter.setBrush(col);
-    painter.setPen(QPen(QBrush(palette.color(QPalette::Mid)), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.drawRect(x, y - 1, width, height);
+    painter.setPen(QPen(QBrush(Theme::Border), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawRoundedRect(QRectF(x, y - 1, width, height), 4.0, 4.0);
 
     if (!layer->visible())
     {
@@ -423,7 +424,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     {
         painter.save();
         QLinearGradient linearGrad(QPointF(0, y), QPointF(0, y + height));
-        linearGrad.setColorAt(0, QColor(255,255,255,150));
+        linearGrad.setColorAt(0, QColor(255,255,255,70));
         linearGrad.setColorAt(1, QColor(0,0,0,0));
         painter.setCompositionMode(QPainter::CompositionMode_Overlay);
         painter.setBrush(linearGrad);
@@ -438,7 +439,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
 
 void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const
 {
-    painter.setPen(QPen(QBrush(QColor(40, 40, 40)), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
     int recTop = y + 1;
     int standardWidth = frameSize - 2;
@@ -465,15 +466,19 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         }
 
         // Paint the frame border
-        painter.setPen(QPen(QBrush(QColor(40, 40, 40)), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
         // Paint the frame contents
         if (selected)
         {
             painter.setBrush(QColor(trackCol.red(), trackCol.green(), trackCol.blue(), 150));
         }
+        else
+        {
+            painter.setBrush(Theme::TimelineFrameFill);
+        }
 
-        painter.drawRect(recLeft, recTop, recWidth, recHeight);
+        painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
     });
 }
 
@@ -481,8 +486,8 @@ void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int 
 {
     painter.save();
     painter.setBrush(Qt::NoBrush);
-    painter.setPen(Qt::white);
-    painter.drawRect(recLeft, recTop, recWidth, recHeight);
+    painter.setPen(QPen(Theme::TimelineCurrentFrameBorder, 2));
+    painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
     painter.restore();
 }
 
@@ -536,8 +541,8 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
             recWidth = mFrameSize * key->length();
         }
 
-        painter.setBrush(QColor(60, 60, 60));
-        painter.setPen(QPen(QBrush(QColor(40, 40, 40)), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Theme::TimelineSelectedFrameFill);
+        painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
         int frameX = getFrameX(framePos);
         if (mMovingFrames) {
@@ -560,16 +565,25 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
 {
     const QPalette palette = QApplication::palette();
 
+    // Row background: rounded card, selected rows get a subtle raised tone
+    painter.setRenderHint(QPainter::Antialiasing, true);
     if (selected)
     {
-        painter.setBrush(palette.color(QPalette::Highlight));
+        painter.setBrush(Theme::TimelineRowAlternate);
     }
     else
     {
         painter.setBrush(palette.color(QPalette::Base));
     }
     painter.setPen(Qt::NoPen);
-    painter.drawRect(x, y - 1, width, height); // empty rectangle by default
+    painter.drawRoundedRect(QRectF(x + 2, y + 1, width - 4, height - 2), 5.0, 5.0);
+
+    // Selected rows carry an accent side bar
+    if (selected)
+    {
+        painter.setBrush(Theme::Accent);
+        painter.drawRoundedRect(QRectF(x + 2, y + 6, 3.0, height - 12), 1.5, 1.5);
+    }
 
     if (!layer->visible())
     {
@@ -600,29 +614,28 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.setPen(palette.color(QPalette::Text));
     }
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.drawEllipse(x + 6, y + 4, 9, 9);
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.drawEllipse(QRectF(x + 10, y + (height - 9) / 2.0, 9.0, 9.0));
 
-    if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg"));
-    if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-sound.svg"));
-    if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(22, y - 1), QPixmap(":icons/themes/playful/timeline/cell-camera.svg"));
+    if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-sound.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-camera.svg").scaledToHeight(18, Qt::SmoothTransformation));
 
     if (selected)
     {
-        painter.setPen(palette.color(QPalette::HighlightedText));
+        painter.setPen(Theme::AccentHover);
     }
     else
     {
         painter.setPen(palette.color(QPalette::Text));
     }
-    painter.drawText(QPoint(45, y + (2 * height) / 3), layer->name());
+    painter.drawText(QPoint(52, y + height / 2 + 4), layer->name());
+    painter.setRenderHint(QPainter::Antialiasing, false);
 }
 
 void TimeLineCells::paintSelection(QPainter& painter, int x, int y, int width, int height) const
 {
     QLinearGradient linearGrad(QPointF(0, y), QPointF(0, y + height));
-    linearGrad.setColorAt(0, QColor(0, 0, 0, 255));
+    linearGrad.setColorAt(0, QColor(255, 255, 255, 60));
     linearGrad.setColorAt(1, QColor(255, 255, 255, 0));
     painter.save();
     painter.setCompositionMode(QPainter::CompositionMode_Overlay);
@@ -634,7 +647,7 @@ void TimeLineCells::paintSelection(QPainter& painter, int x, int y, int width, i
 
 void TimeLineCells::paintLayerGutter(QPainter& painter) const
 {
-    painter.setPen(QApplication::palette().color(QPalette::Mid));
+    painter.setPen(Theme::Accent);
     if (mMouseMoveY > mLayerDetachThreshold)
     {
         painter.drawRect(0, getLayerY(getInbetweenLayerNumber(mEndY))+mLayerHeight, width(), 2);
@@ -674,7 +687,7 @@ void TimeLineCells::paintOnionSkin(QPainter& painter) const
             QRect onionRect;
             onionRect.setTopLeft(QPoint(getFrameX(onionFrameNumber - 1), 0));
             onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), height()));
-            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 19));
+            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 23));
             painter.drawRect(onionRect);
 
             onionFrameNumber = layer->getPreviousFrameNumber(onionFrameNumber, isAbsolute);
@@ -694,7 +707,7 @@ void TimeLineCells::paintOnionSkin(QPainter& painter) const
             QRect onionRect;
             onionRect.setTopLeft(QPoint(getFrameX(onionFrameNumber - 1), 0));
             onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), height()));
-            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 19));
+            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 23));
             painter.drawRect(onionRect);
 
             onionFrameNumber = layer->getNextFrameNumber(onionFrameNumber, isAbsolute);
@@ -754,7 +767,7 @@ void TimeLineCells::paintEvent(QPaintEvent*)
         // --- draw the position of the current frame
         if (currentFrame > mFrameOffset)
         {
-            QColor scrubColor = palette.color(QPalette::Highlight);
+            QColor scrubColor = Theme::TimelinePlayhead;
             scrubColor.setAlpha(160);
             painter.setBrush(scrubColor);
             painter.setPen(Qt::NoPen);
@@ -766,13 +779,13 @@ void TimeLineCells::paintEvent(QPaintEvent*)
             scrubRect.setBottomRight(QPoint(currentFrameEndX, height()));
             if (mbShortScrub)
             {
-                scrubRect.setBottomRight(QPoint(currentFrameEndX, 19));
+                scrubRect.setBottomRight(QPoint(currentFrameEndX, 23));
             }
             painter.save();
 
             bool mouseUnderScrubber = currentFrame == mFramePosMoveX;
             if (mouseUnderScrubber) {
-                QRect smallScrub = QRect(QPoint(currentFrameStartX, 0), QPoint(currentFrameEndX,19));
+                QRect smallScrub = QRect(QPoint(currentFrameStartX, 0), QPoint(currentFrameEndX, 23));
                 QPen pen = scrubColor;
                 pen.setWidth(2);
                 painter.setPen(pen);
@@ -784,7 +797,7 @@ void TimeLineCells::paintEvent(QPaintEvent*)
 
             painter.setPen(palette.color(QPalette::HighlightedText));
             int incr = (currentFrame < 10) ? 4 : 0;
-            painter.drawText(QPoint(currentFrameStartX + incr, 15),
+            painter.drawText(QPoint(currentFrameStartX + incr, 17),
                              QString::number(currentFrame));
         }
     }

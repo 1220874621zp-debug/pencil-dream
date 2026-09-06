@@ -114,6 +114,10 @@ MainWindow2::MainWindow2(QWidget* parent) :
 {
     ui->setupUi(this);
 
+    // Dark immersive backdrop around the rounded paper (plain QWidget needs
+    // its own stylesheet to reliably paint a background)
+    ui->centralWidget->setStyleSheet("background-color: #0D0D0F;");
+
     // Initialize order
     // 1. editor 2. object 3. scribble area 4. other widgets
     mEditor = new Editor(this);
@@ -215,14 +219,17 @@ void MainWindow2::createDockWidgets()
         qDebug() << "Init Dock widget: " << pWidget->objectName();
     }
 
-    addDockWidget(Qt::RightDockWidgetArea, mColorBox);
-    addDockWidget(Qt::RightDockWidgetArea, mColorInspector);
-    addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
     addDockWidget(Qt::LeftDockWidgetArea, mToolBox);
     addDockWidget(Qt::LeftDockWidgetArea, mToolOptions);
-    addDockWidget(Qt::LeftDockWidgetArea, mOnionSkinWidget);
+    addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
+    tabifyDockWidget(mColorPalette, mColorBox);
+    tabifyDockWidget(mColorPalette, mColorInspector);
+    addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     setDockNestingEnabled(true);
+    // give the timeline a generous share of the window height
+    resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
+    mColorPalette->raise();
 
     /*
     mPreview = new PreviewWidget( this );
@@ -1088,13 +1095,15 @@ void MainWindow2::resetAndDockAllSubWidgets()
         dock->show();
     }
 
-    addDockWidget(Qt::RightDockWidgetArea, mColorBox);
-    addDockWidget(Qt::RightDockWidgetArea, mColorInspector);
-    addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
     addDockWidget(Qt::LeftDockWidgetArea, mToolBox);
     addDockWidget(Qt::LeftDockWidgetArea, mToolOptions);
-    addDockWidget(Qt::LeftDockWidgetArea, mOnionSkinWidget);
+    addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
+    tabifyDockWidget(mColorPalette, mColorBox);
+    tabifyDockWidget(mColorPalette, mColorInspector);
+    addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
+    resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
+    mColorPalette->raise();
 }
 
 void MainWindow2::newObject()
@@ -1693,19 +1702,20 @@ void MainWindow2::createToolbars()
     mMainToolbar->addAction(ui->actionUndo);
     mMainToolbar->addAction(ui->actionRedo);
     mMainToolbar->addSeparator();
-    mMainToolbar->addAction(ui->actionCut);
-    mMainToolbar->addAction(ui->actionCopy);
-    mMainToolbar->addAction(ui->actionPaste);
-    mMainToolbar->addAction(ui->actionClearFrame);
+    mMainToolbar->addAction(ui->actionZoom_In);
+    mMainToolbar->addAction(ui->actionZoom_Out);
+    mMainToolbar->addAction(ui->actionReset_View);
+    mMainToolbar->addSeparator();
+    mMainToolbar->addAction(ui->actionHorizontal_Flip);
+    mMainToolbar->addAction(ui->actionVertical_Flip);
+    mMainToolbar->setIconSize(QSize(22, 22));
 
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");
-    mViewToolbar->addAction(ui->actionZoom_In);
-    mViewToolbar->addAction(ui->actionZoom_Out);
-    mViewToolbar->addAction(ui->actionReset_View);
-    mViewToolbar->addSeparator();
-    mViewToolbar->addAction(ui->actionHorizontal_Flip);
-    mViewToolbar->addAction(ui->actionVertical_Flip);
+    mViewToolbar->addAction(ui->actionCut);
+    mViewToolbar->addAction(ui->actionCopy);
+    mViewToolbar->addAction(ui->actionPaste);
+    mViewToolbar->addAction(ui->actionClearFrame);
 
     mOverlayToolbar = addToolBar(tr("Overlay Toolbar"));
     mOverlayToolbar->setObjectName("mOverlayToolbar");
@@ -1732,4 +1742,8 @@ void MainWindow2::createToolbars()
     {
         ui->menuToolbars->addAction(tb->toggleViewAction());
     }
+
+    // keep secondary toolbars out of the way by default
+    mViewToolbar->hide();
+    mOverlayToolbar->hide();
 }

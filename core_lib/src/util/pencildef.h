@@ -235,7 +235,7 @@ const static int MaxFramesBound = 9999;
 #define SETTING_BACKGROUND_STYLE    "Background"
 #define SETTING_WINDOW_OPACITY      "WindowOpacity"
 #define SETTING_WINDOW_GEOMETRY     "WindowGeometry"
-#define SETTING_WINDOW_STATE        "WindowState"
+#define SETTING_WINDOW_STATE        "WindowStateV2" // v2: dark-theme layout reset
 #define SETTING_SHOW_STATUS_BAR     "ShowStatusBar"
 #define SETTING_CURVE_SMOOTHING     "CurveSmoothing"
 #define SETTING_DISPLAY_EFFECT      "RenderEffect"

@@ -176,7 +176,7 @@ void TitleBarWidget::paintEvent(QPaintEvent *)
     painter.setPen(Qt::NoPen);
     painter.drawRect(this->rect());
 
-    QPen pen(palette().color(QPalette::Mid));
+    QPen pen(QColor(0x0D, 0x0D, 0x0F));
     int penWidth = 1;
     pen.setWidth(penWidth);
     painter.setPen(pen);

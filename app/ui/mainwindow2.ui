@@ -13,28 +13,49 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-  <widget class="BackgroundWidget" name="background">
-   <layout class="QVBoxLayout" name="layout">
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="centralLayout">
     <property name="spacing">
      <number>0</number>
     </property>
     <property name="leftMargin">
-     <number>0</number>
+     <number>18</number>
     </property>
     <property name="topMargin">
-     <number>0</number>
+     <number>18</number>
     </property>
     <property name="rightMargin">
-     <number>0</number>
+     <number>18</number>
     </property>
     <property name="bottomMargin">
-     <number>0</number>
+     <number>18</number>
     </property>
     <item>
-     <widget class="ScribbleArea" name="scribbleArea" native="true">
-      <property name="focusPolicy">
-       <enum>Qt::StrongFocus</enum>
-      </property>
+     <widget class="BackgroundWidget" name="background">
+      <layout class="QVBoxLayout" name="layout">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="ScribbleArea" name="scribbleArea" native="true">
+         <property name="focusPolicy">
+          <enum>Qt::StrongFocus</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </item>
    </layout>

@@ -101,6 +101,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionskinwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pegbaralignmentdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pencil2d.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/theme.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/predefinedsetmodel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/preferencesdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/presetdialog.cpp

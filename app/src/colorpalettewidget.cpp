@@ -76,8 +76,8 @@ void ColorPaletteWidget::initUI()
 
     buttonStylesheet = "::menu-indicator{ image: none; }"
                              "QPushButton { border: 0px; }"
-                             "QPushButton:pressed { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }"
-                             "QPushButton:checked { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }";
+                             "QPushButton:pressed { border: 1px solid #3A3A40; border-radius: 4px; background-color: #28282E; }"
+                             "QPushButton:checked { border: 1px solid #3A3A40; border-radius: 4px; background-color: #28282E; }";
 
     ui->addColorButton->setStyleSheet(buttonStylesheet);
     ui->removeColorButton->setStyleSheet(buttonStylesheet);
@@ -337,8 +337,8 @@ void ColorPaletteWidget::palettePreferences()
 
     buttonStylesheet = "::menu-indicator{ image: none; }"
         "QToolButton { border: 0px; }"
-        "QToolButton:pressed { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }"
-        "QToolButton:checked { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }";
+        "QToolButton:pressed { border: 1px solid #3A3A40; border-radius: 4px; background-color: #28282E; }"
+        "QToolButton:checked { border: 1px solid #3A3A40; border-radius: 4px; background-color: #28282E; }";
 
 
     // Add to UI

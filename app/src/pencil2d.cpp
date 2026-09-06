@@ -35,6 +35,7 @@ GNU General Public License for more details.
 #include "mainwindow2.h"
 #include "pencildef.h"
 #include "platformhandler.h"
+#include "theme.h"
 
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
@@ -55,6 +56,8 @@ Pencil2D::Pencil2D(int& argc, char** argv) :
 
     // Set application icon
     setWindowIcon(QIcon(":/icons/icon.png"));
+
+    Theme::applyDarkTheme(*this);
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
     // Associate the application with our desktop entry

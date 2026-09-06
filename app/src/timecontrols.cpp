@@ -65,6 +65,10 @@ void TimeControls::initUI()
     mTimecodeLabel = new QLabel(this);
     mTimecodeLabel->setContentsMargins(2, 0, 0, 0);
     mTimecodeLabel->setText("");
+    QFont timecodeFont = mTimecodeLabel->font();
+    timecodeFont.setFamilies({ "Consolas", "Courier New", "monospace" });
+    timecodeFont.setPointSize(10);
+    mTimecodeLabel->setFont(timecodeFont);
 
     switch (mTimecodeLabelEnum)
     {

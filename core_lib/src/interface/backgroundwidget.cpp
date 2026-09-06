@@ -83,31 +83,31 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
 void BackgroundWidget::loadBackgroundStyle()
 {
     QString bgName = mPrefs->getString(SETTING::BACKGROUND_STYLE);
-    mStyle = "background-color:white; border: 1px solid lightGrey;";
+    mStyle = "background-color:white; border-radius: 12px;";
 
     if ( bgName == "white" )
     {
-        mStyle = "background-color:white; border: 1px solid lightGrey;";
+        mStyle = "background-color:white; border-radius: 12px;";
     }
     else if ( bgName == "grey" )
     {
-        mStyle = "background-color:lightGrey; border: 1px solid grey;";
+        mStyle = "background-color:#3C3C42; border-radius: 12px;";
     }
     else if ( bgName == "checkerboard" )
     {
-        mStyle = "background-image: url(:background/checkerboard.png); background-repeat: repeat-xy; border: 1px solid lightGrey;";
+        mStyle = "background-image: url(:background/checkerboard.png); background-repeat: repeat-xy; border-radius: 12px;";
     }
     else if ( bgName == "dots" )
     {
-        mStyle = "background-image: url(:background/dots.png); background-repeat: repeat-xy; border: 1px solid lightGrey;";
+        mStyle = "background-image: url(:background/dots.png); background-repeat: repeat-xy; border-radius: 12px;";
     }
     else if ( bgName == "weave" )
     {
-        mStyle = "background-image: url(:background/weave.jpg); background-repeat: repeat-xy; border: 1px solid lightGrey;";
+        mStyle = "background-image: url(:background/weave.jpg); background-repeat: repeat-xy; border-radius: 12px;";
     }
     else if ( bgName == "grid" )
     {
-        mStyle = "background-image: url(:background/grid.jpg); background-repeat: repeat-xy; border: 1px solid lightGrey;";
+        mStyle = "background-image: url(:background/grid.jpg); background-repeat: repeat-xy; border-radius: 12px;";
     }
 
     mStyle = QString("BackgroundWidget { %1 }").arg(mStyle);

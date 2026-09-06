@@ -129,11 +129,11 @@ private:
     bool mbShortScrub = false;
     int mFrameLength = 1;
     int mFrameSize = 0;
-    int mFontSize = 10;
+    int mFontSize = 11;
     bool mScrubbing = false;
     bool mHighlightFrameEnabled = false;
     int mHighlightedFrame = -1;
-    int mLayerHeight = 20;
+    int mLayerHeight = 26;
     int mStartY = 0;
     int mEndY   = 0;
 
@@ -170,7 +170,7 @@ private:
     int mMousePressX = 0;
 
     const static int mOffsetX = 0;
-    const static int mOffsetY = 20;
+    const static int mOffsetY = 24;
     const static int mLayerDetachThreshold = 5;
 
 };
