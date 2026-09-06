@@ -18,6 +18,8 @@ GNU General Public License for more details.
 #define STATUSBAR_H
 
 #include <QStatusBar>
+#include <QFileDialog>
+#include <QFile>
 
 #include "pencildef.h"
 
@@ -52,6 +54,7 @@ public:
     void setEditor(Editor *editor) { mEditor = editor; }
 
 public slots:
+    void showDebugLog();
     /**
      * Updates the status bar with information about the current tool.
      *

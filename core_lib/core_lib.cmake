@@ -97,6 +97,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/onionskinpaintstate.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/painterutils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/pencildef.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/debuglog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/pencilerror.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/pencilsettings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/pointerevent.h
@@ -154,6 +155,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/soundplayer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/camera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/filemanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/debuglog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/keyframe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layerbitmap.cpp

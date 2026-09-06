@@ -643,6 +643,16 @@ void ScribbleArea::tabletEvent(QTabletEvent *e)
 
 void ScribbleArea::pointerPressEvent(PointerEvent* event)
 {
+    {
+        Layer* l = mEditor->layers()->currentLayer();
+        const int f = mEditor->currentFrame();
+        qDebug() << "[paint] press tool=" << int(currentTool()->type())
+                 << " frame=" << f
+                 << " layer=" << (l ? l->name() : QString("null"))
+                 << " keyAt=" << (l ? (l->getKeyFrameAt(f) != nullptr) : false)
+                 << " covers=" << (l ? (l->getKeyFrameWhichCovers(f) != nullptr) : false)
+                 << " last=" << (l ? (l->getLastKeyFrameAtPosition(f) != nullptr) : false);
+    }
     bool isCameraLayer = mEditor->layers()->currentLayer()->type() == Layer::CAMERA;
     if ((currentTool()->type() != HAND || isCameraLayer) && (event->button() != Qt::RightButton) && (event->button() != Qt::MiddleButton || isCameraLayer))
     {
@@ -779,9 +789,12 @@ void ScribbleArea::paintBitmapBuffer()
     // just return (since we have nothing to paint on).
     if (layer->getKeyFrameWhichCovers(frameNumber) == nullptr)
     {
+        qDebug() << "[paint] paintBitmapBuffer: no covering key at" << frameNumber << "- DROPPED";
         updateFrame();
         return;
     }
+    qDebug() << "[paint] paintBitmapBuffer: frame=" << frameNumber
+             << " target=" << (currentBitmapImage(layer) != nullptr);
 
     BitmapImage* targetImage = currentBitmapImage(layer);
     if (targetImage != nullptr)
@@ -834,6 +847,8 @@ void ScribbleArea::handleDrawingOnEmptyFrame()
     // Drawing on an empty frame; take action based on preference.
     int action = mPrefs->getInt(SETTING::DRAW_ON_EMPTY_FRAME_ACTION);
     auto previousKeyFrame = layer->getKeyFrameWhichCovers(frameNumber);
+    qDebug() << "[paint] emptyFrame action=" << action
+             << " previousKey=" << (previousKeyFrame != nullptr);
     switch (action)
     {
     case KEEP_DRAWING_ON_PREVIOUS_KEY:

@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include "pencil2d.h"
 #include "pencilerror.h"
 #include "platformhandler.h"
+#include "debuglog.h"
 
 /**
  * This is the entrypoint of the program. It performs basic initialization, then
@@ -29,6 +30,7 @@ int main(int argc, char* argv[])
     Q_INIT_RESOURCE(core_lib);
     PlatformHandler::initialise();
     initCategoryLogging();
+    DebugLog::install();
 
     Pencil2D app(argc, argv);
 

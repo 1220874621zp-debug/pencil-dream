@@ -72,8 +72,8 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setClipRect(event->rect());
 
-    // Friction-style workspace backdrop fills the whole canvas area:
-    // vertical gradient easing into grey, with a faint fine grid
+    // Friction-style workspace backdrop: vertical gradient easing into
+    // grey, with a faint fine grid — visible around the paper only
     const QRect r = rect();
     QLinearGradient grad(QPointF(0, 0), QPointF(0, r.height()));
     grad.setColorAt(0.0,  QColor(0x0E, 0x0F, 0x11));
@@ -81,12 +81,21 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     grad.setColorAt(1.0,  QColor(0x26, 0x28, 0x2C));
     painter.fillRect(r, grad);
 
+    const int margin = 24;
+    const QRect workspace = r;
+    const QRect paper = r.adjusted(margin, margin, -margin, -margin);
+
+    painter.setClipRegion(QRegion(workspace).subtracted(QRegion(paper)));
     painter.setPen(QPen(QColor(0x26, 0x26, 0x26), 1.0));
     const int spacing = 16;
     for (int x = 0; x <= r.width(); x += spacing)
         painter.drawLine(x, 0, x, r.height());
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
+
+    // clean light paper for drawing (strokes stay readable on it)
+    painter.setClipRect(event->rect());
+    painter.fillRect(paper, QColor(0xFF, 0xFF, 0xFF));
 
     if (mHasShadow)
         drawShadow(painter);

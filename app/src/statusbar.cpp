@@ -15,10 +15,18 @@ GNU General Public License for more details.
 */
 
 #include <cmath>
+#include <QClipboard>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QApplication>
 
+#include "debuglog.h"
 #include "editor.h"
 #include "elidedlabel.h"
 #include "layermanager.h"
@@ -34,6 +42,11 @@ StatusBar::StatusBar(QWidget *parent) : QStatusBar(parent)
 
     mToolIcon = new QLabel(this);
     addWidget(mToolIcon);
+
+    QPushButton* debugLogButton = new QPushButton(tr("Debug Log"), this);
+    debugLogButton->setToolTip(tr("View and copy the recent debug log"));
+    connect(debugLogButton, &QPushButton::clicked, this, &StatusBar::showDebugLog);
+    addWidget(debugLogButton);
     mToolLabel = new ElidedLabel(this);
     mToolLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     addWidget(mToolLabel, 1);
@@ -182,4 +195,50 @@ void StatusBar::updateZoomStatus()
 
     QSignalBlocker b2(mZoomSlider);
     mZoomSlider->setValue(static_cast<int>(std::round(std::log10(mEditor->view()->scaling()) * 10)));
+}
+
+void StatusBar::showDebugLog()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Debug Log"));
+    dlg.resize(760, 480);
+
+    QPlainTextEdit* text = new QPlainTextEdit(&dlg);
+    text->setReadOnly(true);
+    text->setFont(QFont("Consolas", 9));
+    text->setPlainText(DebugLog::dump());
+    text->setLineWrapMode(QPlainTextEdit::NoWrap);
+
+    QPushButton* copyButton = new QPushButton(tr("Copy All"), &dlg);
+    connect(copyButton, &QPushButton::clicked, [text]()
+    {
+        QApplication::clipboard()->setText(text->toPlainText());
+    });
+
+    QPushButton* saveButton = new QPushButton(tr("Save to File..."), &dlg);
+    connect(saveButton, &QPushButton::clicked, [this, text]()
+    {
+        const QString path = QFileDialog::getSaveFileName(this, tr("Save Debug Log"),
+                                                          QString(), tr("Text Files (*.txt)"));
+        if (!path.isEmpty())
+        {
+            QFile f(path);
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                f.write(text->toPlainText().toUtf8());
+        }
+    });
+
+    QPushButton* closeButton = new QPushButton(tr("Close"), &dlg);
+    connect(closeButton, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    QDialogButtonBox* btns = new QDialogButtonBox(&dlg);
+    btns->addButton(copyButton, QDialogButtonBox::ActionRole);
+    btns->addButton(saveButton, QDialogButtonBox::ActionRole);
+    btns->addButton(closeButton, QDialogButtonBox::RejectRole);
+
+    QGridLayout* lay = new QGridLayout(&dlg);
+    lay->addWidget(text, 0, 0, 1, 3);
+    lay->addWidget(btns, 1, 0, 1, 3);
+    dlg.setLayout(lay);
+    dlg.exec();
 }
