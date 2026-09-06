@@ -61,9 +61,9 @@ void TimeLine::initUI()
     QWidget* rightWidget = new QWidget();
 
     QWidget* leftToolBar = new QWidget();
-    leftToolBar->setFixedHeight(30);
+    leftToolBar->setFixedHeight(42);
     QWidget* rightToolBar = new QWidget();
-    rightToolBar->setFixedHeight(30);
+    rightToolBar->setFixedHeight(42);
 
     // --- left widget ---
     // --------- layer buttons ---------
@@ -75,20 +75,26 @@ void TimeLine::initUI()
     QToolButton* addLayerButton = new QToolButton(this);
     addLayerButton->setIcon(QIcon(":icons/themes/playful/timeline/layer-add.svg"));
     addLayerButton->setToolTip(tr("Add Layer"));
+    addLayerButton->setIconSize(QSize(26, 26));
+    addLayerButton->setMinimumSize(QSize(34, 34));
 
     mLayerDeleteButton = new QToolButton(this);
     mLayerDeleteButton->setIcon(QIcon(":icons/themes/playful/timeline/layer-remove.svg"));
     mLayerDeleteButton->setToolTip(tr("Delete Layer"));
+    mLayerDeleteButton->setIconSize(QSize(26, 26));
+    mLayerDeleteButton->setMinimumSize(QSize(34, 34));
 
     QToolButton* duplicateLayerButton = new QToolButton(this);
     duplicateLayerButton->setIcon(QIcon(":icons/themes/playful/timeline/layer-duplicate.svg"));
     duplicateLayerButton->setToolTip(tr("Duplicate Layer"));
+    duplicateLayerButton->setIconSize(QSize(26, 26));
+    duplicateLayerButton->setMinimumSize(QSize(34, 34));
 
     layerButtons->addWidget(layerLabel);
     layerButtons->addWidget(addLayerButton);
     layerButtons->addWidget(mLayerDeleteButton);
     layerButtons->addWidget(duplicateLayerButton);
-    layerButtons->setFixedHeight(30);
+    layerButtons->setFixedHeight(42);
 
     QHBoxLayout* leftToolBarLayout = new QHBoxLayout();
     leftToolBarLayout->setContentsMargins(0, 0, 0, 0);
@@ -156,7 +162,7 @@ void TimeLine::initUI()
     timelineButtons->addSeparator();
     timelineButtons->addWidget(zoomLabel);
     timelineButtons->addWidget(zoomSlider);
-    timelineButtons->setFixedHeight(30);
+    timelineButtons->setFixedHeight(42);
 
     // --------- Time controls ---------
     mTimeControls = new TimeControls(this);
