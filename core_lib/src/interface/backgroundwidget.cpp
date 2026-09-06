@@ -82,34 +82,32 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
 
 void BackgroundWidget::loadBackgroundStyle()
 {
-    // Friction-style scene paper: rounded card with a dashed grey boundary
-    const QString paperEdge = "border-radius: 12px; border: 1px dashed #6E6E76;";
     QString bgName = mPrefs->getString(SETTING::BACKGROUND_STYLE);
-    mStyle = "background-color:white; " + paperEdge;
+    mStyle = "background-color:white;";
 
     if ( bgName == "white" )
     {
-        mStyle = "background-color:white; " + paperEdge;
+        mStyle = "background-color:white;";
     }
     else if ( bgName == "grey" )
     {
-        mStyle = "background-color:#4B4B4B; " + paperEdge;
+        mStyle = "background-color:#4B4B4B;";
     }
     else if ( bgName == "checkerboard" )
     {
-        mStyle = "background-image: url(:background/checkerboard.png); background-repeat: repeat-xy; " + paperEdge;
+        mStyle = "background-image: url(:background/checkerboard.png); background-repeat: repeat-xy;";
     }
     else if ( bgName == "dots" )
     {
-        mStyle = "background-image: url(:background/dots.png); background-repeat: repeat-xy; " + paperEdge;
+        mStyle = "background-image: url(:background/dots.png); background-repeat: repeat-xy;";
     }
     else if ( bgName == "weave" )
     {
-        mStyle = "background-image: url(:background/weave.jpg); background-repeat: repeat-xy; " + paperEdge;
+        mStyle = "background-image: url(:background/weave.jpg); background-repeat: repeat-xy;";
     }
     else if ( bgName == "grid" )
     {
-        mStyle = "background-image: url(:background/grid.jpg); background-repeat: repeat-xy; " + paperEdge;
+        mStyle = "background-image: url(:background/grid.jpg); background-repeat: repeat-xy;";
     }
 
     mStyle = QString("BackgroundWidget { %1 }").arg(mStyle);
