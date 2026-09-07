@@ -719,6 +719,19 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         painter.setBrush(trackCol);
         painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
 
+        // separator line towards the next consecutive block (TVP-style)
+        {
+            const int nextPos = layer->getNextKeyFramePosition(framePos);
+            if (nextPos == framePos + blockLen)
+            {
+                QColor sep = Theme::TimelineFrameBorder;
+                sep.setAlpha(200);
+                painter.setPen(QPen(sep, 1.0));
+                const qreal sepX = recLeft + recWidth - 1.0;
+                painter.drawLine(QPointF(sepX, recTop + 4.0), QPointF(sepX, recTop + recHeight - 4.0));
+            }
+        }
+
         // trailing block: "+" creation handle at top-right corner
         if (framePos == lastPos)
         {
@@ -1502,6 +1515,20 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
     mFramePosMoveX = getFrameNumber(mMouseMoveX);
     mLayerPosMoveY = getLayerNumber(event->pos().y());
+
+    // TVP-style hover feedback: <-> over block edges, + over the create handle
+    if (mType == TIMELINE_CELL_TYPE::Tracks && primaryButton == Qt::NoButton && !mTrimming && !mPlusCreating)
+    {
+        Qt::CursorShape shape = Qt::ArrowCursor;
+        if (hitTestPlusHandle(event->pos()) != -1)
+            shape = Qt::CrossCursor;
+        else if (hitTestTrimHandle(event->pos()) != -1)
+            shape = Qt::SizeHorCursor;
+        else if (event->pos().y() < mOffsetY)
+            shape = Qt::PointingHandCursor;
+        if (cursor().shape() != shape)
+            setCursor(shape);
+    }
 
     if (mType == TIMELINE_CELL_TYPE::Layers)
     {
