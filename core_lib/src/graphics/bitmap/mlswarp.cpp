@@ -138,11 +138,11 @@ namespace
         QVector<QPointF> points; // (cols+1)*(rows+1), row-major
     };
 
-    LatticeGeometry makeLattice(int srcW, int srcH)
+    LatticeGeometry makeLattice(int srcW, int srcH, int cellSize = CellSize)
     {
         LatticeGeometry g;
-        g.cols = qMax(1, (srcW + CellSize - 1) / CellSize);
-        g.rows = qMax(1, (srcH + CellSize - 1) / CellSize);
+        g.cols = qMax(1, (srcW + cellSize - 1) / cellSize);
+        g.rows = qMax(1, (srcH + cellSize - 1) / cellSize);
         for (int r = 0; r <= g.rows; ++r)
         {
             for (int c = 0; c <= g.cols; ++c)
@@ -692,6 +692,20 @@ void liquifyDab(QImage& workImage,
             workLine[x] = bilinearSample(workImage, srcPt.x(), srcPt.y());
         }
     }
+}
+
+QImage gridWarpImage(const QImage& srcImage,
+                      const QVector<QPointF>& movedLattice,
+                      int cellSize,
+                      bool smoothSampling,
+                      QPointF* newOffset)
+{
+    if (srcImage.isNull()) { return srcImage; }
+
+    const LatticeGeometry lattice = makeLattice(srcImage.width(), srcImage.height(), cellSize);
+    if (movedLattice.size() != lattice.points.size()) { return srcImage; }
+
+    return renderWarpedLattice(srcImage, lattice, movedLattice, smoothSampling, newOffset);
 }
 
 QImage perspectiveWarpImage(const QImage& srcImage,

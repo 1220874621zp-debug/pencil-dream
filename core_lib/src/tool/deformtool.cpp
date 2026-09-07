@@ -539,6 +539,10 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
         if (mLiquifyStrokeActive)
         {
             mLiquifyStrokeActive = false;
+            if (mAnyPointMoved)
+            {
+                updateLiquifyPreview(false);
+            }
         }
         break;
     case 1:
@@ -714,7 +718,22 @@ void DeformTool::beginSession()
     }
 
     // per-mode state
-    mWorkImage = mSourceImage;
+    if (mDeformMode == 0)
+    {
+        // control-point grid over the region (local coords, row-major)
+        mLiquifyGridCols = qMax(1, (mSourceImage.width() + mLiquifyGridCell - 1) / mLiquifyGridCell);
+        mLiquifyGridRows = qMax(1, (mSourceImage.height() + mLiquifyGridCell - 1) / mLiquifyGridCell);
+        mLiquifyOrigGrid.clear();
+        for (int r = 0; r <= mLiquifyGridRows; r++)
+        {
+            for (int c = 0; c <= mLiquifyGridCols; c++)
+            {
+                mLiquifyOrigGrid << QPointF(qreal(c * mSourceImage.width()) / mLiquifyGridCols,
+                                            qreal(r * mSourceImage.height()) / mLiquifyGridRows);
+            }
+        }
+        mLiquifyMovedGrid = mLiquifyOrigGrid;
+    }
     if (mDeformMode == 1)
     {
         rebuildLattice();
@@ -770,8 +789,11 @@ void DeformTool::teardown()
     mLiquifyStrokeActive = false;
     mAnyPointMoved = false;
     mSourceImage = QImage();
-    mWorkImage = QImage();
     mPreviewSource = QImage();
+    mLiquifyOrigGrid.clear();
+    mLiquifyMovedGrid.clear();
+    mLiquifyGridCols = 0;
+    mLiquifyGridRows = 0;
     mPreviewScale = 1.0;
     mWarpedResult = QImage();
     mOrigPoints.clear();
@@ -787,9 +809,12 @@ void DeformTool::teardown()
 
 void DeformTool::liquifyStrokeTo(const QPointF& pos)
 {
-    if (!mDeformActive) { return; }
+    if (!mDeformActive || mLiquifyMovedGrid.isEmpty()) { return; }
 
-    // Krita spacing: dabs every 0.2 * size along the drag path
+    // Krita spacing: dabs every 0.2 * size along the drag path.
+    // Each dab moves control POINTS within 3*sigma (gaussian falloff),
+    // exactly like KisLiquifyTransformWorker - pixels are only touched by
+    // the per-frame render, which keeps strokes cheap.
     const qreal sigma = mLiquifySize;
     const qreal stepLength = qMax(2.0, 0.2 * sigma);
 
@@ -802,11 +827,15 @@ void DeformTool::liquifyStrokeTo(const QPointF& pos)
     const qreal reverse = mLiquifyReverse ? -1.0 : 1.0;
 
     const int steps = qMax(1, qMin(qCeil(length / stepLength), 64));
+    const qreal maxDist = 3.0 * sigma;
+    const qreal inv2SigmaSq = 1.0 / (2.0 * sigma * sigma);
+    const qreal angle = 2.0 * M_PI * mLiquifyAmount;
 
     for (int i = 1; i <= steps; i++)
     {
         const qreal t = qreal(i) / steps;
-        const QPointF at = from + t * delta;
+        const QPointF atCanvas = from + t * delta;
+        const QPointF base = atCanvas - topLeft;
         const QPointF dirVec = (length > 1e-6) ? (delta / length) : QPointF(1, 0);
 
         QPointF dabVector;
@@ -824,25 +853,107 @@ void DeformTool::liquifyStrokeTo(const QPointF& pos)
             amount = qAbs(mLiquifyAmount); // negative scale/rotate folds the image
             break;
         case 4: // undo
-            amount = mLiquifyAmount;
-            break;
         default:
+            amount = mLiquifyAmount;
             break;
         }
 
-        MlsWarp::liquifyDab(mWorkImage,
-                            mSourceImage,
-                            at - topLeft,
-                            sigma,
-                            static_cast<MlsWarp::LiquifyOp>(mLiquifyOp),
-                            dabVector,
-                            amount);
+        // box of grid points that can be affected by this dab
+        const int c0 = qMax(0, int((base.x() - maxDist) / mLiquifyGridCell) - 1);
+        const int c1 = qMin(mLiquifyGridCols, int((base.x() + maxDist) / mLiquifyGridCell) + 1);
+        const int r0 = qMax(0, int((base.y() - maxDist) / mLiquifyGridCell) - 1);
+        const int r1 = qMin(mLiquifyGridRows, int((base.y() + maxDist) / mLiquifyGridCell) + 1);
+
+        for (int r = r0; r <= r1; r++)
+        {
+            for (int c = c0; c <= c1; c++)
+            {
+                const int idx = r * (mLiquifyGridCols + 1) + c;
+                const QPointF diff = mLiquifyMovedGrid[idx] - base;
+                const qreal distSq = diff.x() * diff.x() + diff.y() * diff.y();
+                if (distSq > maxDist * maxDist) { continue; }
+
+                const qreal lambda = std::exp(-distSq * inv2SigmaSq);
+                switch (mLiquifyOp)
+                {
+                case 0: // move
+                case 3: // offset
+                    mLiquifyMovedGrid[idx] += lambda * dabVector;
+                    break;
+                case 1: // scale
+                    mLiquifyMovedGrid[idx] = base + (1.0 + amount * lambda) * diff;
+                    break;
+                case 2: // rotate
+                {
+                    const qreal a = angle * lambda;
+                    const qreal cs = std::cos(a), sn = std::sin(a);
+                    mLiquifyMovedGrid[idx] = base + QPointF(cs * diff.x() - sn * diff.y(),
+                                                            sn * diff.x() + cs * diff.y());
+                    break;
+                }
+                case 4: // undo: pull the point back toward its origin
+                {
+                    const QPointF origDiff = mLiquifyOrigGrid[idx] - mLiquifyMovedGrid[idx];
+                    mLiquifyMovedGrid[idx] += qBound<qreal>(0.0, amount * lambda, 1.0) * origDiff;
+                    break;
+                }
+                default:
+                    break;
+                }
+            }
+        }
     }
 
     mAnyPointMoved = true;
     mLiquifyLastPos = pos;
 
-    mScribbleArea->setDeformPreview(mWorkImage, QRectF(QPointF(mRegion.topLeft()), QSizeF(mWorkImage.size())));
+    updateLiquifyPreview(true);
+}
+
+void DeformTool::updateLiquifyPreview(bool interactive)
+{
+    if (!mDeformActive || mDeformMode != 0 || mLiquifyMovedGrid.isEmpty()) { return; }
+
+    // interactive frames render a down-scaled copy, release/commit full res
+    const bool useScaled = interactive && mPreviewScale < 1.0 && !mPreviewSource.isNull();
+    const QImage& src = useScaled ? mPreviewSource : mSourceImage;
+    const qreal scale = useScaled ? mPreviewScale : 1.0;
+
+    const int cols = qMax(1, qRound(mLiquifyGridCols * scale));
+    const int rows = qMax(1, qRound(mLiquifyGridRows * scale));
+    const int stride = mLiquifyGridCols + 1;
+
+    QVector<QPointF> mapped;
+    mapped.reserve((cols + 1) * (rows + 1));
+    for (int r = 0; r <= rows; r++)
+    {
+        const int srcR = qMin(mLiquifyGridRows, qRound(qreal(r * mLiquifyGridRows) / rows));
+        for (int c = 0; c <= cols; c++)
+        {
+            const int srcC = qMin(mLiquifyGridCols, qRound(qreal(c * mLiquifyGridCols) / cols));
+            mapped << mLiquifyMovedGrid[srcR * stride + srcC] * scale;
+        }
+    }
+
+    const bool useAA = toolProperties().getInfo(TransformToolProperties::ANTI_ALIASING_ENABLED).boolValue();
+    QPointF offset;
+    const QImage warped = MlsWarp::gridWarpImage(src, mapped,
+                                                 qMax(4, qRound(mLiquifyGridCell * scale)),
+                                                 useAA, &offset);
+
+    const QPointF topLeft(mRegion.topLeft());
+    if (useScaled)
+    {
+        mScribbleArea->setDeformPreview(warped,
+            QRectF(topLeft + offset / scale,
+                   QSizeF(warped.width() / scale, warped.height() / scale)));
+    }
+    else
+    {
+        mWarpedResult = warped;
+        mWarpedTopLeft = topLeft + offset;
+        mScribbleArea->setDeformPreview(mWarpedResult, QRectF(mWarpedTopLeft, QSizeF(mWarpedResult.size())));
+    }
 }
 
 void DeformTool::updateWarpPreview(bool interactive)
@@ -974,15 +1085,14 @@ void DeformTool::commitDeform()
         BitmapImage* bitmapImage = bitmapImageFor(mEditor, layer);
         if (bitmapImage != nullptr)
         {
+            if (mDeformMode == 0)
+            {
+                // make sure the committed result is the full-resolution warp
+                updateLiquifyPreview(false);
+            }
+
             QImage result = mWarpedResult;
             QPointF resultTopLeft = mWarpedTopLeft;
-
-            if (mDeformMode == 0 && !mWorkImage.isNull())
-            {
-                // liquify accumulated at full resolution in the work image
-                result = mWorkImage;
-                resultTopLeft = QPointF(mRegion.topLeft());
-            }
 
             if (!result.isNull())
             {

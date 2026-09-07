@@ -80,6 +80,16 @@ namespace MlsWarp
                     const QPointF& dabVector,
                     qreal amount);
 
+    /** Renders a deformation defined by an explicitly moved lattice
+     *  (row-major, (cols+1)*(rows+1) points, cols = ceil(width/cellSize)).
+     *  This is the liquify data path: dabs move lattice points, rendering
+     *  resamples the image once per frame like Krita's grid strategy. */
+    QImage gridWarpImage(const QImage& srcImage,
+                         const QVector<QPointF>& movedLattice,
+                         int cellSize,
+                         bool smoothSampling,
+                         QPointF* newOffset = nullptr);
+
     /** Perspective (4-point) mapping: maps the source rectangle quad to the
      *  given destination quad. Both in source-image local coordinates. */
     QImage perspectiveWarpImage(const QImage& srcImage,

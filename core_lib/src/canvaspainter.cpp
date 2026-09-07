@@ -448,22 +448,26 @@ void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bi
 
     const bool polygonSelection = mSelectionPolygon.size() >= 3;
 
-    QPixmap transformedPixmap = QPixmap(mSelection.size());
-    transformedPixmap.fill(Qt::transparent);
-
-    QPainter imagePainter(&transformedPixmap);
-    imagePainter.translate(-selection.topLeft());
-    imagePainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
-    if (polygonSelection)
+    QPixmap transformedPixmap;
+    if (!mDeformPreviewActive)
     {
-        // mask the floating content to the lasso shape
-        QPainterPath maskPath;
-        maskPath.addPolygon(mSelectionPolygon.translated(-QPointF(selection.topLeft())));
-        maskPath.setFillRule(Qt::OddEvenFill);
-        imagePainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        imagePainter.fillPath(maskPath, QColor(255, 255, 255, 255));
+        transformedPixmap = QPixmap(mSelection.size());
+        transformedPixmap.fill(Qt::transparent);
+
+        QPainter imagePainter(&transformedPixmap);
+        imagePainter.translate(-selection.topLeft());
+        imagePainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
+        if (polygonSelection)
+        {
+            // mask the floating content to the lasso shape
+            QPainterPath maskPath;
+            maskPath.addPolygon(mSelectionPolygon.translated(-QPointF(selection.topLeft())));
+            maskPath.setFillRule(Qt::OddEvenFill);
+            imagePainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+            imagePainter.fillPath(maskPath, QColor(255, 255, 255, 255));
+        }
+        imagePainter.end();
     }
-    imagePainter.end();
 
     painter.save();
 

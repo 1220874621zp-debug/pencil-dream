@@ -126,7 +126,14 @@ private:
     bool mRegionIsPolygon = false;
 
     QImage mSourceImage;   // captured once per session (never modified)
-    QImage mWorkImage;     // liquify accumulates dabs here
+
+    // liquify: Krita-style control-point grid over the region (local coords),
+    // dabs move points, rendering resamples once per frame
+    QVector<QPointF> mLiquifyOrigGrid;
+    QVector<QPointF> mLiquifyMovedGrid;
+    int mLiquifyGridCols = 0;
+    int mLiquifyGridRows = 0;
+    const int mLiquifyGridCell = 8; // Krita liquify pixel precision
 
     // interactive-warp downscale (warp mode, big regions)
     QImage mPreviewSource;
@@ -141,6 +148,8 @@ private:
     bool mLiquifyStrokeActive = false;
     QPointF mLiquifyLastPos;
     QPointF mCursorPos;
+
+    void updateLiquifyPreview(bool interactive);
 
     // cage mode state
     bool mCageSet = false;
