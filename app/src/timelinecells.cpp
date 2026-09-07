@@ -714,6 +714,20 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* key) { lastPos = qMax(lastPos, key->pos()); });
 
+    // sheet numbering: blocks are sheets of drawing paper, so a block shows
+    // its ordinal among the layer's keyframes (1, 2, 3...) instead of the
+    // timeline frame position
+    QHash<int, int> sheetNumber;
+    {
+        QList<int> sortedPos;
+        layer->foreachKeyFrame([&sortedPos](KeyFrame* key) { sortedPos.append(key->pos()); });
+        std::sort(sortedPos.begin(), sortedPos.end());
+        for (int i = 0; i < sortedPos.count(); ++i)
+        {
+            sheetNumber[sortedPos[i]] = i + 1;
+        }
+    }
+
     auto paintOneBlock = [&](KeyFrame* key)
     {
         int framePos = key->pos();
@@ -756,14 +770,14 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
             }
         }
 
-        // frame number at block bottom center
+        // sheet number at block bottom center (ordinal, not frame position)
         painter.setPen(selected ? QColor(0xE8, 0xE8, 0xEA) : QColor(0x8A, 0x8A, 0x90));
         painter.drawText(QRectF(recLeft, recTop + recHeight - 17.0, static_cast<qreal>(recWidth), 14.0),
-                         Qt::AlignCenter, QString::number(framePos));
+                         Qt::AlignCenter, QString::number(sheetNumber.value(framePos, framePos)));
 
-        // right-edge trim handle indicator (3px bar)
+        // right-edge trim handle indicator (3px bar, TVP draws it neutral gray)
         painter.setPen(Qt::NoPen);
-        painter.setBrush(trackCol);
+        painter.setBrush(QColor(0x9A, 0x9A, 0xA4));
         painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
 
         // TVP create handle: "+" on the top-right of the trailing block;
@@ -880,11 +894,11 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
     painter.save();
     // TVP-style selection: highlight the border only, the block's own card
     // (thumbnail, frame number) stays visible underneath. While dragging, a
-    // translucent ghost keeps the carried outline readable.
-    if (previewing)
-    {
-        painter.setBrush(Theme::TimelineSelectedFrameFill);
-    }
+    // translucent ghost keeps the carried outline readable. The brush must be
+    // set explicitly in both cases — a stale brush from the block painting
+    // leaked a white/blue fill over the selection.
+    painter.setBrush(previewing ? Theme::TimelineSelectedFrameFill : Qt::NoBrush);
+    const QBrush selectionFill = painter.brush();
     painter.setPen(QPen(QBrush(Theme::Accent), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
     // Merge consecutive blocks (block end == next selected start) into one rounded run
@@ -927,8 +941,8 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
                                            recTop + lift + recHeight / 2.0 - 2.0, 4.0, 4.0));
             }
         }
-        painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Theme::TimelineSelectedFrameFill);
+        painter.setPen(QPen(QBrush(Theme::Accent), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(selectionFill);
     }
 
     painter.restore();
