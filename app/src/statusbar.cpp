@@ -153,6 +153,12 @@ void StatusBar::updateToolStatus(ToolType tool)
         case BRUSH:
             mToolLabel->setText(tr("Click to paint. Hold Ctrl and Shift to erase or Alt to select a color from the canvas."));
             break;
+        case LASSO:
+            mToolLabel->setText(tr("拖动绘制自由形状选区；松开闭合生效。"));
+            break;
+        case DEFORM:
+            mToolLabel->setText(tr("点击画布生成变形网格，拖动控制点扭曲内容；回车/双击=应用，Esc=取消，Backspace=复位。"));
+            break;
         default:
             Q_ASSERT(false);
     }
@@ -169,7 +175,9 @@ void StatusBar::updateToolStatus(ToolType tool)
         {":icons/themes/playful/tools/tool-polyline.svg"},
         {":icons/themes/playful/tools/tool-bucket.svg"},
         {":icons/themes/playful/tools/tool-eyedropper.svg"},
-        {":icons/themes/playful/tools/tool-brush.svg"}
+        {":icons/themes/playful/tools/tool-brush.svg"},
+        {":icons/themes/playful/tools/tool-lasso.svg"},
+        {":icons/themes/playful/tools/tool-deform.svg"}
     };
     mToolIcon->setPixmap(toolIcons[tool]);
     mToolIcon->setToolTip(BaseTool::TypeName(tool));

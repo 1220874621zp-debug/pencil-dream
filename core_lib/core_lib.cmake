@@ -12,6 +12,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/external/platformhandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapbucket.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/mlswarp.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushcurve.h
@@ -82,6 +83,8 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/polylinetool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/radialoffsettool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/selecttool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/lassotool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/deformtool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/smudgetool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/strokeinterpolator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/stroketool.h
@@ -118,6 +121,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/canvaspainter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapbucket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/mlswarp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushengine.cpp
@@ -188,6 +192,8 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/polylinetool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/radialoffsettool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/selecttool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/lassotool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/deformtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/smudgetool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/strokeinterpolator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/stroketool.cpp

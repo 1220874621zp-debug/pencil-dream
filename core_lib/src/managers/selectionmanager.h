@@ -59,9 +59,13 @@ public:
 
     void flipSelection(bool flipVertical);
 
-    /** @brief Defines the selection area. 
+    /** @brief Defines the selection area.
      *  @param roundPixels Set to true for Bitmap layers to ensure integer coordinates. */
     void setSelection(QRectF rect, bool roundPixels=false);
+
+    /** @brief Defines a free-form (polygonal) selection area, e.g. from the lasso tool.
+     *  The bounding rect drives all transform math; the polygon masks the content. */
+    void setSelection(QPolygonF polygon, bool roundPixels=false);
 
     void translate(QPointF point);
     void rotate(qreal angle, qreal lockedAngle);
@@ -109,6 +113,8 @@ public:
     void setTransformAnchor(const QPointF& point);
 
     const QRectF& mySelectionRect() const { return mOriginalRect; }
+    const QPolygonF& mySelectionPolygon() const { return mOriginalPolygon; }
+    bool isPolygonSelection() const { return mIsPolygonSelection; }
     const qreal& myRotation() const { return mRotatedAngle; }
     const qreal& myScaleX() const { return mScaleX; }
     const qreal& myScaleY() const { return mScaleY; }
@@ -158,6 +164,11 @@ private:
     bool mLockAxis = false;
     QPolygonF mSelectionPolygon;
     QRectF mOriginalRect;
+
+    // Free-form selection truth (lasso). Rect setters keep it in sync with the
+    // rect corners so consumers can always consult one source.
+    QPolygonF mOriginalPolygon;
+    bool mIsPolygonSelection = false;
 
     qreal mScaleX;
     qreal mScaleY;

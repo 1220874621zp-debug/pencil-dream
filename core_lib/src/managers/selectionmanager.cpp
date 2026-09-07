@@ -67,7 +67,10 @@ void SelectionManager::resetSelectionTransform()
 
 bool SelectionManager::isOutsideSelectionArea(const QPointF& point) const
 {
-    return (!mSelectionTransform.map(mSelectionPolygon).containsPoint(point, Qt::WindingFill)) && mMoveMode == MoveMode::NONE;
+    // free-form selections test against the actual lasso outline,
+    // rect selections against the (possibly transformed) box quad
+    const QPolygonF& shape = mIsPolygonSelection ? mOriginalPolygon : mSelectionPolygon;
+    return (!mSelectionTransform.map(shape).containsPoint(point, Qt::WindingFill)) && mMoveMode == MoveMode::NONE;
 }
 
 void SelectionManager::deleteSelection()
@@ -277,6 +280,42 @@ void SelectionManager::setSelection(QRectF rect, bool roundPixels)
     }
     mSelectionPolygon = rect;
     mOriginalRect = rect;
+    mOriginalPolygon = rect;
+    mIsPolygonSelection = false;
+    mScaleX = 1;
+    mScaleY = 1;
+    mRotatedAngle = 0;
+
+    emit selectionChanged();
+}
+
+void SelectionManager::setSelection(QPolygonF polygon, bool roundPixels)
+{
+    if (polygon.size() < 3)
+    {
+        return;
+    }
+    resetSelectionTransformProperties();
+    if (roundPixels)
+    {
+        QPolygonF rounded;
+        rounded.reserve(polygon.size());
+        for (const QPointF& p : polygon)
+        {
+            rounded << QPointF(qRound(p.x()), qRound(p.y()));
+        }
+        polygon = rounded;
+    }
+    mOriginalPolygon = polygon;
+    mIsPolygonSelection = true;
+
+    QRectF rect = polygon.boundingRect();
+    if (rect.width() < 1) { rect.setWidth(1); }
+    if (rect.height() < 1) { rect.setHeight(1); }
+    mOriginalRect = rect;
+    // the polygon kept in mSelectionPolygon is always the bounding-box quad:
+    // handles, anchor hit-tests and width/height derive from it
+    mSelectionPolygon = rect;
     mScaleX = 1;
     mScaleY = 1;
     mRotatedAngle = 0;
@@ -342,6 +381,8 @@ void SelectionManager::resetSelectionProperties()
 {
     resetSelectionTransformProperties();
     mSelectionPolygon = QPolygonF();
+    mOriginalPolygon = QPolygonF();
+    mIsPolygonSelection = false;
     mOriginalRect = QRectF();
     mMoveMode = MoveMode::NONE;
     emit selectionChanged();

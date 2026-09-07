@@ -970,7 +970,8 @@ void ScribbleArea::paintSelectionVisuals(QPainter &painter)
 
     QRectF currentSelectionRect = selectMan->mySelectionRect();
 
-    TransformParameters params = { currentSelectionRect, editor()->view()->getView(), selectMan->selectionTransform() };
+    TransformParameters params = { currentSelectionRect, editor()->view()->getView(), selectMan->selectionTransform(),
+                                   selectMan->mySelectionPolygon(), selectMan->isPolygonSelection() };
 
     mSelectionPainter.paint(painter,
                             object,
@@ -1047,7 +1048,8 @@ void ScribbleArea::prepCanvas(int frame)
     ViewManager* vm = mEditor->view();
     SelectionManager* sm = mEditor->select();
     mCanvasPainter.setViewTransform(vm->getView(), vm->getViewInverse());
-    mCanvasPainter.setTransformedSelection(sm->mySelectionRect().toRect(), sm->selectionTransform());
+    mCanvasPainter.setTransformedSelection(sm->mySelectionRect().toRect(), sm->selectionTransform(),
+                                           sm->isPolygonSelection() ? sm->mySelectionPolygon() : QPolygonF());
 
     mCanvasPainter.setPaintSettings(object, mEditor->layers()->currentLayerIndex(), frame, &mTiledBuffer);
 }
@@ -1268,6 +1270,7 @@ QPointF ScribbleArea::getCentralPoint()
 void ScribbleArea::applyTransformedSelection()
 {
     mCanvasPainter.ignoreTransformedSelection();
+    mCanvasPainter.clearDeformPreview();
 
     Layer* layer = mEditor->layers()->currentLayer();
 
@@ -1285,11 +1288,20 @@ void ScribbleArea::applyTransformedSelection()
             handleDrawingOnEmptyFrame();
             BitmapImage* bitmapImage = currentBitmapImage(layer);
             if (bitmapImage == nullptr) { return; }
-            BitmapImage transformedImage = bitmapImage->transformed(selectMan->mySelectionRect().toRect(), selectMan->selectionTransform(), useAA);
 
+            if (selectMan->isPolygonSelection())
+            {
+                BitmapImage transformedImage = bitmapImage->transformed(selectMan->mySelectionPolygon(), selectMan->selectionTransform(), useAA);
+                bitmapImage->clear(selectMan->mySelectionPolygon());
+                bitmapImage->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
+            }
+            else
+            {
+                BitmapImage transformedImage = bitmapImage->transformed(selectMan->mySelectionRect().toRect(), selectMan->selectionTransform(), useAA);
 
-            bitmapImage->clear(selectMan->mySelectionRect());
-            bitmapImage->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
+                bitmapImage->clear(selectMan->mySelectionRect());
+                bitmapImage->paste(&transformedImage, QPainter::CompositionMode_SourceOver);
+            }
         }
 
         mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
@@ -1298,9 +1310,22 @@ void ScribbleArea::applyTransformedSelection()
     updateFrame();
 }
 
+void ScribbleArea::setDeformPreview(const QImage& preview, const QPointF& topLeft)
+{
+    mCanvasPainter.setDeformPreview(preview, topLeft);
+    updateFrame();
+}
+
+void ScribbleArea::clearDeformPreview()
+{
+    mCanvasPainter.clearDeformPreview();
+    updateFrame();
+}
+
 void ScribbleArea::cancelTransformedSelection()
 {
     mCanvasPainter.ignoreTransformedSelection();
+    mCanvasPainter.clearDeformPreview();
 
     auto selectMan = mEditor->select();
     if (selectMan->somethingSelected())
@@ -1308,7 +1333,14 @@ void ScribbleArea::cancelTransformedSelection()
         Layer* layer = mEditor->layers()->currentLayer();
         if (layer == nullptr) { return; }
 
-        mEditor->select()->setSelection(selectMan->mySelectionRect(), false);
+        if (selectMan->isPolygonSelection())
+        {
+            mEditor->select()->setSelection(selectMan->mySelectionPolygon(), false);
+        }
+        else
+        {
+            mEditor->select()->setSelection(selectMan->mySelectionRect(), false);
+        }
 
         selectMan->resetSelectionProperties();
         mOriginalPolygonF = QPolygonF();
@@ -1366,7 +1398,14 @@ void ScribbleArea::deleteSelection()
         {
             BitmapImage* bitmapImage = currentBitmapImage(layer);
             Q_CHECK_PTR(bitmapImage);
-            bitmapImage->clear(selectMan->mySelectionRect());
+            if (selectMan->isPolygonSelection())
+            {
+                bitmapImage->clear(selectMan->mySelectionPolygon());
+            }
+            else
+            {
+                bitmapImage->clear(selectMan->mySelectionRect());
+            }
         }
         mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
         mEditor->undoRedo()->record(saveStateId, tr("Delete Selection", "Undo Step: clear the selection area."));

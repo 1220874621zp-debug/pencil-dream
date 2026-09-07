@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #include "canvaspainter.h"
 
 #include <QtMath>
+#include <QPainterPath>
 
 #include "object.h"
 #include "layerbitmap.h"
@@ -60,13 +61,14 @@ void CanvasPainter::setViewTransform(const QTransform view, const QTransform vie
     }
 }
 
-void CanvasPainter::setTransformedSelection(QRect selection, QTransform transform)
+void CanvasPainter::setTransformedSelection(QRect selection, QTransform transform, QPolygonF selectionPolygon)
 {
     // Make sure that the selection is not empty
     if (selection.width() > 0 && selection.height() > 0)
     {
         mSelection = selection;
         mSelectionTransform = transform;
+        mSelectionPolygon = selectionPolygon;
         mRenderTransform = true;
     }
     else
@@ -81,6 +83,20 @@ void CanvasPainter::ignoreTransformedSelection()
     mRenderTransform = false;
     mSelectionTransform.reset();
     mSelection = QRect();
+    mSelectionPolygon = QPolygonF();
+}
+
+void CanvasPainter::setDeformPreview(const QImage& preview, const QPointF& topLeft)
+{
+    mDeformPreview = preview;
+    mDeformPreviewTopLeft = topLeft;
+    mDeformPreviewActive = !preview.isNull();
+}
+
+void CanvasPainter::clearDeformPreview()
+{
+    mDeformPreviewActive = false;
+    mDeformPreview = QImage();
 }
 
 void CanvasPainter::paintCached(const QRect& blitRect)
@@ -409,12 +425,23 @@ void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bi
     if (selection.width() == 0 && selection.height() == 0)
         return;
 
+    const bool polygonSelection = mSelectionPolygon.size() >= 3;
+
     QPixmap transformedPixmap = QPixmap(mSelection.size());
     transformedPixmap.fill(Qt::transparent);
 
     QPainter imagePainter(&transformedPixmap);
     imagePainter.translate(-selection.topLeft());
     imagePainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
+    if (polygonSelection)
+    {
+        // mask the floating content to the lasso shape
+        QPainterPath maskPath;
+        maskPath.addPolygon(mSelectionPolygon.translated(-QPointF(selection.topLeft())));
+        maskPath.setFillRule(Qt::OddEvenFill);
+        imagePainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+        imagePainter.fillPath(maskPath, QColor(255, 255, 255, 255));
+    }
     imagePainter.end();
 
     painter.save();
@@ -424,8 +451,27 @@ void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bi
     // Clear the painted area to make it look like the content has been erased
     painter.save();
     painter.setCompositionMode(QPainter::CompositionMode_Clear);
-    painter.fillRect(selection, QColor(255,255,255,255));
+    if (polygonSelection)
+    {
+        QPainterPath clearPath;
+        clearPath.addPolygon(mSelectionPolygon);
+        clearPath.setFillRule(Qt::OddEvenFill);
+        painter.fillPath(clearPath, QColor(255, 255, 255, 255));
+    }
+    else
+    {
+        painter.fillRect(selection, QColor(255, 255, 255, 255));
+    }
     painter.restore();
+
+    if (mDeformPreviewActive)
+    {
+        // free-deform tool: draw the warped preview instead of an
+        // affine-transformed copy
+        painter.drawImage(mDeformPreviewTopLeft, mDeformPreview);
+        painter.restore();
+        return;
+    }
 
     // Multiply the selection and view matrix to get proper rotation and scale values
     // Now the image origin will be topleft

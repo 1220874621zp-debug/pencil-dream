@@ -194,6 +194,28 @@ BitmapImage BitmapImage::copy(QRect rectangle)
     return result;
 }
 
+BitmapImage BitmapImage::copy(QPolygonF polygon)
+{
+    if (polygon.size() < 3 || mBounds.isEmpty()) return BitmapImage();
+
+    QRect bounding = polygon.boundingRect().toAlignedRect();
+    if (bounding.isEmpty()) return BitmapImage();
+
+    BitmapImage rectCopy = copy(bounding);
+    if (rectCopy.width() <= 0 || rectCopy.height() <= 0) return BitmapImage();
+
+    // Mask the copied region to the polygon shape
+    QPainter painter(rectCopy.image());
+    QPainterPath maskPath;
+    maskPath.addPolygon(polygon.translated(-QPointF(bounding.topLeft())));
+    maskPath.setFillRule(Qt::OddEvenFill);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.fillPath(maskPath, QColor(0, 0, 0, 255));
+    painter.end();
+
+    return rectCopy;
+}
+
 void BitmapImage::paste(BitmapImage* bitmapImage, QPainter::CompositionMode cm)
 {
     if(bitmapImage->width() <= 0 || bitmapImage->height() <= 0)
@@ -277,6 +299,25 @@ BitmapImage BitmapImage::transformed(QRect selection, QTransform transform, bool
         transformedImage = selectedPart.image()->transformed(transform);
     }
     return BitmapImage(transform.mapRect(selection).normalized().topLeft(), transformedImage);
+}
+
+BitmapImage BitmapImage::transformed(QPolygonF selection, QTransform transform, bool smoothTransform)
+{
+    if (selection.size() < 3) { return BitmapImage(); }
+
+    BitmapImage selectedPart = copy(selection);
+    if (selectedPart.width() <= 0 || selectedPart.height() <= 0) { return BitmapImage(); }
+
+    QImage transformedImage;
+    if (smoothTransform)
+    {
+        transformedImage = selectedPart.image()->transformed(transform, Qt::SmoothTransformation);
+    }
+    else
+    {
+        transformedImage = selectedPart.image()->transformed(transform);
+    }
+    return BitmapImage(transform.mapRect(selection.boundingRect()).normalized().topLeft().toPoint(), transformedImage);
 }
 
 BitmapImage BitmapImage::transformed(QRect newBoundaries, bool smoothTransform)
@@ -861,6 +902,27 @@ void BitmapImage::clear(QRect rectangle)
     QPainter painter(image());
     painter.setCompositionMode(QPainter::CompositionMode_Clear);
     painter.fillRect(clearRectangle, QColor(0, 0, 0, 0));
+    painter.end();
+
+    modification();
+}
+
+void BitmapImage::clear(QPolygonF polygon)
+{
+    if (polygon.size() < 3 || mBounds.isEmpty()) { return; }
+
+    QRect bounding = polygon.boundingRect().toAlignedRect().intersected(mBounds);
+    if (bounding.isEmpty()) { return; }
+
+    setCompositionModeBounds(bounding, true, QPainter::CompositionMode_Clear);
+
+    QPainter painter(image());
+    painter.translate(-mBounds.topLeft());
+    painter.setCompositionMode(QPainter::CompositionMode_Clear);
+    QPainterPath clearPath;
+    clearPath.addPolygon(polygon);
+    clearPath.setFillRule(Qt::OddEvenFill);
+    painter.fillPath(clearPath, QColor(0, 0, 0, 0));
     painter.end();
 
     modification();

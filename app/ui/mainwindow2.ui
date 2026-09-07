@@ -278,7 +278,9 @@
     <addaction name="actionPencil"/>
     <addaction name="actionEraser"/>
     <addaction name="actionSelect"/>
+    <addaction name="actionLasso"/>
     <addaction name="actionMove"/>
+    <addaction name="actionDeform"/>
     <addaction name="actionPen"/>
     <addaction name="actionHand"/>
     <addaction name="actionPolyline"/>
@@ -696,6 +698,24 @@
    </property>
    <property name="text">
     <string>Select</string>
+   </property>
+  </action>
+  <action name="actionLasso">
+   <property name="icon">
+    <iconset resource="../data/app.qrc">
+     <normaloff>:/icons/themes/playful/tools/tool-lasso.svg</normaloff>:/icons/themes/playful/tools/tool-lasso.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Lasso</string>
+   </property>
+  </action>
+  <action name="actionDeform">
+   <property name="icon">
+    <iconset resource="../data/app.qrc">
+     <normaloff>:/icons/themes/playful/tools/tool-deform.svg</normaloff>:/icons/themes/playful/tools/tool-deform.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Deform</string>
    </property>
   </action>
   <action name="actionBrush">

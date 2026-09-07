@@ -58,6 +58,8 @@ void ToolBoxWidget::initUI()
         "QToolButton:checked { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }";
     ui->pencilButton->setStyleSheet(sStyle);
     ui->selectButton->setStyleSheet(sStyle);
+    ui->lassoButton->setStyleSheet(sStyle);
+    ui->deformButton->setStyleSheet(sStyle);
     ui->moveButton->setStyleSheet(sStyle);
     ui->handButton->setStyleSheet(sStyle);
     ui->penButton->setStyleSheet(sStyle);
@@ -73,6 +75,10 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
     ui->selectButton->setToolTip( tr( "Select Tool (%1): Select an object" )
         .arg( GetToolTips( CMD_TOOL_SELECT ) ) );
+    ui->lassoButton->setToolTip( tr( "Lasso Tool (%1): Select a free-form area" )
+        .arg( GetToolTips( CMD_TOOL_LASSO ) ) );
+    ui->deformButton->setToolTip( tr( "Deform Tool (%1): Drag grid points to warp the selection" )
+        .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setToolTip( tr( "Move Tool (%1): Move an object" )
         .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
     ui->handButton->setToolTip( tr( "Hand Tool (%1): Move the canvas" )
@@ -98,6 +104,10 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
     ui->selectButton->setWhatsThis( tr( "Select Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_SELECT ) ) );
+    ui->lassoButton->setWhatsThis( tr( "Lasso Tool (%1)" )
+        .arg( GetToolTips( CMD_TOOL_LASSO ) ) );
+    ui->deformButton->setWhatsThis( tr( "Deform Tool (%1)" )
+        .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setWhatsThis( tr( "Move Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
     ui->handButton->setWhatsThis( tr( "Hand Tool (%1)" )
@@ -120,6 +130,8 @@ void ToolBoxWidget::initUI()
     connect(ui->pencilButton, &QToolButton::clicked, this, &ToolBoxWidget::pencilOn);
     connect(ui->eraserButton, &QToolButton::clicked, this, &ToolBoxWidget::eraserOn);
     connect(ui->selectButton, &QToolButton::clicked, this, &ToolBoxWidget::selectOn);
+    connect(ui->lassoButton, &QToolButton::clicked, this, &ToolBoxWidget::lassoOn);
+    connect(ui->deformButton, &QToolButton::clicked, this, &ToolBoxWidget::deformOn);
     connect(ui->moveButton, &QToolButton::clicked, this, &ToolBoxWidget::moveOn);
     connect(ui->penButton, &QToolButton::clicked, this, &ToolBoxWidget::penOn);
     connect(ui->handButton, &QToolButton::clicked, this, &ToolBoxWidget::handOn);
@@ -134,6 +146,8 @@ void ToolBoxWidget::initUI()
     mFlowlayout->addWidget(ui->pencilButton);
     mFlowlayout->addWidget(ui->eraserButton);
     mFlowlayout->addWidget(ui->selectButton);
+    mFlowlayout->addWidget(ui->lassoButton);
+    mFlowlayout->addWidget(ui->deformButton);
     mFlowlayout->addWidget(ui->moveButton);
     mFlowlayout->addWidget(ui->penButton);
     mFlowlayout->addWidget(ui->handButton);
@@ -154,6 +168,8 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->pencilButton);
     buttonGroup->addButton(ui->eraserButton);
     buttonGroup->addButton(ui->selectButton);
+    buttonGroup->addButton(ui->lassoButton);
+    buttonGroup->addButton(ui->deformButton);
     buttonGroup->addButton(ui->moveButton);
     buttonGroup->addButton(ui->penButton);
     buttonGroup->addButton(ui->handButton);
@@ -218,6 +234,12 @@ void ToolBoxWidget::setActiveTool(ToolType toolType)
     case ToolType::SELECT:
         selectOn();
         break;
+    case ToolType::LASSO:
+        lassoOn();
+        break;
+    case ToolType::DEFORM:
+        deformOn();
+        break;
     case ToolType::HAND:
         handOn();
         break;
@@ -258,6 +280,16 @@ void ToolBoxWidget::eraserOn()
 void ToolBoxWidget::selectOn()
 {
     toolOn(SELECT, ui->selectButton);
+}
+
+void ToolBoxWidget::lassoOn()
+{
+    toolOn(LASSO, ui->lassoButton);
+}
+
+void ToolBoxWidget::deformOn()
+{
+    toolOn(DEFORM, ui->deformButton);
 }
 
 void ToolBoxWidget::moveOn()
@@ -309,6 +341,8 @@ void ToolBoxWidget::deselectAllTools()
     ui->pencilButton->setChecked(false);
     ui->eraserButton->setChecked(false);
     ui->selectButton->setChecked(false);
+    ui->lassoButton->setChecked(false);
+    ui->deformButton->setChecked(false);
     ui->moveButton->setChecked(false);
     ui->handButton->setChecked(false);
     ui->penButton->setChecked(false);

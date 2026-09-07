@@ -92,6 +92,8 @@
         <file>icons/themes/playful/tools/tool-polyline.svg</file>
         <file>icons/themes/playful/tools/tool-pen.svg</file>
         <file>icons/themes/playful/tools/tool-select.svg</file>
+        <file>icons/themes/playful/tools/tool-lasso.svg</file>
+        <file>icons/themes/playful/tools/tool-deform.svg</file>
         <file>icons/themes/playful/tools/tool-camera-rotate.svg</file>
         <file>icons/themes/playful/tools/tool-camera-scale.svg</file>
         <file>icons/themes/playful/tools/tool-camera-move.svg</file>

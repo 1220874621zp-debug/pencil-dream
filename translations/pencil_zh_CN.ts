@@ -339,6 +339,16 @@
         <translation>选择</translation>
     </message>
     <message>
+        <location filename="../core_lib/src/tool/basetool.cpp" line="46" />
+        <source>Lasso</source>
+        <translation>套索</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/tool/basetool.cpp" line="47" />
+        <source>Deform</source>
+        <translation>变形</translation>
+    </message>
+    <message>
         <location filename="../core_lib/src/tool/basetool.cpp" line="37" />
         <source>Move</source>
         <translation>移动</translation>
@@ -4881,6 +4891,16 @@ Read the instructions and try again</source>
         <translation>选择</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="705" />
+        <source>Lasso</source>
+        <translation>套索</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mainwindow2.ui" line="714" />
+        <source>Deform</source>
+        <translation>变形</translation>
+    </message>
+    <message>
         <location filename="../app/ui/mainwindow2.ui" line="707" />
         <source>Brush</source>
         <translation>画笔</translation>
@@ -6743,6 +6763,18 @@ or cancel</source>
     </message>
     <message>
         <location filename="../app/src/shortcutspage.cpp" line="396" />
+        <source>Lasso Tool</source>
+        <comment>Shortcut</comment>
+        <translation>套索工具</translation>
+    </message>
+    <message>
+        <location filename="../app/src/shortcutspage.cpp" line="397" />
+        <source>Deform Tool</source>
+        <comment>Shortcut</comment>
+        <translation>变形工具</translation>
+    </message>
+    <message>
+        <location filename="../app/src/shortcutspage.cpp" line="396" />
         <source>Smudge Tool</source>
         <comment>Shortcut</comment>
         <translation>涂抹工具</translation>
@@ -7575,6 +7607,16 @@ or cancel</source>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="76" />
+        <source>Lasso Tool (%1): Select a free-form area</source>
+        <translation>套索工具 (%1): 自由形状选区</translation>
+    </message>
+    <message>
+        <location filename="../app/src/toolboxwidget.cpp" line="78" />
+        <source>Deform Tool (%1): Drag grid points to warp the selection</source>
+        <translation>变形工具 (%1): 拖动网格点扭曲选区</translation>
+    </message>
+    <message>
+        <location filename="../app/src/toolboxwidget.cpp" line="76" />
         <source>Move Tool (%1): Move an object</source>
         <translation>移动工具 (%1): 移动物件</translation>
     </message>
@@ -7627,6 +7669,16 @@ or cancel</source>
         <location filename="../app/src/toolboxwidget.cpp" line="99" />
         <source>Select Tool (%1)</source>
         <translation>选择 (%1)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/toolboxwidget.cpp" line="104" />
+        <source>Lasso Tool (%1)</source>
+        <translation>套索工具 (%1)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/toolboxwidget.cpp" line="106" />
+        <source>Deform Tool (%1)</source>
+        <translation>变形工具 (%1)</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="101" />

@@ -67,6 +67,10 @@ public:
     void applyTransformedSelection();
     void cancelTransformedSelection();
 
+    /** Free-deform tool live preview channel (canvas coords for topLeft). */
+    void setDeformPreview(const QImage& preview, const QPointF& topLeft);
+    void clearDeformPreview();
+
     void setEffect(SETTING e, bool isOn);
 
     LayerVisibility getLayerVisibility() const { return mLayerVisibility; }

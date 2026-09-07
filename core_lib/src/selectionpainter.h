@@ -32,6 +32,9 @@ struct TransformParameters
 
     QTransform viewTransform;
     QTransform selectionTransform;
+
+    QPolygonF originalSelectionPolygonF;
+    bool isPolygonSelection = false;
 };
 
 class SelectionPainter

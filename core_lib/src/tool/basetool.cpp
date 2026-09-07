@@ -43,6 +43,8 @@ QString BaseTool::TypeName(ToolType type)
         map[EYEDROPPER] = tr("Eyedropper");
         map[BRUSH] = tr("Brush");
         map[CAMERA] = tr("Camera");
+        map[LASSO] = tr("Lasso");
+        map[DEFORM] = tr("Deform");
     }
     return map.at(type);
 }

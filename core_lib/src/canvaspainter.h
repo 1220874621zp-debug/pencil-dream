@@ -62,8 +62,13 @@ public:
 
     void setOnionSkinOptions(const OnionSkinPainterOptions& onionSkinOptions) { mOnionSkinPainterOptions = onionSkinOptions;}
     void setOptions(const CanvasPainterOptions& p) { mOptions = p; }
-    void setTransformedSelection(QRect selection, QTransform transform);
+    void setTransformedSelection(QRect selection, QTransform transform, QPolygonF selectionPolygon = QPolygonF());
     void ignoreTransformedSelection();
+
+    /** Deform tool live preview: while active the selection area is cleared
+     *  and the warped image is drawn instead of the affine-transformed one. */
+    void setDeformPreview(const QImage& preview, const QPointF& topLeft);
+    void clearDeformPreview();
 
     void setPaintSettings(const Object* object, int currentLayer, int frame, TiledBuffer* tilledBuffer);
     void paint(const QRect& blitRect);
@@ -122,6 +127,12 @@ private:
     bool mRenderTransform = false;
     QRect mSelection;
     QTransform mSelectionTransform;
+    QPolygonF mSelectionPolygon;
+
+    // Deform tool preview channel
+    bool mDeformPreviewActive = false;
+    QImage mDeformPreview;
+    QPointF mDeformPreviewTopLeft;
 
     // Caches specifically for when drawing on the canvas
     QPixmap mPostLayersPixmap;

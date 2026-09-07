@@ -36,6 +36,36 @@ void SelectionPainter::paint(QPainter& painter,
     QTransform transform = tParams.selectionTransform * tParams.viewTransform;
     QPolygonF projectedSelectionPolygon = transform.map(tParams.originalSelectionRectF);
 
+    if (tParams.isPolygonSelection && tParams.originalSelectionPolygonF.size() >= 3)
+    {
+        // free-form (lasso) selection: outline the actual polygon,
+        // handles sit on the bounding box corners
+        QPolygonF outline = transform.map(tParams.originalSelectionPolygonF);
+
+        if (layer->type() == Layer::BITMAP)
+        {
+            painter.setBrush(Qt::NoBrush);
+            QPen pen(Qt::DashLine);
+            pen.setCosmetic(true);
+            painter.setPen(pen);
+
+            painter.drawPolygon(outline);
+        }
+
+        painter.setPen(Qt::SolidLine);
+        painter.setBrush(QBrush(Qt::gray));
+        int radius = HANDLE_WIDTH / 2;
+
+        for (int i = 0; i < projectedSelectionPolygon.size() && i < 4; ++i)
+        {
+            const QRectF corner = QRectF(projectedSelectionPolygon[i].x() - radius,
+                                         projectedSelectionPolygon[i].y() - radius,
+                                         HANDLE_WIDTH, HANDLE_WIDTH);
+            painter.drawRect(corner);
+        }
+        return;
+    }
+
     if (layer->type() == Layer::BITMAP)
     {
         painter.setBrush(Qt::NoBrush);

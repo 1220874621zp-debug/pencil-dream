@@ -51,6 +51,8 @@ public:
     void pencilOn();
     void eraserOn();
     void selectOn();
+    void lassoOn();
+    void deformOn();
     void moveOn();
     void penOn();
     void handOn();

@@ -454,6 +454,8 @@ void MainWindow2::createMenus()
     toolsActionGroup->setExclusive(true);
     toolsActionGroup->addAction(ui->actionMove);
     toolsActionGroup->addAction(ui->actionSelect);
+    toolsActionGroup->addAction(ui->actionLasso);
+    toolsActionGroup->addAction(ui->actionDeform);
     toolsActionGroup->addAction(ui->actionBrush);
     toolsActionGroup->addAction(ui->actionPolyline);
     toolsActionGroup->addAction(ui->actionSmudge);
@@ -468,6 +470,8 @@ void MainWindow2::createMenus()
     connect(toolsActionGroup, &QActionGroup::triggered, this, [&](QAction* action) {
         if (action == ui->actionMove) mToolBox->setActiveTool(MOVE);
         else if (action == ui->actionSelect) mToolBox->setActiveTool(SELECT);
+        else if (action == ui->actionLasso) mToolBox->setActiveTool(LASSO);
+        else if (action == ui->actionDeform) mToolBox->setActiveTool(DEFORM);
         else if (action == ui->actionBrush) mToolBox->setActiveTool(BRUSH);
         else if (action == ui->actionPolyline) mToolBox->setActiveTool(POLYLINE);
         else if (action == ui->actionSmudge) mToolBox->setActiveTool(SMUDGE);
@@ -1563,6 +1567,8 @@ void MainWindow2::setupKeyboardShortcuts()
     ShortcutFilter* shortcutFilter = new ShortcutFilter(ui->scribbleArea, this);
     ui->actionMove->setShortcut(cmdKeySeq(CMD_TOOL_MOVE));
     ui->actionSelect->setShortcut(cmdKeySeq(CMD_TOOL_SELECT));
+    ui->actionLasso->setShortcut(cmdKeySeq(CMD_TOOL_LASSO));
+    ui->actionDeform->setShortcut(cmdKeySeq(CMD_TOOL_DEFORM));
     ui->actionBrush->setShortcut(cmdKeySeq(CMD_TOOL_BRUSH));
     ui->actionPolyline->setShortcut(cmdKeySeq(CMD_TOOL_POLYLINE));
     ui->actionSmudge->setShortcut(cmdKeySeq(CMD_TOOL_SMUDGE));
@@ -1577,6 +1583,8 @@ void MainWindow2::setupKeyboardShortcuts()
     ui->actionMove->installEventFilter(shortcutFilter);
     ui->actionMove->installEventFilter(shortcutFilter);
     ui->actionSelect->installEventFilter(shortcutFilter);
+    ui->actionLasso->installEventFilter(shortcutFilter);
+    ui->actionDeform->installEventFilter(shortcutFilter);
     ui->actionBrush->installEventFilter(shortcutFilter);
     ui->actionPolyline->installEventFilter(shortcutFilter);
     ui->actionSmudge->installEventFilter(shortcutFilter);
