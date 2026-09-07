@@ -1892,30 +1892,66 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             if (trimKey != nullptr && mTrimPreviewLength != mTrimOriginalLength && !currentLayer->locked())
             {
                 // Layout transaction: one undo step restores the new length,
-                // the explicit flag AND the ripple moves of later blocks
+                // the explicit flag, ripple moves AND materialized frames
                 mEditor->beginLayerLayoutEdit(currentLayer);
                 const int delta = mTrimPreviewLength - mTrimOriginalLength;
-                if (delta != 0)
+
+                QList<int> laterPos;
+                currentLayer->foreachKeyFrame([&](KeyFrame* k)
                 {
-                    // TVP-style bidirectional ripple: trimming inserts or
-                    // removes time, later keyframes follow the drag either way.
-                    // grow -> move far ones first; shrink -> move near ones first
-                    QList<int> laterPos;
-                    currentLayer->foreachKeyFrame([&](KeyFrame* k)
+                    if (k->pos() > mTrimKeyPos) laterPos << k->pos();
+                });
+                const bool isTrailingBlock = laterPos.isEmpty();
+
+                if (isTrailingBlock && delta > 0)
+                {
+                    // Trailing block: the extension becomes real blank
+                    // keyframes (one per frame, per user preference); the
+                    // drawing keeps its original span
+                    for (int f = mTrimKeyPos + mTrimOriginalLength;
+                         f < mTrimKeyPos + mTrimPreviewLength; ++f)
                     {
-                        if (k->pos() > mTrimKeyPos) laterPos << k->pos();
-                    });
-                    if (delta > 0)
-                        std::sort(laterPos.begin(), laterPos.end(), std::greater<int>());
-                    else
-                        std::sort(laterPos.begin(), laterPos.end());
-                    for (int p : laterPos)
-                        currentLayer->moveKeyFrame(p, delta);
+                        if (!currentLayer->keyExists(f))
+                        {
+                            QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
+                            blank.fill(Qt::transparent);
+                            currentLayer->addKeyFrame(f, new BitmapImage(QPoint(0, 0), blank));
+                        }
+                    }
+                }
+                else if (isTrailingBlock && delta < 0)
+                {
+                    // Shrinking the trailing block removes the materialized
+                    // frames inside the vacated span (undo restores them)
+                    const int prevEnd = mTrimKeyPos + mTrimOriginalLength;
+                    const int newEnd = mTrimKeyPos + mTrimPreviewLength;
+                    for (int f = newEnd; f < prevEnd; ++f)
+                    {
+                        mEditor->takeLayerKeyFrame(currentLayer, f); // stays alive in the transaction
+                    }
+                    trimKey->setLength(mTrimPreviewLength);
+                    trimKey->setLengthExplicit(true);
+                }
+                else
+                {
+                    // Middle block: TVP-style bidirectional ripple — trimming
+                    // inserts or removes time, later keyframes follow the drag
+                    // either way. grow -> move far ones first; shrink -> near first
+                    if (delta != 0)
+                    {
+                        if (delta > 0)
+                            std::sort(laterPos.begin(), laterPos.end(), std::greater<int>());
+                        else
+                            std::sort(laterPos.begin(), laterPos.end());
+                        for (int p : laterPos)
+                            currentLayer->moveKeyFrame(p, delta);
+                    }
+                    trimKey->setLength(mTrimPreviewLength);
+                    trimKey->setLengthExplicit(true);
                 }
                 qDebug() << "[ui] trim-drag end: block" << mTrimKeyPos
-                         << "len" << mTrimOriginalLength << "->" << mTrimPreviewLength;
-                trimKey->setLength(mTrimPreviewLength);
-                trimKey->setLengthExplicit(true);
+                         << "len" << mTrimOriginalLength << "->" << mTrimPreviewLength
+                         << (isTrailingBlock ? "(trailing)" : "(ripple)");
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
                 mEditor->endLayerLayoutEdit(tr("拉伸帧块"));
             }
