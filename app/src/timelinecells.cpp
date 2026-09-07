@@ -2111,9 +2111,10 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     int blockEnd = layer->getBlockEnd(key);
     if (blockEnd < 0) { blockEnd = key->pos() + 1; } // open-ended hold: single-cell block
 
-    // The visual right edge of the block card (getFrameX returns the LEFT
-    // border of a frame, so the card edge sits 2px inside the next frame)
-    const int edgeX = getFrameX(blockEnd) - 2;
+    // The block card spans [getFrameX(pos-1)+2, getFrameX(blockEnd-1)]:
+    // its visual right edge is the right border of the LAST covered frame's
+    // cell — NOT getFrameX(blockEnd), which sits a full cell further right
+    const int edgeX = getFrameX(blockEnd - 1);
     const int nextPos = layer->getNextKeyFramePosition(key->pos());
     const bool nearEdge = qAbs(pos.x() - edgeX) <= 7;
     const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos);
@@ -2123,15 +2124,20 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     // whose predecessor ends right there is the same boundary as the
     // predecessor's end edge — the <-> cursor and the trim drag act on the
     // preceding block
-    if (frameNumber == key->pos() && qAbs(pos.x() - getFrameX(key->pos())) <= 9)
+    if (frameNumber == key->pos())
     {
-        const int prevPos = layer->getPreviousKeyFramePosition(key->pos());
-        if (prevPos > 0 && prevPos < key->pos())
+        // left border of this block's first cell == predecessor's visual edge
+        const int leftBorderX = getFrameX(key->pos()) - mFrameSize;
+        if (qAbs(pos.x() - leftBorderX) <= 9)
         {
-            KeyFrame* prevKey = layer->getKeyFrameAt(prevPos);
-            if (prevKey != nullptr && layer->getBlockEnd(prevKey) == key->pos())
+            const int prevPos = layer->getPreviousKeyFramePosition(key->pos());
+            if (prevPos > 0 && prevPos < key->pos())
             {
-                return prevPos;
+                KeyFrame* prevKey = layer->getKeyFrameAt(prevPos);
+                if (prevKey != nullptr && layer->getBlockEnd(prevKey) == key->pos())
+                {
+                    return prevPos;
+                }
             }
         }
     }

@@ -160,8 +160,8 @@ void TimeControls::initUI()
 
     mPlayButton->setToolTip(tr("Play"));
     mLoopButton->setToolTip(tr("Loop"));
-    mSoundButton->setToolTip(tr("Sound on/off"));
-    mSoundScrubButton->setToolTip(tr("Sound scrub on/off"));
+    mSoundButton->setToolTip(tr("声音开/关"));
+    mSoundScrubButton->setToolTip(tr("擦洗时间轴时播放声音"));
     mJumpToEndButton->setToolTip(tr("Jump to the End", "Tooltip of the jump to end button"));
     mJumpToStartButton->setToolTip(tr("Jump to the Start", "Tooltip of the jump to start button"));
 

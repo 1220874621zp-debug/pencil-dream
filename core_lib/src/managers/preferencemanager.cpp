@@ -113,17 +113,17 @@ void PreferenceManager::loadPrefs()
 
     // Timeline
     set(SETTING::SHORT_SCRUB,              settings.value(SETTING_SHORT_SCRUB,            false ).toBool());
-    // TVP-style default frame width (90); one-time migration lifts older
-    // installs from the previous small default / transient zoom so the new
-    // baseline is actually visible
-    int frameSize = settings.value(SETTING_FRAME_SIZE, 90).toInt();
-    if (!settings.contains("FrameSizeDefault90Migrated"))
+    // TVP-style default frame width: maximum (120). Two one-time migrations
+    // lift older installs (old default 56 / interim default 90) so the new
+    // baseline is actually visible; any later user zoom choice is respected.
+    int frameSize = settings.value(SETTING_FRAME_SIZE, 120).toInt();
+    if (!settings.contains("FrameSizeMaxDefaultMigrated"))
     {
-        if (frameSize < 90)
+        if (frameSize < 120)
         {
-            frameSize = 90;
+            frameSize = 120;
         }
-        settings.setValue("FrameSizeDefault90Migrated", true);
+        settings.setValue("FrameSizeMaxDefaultMigrated", true);
     }
     set(SETTING::FRAME_SIZE, frameSize);
     set(SETTING::TIMELINE_SIZE,            settings.value(SETTING_TIMELINE_SIZE,          240).toInt());
