@@ -66,6 +66,7 @@ GNU General Public License for more details.
 #include "colorbox.h"
 #include "colorinspector.h"
 #include "colorpalettewidget.h"
+#include "brushpresetpanel.h"
 #include "tooloptionwidget.h"
 #include "preferencesdialog.h"
 #include "timeline.h"
@@ -191,6 +192,9 @@ void MainWindow2::createDockWidgets()
     mColorPalette->setCore(mEditor);
     mColorPalette->setObjectName("ColorPalette");
 
+    mBrushPresetPanel = new BrushPresetPanel(this);
+    mBrushPresetPanel->setObjectName("BrushPresets");
+
     mOnionSkinWidget = new OnionSkinWidget(this);
     mOnionSkinWidget->setObjectName("Onion Skin");
 
@@ -205,6 +209,7 @@ void MainWindow2::createDockWidgets()
         << mColorBox
         << mColorInspector
         << mColorPalette
+        << mBrushPresetPanel
         << mOnionSkinWidget
         << mToolOptions
         << mToolBox;
@@ -234,6 +239,7 @@ void MainWindow2::createDockWidgets()
     addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
     tabifyDockWidget(mColorPalette, mColorBox);
     tabifyDockWidget(mColorPalette, mColorInspector);
+    tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     setDockNestingEnabled(true);
@@ -1130,6 +1136,7 @@ void MainWindow2::resetAndDockAllSubWidgets()
     addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
     tabifyDockWidget(mColorPalette, mColorBox);
     tabifyDockWidget(mColorPalette, mColorInspector);
+    tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
@@ -1227,6 +1234,7 @@ void MainWindow2::applyDefaultWorkspace()
     addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
     tabifyDockWidget(mColorPalette, mColorBox);
     tabifyDockWidget(mColorPalette, mColorInspector);
+    tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);

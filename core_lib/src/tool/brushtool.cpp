@@ -33,6 +33,8 @@ GNU General Public License for more details.
 
 BrushTool::BrushTool(QObject* parent) : StrokeTool(parent)
 {
+    mPresetExtras.name = QStringLiteral("圆头笔");
+    mEngine.setSettings(mPresetExtras);
 }
 
 ToolType BrushTool::type() const
@@ -53,7 +55,7 @@ void BrushTool::loadSettings()
 
     QHash<int, PropertyInfo> info;
     info[StrokeToolProperties::WIDTH_VALUE] = { WIDTH_MIN, WIDTH_MAX, 24.0 };
-    info[StrokeToolProperties::FEATHER_VALUE] = { FEATHER_MIN, FEATHER_MAX, 48.0 };
+    info[StrokeToolProperties::FEATHER_VALUE] = { FEATHER_MIN, FEATHER_MAX, 10.0 };
     info[StrokeToolProperties::FEATHER_ENABLED] = true;
     info[StrokeToolProperties::PRESSURE_ENABLED] = true;
     info[StrokeToolProperties::STABILIZATION_VALUE] = { StabilizationLevel::NONE, StabilizationLevel::STRONG, StabilizationLevel::STRONG } ;
@@ -75,6 +77,8 @@ void BrushTool::loadSettings()
 
     mQuickSizingProperties.insert(Qt::ShiftModifier, StrokeToolProperties::WIDTH_VALUE);
     mQuickSizingProperties.insert(Qt::ControlModifier, StrokeToolProperties::FEATHER_VALUE);
+
+    syncEngineSettings();
 }
 
 QCursor BrushTool::cursor()
@@ -97,6 +101,14 @@ void BrushTool::pointerPressEvent(PointerEvent *event)
     mLastBrushPoint = getCurrentPoint();
 
     startStroke(event->inputType());
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer->type() == Layer::BITMAP)
+    {
+        syncEngineSettings();
+        mEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
+                            mEditor->color()->frontColor(), dabPainter());
+    }
 
     StrokeTool::pointerPressEvent(event);
 }
@@ -143,6 +155,7 @@ void BrushTool::pointerReleaseEvent(PointerEvent *event)
     }
 
     endStroke();
+    mEngine.endStroke();
 
     StrokeTool::pointerReleaseEvent(event);
 }
@@ -150,21 +163,12 @@ void BrushTool::pointerReleaseEvent(PointerEvent *event)
 // draw a single paint dab at the given location
 void BrushTool::paintAt(QPointF point)
 {
-    //qDebug() << "Made a single dab at " << point;
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer->type() == Layer::BITMAP)
     {
-        qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
-        qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
-        qreal brushWidth = mSettings.width() * pressure;
-        mCurrentWidth = brushWidth;
-        mScribbleArea->drawBrush(point,
-                                 brushWidth,
-                                 mSettings.feather(),
-                                 mEditor->color()->frontColor(),
-                                 QPainter::CompositionMode_SourceOver,
-                                 opacity,
-                                 true);
+        syncEngineSettings();
+        mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
+        mEngine.dabAt(point, mCurrentPressure, dabPainter());
     }
 }
 
@@ -176,51 +180,50 @@ void BrushTool::drawStroke()
 
     if (layer->type() == Layer::BITMAP)
     {
-        qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
-        qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
-        qreal brushWidth = mSettings.width() * pressure;
-        mCurrentWidth = brushWidth;
-
-        qreal brushStep = (0.5 * brushWidth);
-        brushStep = qMax(1.0, brushStep);
-
-        QPointF a = mLastBrushPoint;
-        QPointF b = getCurrentPoint();
-
-        qreal distance = 4 * QLineF(b, a).length();
-        int steps = qRound(distance / brushStep);
-
-        for (int i = 0; i < steps; i++)
-        {
-            QPointF point = mLastBrushPoint + (i + 1) * brushStep * (getCurrentPoint() - mLastBrushPoint) / distance;
-
-            mScribbleArea->drawBrush(point,
-                                     brushWidth,
-                                     mSettings.feather(),
-                                     mEditor->color()->frontColor(),
-                                     QPainter::CompositionMode_SourceOver,
-                                     opacity,
-                                     true);
-            if (i == (steps - 1))
-            {
-                mLastBrushPoint = getCurrentPoint();
-            }
-        }
-
-        // Line visualizer
-        // for debugging
-//        QPainterPath tempPath;
-
-//        QPointF mappedMousePos = mEditor->view()->mapScreenToCanvas(strokeManager()->getMousePos());
-//        tempPath.moveTo(getCurrentPoint());
-//        tempPath.lineTo(mappedMousePos);
-
-//        QPen pen( Qt::black,
-//                   1,
-//                   Qt::SolidLine,
-//                   Qt::RoundCap,
-//                   Qt::RoundJoin );
-//        mScribbleArea->drawPolyline(tempPath, pen, true);
-
+        syncEngineSettings();
+        mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
+        mEngine.strokeTo(getCurrentPoint(), mCurrentPressure, dabPainter());
     }
+}
+
+void BrushTool::applyBrushPreset(const BrushSettings& preset)
+{
+    mPresetExtras = preset;
+
+    setWidth(preset.diameter);
+    // 硬度与羽化互为倒数映射：硬度 1 → 羽化 1，硬度 0.05 → 羽化 95
+    setFeather((1.0 - preset.hardness) * 100.0);
+    setPressureEnabled(preset.pressureSize || preset.pressureOpacity);
+
+    syncEngineSettings();
+}
+
+void BrushTool::initPresetExtras(const BrushSettings& preset)
+{
+    mPresetExtras = preset;
+    syncEngineSettings();
+}
+
+BrushSettings BrushTool::currentBrushSettings()
+{
+    syncEngineSettings();
+    return mEngine.settings();
+}
+
+void BrushTool::syncEngineSettings()
+{
+    BrushSettings merged = mPresetExtras;
+    merged.diameter = mSettings.width();
+    merged.hardness = 1.0 - qBound(FEATHER_MIN, mSettings.feather(), FEATHER_MAX) / 100.0;
+    // 工具选项里的"压感"勾选框是总开关；预设只决定用压感控什么
+    merged.pressureSize = mPresetExtras.pressureSize && mSettings.pressureEnabled();
+    merged.pressureOpacity = mPresetExtras.pressureOpacity && mSettings.pressureEnabled();
+    mEngine.setSettings(merged);
+}
+
+BrushEngine::DabPainter BrushTool::dabPainter() const
+{
+    return [this](const BrushEngine::DabRequest& dab) {
+        mScribbleArea->drawDab(dab.dab, dab.center, dab.opacity);
+    };
 }

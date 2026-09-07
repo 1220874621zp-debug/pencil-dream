@@ -1113,6 +1113,11 @@ void ScribbleArea::drawBrush(QPointF thePoint, qreal brushWidth, qreal mOffset, 
     mTiledBuffer.drawBrush(thePoint, brushWidth, Qt::NoPen, brush, compMode, useAA);
 }
 
+void ScribbleArea::drawDab(const QImage& dab, const QPointF& center, qreal opacity)
+{
+    mTiledBuffer.drawDab(dab, center, opacity);
+}
+
 void ScribbleArea::drawPolyline(QPainterPath path, QPen pen, bool useAA)
 {
     BlitRect blitRect;

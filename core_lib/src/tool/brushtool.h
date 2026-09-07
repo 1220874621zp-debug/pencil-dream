@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #define BRUSHTOOL_H
 
 #include "stroketool.h"
+#include "brush/brushengine.h"
 #include <QColor>
 
 class Layer;
@@ -45,6 +46,13 @@ public:
     void drawStroke();
     void paintAt(QPointF point);
 
+    /** 应用一笔预设：宽度/羽化/压感同步进工具属性（滑杆联动），其余参数进引擎 */
+    void applyBrushPreset(const BrushSettings& preset);
+    /** 启动恢复用：只装载预设参数，不覆盖用户上次调过的宽度/羽化属性 */
+    void initPresetExtras(const BrushSettings& preset);
+    /** 当前生效的完整笔刷参数（工具属性 + 预设额外参数的合并视图） */
+    BrushSettings currentBrushSettings();
+
 protected:
     QPointF mLastBrushPoint;
     QPointF mMouseDownPoint;
@@ -53,6 +61,14 @@ protected:
     qreal mOpacity = 1.0;
 
     StrokeToolProperties mSettings;
+
+private:
+    void syncEngineSettings();
+    BrushEngine::DabPainter dabPainter() const;
+
+    // 预设里超出工具属性范围的参数（笔尖形状/扁率/角度/间距/曲线等）
+    BrushSettings mPresetExtras;
+    BrushEngine mEngine;
 };
 
 #endif // BRUSHTOOL_H

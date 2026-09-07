@@ -162,6 +162,8 @@ public:
     void drawPen(QPointF thePoint, qreal brushWidth, QColor fillColor, bool useAA = true);
     void drawPencil(QPointF thePoint, qreal brushWidth, qreal fixedBrushFeather, QColor fillColor, qreal opacity);
     void drawBrush(QPointF thePoint, qreal brushWidth, qreal offset, QColor fillColor, QPainter::CompositionMode compMode, qreal opacity, bool usingFeather = true, bool useAA = false);
+    /** 笔刷引擎专用：把一个上好色的 dab 盖到绘制缓冲（wash 混合） */
+    void drawDab(const QImage& dab, const QPointF& center, qreal opacity);
     void blurBrush(BitmapImage *bmiSource_, QPointF srcPoint_, QPointF thePoint_, qreal brushWidth_, qreal offset_, qreal opacity_);
     void liquifyBrush(BitmapImage *bmiSource_, QPointF srcPoint_, QPointF thePoint_, qreal brushWidth_, qreal offset_, qreal opacity_);
 

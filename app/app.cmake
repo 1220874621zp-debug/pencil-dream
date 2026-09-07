@@ -19,6 +19,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameracontextmenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameraoptionswidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/camerapropertiesdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/brushpresetpanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/checkupdatesdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorbox.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorinspector.h
@@ -83,6 +84,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorbox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorinspector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorpalettewidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/brushpresetpanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorslider.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorwheel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/commandlineexporter.cpp
