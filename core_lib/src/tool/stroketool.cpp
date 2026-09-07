@@ -24,6 +24,8 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "toolmanager.h"
 #include "mathutils.h"
+#include "layermanager.h"
+#include "layercamera.h"
 
 #include "canvascursorpainter.h"
 
@@ -138,7 +140,27 @@ QPointF StrokeTool::getCurrentPixel() const
 
 QPointF StrokeTool::getCurrentPoint() const
 {
-    return mEditor->view()->mapScreenToCanvas(getCurrentPixel());
+    return clampToCanvas(mEditor->view()->mapScreenToCanvas(getCurrentPixel()));
+}
+
+QPointF StrokeTool::clampToCanvas(const QPointF& point) const
+{
+    if (!mClampStrokeToCanvas)
+    {
+        return point;
+    }
+
+    LayerCamera* camera = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
+    if (camera == nullptr)
+    {
+        return point;
+    }
+
+    // fixed bound: the camera-size rect itself, not the animated camera view,
+    // so the drawable area never moves with camera keyframes
+    const QRectF canvasRect(camera->getViewRect());
+    return QPointF(qBound(canvasRect.left(), point.x(), canvasRect.right()),
+                   qBound(canvasRect.top(), point.y(), canvasRect.bottom()));
 }
 
 QPointF StrokeTool::getLastPixel() const
@@ -165,7 +187,7 @@ void StrokeTool::startStroke(PointerEvent::InputType inputType)
 
     //Experimental
     QPointF startStrokes = mInterpolator.interpolateStart(mLastPixel);
-    mStrokePoints << mEditor->view()->mapScreenToCanvas(startStrokes);
+    mStrokePoints << clampToCanvas(mEditor->view()->mapScreenToCanvas(startStrokes));
 
     mStrokePressures.clear();
     mStrokePressures << mInterpolator.getPressure();
@@ -222,7 +244,7 @@ void StrokeTool::drawStroke()
     {
         // get last pixel before interpolation initializes
         QPointF startStrokes = mInterpolator.interpolateStart(getLastPixel());
-        mStrokePoints << mEditor->view()->mapScreenToCanvas(startStrokes);
+        mStrokePoints << clampToCanvas(mEditor->view()->mapScreenToCanvas(startStrokes));
         mStrokePressures << mInterpolator.getPressure();
     }
     else
