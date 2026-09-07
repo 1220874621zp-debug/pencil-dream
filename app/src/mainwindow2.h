@@ -46,7 +46,6 @@ class UndoRedoCommand;
 class LayerOpacityDialog;
 class PegBarAlignmentDialog;
 class AddTransparencyToPaperDialog;
-class GapFillDialog;
 class RepositionFramesDialog;
 class StatusBar;
 class AutosaverByTime;
@@ -76,7 +75,6 @@ public slots:
     void closeRepositionDialog();
     void openLayerOpacityDialog();
     void openAddTranspToPaperDialog();
-    void openGapFillDialog();
     void currentLayerChanged();
     void selectionChanged();
     void viewFlipped();
@@ -204,7 +202,6 @@ private:
     RepositionFramesDialog* mReposDialog = nullptr;
     LayerOpacityDialog* mLayerOpacityDialog = nullptr;
     AddTransparencyToPaperDialog* mAddTranspToPaper = nullptr;
-    GapFillDialog* mGapFillDialog = nullptr;
 
     // Autosave handler
     AutosaverByTime* mAutoSaver = nullptr;
