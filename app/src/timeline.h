@@ -93,6 +93,7 @@ protected:
 private slots:
     void applyHoldLength(int n);
     void cloneLoopFrames();
+    void duplicateLayerCleared();
 
 private:
     void updateVerticalScrollbarPosition();

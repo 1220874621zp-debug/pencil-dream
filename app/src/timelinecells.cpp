@@ -725,8 +725,11 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         if (mTrimming && framePos > mTrimKeyPos)
             recLeft += mTrimRippleOffset * mFrameSize;
 
-        // Selected frames are painted separately
-        if (selectedFrames.contains(framePos)) {
+        // Selected frames are normally drawn as regular cards with a
+        // border-only highlight on top (paintSelectedFrames). While moving,
+        // the card at the original spot is hidden so the floating outline
+        // reads as the block being carried.
+        if (selectedFrames.contains(framePos) && mMovingFrames) {
             return;
         }
 
@@ -884,8 +887,14 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
     }
 
     painter.save();
-    painter.setBrush(Theme::TimelineSelectedFrameFill);
-    painter.setPen(QPen(QBrush(Theme::Accent), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    // TVP-style selection: highlight the border only, the block's own card
+    // (thumbnail, frame number) stays visible underneath. While dragging, a
+    // translucent ghost keeps the carried outline readable.
+    if (previewing)
+    {
+        painter.setBrush(Theme::TimelineSelectedFrameFill);
+    }
+    painter.setPen(QPen(QBrush(Theme::Accent), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
     // Merge consecutive blocks (block end == next selected start) into one rounded run
     int i = 0;

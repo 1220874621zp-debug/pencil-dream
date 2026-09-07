@@ -40,6 +40,8 @@ GNU General Public License for more details.
 #include "timecontrols.h"
 #include "timelinecells.h"
 #include "tvptoolsdialog.h"
+#include "layerbitmap.h"
+#include "bitmapimage.h"
 
 
 TimeLine::TimeLine(QWidget* parent) : BaseDockWidget(parent)
@@ -97,6 +99,13 @@ void TimeLine::initUI()
     duplicateLayerButton->setIconSize(QSize(26, 26));
     duplicateLayerButton->setMinimumSize(QSize(34, 34));
 
+    // TVP "copy clear": duplicate the layer structure above the original
+    // with blank frames (cleanup / trace-over workflow)
+    QToolButton* copyClearButton = new QToolButton(this);
+    copyClearButton->setText(tr("复制清空"));
+    copyClearButton->setToolTip(tr("在原图层上方复制一个同结构图层，关键帧内容全部为空白（清稿/描线用）"));
+    copyClearButton->setMinimumSize(QSize(38, 30));
+
     // TVP global toggles: every layer on -> every layer off (and back)
     QToolButton* allVisibleButton = new QToolButton(this);
     allVisibleButton->setText(tr("可见"));
@@ -112,6 +121,7 @@ void TimeLine::initUI()
     layerButtons->addWidget(addLayerButton);
     layerButtons->addWidget(mLayerDeleteButton);
     layerButtons->addWidget(duplicateLayerButton);
+    layerButtons->addWidget(copyClearButton);
     layerButtons->addSeparator();
     layerButtons->addWidget(allVisibleButton);
     layerButtons->addWidget(allLockedButton);
@@ -302,6 +312,7 @@ void TimeLine::initUI()
     connect(holdThreeButton, &QToolButton::clicked, this, [this]() { applyHoldLength(3); });
     connect(holdFourButton, &QToolButton::clicked, this, [this]() { applyHoldLength(4); });
     connect(loopCloneButton, &QToolButton::clicked, this, &TimeLine::cloneLoopFrames);
+    connect(copyClearButton, &QToolButton::clicked, this, &TimeLine::duplicateLayerCleared);
     connect(lipsyncAct, &QAction::triggered, this, [this]()
     {
         if (mLipsyncDialog == nullptr) { mLipsyncDialog = new LipsyncDialog(editor(), this); }
@@ -660,6 +671,56 @@ void TimeLine::applyHoldLength(int n)
     emit editor()->framesModified();
     updateContent();
     editor()->updateFrame();
+}
+
+/** TVP "copy clear": duplicates the current bitmap layer right above
+ *  itself, keeping the keyframe structure (positions and exposure lengths)
+ *  but replacing every frame with a blank one. One undo step. */
+void TimeLine::duplicateLayerCleared()
+{
+    Layer* source = editor()->layers()->currentLayer();
+    if (source == nullptr || source->type() != Layer::BITMAP || source->locked()) { return; }
+
+    const int sourceIndex = editor()->layers()->currentLayerIndex();
+
+    QList<KeyFrameLayoutEntry> structure;
+    source->foreachKeyFrame([&structure](KeyFrame* key)
+    {
+        KeyFrameLayoutEntry entry;
+        entry.pos = key->pos();
+        entry.length = key->length();
+        entry.lengthExplicit = key->isLengthExplicit();
+        structure.append(entry);
+    });
+
+    LayerBitmap* copy = editor()->layers()->createBitmapLayer(tr("%1_清空").arg(source->name()));
+    if (copy == nullptr) { return; }
+
+    // park the copy directly above its source (canvas stacking = higher index)
+    const int copyIndex = editor()->layers()->count() - 1;
+    editor()->object()->moveLayer(copyIndex, sourceIndex + 1);
+
+    editor()->beginLayerLayoutEdit(copy);
+    // the fresh layer ships with a default keyframe at position 1
+    KeyFrame* defaultKey = editor()->takeLayerKeyFrame(copy, 1);
+    delete defaultKey;
+    for (const KeyFrameLayoutEntry& entry : structure)
+    {
+        QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
+        blank.fill(Qt::transparent);
+        BitmapImage* blankImage = new BitmapImage(QPoint(0, 0), blank);
+        copy->addKeyFrame(entry.pos, blankImage);
+        blankImage->setLength(entry.length);
+        blankImage->setLengthExplicit(entry.lengthExplicit);
+    }
+    editor()->endLayerLayoutEdit(tr("复制图层并清空"));
+
+    editor()->layers()->setCurrentLayer(sourceIndex);
+    emit editor()->updateTimeLine();
+    editor()->getScribbleArea()->onLayerChanged();
+    emit editor()->framesModified();
+    editor()->layers()->notifyAnimationLengthChanged();
+    updateContent();
 }
 
 /** TVP loop-clone: repeats the selected frames (or every frame of the layer
