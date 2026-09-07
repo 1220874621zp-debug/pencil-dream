@@ -127,11 +127,17 @@ void BaseTool::pointerDoubleClickEvent(PointerEvent* event)
  * @brief BaseTool::isDrawingTool - A drawing tool is anything that applies something to the canvas.
  * SELECT and MOVE does not count here because they modify already applied content.
  * @return true if not a drawing tool and false otherwise
+ *
+ *  While active, drawing tools have updateFrame()/invalidateAllCache() skipped
+ *  (they refresh through the tiled buffer instead). Any tool NOT wired into the
+ *  tiled buffer must return false here, or the canvas freezes for its whole
+ *  session - DEFORM/LASSO broke exactly this way.
  */
 bool BaseTool::isDrawingTool()
 {
     if (type() == ToolType::HAND || type() == ToolType::MOVE || type() == ToolType::CAMERA || type() == ToolType::SELECT
-         || type() == ToolType::ONION_ALIGN )
+         || type() == ToolType::ONION_ALIGN
+         || type() == ToolType::DEFORM || type() == ToolType::LASSO )
     {
         return false;
     }

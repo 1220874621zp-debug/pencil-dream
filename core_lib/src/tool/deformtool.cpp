@@ -407,6 +407,7 @@ void DeformTool::pointerPressEvent(PointerEvent* event)
 
     const QPointF pos = event->canvasPos();
     mCursorPos = pos;
+    mLastHoverPos = pos;
 
     if (!mDeformActive)
     {
@@ -474,12 +475,22 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
 
     if (!mScribbleArea->isPointerInUse())
     {
-        if (mDeformMode == 0 || mDeformMode == 2)
+        if (mDeformMode == 0)
         {
-            mScribbleArea->updateFrame(); // keep brush cursor / cage visuals fresh
+            // hover only moves the brush ring: repaint just the union of its
+            // old and new areas instead of the whole canvas
+            const qreal radius = 3.0 * mLiquifySize + 2.0;
+            const QRectF newRing(pos.x() - radius, pos.y() - radius, 2 * radius, 2 * radius);
+            const QRectF oldRing(mLastHoverPos.x() - radius, mLastHoverPos.y() - radius, 2 * radius, 2 * radius);
+            const QRect widgetRect = mEditor->view()->getView()
+                .mapRect(newRing | oldRing).toAlignedRect().adjusted(-2, -2, 2, 2);
+            mScribbleArea->update(widgetRect);
         }
+        // cage/warp/perspective hover visuals don't depend on the cursor
+        mLastHoverPos = pos;
         return;
     }
+    mLastHoverPos = pos; // the ring follows the pointer while dragging too
 
     switch (mDeformMode)
     {
@@ -919,8 +930,12 @@ void DeformTool::updateLiquifyPreview(bool interactive)
     const QImage& src = useScaled ? mPreviewSource : mSourceImage;
     const qreal scale = useScaled ? mPreviewScale : 1.0;
 
-    const int cols = qMax(1, qRound(mLiquifyGridCols * scale));
-    const int rows = qMax(1, qRound(mLiquifyGridRows * scale));
+    // cols/rows must be derived exactly like the lattice gridWarpImage builds
+    // internally (ceil(size/cell)): any other count fails its point-count
+    // check and the call silently returns the source unwarped
+    const int cell = qMax(4, qRound(mLiquifyGridCell * scale));
+    const int cols = qMax(1, (src.width() + cell - 1) / cell);
+    const int rows = qMax(1, (src.height() + cell - 1) / cell);
     const int stride = mLiquifyGridCols + 1;
 
     QVector<QPointF> mapped;
@@ -937,9 +952,7 @@ void DeformTool::updateLiquifyPreview(bool interactive)
 
     const bool useAA = toolProperties().getInfo(TransformToolProperties::ANTI_ALIASING_ENABLED).boolValue();
     QPointF offset;
-    const QImage warped = MlsWarp::gridWarpImage(src, mapped,
-                                                 qMax(4, qRound(mLiquifyGridCell * scale)),
-                                                 useAA, &offset);
+    const QImage warped = MlsWarp::gridWarpImage(src, mapped, cell, useAA, &offset);
 
     const QPointF topLeft(mRegion.topLeft());
     if (useScaled)

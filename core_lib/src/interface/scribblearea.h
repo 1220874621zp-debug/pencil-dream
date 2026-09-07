@@ -70,6 +70,8 @@ public:
     /** Free-deform tool live preview channel (canvas coords for targetRect). */
     void setDeformPreview(const QImage& preview, const QRectF& targetRect);
     void clearDeformPreview();
+    /** Test seam: the current deform preview image (null when inactive). */
+    QImage deformPreviewImage() const { return mCanvasPainter.deformPreview(); }
 
     /** 洋葱皮对位工具：取该图层的幽灵偏移（无则创建），显示辅助态不落盘 */
     OnionGhostOffset& onionGhostOffsetRef(int layerId);

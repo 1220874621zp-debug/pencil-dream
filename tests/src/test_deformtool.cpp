@@ -170,3 +170,49 @@ TEST_CASE("DeformTool no-op click keeps image")
 
     REQUIRE(img->image()->pixel(100, 100) == before);
 }
+
+TEST_CASE("DeformTool liquify interactive preview updates on large regions")
+{
+    DeformHarness h;
+
+    DeformTool* tool = h.deformTool();
+    tool->setDeformMode(0);
+
+    // a region big enough to engage the down-scaled interactive path
+    // (>220k px): it used to build a lattice whose point count mismatched
+    // the mapped grid, and gridWarpImage silently returned the source
+    BitmapImage* img = static_cast<BitmapImage*>(h.layer->getKeyFrameAt(1));
+    QImage big(600, 600, QImage::Format_ARGB32_Premultiplied);
+    big.fill(QColor(255, 0, 0, 255));
+    // blue band under the stroke so displacement is observable
+    for (int y = 0; y < 600; y++) {
+        QRgb* line = reinterpret_cast<QRgb*>(big.scanLine(y));
+        for (int x = 290; x < 310; x++) {
+            line[x] = qPremultiply(qRgba(0, 0, 255, 255));
+        }
+    }
+    BitmapImage content(QPoint(0, 0), big);
+    img->paste(&content);
+
+    h.press(QPointF(300, 300));
+    REQUIRE(tool->isActive());
+    const QImage before = h.scribbleArea->deformPreviewImage();
+    REQUIRE(!before.isNull());
+
+    for (int i = 1; i <= 20; i++)
+    {
+        h.move(QPointF(300 + i * 3, 300));
+    }
+
+    // sample the stroke start in preview pixels (the preview is down-scaled):
+    // the drag pushes the band away, so blue must be gone from under it
+    const QImage during = h.scribbleArea->deformPreviewImage();
+    REQUIRE(during.size() != before.size());
+    const qreal previewScale = qreal(during.width()) / before.width();
+    const QRgb sample = during.pixel(qRound(480 * previewScale), qRound(480 * previewScale));
+    INFO("sampled=" << qRed(sample) << "," << qGreen(sample) << "," << qBlue(sample));
+    REQUIRE(qBlue(sample) < 200);
+
+    h.release(QPointF(360, 300));
+    tool->leavingThisTool();
+}

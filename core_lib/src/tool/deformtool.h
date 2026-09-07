@@ -148,6 +148,7 @@ private:
     bool mLiquifyStrokeActive = false;
     QPointF mLiquifyLastPos;
     QPointF mCursorPos;
+    QPointF mLastHoverPos; // where the brush ring was last painted (partial hover updates)
 
     void updateLiquifyPreview(bool interactive);
 

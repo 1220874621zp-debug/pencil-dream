@@ -254,8 +254,25 @@ void LassoTool::endLasso(const QPointF& pos)
     }
 
     auto selectMan = mEditor->select();
-    QPainterPath newPath = polygonToPath(mLassoPoints);
+
+    // freehand points arrive every >=2px, so long strokes hold thousands of
+    // vertices and the QPainterPath boolean ops below slow down badly.
+    // Halve until manageable (same approach as DeformTool::finalizeCage).
+    QPolygonF simplified = mLassoPoints;
+    constexpr int kMaxLassoVertices = 256;
+    while (simplified.size() > kMaxLassoVertices)
+    {
+        QPolygonF reduced;
+        reduced.reserve((simplified.size() + 1) / 2);
+        for (int i = 0; i < simplified.size(); i += 2)
+        {
+            reduced << simplified[i];
+        }
+        simplified = reduced;
+    }
     mLassoPoints.clear();
+
+    QPainterPath newPath = polygonToPath(simplified);
 
     // combine with the existing selection according to the action
     QPainterPath result;

@@ -84,6 +84,8 @@ public:
      *  targetRect is in canvas coordinates and may stretch the preview. */
     void setDeformPreview(const QImage& preview, const QRectF& targetRect);
     void clearDeformPreview();
+    /** Test seam: the current live-preview image (null when inactive). */
+    const QImage& deformPreview() const { return mDeformPreview; }
 
     /** Clip applied to in-progress stroke tiles (selection constraint). */
     void setSelectionClipPath(const QPainterPath& path) { mSelectionClipPath = path; }
