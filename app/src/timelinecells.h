@@ -35,6 +35,7 @@ class Editor;
 class PreferenceManager;
 class QMenu;
 class QAction;
+class QTimer;
 enum class SETTING;
 
 enum class TIMELINE_CELL_TYPE
@@ -98,6 +99,7 @@ protected:
 
 private slots:
     void loadSetting(SETTING setting);
+    void processThumbQueue();
 
 private:
     int getLayerNumber(int y) const;
@@ -156,6 +158,11 @@ private:
 
     QPixmap* mCache = nullptr;
     mutable QHash<QString, QPixmap> mThumbCache;
+    // async thumbnail generation: misses are queued and rendered in batches
+    struct ThumbRequest { int layerId; int framePos; };
+    mutable QList<ThumbRequest> mThumbQueue;
+    mutable QSet<QString> mThumbQueued;
+    QTimer* mThumbTimer = nullptr;
     QSet<int> mCollapsedLayerIds;
     bool mRedrawContent = false;
     bool mDrawFrameNumber = true;

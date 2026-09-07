@@ -25,6 +25,7 @@ GNU General Public License for more details.
 #include <QSettings>
 #include <QDebug>
 #include <QWheelEvent>
+#include <QTimer>
 #include <algorithm>
 #include <QThreadPool>
 #include <QRunnable>
@@ -55,7 +56,16 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     mEditor = editor;
     mPrefs = editor->preference();
     // frame contents changed -> thumbnails must be regenerated
-    connect(mEditor, &Editor::framesModified, this, [this]() { mThumbCache.clear(); });
+    connect(mEditor, &Editor::framesModified, this, [this]()
+    {
+        mThumbCache.clear();
+        mThumbQueue.clear();
+        mThumbQueued.clear();
+    });
+    // async thumbnail batches (TVP-style: paint reads the cache only)
+    mThumbTimer = new QTimer(this);
+    mThumbTimer->setSingleShot(true);
+    connect(mThumbTimer, &QTimer::timeout, this, &TimeLineCells::processThumbQueue);
     mType = type;
 
     mFrameLength = mPrefs->getInt(SETTING::TIMELINE_SIZE);
@@ -224,7 +234,8 @@ void TimeLineCells::updateFrame(int frameNumber)
 
 void TimeLineCells::updateContent()
 {
-    mThumbCache.clear();
+    // note: thumbnails are NOT dropped here — scrolling must not regenerate
+    // them; only real frame modifications invalidate the thumbnail cache
     mRedrawContent = true;
     update();
 }
@@ -445,9 +456,10 @@ void TimeLineCells::paintTicks(QPainter& painter, const QPalette& palette) const
         {
             painter.drawLine(lineX, 1, lineX, 3);
         }
-        if (i == 0 || i % fps == fps - 1)
+        // TVP numbering: every 5th frame, or every frame when cells are wide
+        if (i == mFrameOffset || (i + 1) % 5 == 0 || mFrameSize > 35)
         {
-            int incr = (i < 9) ? 4 : 0; // poor man’s text centering
+            int incr = (i < 9) ? 4 : 0; // poor man's text centering
             painter.drawText(QPoint(lineX + incr, 17), QString::number(i + 1));
         }
     }
@@ -565,32 +577,69 @@ QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
     if (it != mThumbCache.constEnd())
         return it.value();
 
-    QPixmap thumb;
-    LayerBitmap* bitmapLayer = const_cast<LayerBitmap*>(dynamic_cast<const LayerBitmap*>(layer));
-    if (bitmapLayer != nullptr)
+    // cache miss: queue for async generation, the placeholder shows meanwhile
+    if (!mThumbQueued.contains(key))
     {
-        BitmapImage* img = bitmapLayer->getBitmapImageAtFrame(framePos);
-        if (img == nullptr)
-            img = bitmapLayer->getLastBitmapImageAtFrame(framePos);
-        if (img != nullptr && !img->image()->isNull())
-        {
-            // crop to actual content, then letterbox into a 16:9 card
-            const QImage src = img->image()->copy(img->bounds());
-            QImage card(160, 90, QImage::Format_ARGB32_Premultiplied);
-            card.fill(Qt::transparent);
-            QPainter cp(&card);
-            const QSize scaled = src.size().scaled(160, 90, Qt::KeepAspectRatio);
-            const int dx = (160 - scaled.width()) / 2;
-            const int dy = (90 - scaled.height()) / 2;
-            cp.drawImage(QRect(dx, dy, scaled.width(), scaled.height()), src);
-            cp.end();
-            thumb = QPixmap::fromImage(card);
-        }
+        mThumbQueued.insert(key);
+        mThumbQueue.append({ layer->id(), framePos });
+        if (!mThumbTimer->isActive())
+            mThumbTimer->start(30);
     }
-    mThumbCache.insert(key, thumb);
-    if (mThumbCache.size() > 400)
-        mThumbCache.erase(mThumbCache.begin()); // simple bound; refresh clears it anyway
-    return thumb;
+    return QPixmap();
+}
+
+void TimeLineCells::processThumbQueue()
+{
+    if (mType != TIMELINE_CELL_TYPE::Tracks)
+    {
+        mThumbQueue.clear();
+        mThumbQueued.clear();
+        return;
+    }
+
+    int generated = 0;
+    while (!mThumbQueue.isEmpty() && generated < 8)
+    {
+        const ThumbRequest request = mThumbQueue.takeFirst();
+        const QString key = QString("%1_%2").arg(request.layerId).arg(request.framePos);
+        mThumbQueued.remove(key);
+        if (mThumbCache.contains(key)) { continue; }
+
+        const Layer* layer = mEditor->layers()->findLayerById(request.layerId);
+        if (layer == nullptr) { continue; }
+
+        QPixmap thumb;
+        LayerBitmap* bitmapLayer = const_cast<LayerBitmap*>(dynamic_cast<const LayerBitmap*>(layer));
+        if (bitmapLayer != nullptr)
+        {
+            BitmapImage* img = bitmapLayer->getBitmapImageAtFrame(request.framePos);
+            if (img == nullptr)
+                img = bitmapLayer->getLastBitmapImageAtFrame(request.framePos);
+            if (img != nullptr && !img->image()->isNull())
+            {
+                // crop to actual content, then letterbox into a 16:9 card
+                const QImage src = img->image()->copy(img->bounds());
+                QImage card(160, 90, QImage::Format_ARGB32_Premultiplied);
+                card.fill(Qt::transparent);
+                QPainter cp(&card);
+                const QSize scaled = src.size().scaled(160, 90, Qt::KeepAspectRatio);
+                const int dx = (160 - scaled.width()) / 2;
+                const int dy = (90 - scaled.height()) / 2;
+                cp.drawImage(QRect(dx, dy, scaled.width(), scaled.height()), src);
+                cp.end();
+                thumb = QPixmap::fromImage(card);
+            }
+        }
+        mThumbCache.insert(key, thumb);
+        if (mThumbCache.size() > 400)
+            mThumbCache.erase(mThumbCache.begin()); // simple bound; refresh clears it anyway
+        ++generated;
+    }
+
+    if (!mThumbQueue.isEmpty())
+        mThumbTimer->start(30);
+    else
+        update();
 }
 
 void TimeLineCells::paintPlusPreview(QPainter& painter) const
@@ -1274,10 +1323,20 @@ void TimeLineCells::wheelEvent(QWheelEvent* event)
     const int delta = event->angleDelta().y();
     if (event->modifiers() & Qt::AltModifier)
     {
+        // TVP: the frame under the viewport center stays anchored while zooming
+        const qreal centerFrame = mFrameOffset + (width() / 2.0) / mFrameSize;
         const int newSize = qBound(6, mFrameSize + (delta > 0 ? 4 : -4), 120);
         if (newSize != mFrameSize)
         {
             setFrameSize(newSize);
+            int newOffset = qRound(centerFrame - (width() / 2.0) / newSize);
+            const int maxOffset = qMax(0, mFrameLength - width() / newSize);
+            newOffset = qBound(0, newOffset, maxOffset);
+            if (newOffset != mFrameOffset)
+            {
+                mFrameOffset = newOffset;
+                emit offsetChanged(newOffset);
+            }
             emit frameSizeChanged(newSize);
         }
     }
