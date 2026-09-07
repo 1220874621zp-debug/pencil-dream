@@ -17,6 +17,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
+#include <QDebug>
 #include <QEventLoop>
 #include <QPainter>
 #include <QProgressDialog>
@@ -197,6 +198,7 @@ void GapFillDialog::detectGaps()
     BitmapImage* coloringKeyframe = coloringLayer->getLastBitmapImageAtFrame(frame);
     if (coloringKeyframe == nullptr || coloringKeyframe->image() == nullptr) {
         setStatus(tr("当前帧没有可用的关键帧，请先在着色图层绘制。"));
+        qDebug() << "[ui] gapfill detect: no keyframe at frame" << frame;
         return;
     }
     const QRect coloringBounds = coloringKeyframe->bounds();
@@ -217,8 +219,12 @@ void GapFillDialog::detectGaps()
     }
     if (mCanvasRect.width() <= 0 || mCanvasRect.height() <= 0) {
         setStatus(tr("着色图层为空，没有可检测的内容。"));
+        qDebug() << "[ui] gapfill detect: empty layer bounds";
         return;
     }
+    qDebug() << "[ui] gapfill detect: frame" << frame
+             << "layer" << current->name() << "lineLayerId" << lineLayerId
+             << "canvas" << mCanvasRect;
 
     const Image coloringImage = canvasToGapImage(
                 keyframeToCanvas(coloringKeyframe, mCanvasRect));
@@ -242,6 +248,8 @@ void GapFillDialog::detectGaps()
     if (!learned) {
         predictor = std::make_unique<RuleBasedPredictor>();
     }
+    qDebug() << "[ui] gapfill detect: learned" << learned
+             << "backendError" << backendError;
 
     Settings settings;
     settings.scope = Scope::WholeLayer;
@@ -317,8 +325,12 @@ void GapFillDialog::detectGaps()
 
         auto* applyItem = new QTableWidgetItem;
         applyItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
-        applyItem->setCheckState(gap.suggestedColor.has_value() && gap.apply
-                                     ? Qt::Checked : Qt::Unchecked);
+        // Pre-check learned suggestions at medium confidence or above;
+        // low-confidence and rule-based rows need explicit review.
+        const bool preCheck = gap.suggestedColor.has_value() &&
+                gap.predictionProvenance == PredictionProvenance::Learned &&
+                gap.confidenceBand != ConfidenceBand::Low;
+        applyItem->setCheckState(preCheck ? Qt::Checked : Qt::Unchecked);
         ui->gapsTable->setItem(row, 0, applyItem);
 
         ui->gapsTable->setItem(row, 1,
@@ -373,6 +385,14 @@ void GapFillDialog::detectGaps()
                             .arg(backendError.isEmpty() ? QString()
                                                         : backendError + QStringLiteral(" "));
     setStatus(status);
+    int preChecked = 0;
+    for (int row = 0; row < ui->gapsTable->rowCount(); ++row) {
+        const QTableWidgetItem* item = ui->gapsTable->item(row, 0);
+        if (item != nullptr && item->checkState() == Qt::Checked) { ++preChecked; }
+    }
+    qDebug() << "[ui] gapfill detect done: gaps" << mGaps.size()
+             << "high" << highCount << "learned" << learned
+             << "preChecked" << preChecked;
 }
 
 void GapFillDialog::checkHighConfidence()
@@ -437,6 +457,22 @@ void GapFillDialog::applySelected()
     }
     QImage* image = keyframe->image();
 
+    int checkedRows = 0;
+    for (int row = 0; row < static_cast<int>(mGaps.size()); ++row) {
+        const QTableWidgetItem* item = ui->gapsTable->item(row, 0);
+        if (item != nullptr && item->checkState() == Qt::Checked &&
+            !mApplied[static_cast<std::size_t>(row)]) {
+            ++checkedRows;
+        }
+    }
+    if (checkedRows == 0) {
+        setStatus(tr("没有勾选任何间隙：请先在列表第一列勾选要应用的行。"));
+        qDebug() << "[ui] gapfill apply: no rows checked";
+        return;
+    }
+    qDebug() << "[ui] gapfill apply: checkedRows" << checkedRows
+             << "layerId" << mColoringLayerId << "keyPos" << mColoringKeyPos;
+
     // legacyBackup() snapshots relative to the editor's current frame;
     // scrub to the target keyframe so the backup lands on the right one.
     mEditor->scrubTo(mColoringKeyPos);
@@ -447,6 +483,7 @@ void GapFillDialog::applySelected()
     const int canvasWidth = mCanvasRect.width();
 
     int appliedGaps = 0;
+    int totalWritten = 0;
     for (int row = 0; row < static_cast<int>(mGaps.size()); ++row) {
         const auto gapIndex = static_cast<std::size_t>(row);
         if (mApplied[gapIndex]) { continue; }
@@ -480,10 +517,13 @@ void GapFillDialog::applySelected()
         if (written == 0) { continue; }
         mApplied[gapIndex] = true;
         ++appliedGaps;
+        totalWritten += written;
     }
 
     if (appliedGaps == 0) {
         setStatus(tr("选中的间隙没有写入任何像素（图层内容可能已变化），请重新检测。"));
+        qDebug() << "[ui] gapfill apply: zero pixels written, canvas"
+                 << mCanvasRect << "offset" << canvasOffset;
         return;
     }
     keyframe->modification();
@@ -499,5 +539,8 @@ void GapFillDialog::applySelected()
         }
     }
     mSuppressCellChanged = false;
-    setStatus(tr("已填充 %1 个间隙（可通过撤销还原）。").arg(appliedGaps));
+    setStatus(tr("已填充 %1 个间隙（共 %2 像素，可通过撤销还原）。")
+                  .arg(appliedGaps).arg(totalWritten));
+    qDebug() << "[ui] gapfill apply done: gaps" << appliedGaps
+             << "pixels" << totalWritten;
 }
