@@ -235,9 +235,10 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
     engine.setSettings(preview);
 
     const auto painter = [&strokeLayer](const DabRequest& dab) {
-        const QPoint topLeft(qRound(dab.center.x() - dab.dab.width() * 0.5),
-                             qRound(dab.center.y() - dab.dab.height() * 0.5));
-        washBlendImage(strokeLayer, dab.dab, topLeft, dab.opacity);
+        washBlendImage(strokeLayer, dab.dab,
+                       QPointF(dab.center.x() - dab.dab.width() * 0.5,
+                               dab.center.y() - dab.dab.height() * 0.5),
+                       dab.opacity);
     };
 
     QPainterPath path;
