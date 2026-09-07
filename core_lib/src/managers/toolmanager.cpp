@@ -134,6 +134,7 @@ void ToolManager::setDefaultTool()
 
 void ToolManager::setCurrentTool(ToolType eToolType)
 {
+    qDebug() << "[ui] tool ->" << BaseTool::TypeName(eToolType);
     // We're already using this tool
     if (mCurrentTool == getTool(eToolType)) { return; }
 

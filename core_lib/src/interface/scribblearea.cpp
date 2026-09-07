@@ -643,6 +643,12 @@ void ScribbleArea::tabletEvent(QTabletEvent *e)
 
 void ScribbleArea::pointerPressEvent(PointerEvent* event)
 {
+    {
+        Layer* l = mEditor->layers()->currentLayer();
+        qDebug() << "[ui] canvas press:" << (l ? l->name() : QString("?"))
+                 << "frame" << mEditor->currentFrame()
+                 << "button" << event->button();
+    }
     bool isCameraLayer = mEditor->layers()->currentLayer()->type() == Layer::CAMERA;
     if ((currentTool()->type() != HAND || isCameraLayer) && (event->button() != Qt::RightButton) && (event->button() != Qt::MiddleButton || isCameraLayer))
     {

@@ -98,6 +98,7 @@ bool PlaybackManager::isPlaying()
 
 void PlaybackManager::play()
 {
+    qDebug() << "[ui] playback play";
     updateStartFrame();
     updateEndFrame();
 
@@ -129,6 +130,7 @@ void PlaybackManager::play()
 
 void PlaybackManager::stop()
 {
+    qDebug() << "[ui] playback stop";
     mTimer->stop();
     stopSounds();
     emit playStateChanged(false);

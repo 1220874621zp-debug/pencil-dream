@@ -187,6 +187,7 @@ void TimeLineCells::toggleLayerCollapsed(int layerNumber)
 {
     Layer* l = mEditor->object()->getLayer(layerNumber);
     if (l == nullptr) return;
+    qDebug() << "[ui] layer" << layerNumber << "collapse toggle";
     const int id = l->id();
     const bool nowCollapsed = !mCollapsedLayerIds.contains(id);
     setLayerCollapsed(id, nowCollapsed);
@@ -1275,6 +1276,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 // cycle the 8-color label: -1 -> 0 -> ... -> 7 -> -1
                 Layer* labelLayer = mEditor->object()->getLayer(layerNumber);
                 labelLayer->setColorIndex((labelLayer->colorIndex() + 2) % 9 - 1);
+                qDebug() << "[ui] layer" << layerNumber << "label color ->" << labelLayer->colorIndex();
                 updateContent();
             }
             else if (event->pos().x() > width() - 24)
@@ -1283,6 +1285,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             }
             else if (event->pos().x() < 30)
             {
+                qDebug() << "[ui] layer" << layerNumber << "toggle visible";
                 mEditor->switchVisibilityOfLayer(layerNumber);
             }
             else if (mEditor->currentLayerIndex() != layerNumber)
@@ -1316,6 +1319,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 const int plusLayer = hitTestPlusHandle(event->pos());
                 if (plusLayer != -1)
                 {
+                    qDebug() << "[ui] trim-drag start: plus handle layer" << plusLayer;
                     if (mEditor->currentLayerIndex() != plusLayer)
                     {
                         mEditor->layers()->currentLayer()->deselectAll();
@@ -1334,6 +1338,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 int trimPos = hitTestTrimHandle(event->pos());
                 if (trimPos > 0)
                 {
+                    qDebug() << "[ui] trim-drag start: block" << trimPos << "layer" << layerNumber;
                     Layer* trimLayer = mEditor->object()->getLayer(layerNumber);
                     KeyFrame* trimKey = trimLayer->getKeyFrameAt(trimPos);
                     if (trimKey != nullptr)
@@ -1651,6 +1656,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
                     const int blockLen = (lastPos >= 0) ? blockLengthFor(layer, layer->getKeyFrameAt(lastPos)) : 1;
                     const int startFrame = (lastPos >= 0) ? lastPos + blockLen : getFrameNumber(mMousePressX);
+                    qDebug() << "[ui] plus-create" << n << "frames from" << startFrame;
                     for (int i = 0; i < n; i++)
                     {
                         mEditor->scrubTo(startFrame + i);
@@ -1690,6 +1696,8 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     for (int p : laterPos)
                         currentLayer->moveKeyFrame(p, delta);
                 }
+                qDebug() << "[ui] trim-drag end: block" << mTrimKeyPos
+                         << "len" << mTrimOriginalLength << "->" << mTrimPreviewLength;
                 trimKey->setLength(mTrimPreviewLength);
                 trimKey->setLengthExplicit(true);
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
@@ -1719,6 +1727,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 userState.moveFramesState = MoveFramesSaveState(offset, currentLayer->selectedKeyFramesPositions());
                 mEditor->undoRedo()->addUserState(saveStateId, userState);
 
+                qDebug() << "[ui] frames moved by" << offset;
                 currentLayer->moveSelectedFrames(offset);
                 mEditor->undoRedo()->record(saveStateId, tr("Move Frames"));
             }
