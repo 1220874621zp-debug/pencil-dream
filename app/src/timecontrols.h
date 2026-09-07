@@ -43,6 +43,10 @@ public:
     void setLoop(bool);
     void setRangeState(bool);
 
+    /** Playback-range row and everything after it: hosted at the bottom of
+     *  the timeline (TVP layout) instead of the top toolbar. */
+    QWidget* bottomBar() const { return mBottomBar; }
+
     void updateLength(int frameLength);
     void updatePlayState();
 
@@ -98,7 +102,9 @@ private:
     QAction*     mOnlyFramesAction = nullptr;
     QAction*     mSmpteAction = nullptr;
     QAction*     mSffAction = nullptr;
-    QAction*     mTimecodeLabelAction = nullptr;
+
+    // playback range + everything after it lives in this bottom bar
+    QWidget* mBottomBar = nullptr;
 
     QIcon mStartIcon;
     QIcon mStopIcon;

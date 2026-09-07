@@ -17,6 +17,8 @@ GNU General Public License for more details.
 
 #include "timecontrols.h"
 
+#include <QHBoxLayout>
+
 #include <QLabel>
 #include <QSettings>
 #include <QMenu>
@@ -179,13 +181,22 @@ void TimeControls::initUI()
     addWidget(mFpsBox);
     addWidget(mPlaybackSpeedBox);
     addWidget(mFpsLabel);
-    addWidget(mPlaybackRangeCheckBox);
-    addWidget(mLoopStartSpinBox);
-    addWidget(mLoopEndSpinBox);
-    addWidget(mSoundButton);
-    addWidget(mSoundScrubButton);
-    addWidget(mTimecodeSelect);
-    mTimecodeLabelAction = addWidget(mTimecodeLabel);
+
+    // TVP layout: the playback range and everything after it moves to a
+    // slim bar at the bottom of the timeline
+    mBottomBar = new QWidget(this);
+    mBottomBar->setFixedHeight(34);
+    auto* bottomLayout = new QHBoxLayout(mBottomBar);
+    bottomLayout->setContentsMargins(6, 2, 6, 2);
+    bottomLayout->setSpacing(4);
+    bottomLayout->addWidget(mPlaybackRangeCheckBox);
+    bottomLayout->addWidget(mLoopStartSpinBox);
+    bottomLayout->addWidget(mLoopEndSpinBox);
+    bottomLayout->addWidget(mSoundButton);
+    bottomLayout->addWidget(mSoundScrubButton);
+    bottomLayout->addWidget(mTimecodeSelect);
+    bottomLayout->addWidget(mTimecodeLabel);
+    bottomLayout->addStretch();
 
     makeConnections();
 
@@ -412,7 +423,7 @@ void TimeControls::updateFpsLabel(qreal actualFps)
 
 void TimeControls::updateTimecodeLabel(int frame)
 {
-    mTimecodeLabelAction->setVisible(true);
+    mTimecodeLabel->setVisible(true);
 
     switch (mTimecodeLabelEnum)
     {
@@ -432,7 +443,7 @@ void TimeControls::updateTimecodeLabel(int frame)
         break;
     case TimecodeTextLevel::NOTEXT:
     default:
-        mTimecodeLabelAction->setVisible(false);
+        mTimecodeLabel->setVisible(false);
         break;
     }
 

@@ -269,6 +269,9 @@ void TimeLine::initUI()
     QGridLayout* rightLayout = new QGridLayout();
     rightLayout->addWidget(rightToolBar, 0, 0);
     rightLayout->addWidget(mTracks, 1, 0);
+    // TVP: playback range & co. sit at the bottom of the timeline
+    rightLayout->addWidget(mTimeControls->bottomBar(), 2, 0);
+    rightLayout->setRowStretch(1, 1);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     rightLayout->setSpacing(0);
     rightWidget->setLayout(rightLayout);
