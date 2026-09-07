@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #include "timecontrols.h"
 
 #include <QHBoxLayout>
+#include <QLineEdit>
 
 #include <QLabel>
 #include <QSettings>
@@ -49,6 +50,7 @@ void TimeControls::initUI()
     mFpsBox->setSuffix(tr(" fps"));
     mFpsBox->setToolTip(tr("Frames per second"));
     mFpsBox->setFocusPolicy(Qt::WheelFocus);
+    mFpsBox->setAlignment(Qt::AlignRight | Qt::AlignVCenter); // numbers right-aligned
 
     mFps = mFpsBox->value();
     mTimecodeSelect = new QToolButton(this);
@@ -106,6 +108,12 @@ void TimeControls::initUI()
     if (speedIndex < 0) { speedIndex = 2; } // default: 1x
     mPlaybackSpeedBox->setCurrentIndex(speedIndex);
     mEditor->playback()->setPlaybackSpeed(mPlaybackSpeedBox->currentData().toDouble());
+    // right-align the shown text via a read-only line edit (combos have no
+    // text-alignment API of their own)
+    mPlaybackSpeedBox->setEditable(true);
+    mPlaybackSpeedBox->lineEdit()->setReadOnly(true);
+    mPlaybackSpeedBox->lineEdit()->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    mPlaybackSpeedBox->setInsertPolicy(QComboBox::NoInsert);
 
     mFpsLabel = new QLabel(this);
     mFpsLabel->setFixedWidth(60);
