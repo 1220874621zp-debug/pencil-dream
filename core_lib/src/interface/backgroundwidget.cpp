@@ -110,8 +110,11 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
 
             constexpr qreal baseScale = 1.5;
             QPolygonF basePoly;
-            for (const QPointF& pnt : camPoly)
-                basePoly << mEditor->view()->mapCanvasToScreen(center + baseScale * (pnt - center));
+            // QPolygonF(QRectF) appends a closing 5th point — use only the
+            // four real corners, otherwise the axis-aligned check below
+            // never passes and the rounded corners are never drawn
+            for (int i = 0; i < 4 && i < camPoly.size(); ++i)
+                basePoly << mEditor->view()->mapCanvasToScreen(center + baseScale * (camPoly.at(i) - center));
 
             const QRectF b = basePoly.boundingRect();
             const bool axisAligned = basePoly.size() == 4
