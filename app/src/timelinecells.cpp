@@ -550,10 +550,8 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int blockLen = blockLengthFor(layer, key);
     const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
     const int y = getLayerY(layerIndex);
-    // precise circular hit matching the drawn handle, so the trim bar
-    // right beside it is never stolen by the square bounding box
-    const QPointF center(recLeft + recWidth - 9.0, y + 7.0);
-    return QLineF(center, QPointF(pos)).length() <= 8.0 ? layerIndex : -1;
+    Q_UNUSED(recLeft); Q_UNUSED(recWidth); Q_UNUSED(y);
+    return -1; // "+" handle removed: it was constantly mistaken for a drag grip
 }
 
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
@@ -732,16 +730,6 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
                 const qreal sepX = recLeft + recWidth - 1.0;
                 painter.drawLine(QPointF(sepX, recTop + 4.0), QPointF(sepX, recTop + recHeight - 4.0));
             }
-        }
-
-        // trailing block: "+" creation handle at top-right corner
-        if (framePos == lastPos)
-        {
-            painter.setBrush(Theme::PanelRaised);
-            painter.setPen(QPen(trackCol, 1.4));
-            painter.drawEllipse(QRectF(recLeft + recWidth - 15.0, recTop + 1.0, 12.0, 12.0));
-            painter.drawLine(QPointF(recLeft + recWidth - 12.2, recTop + 7.0), QPointF(recLeft + recWidth - 5.8, recTop + 7.0));
-            painter.drawLine(QPointF(recLeft + recWidth - 9.0, recTop + 3.8), QPointF(recLeft + recWidth - 9.0, recTop + 10.2));
         }
 
         painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -1357,25 +1345,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 }
             }
 
-            // TVP-style trailing "+": dragging it out creates consecutive new
-            // frames (only a precise hit inside the drawn circle starts this)
-            if (event->button() == Qt::LeftButton)
-            {
-                const int plusLayer = hitTestPlusHandle(event->pos());
-                if (plusLayer != -1)
-                {
-                    qDebug() << "[ui] plus-drag start: layer" << plusLayer;
-                    if (mEditor->currentLayerIndex() != plusLayer)
-                    {
-                        mEditor->layers()->currentLayer()->deselectAll();
-                        mEditor->layers()->setCurrentLayer(plusLayer);
-                    }
-                    mPlusCreating = true;
-                    mPlusPreviewCount = 0;
-                    update();
-                    break;
-                }
-            }
 
             if (frameNumber == mEditor->currentFrame() && mStartY < 20)
             {
@@ -1414,6 +1383,8 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     // Check if we are clicking on a non selected frame
                     else if (!currentLayer->isFrameSelected(frameNumber))
                     {
+                        qDebug() << "[ui] tracks click: select frame" << frameNumber << "layer" << layerNumber
+                                 << "mods" << event->modifiers();
                         // If it is the case, we select it if it is the left button...
                         mCanBoxSelect = true;
                         mClickSelecting = true;
@@ -1455,6 +1426,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             showCameraMenu(event->pos());
                         }
                         // We clicked on a selected frame, we can move it
+                        qDebug() << "[ui] tracks click: drag selected frames at" << frameNumber << "layer" << layerNumber;
                         mCanMoveFrame = true;
                     }
 
@@ -1481,7 +1453,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         mEditor->scrubTo(frameNumber);
 
                         mTimeLine->scrubbing = true;
-                        qDebug("Scrub to %d frame", frameNumber);
+                        qDebug() << "[ui] scrub to" << frameNumber;
                     }
                 }
             }
@@ -1597,6 +1569,7 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
                             // If it is the case, we move the selected frames in the layer
                             mMovingFrames = true;
+                            qDebug() << "[ui] frames drag begin";;
 
                             // Vertical drag onto another row of the same type = cross-layer move
                             mDropTargetLayer = -1;
@@ -1771,6 +1744,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             // De-selecting if we didn't move, scrub nor select anything
             bool multipleSelection = (event->modifiers() == Qt::ControlModifier);
 
+            qDebug() << "[ui] tracks release: toggle frame" << frameNumber << "multi" << multipleSelection;
             // Add/remove from already selected
             currentLayer->toggleFrameSelected(frameNumber, multipleSelection);
             emit mEditor->selectedFramesChanged();
