@@ -49,7 +49,7 @@ Pencil2D::Pencil2D(int& argc, char** argv) :
     setOrganizationName("Pencil2D");
     setOrganizationDomain("pencil2d.org");
     setApplicationName("Pencil2D");
-    setApplicationDisplayName("Pencil2D");
+    setApplicationDisplayName("Pencil Dream");
 
     // Set application version
     setApplicationVersion(APP_VERSION);

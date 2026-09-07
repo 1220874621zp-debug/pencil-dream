@@ -98,11 +98,11 @@ namespace {
     QString getWindowTitle() {
         QString version(APP_VERSION);
         if (version.startsWith("99.0.0")) {
-            return QString("[*]Pencil2D Nightly Build %1").arg(BUILD_DATE);
+            return QString("[*]Pencil Dream Nightly Build %1").arg(BUILD_DATE);
         } else if (version == "0.0.0.0") {
-            return QString("[*]Pencil2D Development Build %1").arg(BUILD_DATE);
+            return QString("[*]Pencil Dream Development Build %1").arg(BUILD_DATE);
         } else {
-            return QString("[*]Pencil2D %1").arg(APP_VERSION);
+            return QString("[*]Pencil Dream %1").arg(APP_VERSION);
         }
     }
 }
