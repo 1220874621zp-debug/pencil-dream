@@ -1877,8 +1877,9 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     int blockEnd = layer->getBlockEnd(key);
     if (blockEnd < 0) { blockEnd = key->pos() + 1; } // open-ended hold: single-cell block
 
-    // The visual right edge of the block is the right border of its last frame cell
-    const int edgeX = getFrameX(blockEnd - 1);
+    // The visual right edge of the block card (getFrameX returns the LEFT
+    // border of a frame, so the card edge sits 2px inside the next frame)
+    const int edgeX = getFrameX(blockEnd) - 2;
     const int nextPos = layer->getNextKeyFramePosition(key->pos());
     const bool nearEdge = qAbs(pos.x() - edgeX) <= 7;
     const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos);
