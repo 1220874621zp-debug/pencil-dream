@@ -550,8 +550,20 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int blockLen = blockLengthFor(layer, key);
     const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
     const int y = getLayerY(layerIndex);
-    Q_UNUSED(recLeft); Q_UNUSED(recWidth); Q_UNUSED(y);
-    return -1; // "+" handle removed: it was constantly mistaken for a drag grip
+    // circular hit on the top-right grip of the LAST block only is too
+    // restrictive: test every block so any block can be grabbed
+    const int standardWidth2 = mFrameSize - 2;
+    int hit = -1;
+    layer->foreachKeyFrame([&](KeyFrame* k)
+    {
+        const int bl = blockLengthFor(layer, k);
+        const int rw = standardWidth2 + (bl - 1) * mFrameSize;
+        const int rl = getFrameX(k->pos()) - standardWidth2;
+        const QPointF c(rl + rw - 9.0, getLayerY(layerIndex) + 7.0);
+        if (QLineF(c, QPointF(pos)).length() <= 8.0)
+            hit = layerIndex;
+    });
+    return hit;
 }
 
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
@@ -718,6 +730,20 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         painter.setPen(Qt::NoPen);
         painter.setBrush(trackCol);
         painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
+
+        // drag grip at the top-right corner: drag it to move the block
+        {
+            const QPointF c(recLeft + recWidth - 9.0, recTop + 7.0);
+            painter.setBrush(Theme::PanelRaised);
+            painter.setPen(QPen(trackCol, 1.2));
+            painter.drawEllipse(c, 7.0, 7.0);
+            painter.setPen(QPen(trackCol, 1.4));
+            painter.drawLine(QPointF(c.x() - 4.0, c.y()), QPointF(c.x() + 4.0, c.y()));
+            painter.drawLine(QPointF(c.x() - 3.4, c.y() - 2.2), QPointF(c.x() - 4.6, c.y()));
+            painter.drawLine(QPointF(c.x() - 3.4, c.y() + 2.2), QPointF(c.x() - 4.6, c.y()));
+            painter.drawLine(QPointF(c.x() + 3.4, c.y() - 2.2), QPointF(c.x() + 4.6, c.y()));
+            painter.drawLine(QPointF(c.x() + 3.4, c.y() + 2.2), QPointF(c.x() + 4.6, c.y()));
+        }
 
         // separator line towards the next consecutive block (TVP-style)
         {
@@ -1346,6 +1372,33 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             }
 
 
+            // grip handle: grab-and-drag to move the block (native frame move)
+            if (event->button() == Qt::LeftButton)
+            {
+                const int gripLayer = hitTestPlusHandle(event->pos());
+                if (gripLayer != -1)
+                {
+                    Layer* gripL = mEditor->object()->getLayer(gripLayer);
+                    const int gripFrame = getFrameNumber(event->pos().x());
+                    // settle focus/selection on the grabbed frame
+                    if (mEditor->currentLayerIndex() != gripLayer)
+                    {
+                        mEditor->layers()->currentLayer()->deselectAll();
+                        mEditor->layers()->setCurrentLayer(gripLayer);
+                    }
+                    if (!gripL->isFrameSelected(gripFrame))
+                    {
+                        gripL->deselectAll();
+                        gripL->toggleFrameSelected(gripFrame, false);
+                    }
+                    emit mEditor->selectedFramesChanged();
+                    mCanMoveFrame = true;
+                    qDebug() << "[ui] grip-drag start: frame" << gripFrame << "layer" << gripLayer;
+                    mTimeLine->updateContent();
+                    break;
+                }
+            }
+
             if (frameNumber == mEditor->currentFrame() && mStartY < 20)
             {
                 if (mEditor->playback()->isPlaying())
@@ -1497,7 +1550,7 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
     {
         Qt::CursorShape shape = Qt::ArrowCursor;
         if (hitTestPlusHandle(event->pos()) != -1)
-            shape = Qt::CrossCursor;
+            shape = Qt::SizeAllCursor;
         else if (hitTestTrimHandle(event->pos()) != -1)
             shape = Qt::SizeHorCursor;
         else if (event->pos().y() < mOffsetY)
