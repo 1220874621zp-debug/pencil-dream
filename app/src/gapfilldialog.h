@@ -42,6 +42,7 @@ private slots:
     void applySelected();
     void gapSizeChanged(int index);
     void cellChanged(int row, int column);
+    void zoomToGap(int row, int column);
 
 private:
     void refreshLineLayerCombo();

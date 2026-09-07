@@ -166,6 +166,11 @@
        <string>来源</string>
       </property>
      </column>
+     <column>
+      <property name="text">
+       <string>位置</string>
+      </property>
+     </column>
     </widget>
    </item>
    <item>

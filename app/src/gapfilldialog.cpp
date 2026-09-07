@@ -32,7 +32,9 @@
 #include "layermanager.h"
 #include "bitmapimage.h"
 #include "object.h"
+#include "scribblearea.h"
 #include "undoredomanager.h"
+#include "viewmanager.h"
 
 #include "gapfill/core/smart_gap_propagation.hpp"
 #include "gapfill/predictors/rule_based_predictor.hpp"
@@ -89,6 +91,8 @@ GapFillDialog::GapFillDialog(QWidget* parent) :
     connect(ui->btnClose, &QPushButton::clicked, this, &QDialog::reject);
     connect(ui->gapsTable, &QTableWidget::cellChanged,
             this, &GapFillDialog::cellChanged);
+    connect(ui->gapsTable, &QTableWidget::cellDoubleClicked,
+            this, &GapFillDialog::zoomToGap);
 
     ui->cbGapSize->setCurrentIndex(1);      // 中（≤10 像素）
     ui->cbConfidence->setCurrentIndex(1);   // 平衡
@@ -375,6 +379,10 @@ void GapFillDialog::detectGaps()
                 isLearned ? tr("学习模型")
                           : (gap.suggestedColor.has_value()
                                  ? tr("规则") : QStringLiteral("—"))));
+        ui->gapsTable->setItem(row, 6, new QTableWidgetItem(
+                QStringLiteral("(%1, %2)")
+                .arg(std::lround(mCanvasRect.x() + gap.centroid.x))
+                .arg(std::lround(mCanvasRect.y() + gap.centroid.y))));
     }
     mSuppressCellChanged = false;
 
@@ -394,6 +402,18 @@ void GapFillDialog::detectGaps()
     qDebug() << "[ui] gapfill detect done: gaps" << mGaps.size()
              << "high" << highCount << "learned" << learned
              << "preChecked" << preChecked;
+    for (const GapCandidate& gap : mGaps) {
+        const QString colorText = gap.suggestedColor.has_value()
+                ? QStringLiteral("#%1%2%3")
+                  .arg(gap.suggestedColor->r, 2, 16, QChar('0'))
+                  .arg(gap.suggestedColor->g, 2, 16, QChar('0'))
+                  .arg(gap.suggestedColor->b, 2, 16, QChar('0'))
+                : QStringLiteral("none");
+        qDebug() << "[ui] gapfill gap" << gap.id << "area" << gap.area
+                 << "at" << mCanvasRect.x() + (int)gap.centroid.x
+                 << "," << mCanvasRect.y() + (int)gap.centroid.y
+                 << "color" << colorText;
+    }
 }
 
 void GapFillDialog::checkHighConfidence()
@@ -427,6 +447,23 @@ void GapFillDialog::clearChecks()
 void GapFillDialog::cellChanged(int, int column)
 {
     if (mSuppressCellChanged || column != 0) { return; }
+}
+
+void GapFillDialog::zoomToGap(int row, int)
+{
+    if (row < 0 || row >= static_cast<int>(mGaps.size())) { return; }
+    const GapCandidate& gap = mGaps[static_cast<std::size_t>(row)];
+    const QPointF docPoint(mCanvasRect.x() + gap.centroid.x,
+                           mCanvasRect.y() + gap.centroid.y);
+    ViewManager* view = mEditor->view();
+    // Reset pan, zoom in, then pan so the gap lands in the middle.
+    view->translate(-view->translation());
+    view->scale(8.0);
+    const QPointF screenPoint = view->mapCanvasToScreen(docPoint);
+    QWidget* canvas = mEditor->getScribbleArea();
+    const QPointF canvasCenter(canvas->width() / 2.0, canvas->height() / 2.0);
+    view->translate(canvasCenter - screenPoint);
+    qDebug() << "[ui] gapfill zoom to gap" << gap.id << "at" << docPoint;
 }
 
 void GapFillDialog::applySelected()
