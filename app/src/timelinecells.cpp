@@ -697,14 +697,9 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
                 return;
             }
 
-            if (selected)
-            {
-                painter.setBrush(QColor(trackCol.red(), trackCol.green(), trackCol.blue(), 150));
-            }
-            else
-            {
-                painter.setBrush(Theme::TimelineFrameFill);
-            }
+            // uniform black block base (TVP): the current layer is marked by
+            // the track background, not by recoloring its blocks
+            painter.setBrush(Theme::TimelineFrameFill);
 
             painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
         });
@@ -736,14 +731,8 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         int blockLen = blockLengthFor(layer, key);
         int recWidth = standardWidth + (blockLen - 1) * frameSize;
 
-        if (selected)
-        {
-            painter.setBrush(QColor(trackCol.red(), trackCol.green(), trackCol.blue(), 150));
-        }
-        else
-        {
-            painter.setBrush(Theme::TimelineFrameFill);
-        }
+        // uniform black block base (TVP): selection is border-only
+        painter.setBrush(Theme::TimelineFrameFill);
 
         painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 6.0, 6.0);
 
@@ -760,7 +749,9 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
             }
             else
             {
-                painter.setBrush(QColor(0xE8, 0xE8, 0xEA));
+                // dark placeholder for empty frames (TVP blocks are black-based)
+                painter.setBrush(QColor(0x1E, 0x1E, 0x26));
+                painter.setPen(QPen(QColor(0x3A, 0x3A, 0x44), 1));
                 painter.drawRoundedRect(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), 4.0, 4.0);
             }
         }

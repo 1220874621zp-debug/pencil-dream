@@ -316,15 +316,6 @@
     <property name="title">
      <string>Help</string>
     </property>
-    <addaction name="actionHelp"/>
-    <addaction name="actionQuick_Guide"/>
-    <addaction name="separator"/>
-    <addaction name="actionWebsite"/>
-    <addaction name="actionForum"/>
-    <addaction name="actionDiscord"/>
-    <addaction name="separator"/>
-    <addaction name="actionCheck_for_Updates"/>
-    <addaction name="actionReport_Bug"/>
     <addaction name="actionOpen_Temporary_Directory"/>
     <addaction name="separator"/>
     <addaction name="actionAbout"/>

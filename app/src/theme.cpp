@@ -52,7 +52,7 @@ namespace Theme
     const QColor TimelineBackground         = QColor(0x16, 0x16, 0x18);
     const QColor TimelineRowAlternate       = QColor(0x1A, 0x1A, 0x1E);
     const QColor TimelineFrameBorder        = QColor(0x2A, 0x2A, 0x2E);
-    const QColor TimelineFrameFill          = QColor(0x24, 0x24, 0x28);
+    const QColor TimelineFrameFill          = QColor(0x12, 0x12, 0x16);
     const QColor TimelineSelectedFrameFill  = QColor(0x3A, 0x24, 0x2C);
     const QColor TimelineCurrentFrameBorder = QColor(0xE8, 0xE8, 0xEA);
     const QColor TimelinePlayhead           = QColor(0xE8, 0x38, 0x5A);

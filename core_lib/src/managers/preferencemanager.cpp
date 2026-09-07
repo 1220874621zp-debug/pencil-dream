@@ -117,13 +117,13 @@ void PreferenceManager::loadPrefs()
     // lift older installs (old default 56 / interim default 90) so the new
     // baseline is actually visible; any later user zoom choice is respected.
     int frameSize = settings.value(SETTING_FRAME_SIZE, 120).toInt();
-    if (!settings.contains("FrameSizeMaxDefaultMigrated"))
+    if (!settings.contains("FrameSize120Migrated"))
     {
         if (frameSize < 120)
         {
             frameSize = 120;
         }
-        settings.setValue("FrameSizeMaxDefaultMigrated", true);
+        settings.setValue("FrameSize120Migrated", true);
     }
     set(SETTING::FRAME_SIZE, frameSize);
     set(SETTING::TIMELINE_SIZE,            settings.value(SETTING_TIMELINE_SIZE,          240).toInt());
@@ -277,8 +277,10 @@ void PreferenceManager::set(SETTING option, int value)
         settings.setValue(SETTING_AUTO_SAVE_BY_TIME_TIMER, value);
         break;
     case SETTING::FRAME_SIZE:
-        if (value < 4) { value = 4; }
-        else if (value > 40) { value = 40; }
+        // the TVP timeline zooms across the full slider range (6..120);
+        // the old upstream cap of 40 silently reset every larger zoom
+        if (value < 6) { value = 6; }
+        else if (value > 120) { value = 120; }
         settings.setValue(SETTING_FRAME_SIZE, value);
         break;
     case SETTING::TIMELINE_SIZE:
