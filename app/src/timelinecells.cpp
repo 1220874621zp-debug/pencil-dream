@@ -550,8 +550,10 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int blockLen = blockLengthFor(layer, key);
     const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
     const int y = getLayerY(layerIndex);
-    const QRectF handle(recLeft + recWidth - 16.0, y + 1.0, 15.0, 15.0);
-    return handle.contains(QPointF(pos)) ? layerIndex : -1;
+    // precise circular hit matching the drawn handle, so the trim bar
+    // right beside it is never stolen by the square bounding box
+    const QPointF center(recLeft + recWidth - 9.0, y + 7.0);
+    return QLineF(center, QPointF(pos)).length() <= 8.0 ? layerIndex : -1;
 }
 
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
@@ -1326,36 +1328,18 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         else
         {
-            // TVP-style trailing "+": dragging it out creates consecutive new frames
-            if (event->button() == Qt::LeftButton)
-            {
-                const int plusLayer = hitTestPlusHandle(event->pos());
-                if (plusLayer != -1)
-                {
-                    qDebug() << "[ui] trim-drag start: plus handle layer" << plusLayer;
-                    if (mEditor->currentLayerIndex() != plusLayer)
-                    {
-                        mEditor->layers()->currentLayer()->deselectAll();
-                        mEditor->layers()->setCurrentLayer(plusLayer);
-                    }
-                    mPlusCreating = true;
-                    mPlusPreviewCount = 0;
-                    update();
-                    break;
-                }
-            }
-
-            // Dreams-style trim: grabbing the right edge of a bitmap block adjusts its length
+            // Dreams-style trim: grabbing the right edge of a bitmap block
+            // adjusts its length (checked FIRST so the edge bar always wins)
             if (event->button() == Qt::LeftButton && layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
             {
                 int trimPos = hitTestTrimHandle(event->pos());
                 if (trimPos > 0)
                 {
-                    qDebug() << "[ui] trim-drag start: block" << trimPos << "layer" << layerNumber;
                     Layer* trimLayer = mEditor->object()->getLayer(layerNumber);
                     KeyFrame* trimKey = trimLayer->getKeyFrameAt(trimPos);
                     if (trimKey != nullptr)
                     {
+                        qDebug() << "[ui] trim-drag start: block" << trimPos << "layer" << layerNumber;
                         if (mEditor->currentLayerIndex() != layerNumber)
                         {
                             mEditor->layers()->currentLayer()->deselectAll();
@@ -1370,6 +1354,26 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         updateContent();
                         break;
                     }
+                }
+            }
+
+            // TVP-style trailing "+": dragging it out creates consecutive new
+            // frames (only a precise hit inside the drawn circle starts this)
+            if (event->button() == Qt::LeftButton)
+            {
+                const int plusLayer = hitTestPlusHandle(event->pos());
+                if (plusLayer != -1)
+                {
+                    qDebug() << "[ui] plus-drag start: layer" << plusLayer;
+                    if (mEditor->currentLayerIndex() != plusLayer)
+                    {
+                        mEditor->layers()->currentLayer()->deselectAll();
+                        mEditor->layers()->setCurrentLayer(plusLayer);
+                    }
+                    mPlusCreating = true;
+                    mPlusPreviewCount = 0;
+                    update();
+                    break;
                 }
             }
 
