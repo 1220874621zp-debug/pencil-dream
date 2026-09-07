@@ -663,7 +663,7 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* key) { lastPos = qMax(lastPos, key->pos()); });
 
-    layer->foreachKeyFrame([&](KeyFrame* key)
+    auto paintOneBlock = [&](KeyFrame* key)
     {
         int framePos = key->pos();
         int recLeft = getFrameX(framePos) - standardWidth;
@@ -726,7 +726,19 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         }
 
         painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    };
+
+    layer->foreachKeyFrame([&](KeyFrame* key)
+    {
+        // the block being trimmed is painted last so its growth stays visible
+        if (mTrimming && key->pos() == mTrimKeyPos) { return; }
+        paintOneBlock(key);
     });
+    if (mTrimming)
+    {
+        KeyFrame* trimKey = layer->getKeyFrameAt(mTrimKeyPos);
+        if (trimKey != nullptr) { paintOneBlock(trimKey); }
+    }
 }
 
 void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int recTop, int recWidth, int recHeight) const
@@ -1497,10 +1509,9 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
             KeyFrame* key = (layer != nullptr) ? layer->getKeyFrameAt(mTrimKeyPos) : nullptr;
             if (key != nullptr)
             {
-                // The block cannot swallow the next keyframe
-                int nextPos = layer->getNextKeyFramePosition(mTrimKeyPos);
-                int maxLen = (nextPos > mTrimKeyPos) ? (nextPos - mTrimKeyPos)
-                                                     : (mFrameLength - mTrimKeyPos + 1);
+                // no clamp against the next keyframe: the release-side ripple
+                // pushes subsequent keyframes away, so let the preview grow
+                const int maxLen = mFrameLength - mTrimKeyPos + 1;
                 int newLen = mFramePosMoveX - mTrimKeyPos + 1;
                 mTrimPreviewLength = qBound(1, newLen, maxLen);
                 updateContent();
@@ -1856,14 +1867,22 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
 
     const int frameNumber = getFrameNumber(pos.x());
     KeyFrame* key = layer->getKeyFrameWhichCovers(frameNumber);
-    if (key == nullptr) { return -1; }
+    if (key == nullptr)
+    {
+        // gap between blocks: dragging inside the gap stretches the preceding block
+        key = layer->getLastKeyFrameAtPosition(frameNumber);
+        if (key == nullptr) { return -1; }
+    }
 
     int blockEnd = layer->getBlockEnd(key);
     if (blockEnd < 0) { blockEnd = key->pos() + 1; } // open-ended hold: single-cell block
 
     // The visual right edge of the block is the right border of its last frame cell
     const int edgeX = getFrameX(blockEnd - 1);
-    return (qAbs(pos.x() - edgeX) <= 7) ? key->pos() : -1;
+    const int nextPos = layer->getNextKeyFramePosition(key->pos());
+    const bool nearEdge = qAbs(pos.x() - edgeX) <= 7;
+    const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos);
+    return (nearEdge || inGap) ? key->pos() : -1;
 }
 
 void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
