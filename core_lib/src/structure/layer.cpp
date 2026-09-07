@@ -696,10 +696,6 @@ KeyFrame* Layer::getKeyFrameWhichCovers(int frameNumber) const
         {
             return keyFrame;
         }
-        qDebug() << "[covers] miss: layer-key pos=" << keyFrame->pos()
-                 << " len=" << len
-                 << " explicit=" << keyFrame->isLengthExplicit()
-                 << " frame=" << frameNumber;
     }
     return nullptr;
 }

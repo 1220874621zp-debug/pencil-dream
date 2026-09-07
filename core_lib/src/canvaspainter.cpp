@@ -283,8 +283,6 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
     // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing
     BitmapImage* paintedImage = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(mFrameNumber));
-    if (paintedImage == nullptr)
-        qDebug() << "[paint] render: no covering key at frame" << mFrameNumber << "- nothing drawn";
 
     if (paintedImage == nullptr) { return; }
     paintedImage->loadFile(); // Critical! force the BitmapImage to load the image

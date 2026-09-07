@@ -155,7 +155,6 @@ void StrokeTool::startStroke(PointerEvent::InputType inputType)
 {
     if (emptyFrameActionEnabled())
     {
-        qDebug() << "[paint] startStroke: handling empty frame first";
         mScribbleArea->handleDrawingOnEmptyFrame();
     }
 
