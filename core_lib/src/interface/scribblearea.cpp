@@ -788,6 +788,15 @@ void ScribbleArea::showLayerLockedWarning()
                          QMessageBox::Ok);
 }
 
+/** Selection clip for the in-progress stroke buffer, nullptr when the
+ *  stroke is unconstrained. The path is cached so callers may keep the
+ *  pointer for the duration of the paste. */
+const QPainterPath* ScribbleArea::paintBufferClip()
+{
+    mPaintClipPath = mEditor->select()->selectionClipPath();
+    return mPaintClipPath.isEmpty() ? nullptr : &mPaintClipPath;
+}
+
 void ScribbleArea::paintBitmapBuffer()
 {
     LayerBitmap* layer = static_cast<LayerBitmap*>(mEditor->layers()->currentLayer());
@@ -820,7 +829,7 @@ void ScribbleArea::paintBitmapBuffer()
         default: //nothing
             break;
         }
-        targetImage->paste(&mTiledBuffer, cm);
+        targetImage->paste(&mTiledBuffer, cm, paintBufferClip());
     }
 
     QRect rect = mEditor->view()->mapCanvasToScreen(mTiledBuffer.bounds()).toRect();
@@ -1059,6 +1068,7 @@ void ScribbleArea::prepCanvas(int frame)
     mCanvasPainter.setViewTransform(vm->getView(), vm->getViewInverse());
     mCanvasPainter.setTransformedSelection(sm->mySelectionRect().toRect(), sm->selectionTransform(),
                                            sm->isPolygonSelection() ? sm->mySelectionPolygon() : QPolygonF());
+    mCanvasPainter.setSelectionClipPath(sm->selectionClipPath());
 
     mCanvasPainter.setPaintSettings(object, mEditor->layers()->currentLayerIndex(), frame, &mTiledBuffer);
 }
@@ -1319,9 +1329,9 @@ void ScribbleArea::applyTransformedSelection()
     updateFrame();
 }
 
-void ScribbleArea::setDeformPreview(const QImage& preview, const QPointF& topLeft)
+void ScribbleArea::setDeformPreview(const QImage& preview, const QRectF& targetRect)
 {
-    mCanvasPainter.setDeformPreview(preview, topLeft);
+    mCanvasPainter.setDeformPreview(preview, targetRect);
     updateFrame();
 }
 

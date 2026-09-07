@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include <QObject>
 #include <QTransform>
 #include <QPainter>
+#include <QPainterPath>
 #include "log.h"
 #include "pencildef.h"
 
@@ -79,9 +80,13 @@ public:
     void ignoreTransformedSelection();
 
     /** Deform tool live preview: while active the selection area is cleared
-     *  and the warped image is drawn instead of the affine-transformed one. */
-    void setDeformPreview(const QImage& preview, const QPointF& topLeft);
+     *  and the warped image is drawn instead of the affine-transformed one.
+     *  targetRect is in canvas coordinates and may stretch the preview. */
+    void setDeformPreview(const QImage& preview, const QRectF& targetRect);
     void clearDeformPreview();
+
+    /** Clip applied to in-progress stroke tiles (selection constraint). */
+    void setSelectionClipPath(const QPainterPath& path) { mSelectionClipPath = path; }
 
     void setPaintSettings(const Object* object, int currentLayer, int frame, TiledBuffer* tilledBuffer);
     void paint(const QRect& blitRect);
@@ -146,7 +151,10 @@ private:
     // Deform tool preview channel
     bool mDeformPreviewActive = false;
     QImage mDeformPreview;
-    QPointF mDeformPreviewTopLeft;
+    QRectF mDeformPreviewTargetRect;
+
+    // selection constraint for live stroke tiles
+    QPainterPath mSelectionClipPath;
 
     // Caches specifically for when drawing on the canvas
     QPixmap mPostLayersPixmap;

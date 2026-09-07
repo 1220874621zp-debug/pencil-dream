@@ -86,10 +86,10 @@ void CanvasPainter::ignoreTransformedSelection()
     mSelectionPolygon = QPolygonF();
 }
 
-void CanvasPainter::setDeformPreview(const QImage& preview, const QPointF& topLeft)
+void CanvasPainter::setDeformPreview(const QImage& preview, const QRectF& targetRect)
 {
     mDeformPreview = preview;
-    mDeformPreviewTopLeft = topLeft;
+    mDeformPreviewTargetRect = targetRect;
     mDeformPreviewActive = !preview.isNull();
 }
 
@@ -378,6 +378,10 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
     if (isCurrentLayer && isDrawing)
     {
         currentBitmapPainter.setCompositionMode(mOptions.cmBufferBlendMode);
+        if (!mSelectionClipPath.isEmpty()) {
+            // constrain live strokes to the active selection (lasso/rect)
+            currentBitmapPainter.setClipPath(mSelectionClipPath);
+        }
         const auto tiles = mTiledBuffer->tiles();
         for (const Tile* tile : tiles) {
             currentBitmapPainter.drawPixmap(tile->posF(), tile->pixmap());
@@ -484,8 +488,10 @@ void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bi
     if (mDeformPreviewActive)
     {
         // free-deform tool: draw the warped preview instead of an
-        // affine-transformed copy
-        painter.drawImage(mDeformPreviewTopLeft, mDeformPreview);
+        // affine-transformed copy (possibly stretched back from a
+        // down-scaled interactive warp)
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(mDeformPreviewTargetRect, mDeformPreview);
         painter.restore();
         return;
     }

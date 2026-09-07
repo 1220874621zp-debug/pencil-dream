@@ -323,6 +323,16 @@ void SelectionManager::setSelection(QPolygonF polygon, bool roundPixels)
     emit selectionChanged();
 }
 
+QPainterPath SelectionManager::selectionClipPath() const
+{
+    QPainterPath path;
+    if (mOriginalRect.isEmpty()) { return path; }
+
+    path.setFillRule(Qt::OddEvenFill);
+    path.addPolygon(mSelectionTransform.map(mIsPolygonSelection ? mOriginalPolygon : QPolygonF(mOriginalRect)));
+    return path;
+}
+
 void SelectionManager::setTransformAnchor(const QPointF& point)
 {
     QPointF newPos = mapToSelection(point);

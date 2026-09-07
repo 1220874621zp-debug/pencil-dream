@@ -44,11 +44,18 @@ void SelectionPainter::paint(QPainter& painter,
 
         if (layer->type() == Layer::BITMAP)
         {
+            // two-pass outline (white underlay + black dashes): visible on
+            // both the white paper and the dark workspace
             painter.setBrush(Qt::NoBrush);
-            QPen pen(Qt::DashLine);
-            pen.setCosmetic(true);
-            painter.setPen(pen);
 
+            QPen underlay(Qt::white, 2.0, Qt::SolidLine);
+            underlay.setCosmetic(true);
+            painter.setPen(underlay);
+            painter.drawPolygon(outline);
+
+            QPen dashes(Qt::black, 1.0, Qt::DashLine);
+            dashes.setCosmetic(true);
+            painter.setPen(dashes);
             painter.drawPolygon(outline);
         }
 
@@ -69,7 +76,13 @@ void SelectionPainter::paint(QPainter& painter,
     if (layer->type() == Layer::BITMAP)
     {
         painter.setBrush(Qt::NoBrush);
-        painter.setPen(QPen(Qt::DashLine));
+
+        QPen underlay(Qt::white, 2.0, Qt::SolidLine);
+        painter.setPen(underlay);
+        painter.drawPolygon(projectedSelectionPolygon.toPolygon());
+
+        QPen dashes(Qt::black, 1.0, Qt::DashLine);
+        painter.setPen(dashes);
 
         // Draw current selection
         painter.drawPolygon(projectedSelectionPolygon.toPolygon());

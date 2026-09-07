@@ -24,6 +24,7 @@ GNU General Public License for more details.
 #include <QRectF>
 #include <QPolygonF>
 #include <QTransform>
+#include <QPainterPath>
 
 class Editor;
 
@@ -115,6 +116,10 @@ public:
     const QRectF& mySelectionRect() const { return mOriginalRect; }
     const QPolygonF& mySelectionPolygon() const { return mOriginalPolygon; }
     bool isPolygonSelection() const { return mIsPolygonSelection; }
+
+    /** Clip path of the current selection (canvas coordinates), used to
+     *  constrain painting. Empty when nothing is selected. */
+    QPainterPath selectionClipPath() const;
     const qreal& myRotation() const { return mRotatedAngle; }
     const qreal& myScaleX() const { return mScaleX; }
     const qreal& myScaleY() const { return mScaleY; }

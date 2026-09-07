@@ -51,12 +51,34 @@ void DeformTool::loadSettings()
     QSettings pencilSettings(PENCIL2D, PENCIL2D);
 
     mPropertyUsed[TransformToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
+    mPropertyUsed[TransformToolProperties::GRID_SIZE_VALUE] = { Layer::BITMAP };
 
     QHash<int, PropertyInfo> info;
     info[TransformToolProperties::ANTI_ALIASING_ENABLED] = true;
+    info[TransformToolProperties::GRID_SIZE_VALUE] = { 2, 10, 4 };
 
     toolProperties().insertProperties(info);
     toolProperties().loadFrom(typeName(), pencilSettings);
+
+    mGridSize = toolProperties().getInfo(TransformToolProperties::GRID_SIZE_VALUE).intValue();
+}
+
+void DeformTool::setGridSize(int size)
+{
+    size = qBound(2, size, 10);
+    if (size == mGridSize) { return; }
+
+    mGridSize = size;
+    toolProperties().setBaseValue(TransformToolProperties::GRID_SIZE_VALUE, size);
+    emit gridSizeChanged(size);
+
+    if (mDeformActive)
+    {
+        rebuildLattice();
+        mAnyPointMoved = false;
+        updateWarpPreview(true);
+    }
+    mScribbleArea->updateFrame();
 }
 
 QCursor DeformTool::cursor()
@@ -202,7 +224,7 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
         {
             mAnyPointMoved = true;
         }
-        updateWarpPreview();
+        updateWarpPreview(true);
     }
 }
 
@@ -213,6 +235,11 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
     if (mDragIndex >= 0)
     {
         mDragIndex = -1;
+        // the drag preview may be down-sampled: restore full resolution
+        if (mAnyPointMoved)
+        {
+            updateWarpPreview(false);
+        }
         mScribbleArea->updateToolCursor();
         mScribbleArea->updateFrame();
     }
@@ -252,7 +279,7 @@ bool DeformTool::keyPressEvent(QKeyEvent* event)
             // reset all control points to their original positions
             mMovedPoints = mOrigPoints;
             mAnyPointMoved = false;
-            updateWarpPreview();
+            updateWarpPreview(true);
             return true;
         }
         break;
@@ -312,7 +339,39 @@ void DeformTool::beginDeform(const QPointF& pos)
 
     mSourceImage = *sourcePart.image();
 
-    // build the control lattice over the region
+    // large regions get a down-scaled copy for interactive dragging
+    const qreal area = qreal(mSourceImage.width()) * mSourceImage.height();
+    const qreal kInteractiveBudget = 220000.0;
+    mPreviewScale = (area > kInteractiveBudget) ? qSqrt(kInteractiveBudget / area) : 1.0;
+    if (mPreviewScale < 1.0)
+    {
+        mPreviewSource = mSourceImage.scaled(
+            qMax(1, qRound(mSourceImage.width() * mPreviewScale)),
+            qMax(1, qRound(mSourceImage.height() * mPreviewScale)),
+            Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+    else
+    {
+        mPreviewSource = QImage();
+    }
+
+    rebuildLattice();
+
+    mAnyPointMoved = false;
+    mDragIndex = -1;
+    mDeformActive = true;
+    emit isActiveChanged(DEFORM, true);
+
+    Q_UNUSED(pos)
+
+    // identity preview takes over rendering of the region
+    mWarpedResult = mSourceImage;
+    mWarpedTopLeft = QPointF(mRegion.topLeft());
+    mScribbleArea->setDeformPreview(mSourceImage, QRectF(QPointF(mRegion.topLeft()), QSizeF(mSourceImage.size())));
+}
+
+void DeformTool::rebuildLattice()
+{
     mOrigPoints.clear();
     const int n = mGridSize;
     for (int r = 0; r < n; ++r)
@@ -325,17 +384,6 @@ void DeformTool::beginDeform(const QPointF& pos)
         }
     }
     mMovedPoints = mOrigPoints;
-    mAnyPointMoved = false;
-    mDragIndex = -1;
-    mDeformActive = true;
-    emit isActiveChanged(DEFORM, true);
-
-    Q_UNUSED(pos)
-
-    // identity preview takes over rendering of the region
-    mWarpedResult = mSourceImage;
-    mWarpedTopLeft = QPointF(mRegion.topLeft());
-    mScribbleArea->setDeformPreview(mSourceImage, QPointF(mRegion.topLeft()));
 }
 
 void DeformTool::teardown()
@@ -344,6 +392,8 @@ void DeformTool::teardown()
     mDragIndex = -1;
     mAnyPointMoved = false;
     mSourceImage = QImage();
+    mPreviewSource = QImage();
+    mPreviewScale = 1.0;
     mWarpedResult = QImage();
     mOrigPoints.clear();
     mMovedPoints.clear();
@@ -352,9 +402,15 @@ void DeformTool::teardown()
     mScribbleArea->clearDeformPreview();
 }
 
-void DeformTool::updateWarpPreview()
+void DeformTool::updateWarpPreview(bool interactive)
 {
     if (!mDeformActive) { return; }
+
+    // while dragging, large regions are warped at reduced resolution and
+    // stretched back for display; pointer release / commit recompute full res
+    const bool useScaled = interactive && mPreviewScale < 1.0 && !mPreviewSource.isNull();
+    const QImage& src = useScaled ? mPreviewSource : mSourceImage;
+    const qreal scale = useScaled ? mPreviewScale : 1.0;
 
     // control points are local to the source image
     QVector<QPointF> origLocal;
@@ -364,16 +420,27 @@ void DeformTool::updateWarpPreview()
     const QPointF topLeft(mRegion.topLeft());
     for (int i = 0; i < mOrigPoints.size(); ++i)
     {
-        origLocal << mOrigPoints[i] - topLeft;
-        movedLocal << mMovedPoints[i] - topLeft;
+        origLocal << (mOrigPoints[i] - topLeft) * scale;
+        movedLocal << (mMovedPoints[i] - topLeft) * scale;
     }
 
     QPointF offset;
     const bool useAA = toolProperties().getInfo(TransformToolProperties::ANTI_ALIASING_ENABLED).boolValue();
-    mWarpedResult = MlsWarp::warpImage(mSourceImage, origLocal, movedLocal, 1.0, useAA, &offset);
-    mWarpedTopLeft = topLeft + offset;
+    const QImage warped = MlsWarp::warpImage(src, origLocal, movedLocal, 1.0, useAA, &offset);
 
-    mScribbleArea->setDeformPreview(mWarpedResult, mWarpedTopLeft);
+    if (useScaled)
+    {
+        // display at original size; keep the full-res cache untouched
+        mScribbleArea->setDeformPreview(warped,
+            QRectF(topLeft + offset / scale,
+                   QSizeF(warped.width() / scale, warped.height() / scale)));
+    }
+    else
+    {
+        mWarpedResult = warped;
+        mWarpedTopLeft = topLeft + offset;
+        mScribbleArea->setDeformPreview(mWarpedResult, QRectF(mWarpedTopLeft, QSizeF(mWarpedResult.size())));
+    }
 }
 
 void DeformTool::commitDeform()
@@ -385,6 +452,12 @@ void DeformTool::commitDeform()
     {
         teardown();
         return;
+    }
+
+    if (mAnyPointMoved)
+    {
+        // make sure the committed result is the full-resolution warp
+        updateWarpPreview(false);
     }
 
     if (mAnyPointMoved && !mWarpedResult.isNull())

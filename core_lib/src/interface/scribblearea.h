@@ -67,8 +67,8 @@ public:
     void applyTransformedSelection();
     void cancelTransformedSelection();
 
-    /** Free-deform tool live preview channel (canvas coords for topLeft). */
-    void setDeformPreview(const QImage& preview, const QPointF& topLeft);
+    /** Free-deform tool live preview channel (canvas coords for targetRect). */
+    void setDeformPreview(const QImage& preview, const QRectF& targetRect);
     void clearDeformPreview();
 
     /** 洋葱皮对位工具：取该图层的幽灵偏移（无则创建），显示辅助态不落盘 */
@@ -220,6 +220,9 @@ private:
     void drawCanvas(int frame, QRect rect);
     void settingUpdated(SETTING setting);
     void paintSelectionVisuals(QPainter &painter);
+
+    const QPainterPath* paintBufferClip();
+    QPainterPath mPaintClipPath;
 
     BitmapImage* currentBitmapImage(Layer* layer) const;
 

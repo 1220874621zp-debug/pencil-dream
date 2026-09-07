@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "toolmanager.h"
 #include "transformtool.h"
+#include "deformtool.h"
 
 TransformOptionsWidget::TransformOptionsWidget(Editor* editor, QWidget *parent) :
     BaseWidget(parent),
@@ -63,6 +64,10 @@ void TransformOptionsWidget::updatePropertyVisibility()
     if (mEditor->tools()->currentTransformTool() == nullptr) { return; }
 
     ui->antiAliasingCheckBox->setVisible(currentTool->isPropertyEnabled(TransformToolProperties::ANTI_ALIASING_ENABLED));
+
+    const bool isDeform = currentTool->type() == DEFORM;
+    ui->gridSizeLabel->setVisible(isDeform);
+    ui->gridSizeSpinBox->setVisible(isDeform);
 }
 
 void TransformOptionsWidget::updateToolConnections(BaseTool* tool)
@@ -85,12 +90,25 @@ void TransformOptionsWidget::makeConnectionsFromUIToModel()
     connect(ui->antiAliasingCheckBox, &QCheckBox::clicked, this, [=](bool enabled) {
        mTransformTool->setAntiAliasingEnabled(enabled);
     });
+
+    connect(ui->gridSizeSpinBox, &QSpinBox::valueChanged, this, [=](int value) {
+        DeformTool* deformTool = dynamic_cast<DeformTool*>(mTransformTool);
+        if (deformTool != nullptr && deformTool->type() == DEFORM) {
+            deformTool->setGridSize(value);
+        }
+    });
 }
 
 void TransformOptionsWidget::makeConnectionFromModelToUI(TransformTool* transformTool)
 {
     connect(transformTool, &TransformTool::showSelectionInfoChanged, this, &TransformOptionsWidget::setShowSelectionInfo);
     connect(transformTool, &TransformTool::antiAliasingChanged, this, &TransformOptionsWidget::setAntiAliasingEnabled);
+
+    DeformTool* deformTool = dynamic_cast<DeformTool*>(transformTool);
+    if (deformTool != nullptr && deformTool->type() == DEFORM) {
+        connect(deformTool, &DeformTool::gridSizeChanged, this, &TransformOptionsWidget::setGridSize);
+        setGridSize(deformTool->gridSize());
+    }
 }
 
 void TransformOptionsWidget::setShowSelectionInfo(bool enabled)
@@ -103,4 +121,10 @@ void TransformOptionsWidget::setAntiAliasingEnabled(bool enabled)
 {
     QSignalBlocker b(ui->antiAliasingCheckBox);
     ui->antiAliasingCheckBox->setChecked(enabled);
+}
+
+void TransformOptionsWidget::setGridSize(int size)
+{
+    QSignalBlocker b(ui->gridSizeSpinBox);
+    ui->gridSizeSpinBox->setValue(size);
 }

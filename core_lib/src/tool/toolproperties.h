@@ -566,6 +566,7 @@ struct TransformToolProperties: public ToolPropertiesBase
         START                        = 500,
         SHOWSELECTIONINFO_ENABLED    = START,
         ANTI_ALIASING_ENABLED        = 501,
+        GRID_SIZE_VALUE              = 502,
         END                          = 599,
     };
 
@@ -574,7 +575,8 @@ struct TransformToolProperties: public ToolPropertiesBase
 
         mProperties.insertIdentifiers({
             { SHOWSELECTIONINFO_ENABLED,    "ShowSelectionInfoEnabled" },
-            { ANTI_ALIASING_ENABLED,        "AntiAliasingEnabled" }
+            { ANTI_ALIASING_ENABLED,        "AntiAliasingEnabled" },
+            { GRID_SIZE_VALUE,              "GridSizeValue" }
         });
     }
 

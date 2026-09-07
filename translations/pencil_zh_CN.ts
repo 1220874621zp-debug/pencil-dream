@@ -7813,6 +7813,11 @@ or cancel</source>
         <source>Anti-Aliasing</source>
         <translation>抗锯齿</translation>
     </message>
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="47" />
+        <source>Grid Density</source>
+        <translation>网格密度</translation>
+    </message>
 </context>
 <context>
     <name>UndoRedoManager</name>

@@ -235,7 +235,7 @@ void BitmapImage::paste(BitmapImage* bitmapImage, QPainter::CompositionMode cm)
     modification();
 }
 
-void BitmapImage::paste(const TiledBuffer* tiledBuffer, QPainter::CompositionMode cm)
+void BitmapImage::paste(const TiledBuffer* tiledBuffer, QPainter::CompositionMode cm, const QPainterPath* selectionClip)
 {
     if(tiledBuffer->bounds().width() <= 0 || tiledBuffer->bounds().height() <= 0)
     {
@@ -247,10 +247,19 @@ void BitmapImage::paste(const TiledBuffer* tiledBuffer, QPainter::CompositionMod
 
     painter.setCompositionMode(cm);
     auto const tiles = tiledBuffer->tiles();
-    for (const Tile* item : tiles) {
-        const QPixmap& tilePixmap = item->pixmap();
-        const QPoint& tilePos = item->pos();
-        painter.drawPixmap(tilePos-mBounds.topLeft(), tilePixmap);
+    if (selectionClip != nullptr && !selectionClip->isEmpty()) {
+        // constrain the stroke to the active selection (lasso/rect)
+        painter.translate(-mBounds.topLeft());
+        painter.setClipPath(*selectionClip);
+        for (const Tile* item : tiles) {
+            painter.drawPixmap(item->pos(), item->pixmap());
+        }
+    } else {
+        for (const Tile* item : tiles) {
+            const QPixmap& tilePixmap = item->pixmap();
+            const QPoint& tilePos = item->pos();
+            painter.drawPixmap(tilePos-mBounds.topLeft(), tilePixmap);
+        }
     }
     painter.end();
 

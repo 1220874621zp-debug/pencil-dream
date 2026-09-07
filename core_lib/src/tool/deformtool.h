@@ -55,6 +55,12 @@ public:
 
     void clearToolData() override;
 
+    int gridSize() const { return mGridSize; }
+    void setGridSize(int size);
+
+signals:
+    void gridSizeChanged(int size);
+
 private:
     void pointerPressEvent(PointerEvent*) override;
     void pointerMoveEvent(PointerEvent*) override;
@@ -65,7 +71,8 @@ private:
 
     void beginDeform(const QPointF& pos);
     void teardown();
-    void updateWarpPreview();
+    void rebuildLattice();
+    void updateWarpPreview(bool interactive);
     void commitDeform();
     void cancelDeform();
 
@@ -77,6 +84,11 @@ private:
     bool mRegionIsPolygon = false;
 
     QImage mSourceImage;
+
+    // down-scaled copy for interactive dragging of large regions
+    QImage mPreviewSource;
+    qreal mPreviewScale = 1.0;
+
     QVector<QPointF> mOrigPoints;
     QVector<QPointF> mMovedPoints;
     int mGridSize = 4;
@@ -85,7 +97,7 @@ private:
     bool mDeformActive = false;
     bool mAnyPointMoved = false;
 
-    // cached warp result for commit
+    // cached warp result for commit (full resolution)
     QImage mWarpedResult;
     QPointF mWarpedTopLeft;
 };

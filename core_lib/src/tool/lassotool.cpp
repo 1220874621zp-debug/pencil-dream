@@ -66,11 +66,17 @@ void LassoTool::paint(QPainter& painter, const QRect& blitRect)
     painter.save();
     painter.setTransform(mEditor->view()->getView());
 
-    QPen pen(Qt::white, 1.0, Qt::DashLine);
-    pen.setCosmetic(true);
-    painter.setPen(pen);
+    // two-pass stroke: visible on white paper and dark workspace alike
+    QPen underlay(Qt::black, 2.0, Qt::SolidLine);
+    underlay.setCosmetic(true);
+    painter.setPen(underlay);
     painter.setBrush(Qt::NoBrush);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.drawPolyline(mLassoPoints);
+
+    QPen dashes(Qt::white, 1.0, Qt::DashLine);
+    dashes.setCosmetic(true);
+    painter.setPen(dashes);
     painter.drawPolyline(mLassoPoints);
 
     painter.restore();

@@ -50,6 +50,7 @@ private:
     void updateToolConnections(BaseTool* tool);
     void setShowSelectionInfo(bool enabled);
     void setAntiAliasingEnabled(bool enabled);
+    void setGridSize(int size);
 
     Ui::TransformOptionsWidget *ui;
 

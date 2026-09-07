@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #define BITMAP_IMAGE_H
 
 #include <QPainter>
+#include <QPainterPath>
 #include "keyframe.h"
 #include <QtMath>
 #include <QHash>
@@ -68,7 +69,7 @@ public:
     BitmapImage copy(QRect rectangle);
     BitmapImage copy(QPolygonF polygon);
     void paste(BitmapImage*, QPainter::CompositionMode cm = QPainter::CompositionMode_SourceOver);
-    void paste(const TiledBuffer* tiledBuffer, QPainter::CompositionMode cm = QPainter::CompositionMode_SourceOver);
+    void paste(const TiledBuffer* tiledBuffer, QPainter::CompositionMode cm = QPainter::CompositionMode_SourceOver, const QPainterPath* selectionClip = nullptr);
 
     void moveTopLeft(QPoint point);
     void moveTopLeft(QPointF point) { moveTopLeft(point.toPoint()); }
