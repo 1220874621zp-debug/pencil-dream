@@ -280,6 +280,7 @@
     <addaction name="actionSelect"/>
     <addaction name="actionLasso"/>
     <addaction name="actionMove"/>
+    <addaction name="actionOnionAlign"/>
     <addaction name="actionDeform"/>
     <addaction name="actionPen"/>
     <addaction name="actionHand"/>
@@ -689,6 +690,15 @@
    </property>
    <property name="text">
     <string>Move</string>
+   </property>
+  </action>
+  <action name="actionOnionAlign">
+   <property name="icon">
+    <iconset resource="../data/app.qrc">
+     <normaloff>:/icons/themes/playful/tools/tool-onionalign.svg</normaloff>:/icons/themes/playful/tools/tool-onionalign.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Onion Align</string>
    </property>
   </action>
   <action name="actionSelect">

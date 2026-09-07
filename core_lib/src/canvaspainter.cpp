@@ -308,8 +308,25 @@ void CanvasPainter::paintBitmapOnionSkinFrame(QPainter& painter, const QRect& bl
     QPainter onionSkinPainter;
     initializePainter(onionSkinPainter, mOnionSkinPixmap, blitRect);
 
-    onionSkinPainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
+    onionSkinPainter.drawImage(bitmapImage->topLeft() + onionGhostOffset(layer, nFrame), *bitmapImage->image());
     paintOnionSkinFrame(painter, onionSkinPainter, nFrame, colorize, bitmapImage->getOpacity());
+}
+
+QPointF CanvasPainter::onionGhostOffset(const Layer* layer, int nFrame) const
+{
+    if (mOnionGhostOffsets == nullptr || nFrame == mFrameNumber) { return QPointF(); }
+    auto it = mOnionGhostOffsets->constFind(layer->id());
+    if (it == mOnionGhostOffsets->constEnd()) { return QPointF(); }
+    const OnionGhostOffset& ghost = it.value();
+    if (nFrame < mFrameNumber && nFrame == ghost.prevFrameNumber)
+    {
+        return ghost.prevOffset;
+    }
+    if (nFrame > mFrameNumber && nFrame == ghost.nextFrameNumber)
+    {
+        return ghost.nextOffset;
+    }
+    return QPointF();
 }
 
 void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity)

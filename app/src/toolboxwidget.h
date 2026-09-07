@@ -54,6 +54,7 @@ public:
     void lassoOn();
     void deformOn();
     void moveOn();
+    void onionAlignOn();
     void penOn();
     void handOn();
     void polylineOn();

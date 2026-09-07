@@ -36,6 +36,17 @@ class Object;
 class BitmapImage;
 class ViewManager;
 
+/** 洋葱皮幽灵的运行时显示偏移（对位中割用，不落盘）。
+ *  偏移绑定创建时的洋葱帧号：换帧后前后幽灵变了，旧偏移自动失效归零。 */
+struct OnionGhostOffset
+{
+    QPointF prevOffset;
+    QPointF nextOffset;
+    int prevFrameNumber = -1;
+    int nextFrameNumber = -1;
+};
+using OnionGhostOffsetMap = QMap<int, OnionGhostOffset>;
+
 struct CanvasPainterOptions
 {
     bool  bAntiAlias = false;
@@ -62,6 +73,8 @@ public:
 
     void setOnionSkinOptions(const OnionSkinPainterOptions& onionSkinOptions) { mOnionSkinPainterOptions = onionSkinOptions;}
     void setOptions(const CanvasPainterOptions& p) { mOptions = p; }
+    /** 洋葱皮对位工具：传入按图层 id 索引的幽灵偏移表（调用方保证生命周期） */
+    void setOnionGhostOffsets(const OnionGhostOffsetMap* offsets) { mOnionGhostOffsets = offsets; }
     void setTransformedSelection(QRect selection, QTransform transform, QPolygonF selectionPolygon = QPolygonF());
     void ignoreTransformedSelection();
 
@@ -98,6 +111,7 @@ private:
 
     void paintBitmapOnionSkinFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int nFrame, bool colorize);
     void paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity);
+    QPointF onionGhostOffset(const Layer* layer, int nFrame) const;
 
     void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
 
@@ -160,6 +174,9 @@ private:
 
     OnionSkinSubPainter mOnionSkinSubPainter;
     OnionSkinPainterOptions mOnionSkinPainterOptions;
+
+    // 洋葱皮对位工具的幽灵偏移（所有权在 ScribbleArea，这里只读）
+    const OnionGhostOffsetMap* mOnionGhostOffsets = nullptr;
 
     const static int OVERLAY_SAFE_CENTER_CROSS_SIZE = 25;
 };

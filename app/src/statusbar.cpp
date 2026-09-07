@@ -159,6 +159,9 @@ void StatusBar::updateToolStatus(ToolType tool)
         case DEFORM:
             mToolLabel->setText(tr("点击画布生成变形网格，拖动控制点扭曲内容；回车/双击=应用，Esc=取消，Backspace=复位。"));
             break;
+        case ONION_ALIGN:
+            mToolLabel->setText(tr("拖动洋葱皮红/蓝幽灵像对位参考；双击=前后帧中心自动对齐；Alt+点击=归零该侧，Alt+点空白=清空全部。"));
+            break;
         default:
             Q_ASSERT(false);
     }
@@ -176,8 +179,9 @@ void StatusBar::updateToolStatus(ToolType tool)
         {":icons/themes/playful/tools/tool-bucket.svg"},
         {":icons/themes/playful/tools/tool-eyedropper.svg"},
         {":icons/themes/playful/tools/tool-brush.svg"},
-        {":icons/themes/playful/tools/tool-lasso.svg"},
-        {":icons/themes/playful/tools/tool-deform.svg"}
+        {":icons/themes/playful/tools/tool-lasso.svg"}, // Lasso
+        {":icons/themes/playful/tools/tool-deform.svg"}, // Deform
+        {":icons/themes/playful/tools/tool-onionalign.svg"}
     };
     mToolIcon->setPixmap(toolIcons[tool]);
     mToolIcon->setToolTip(BaseTool::TypeName(tool));

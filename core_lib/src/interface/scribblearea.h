@@ -71,6 +71,15 @@ public:
     void setDeformPreview(const QImage& preview, const QPointF& topLeft);
     void clearDeformPreview();
 
+    /** 洋葱皮对位工具：取该图层的幽灵偏移（无则创建），显示辅助态不落盘 */
+    OnionGhostOffset& onionGhostOffsetRef(int layerId);
+    /** 洋葱皮对位工具：只读访问整张偏移表（命中测试用） */
+    const OnionGhostOffsetMap& onionGhostOffsets() const { return mOnionGhostOffsets; }
+    /** 洋葱皮对位工具：清空该图层全部幽灵偏移 */
+    void clearOnionGhostOffsets(int layerId);
+    /** 洋葱皮对位工具：偏移变化后重绘（洋葱皮在 pre-layer 缓存里，须重置缓存） */
+    void invalidateOnionGhostVisual();
+
     void setEffect(SETTING e, bool isOn);
 
     LayerVisibility getLayerVisibility() const { return mLayerVisibility; }
@@ -255,6 +264,9 @@ private:
     CameraPainter mCameraPainter;
 
     QPolygonF mOriginalPolygonF = QPolygonF();
+
+    // 洋葱皮对位工具的幽灵偏移表（按图层 id；显示辅助态，不存盘不入撤销栈）
+    OnionGhostOffsetMap mOnionGhostOffsets;
 
     // Pixmap Cache keys
     QMap<unsigned int, QPixmapCache::Key> mPixmapCacheKeys;

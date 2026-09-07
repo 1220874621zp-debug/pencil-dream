@@ -389,6 +389,7 @@ static QString getHumanReadableShortcutName(const QString& cmdName)
         {CMD_TOOL_EYEDROPPER, ShortcutsPage::tr("Eyedropper Tool", "Shortcut")},
         {CMD_TOOL_HAND, ShortcutsPage::tr("Hand Tool", "Shortcut")},
         {CMD_TOOL_MOVE, ShortcutsPage::tr("Move Tool", "Shortcut")},
+        {CMD_TOOL_ONION_ALIGN, ShortcutsPage::tr("洋葱皮对位工具", "Shortcut")},
         {CMD_TOOL_PEN, ShortcutsPage::tr("Pen Tool", "Shortcut")},
         {CMD_TOOL_PENCIL, ShortcutsPage::tr("Pencil Tool", "Shortcut")},
         {CMD_TOOL_POLYLINE, ShortcutsPage::tr("Polyline Tool", "Shortcut")},

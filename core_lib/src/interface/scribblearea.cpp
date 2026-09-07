@@ -357,6 +357,7 @@ void ScribbleArea::onOnionSkinTypeChanged()
 
 void ScribbleArea::onObjectLoaded()
 {
+    mOnionGhostOffsets.clear();
     invalidateAllCache();
 }
 
@@ -1042,8 +1043,16 @@ void ScribbleArea::prepCanvas(int frame)
     onionSkinOptions.maxOpacity = mPrefs->getInt(SETTING::ONION_MAX_OPACITY);
     onionSkinOptions.minOpacity = mPrefs->getInt(SETTING::ONION_MIN_OPACITY);
 
+    // 对位工具依赖红/蓝区分前后幽灵，激活期间强制着色显示（不回写偏好设置）
+    if (mEditor->tools()->currentTool()->type() == ToolType::ONION_ALIGN)
+    {
+        onionSkinOptions.colorizePrevFrames = true;
+        onionSkinOptions.colorizeNextFrames = true;
+    }
+
     mCanvasPainter.setOnionSkinOptions(onionSkinOptions);
     mCanvasPainter.setOptions(o);
+    mCanvasPainter.setOnionGhostOffsets(&mOnionGhostOffsets);
 
     ViewManager* vm = mEditor->view();
     SelectionManager* sm = mEditor->select();
@@ -1319,6 +1328,22 @@ void ScribbleArea::setDeformPreview(const QImage& preview, const QPointF& topLef
 void ScribbleArea::clearDeformPreview()
 {
     mCanvasPainter.clearDeformPreview();
+    updateFrame();
+}
+
+OnionGhostOffset& ScribbleArea::onionGhostOffsetRef(int layerId)
+{
+    return mOnionGhostOffsets[layerId];
+}
+
+void ScribbleArea::clearOnionGhostOffsets(int layerId)
+{
+    mOnionGhostOffsets.remove(layerId);
+}
+
+void ScribbleArea::invalidateOnionGhostVisual()
+{
+    mCanvasPainter.resetLayerCache();
     updateFrame();
 }
 

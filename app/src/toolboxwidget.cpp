@@ -61,6 +61,7 @@ void ToolBoxWidget::initUI()
     ui->lassoButton->setStyleSheet(sStyle);
     ui->deformButton->setStyleSheet(sStyle);
     ui->moveButton->setStyleSheet(sStyle);
+    ui->onionAlignButton->setStyleSheet(sStyle);
     ui->handButton->setStyleSheet(sStyle);
     ui->penButton->setStyleSheet(sStyle);
     ui->eraserButton->setStyleSheet(sStyle);
@@ -81,6 +82,8 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setToolTip( tr( "Move Tool (%1): Move an object" )
         .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
+    ui->onionAlignButton->setToolTip( tr( "洋葱皮对位工具 (%1)：拖动红/蓝幽灵像对位中割；双击=中心对齐；Alt+点击=归零" )
+        .arg( GetToolTips( CMD_TOOL_ONION_ALIGN ) ) );
     ui->handButton->setToolTip( tr( "Hand Tool (%1): Move the canvas" )
         .arg( GetToolTips( CMD_TOOL_HAND ) ) );
     ui->penButton->setToolTip( tr( "Pen Tool (%1): Sketch with pen" )
@@ -110,6 +113,8 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setWhatsThis( tr( "Move Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
+    ui->onionAlignButton->setWhatsThis( tr( "洋葱皮对位工具 (%1)" )
+        .arg( GetToolTips( CMD_TOOL_ONION_ALIGN ) ) );
     ui->handButton->setWhatsThis( tr( "Hand Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_HAND ) ) );
     ui->penButton->setWhatsThis( tr( "Pen Tool (%1)" )
@@ -133,6 +138,7 @@ void ToolBoxWidget::initUI()
     connect(ui->lassoButton, &QToolButton::clicked, this, &ToolBoxWidget::lassoOn);
     connect(ui->deformButton, &QToolButton::clicked, this, &ToolBoxWidget::deformOn);
     connect(ui->moveButton, &QToolButton::clicked, this, &ToolBoxWidget::moveOn);
+    connect(ui->onionAlignButton, &QToolButton::clicked, this, &ToolBoxWidget::onionAlignOn);
     connect(ui->penButton, &QToolButton::clicked, this, &ToolBoxWidget::penOn);
     connect(ui->handButton, &QToolButton::clicked, this, &ToolBoxWidget::handOn);
     connect(ui->polylineButton, &QToolButton::clicked, this, &ToolBoxWidget::polylineOn);
@@ -149,6 +155,7 @@ void ToolBoxWidget::initUI()
     mFlowlayout->addWidget(ui->lassoButton);
     mFlowlayout->addWidget(ui->deformButton);
     mFlowlayout->addWidget(ui->moveButton);
+    mFlowlayout->addWidget(ui->onionAlignButton);
     mFlowlayout->addWidget(ui->penButton);
     mFlowlayout->addWidget(ui->handButton);
     mFlowlayout->addWidget(ui->polylineButton);
@@ -171,6 +178,7 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->lassoButton);
     buttonGroup->addButton(ui->deformButton);
     buttonGroup->addButton(ui->moveButton);
+    buttonGroup->addButton(ui->onionAlignButton);
     buttonGroup->addButton(ui->penButton);
     buttonGroup->addButton(ui->handButton);
     buttonGroup->addButton(ui->polylineButton);
@@ -247,6 +255,9 @@ void ToolBoxWidget::setActiveTool(ToolType toolType)
     case ToolType::CAMERA:
         moveOn();
         break;
+    case ToolType::ONION_ALIGN:
+        onionAlignOn();
+        break;
     case ToolType::ERASER:
         eraserOn();
         break;
@@ -301,6 +312,11 @@ void ToolBoxWidget::moveOn()
     }
 }
 
+void ToolBoxWidget::onionAlignOn()
+{
+    toolOn(ONION_ALIGN, ui->onionAlignButton);
+}
+
 void ToolBoxWidget::penOn()
 {
     toolOn(PEN, ui->penButton);
@@ -344,6 +360,7 @@ void ToolBoxWidget::deselectAllTools()
     ui->lassoButton->setChecked(false);
     ui->deformButton->setChecked(false);
     ui->moveButton->setChecked(false);
+    ui->onionAlignButton->setChecked(false);
     ui->handButton->setChecked(false);
     ui->penButton->setChecked(false);
     ui->polylineButton->setChecked(false);
