@@ -3,6 +3,7 @@
 **Pencil Dream** 是基于开源动画软件 [Pencil2D](https://github.com/pencil2d/pencil) 的深度改造版本：面向传统手绘动画的**纯位图工作流**，时间轴按 **TVPaint** 的交互习惯全面重塑，界面采用 **Procreate Dreams** 风格的深色主题。
 
 上游英文说明保留在 [README-upstream.md](README-upstream.md)。
+<img width="3842" height="2090" alt="ScreenShot_2026-09-07_121847_579" src="https://github.com/user-attachments/assets/3c01f0dc-70f6-4551-b5ee-625fc4818088" />
 
 ---
 
