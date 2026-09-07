@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QFile>
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QTimer>
 #include <QProgressDialog>
 #include <QTabletEvent>
 #include <QStandardPaths>
@@ -1389,7 +1390,12 @@ void MainWindow2::readSettings()
             winState = workspaceState;
         }
     }
-    restoreState(winState.toByteArray());
+    // Do NOT call restoreState() here: the window is not shown yet and
+    // its final size arrives asynchronously (maximize), so the dock
+    // layout would be clamped to the dock minimums and the saved panel
+    // sizes lost. The state is applied by applyPendingStateRestore()
+    // once the window geometry is stable (debounced in show/resize).
+    mPendingStateRestore = winState.toByteArray();
 
     int opacity = mEditor->preference()->getInt(SETTING::WINDOW_OPACITY);
     setOpacity(100 - opacity);
@@ -1403,6 +1409,46 @@ void MainWindow2::writeSettings()
     QSettings settings(PENCIL2D, PENCIL2D);
     settings.setValue(SETTING_WINDOW_GEOMETRY, saveGeometry());
     settings.setValue(SETTING_WINDOW_STATE, saveState());
+}
+
+void MainWindow2::showEvent(QShowEvent* event)
+{
+    QMainWindow::showEvent(event);
+    armPendingStateRestore();
+}
+
+void MainWindow2::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    // restart the debounce timer: apply the saved dock layout only
+    // after the window size has settled
+    armPendingStateRestore();
+}
+
+void MainWindow2::armPendingStateRestore()
+{
+    if (mPendingStateRestore.isEmpty()) { return; }
+    if (!mStateRestoreTimer)
+    {
+        mStateRestoreTimer = new QTimer(this);
+        mStateRestoreTimer->setSingleShot(true);
+        mStateRestoreTimer->setInterval(60);
+        connect(mStateRestoreTimer, &QTimer::timeout,
+                this, &MainWindow2::applyPendingStateRestore);
+    }
+    // debounce: every show/resize restarts the countdown so the state
+    // is restored only once the final window geometry is in place
+    mStateRestoreTimer->start();
+}
+
+void MainWindow2::applyPendingStateRestore()
+{
+    if (mPendingStateRestore.isEmpty()) { return; }
+    const QByteArray state = mPendingStateRestore;
+    mPendingStateRestore.clear();
+    // the window geometry is stable now, so the saved dock and
+    // toolbar sizes apply at full value instead of being clamped
+    restoreState(state);
 }
 
 void MainWindow2::setupKeyboardShortcuts()

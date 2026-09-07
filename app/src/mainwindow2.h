@@ -23,6 +23,7 @@ GNU General Public License for more details.
 template<typename T> class QList;
 class QActionGroup;
 class QMenu;
+class QTimer;
 class QToolBar;
 class Object;
 class Editor;
@@ -117,6 +118,8 @@ protected:
     void tabletEvent(QTabletEvent*) override;
     void closeEvent(QCloseEvent*) override;
     bool event(QEvent*) override;
+    void showEvent(QShowEvent*) override;
+    void resizeEvent(QResizeEvent*) override;
 
 private slots:
     void updateCopyCutPasteEnabled();
@@ -144,6 +147,14 @@ private:
     void readSettings();
     void writeSettings();
     void resetAndDockAllSubWidgets();
+
+    // dock layout is restored only after the window geometry is stable:
+    // restoreState() before show() gets clamped to dock minimum sizes
+    // and the saved panel sizes are lost
+    void armPendingStateRestore();
+    void applyPendingStateRestore();
+    QByteArray mPendingStateRestore;
+    QTimer* mStateRestoreTimer = nullptr;
 
     // named panel-layout workspaces (friction-style):
     // snapshots of saveState() stored per name in QSettings,
