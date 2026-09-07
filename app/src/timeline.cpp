@@ -39,6 +39,7 @@ GNU General Public License for more details.
 #include "scribblearea.h"
 #include "timecontrols.h"
 #include "timelinecells.h"
+#include "tvptoolsdialog.h"
 
 
 TimeLine::TimeLine(QWidget* parent) : BaseDockWidget(parent)
@@ -197,6 +198,19 @@ void TimeLine::initUI()
     loopCloneButton->setToolTip(tr("循环克隆帧：把选中的帧（未选中则整层）按原间隔重复指定次数"));
     loopCloneButton->setMinimumSize(QSize(38, 34));
 
+    // TVP satellite tools (lazy, non-modal)
+    QToolButton* toolsButton = new QToolButton(this);
+    toolsButton->setText(tr("工具"));
+    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 对位中割 / 视频抽帧"));
+    toolsButton->setMinimumSize(QSize(38, 34));
+    QMenu* toolsMenu = new QMenu(this);
+    QAction* lipsyncAct = toolsMenu->addAction(tr("口型同步切换器"));
+    QAction* paletteAct = toolsMenu->addAction(tr("调色板提取"));
+    QAction* inbetweenAct = toolsMenu->addAction(tr("对位中割参考"));
+    QAction* videoAct = toolsMenu->addAction(tr("视频抽帧中割"));
+    toolsButton->setMenu(toolsMenu);
+    toolsButton->setPopupMode(QToolButton::InstantPopup);
+
     QLabel* zoomLabel = new QLabel(tr("Zoom:"));
     zoomLabel->setIndent(5);
 
@@ -220,6 +234,8 @@ void TimeLine::initUI()
     timelineButtons->addSeparator();
     timelineButtons->addWidget(loopCloneButton);
     timelineButtons->addWidget(loopCloneSpin);
+    timelineButtons->addSeparator();
+    timelineButtons->addWidget(toolsButton);
     timelineButtons->addSeparator();
     timelineButtons->addWidget(zoomLabel);
     timelineButtons->addWidget(zoomSlider);
@@ -286,6 +302,34 @@ void TimeLine::initUI()
     connect(holdThreeButton, &QToolButton::clicked, this, [this]() { applyHoldLength(3); });
     connect(holdFourButton, &QToolButton::clicked, this, [this]() { applyHoldLength(4); });
     connect(loopCloneButton, &QToolButton::clicked, this, &TimeLine::cloneLoopFrames);
+    connect(lipsyncAct, &QAction::triggered, this, [this]()
+    {
+        if (mLipsyncDialog == nullptr) { mLipsyncDialog = new LipsyncDialog(editor(), this); }
+        mLipsyncDialog->show();
+        mLipsyncDialog->raise();
+        mLipsyncDialog->activateWindow();
+    });
+    connect(paletteAct, &QAction::triggered, this, [this]()
+    {
+        if (mPaletteDialog == nullptr) { mPaletteDialog = new PaletteExtractDialog(editor(), this); }
+        mPaletteDialog->show();
+        mPaletteDialog->raise();
+        mPaletteDialog->activateWindow();
+    });
+    connect(inbetweenAct, &QAction::triggered, this, [this]()
+    {
+        if (mInbetweenDialog == nullptr) { mInbetweenDialog = new InbetweenRefsDialog(editor(), this); }
+        mInbetweenDialog->show();
+        mInbetweenDialog->raise();
+        mInbetweenDialog->activateWindow();
+    });
+    connect(videoAct, &QAction::triggered, this, [this]()
+    {
+        if (mVideoDialog == nullptr) { mVideoDialog = new VideoExtractDialog(editor(), this); }
+        mVideoDialog->show();
+        mVideoDialog->raise();
+        mVideoDialog->activateWindow();
+    });
 
     // TVP global toggles: unanimous state flips, mixed state resolves to "all on"
     connect(allVisibleButton, &QToolButton::clicked, this, [this]()

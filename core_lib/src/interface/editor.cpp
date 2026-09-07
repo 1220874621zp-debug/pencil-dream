@@ -527,7 +527,10 @@ Status Editor::setObject(Object* newObject)
 
     // Discard the undo history before the previous object dies: layout
     // commands still hold keyframe pointers of the old document
-    undoRedo()->clearStack();
+    if (UndoRedoManager* undo = undoRedo())
+    {
+        undo->clearStack();
+    }
 
     mObject.reset(newObject);
 

@@ -8,6 +8,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/gapfilldialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app_util.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app-pch.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/appearance.h
@@ -69,6 +70,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/gapfilldialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/app_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/basedockwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/basewidget.cpp

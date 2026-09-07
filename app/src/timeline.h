@@ -27,6 +27,10 @@ class TimeControls;
 class QToolButton;
 class QWheelEvent;
 class QSpinBox;
+class LipsyncDialog;
+class PaletteExtractDialog;
+class InbetweenRefsDialog;
+class VideoExtractDialog;
 
 
 class TimeLine : public BaseDockWidget
@@ -103,6 +107,12 @@ private:
 
     QToolButton* mLayerDeleteButton = nullptr;
     QSpinBox* mLoopCloneSpin = nullptr;
+
+    // TVP satellite tools (lazily created, non-modal)
+    LipsyncDialog* mLipsyncDialog = nullptr;
+    PaletteExtractDialog* mPaletteDialog = nullptr;
+    InbetweenRefsDialog* mInbetweenDialog = nullptr;
+    VideoExtractDialog* mVideoDialog = nullptr;
     int mNumLayers = 0;
     int mLastUpdatedFrame = 0;
 };
