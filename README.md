@@ -1,60 +1,75 @@
-[![Build & Tests](https://github.com/pencil2d/pencil/actions/workflows/ci.yml/badge.svg)](https://github.com/pencil2d/pencil/actions/workflows/ci.yml)
+# Pencil Dream
 
-# Pencil2D Animation
+**Pencil Dream** 是基于开源动画软件 [Pencil2D](https://github.com/pencil2d/pencil) 的深度改造版本：面向传统手绘动画的**纯位图工作流**，时间轴按 **TVPaint** 的交互习惯全面重塑，界面采用 **Procreate Dreams** 风格的深色主题。
 
-**Pencil2D** is a free and open source animation/drawing software for Windows, macOS, Linux, and FreeBSD. It lets you create traditional hand-drawn animation (cartoon) using both bitmap and vector graphics.
+上游英文说明保留在 [README-upstream.md](README-upstream.md)。
 
-Pencil2D is a community-driven project developed entirely by volunteers and we are always looking for more helping hands! There are many different ways to contribute, so anyone can help regardless of their background. For more information, please see the [Contributing](#contributing) section below.
+---
 
-Don’t forget to check out our official website: <https://www.pencil2d.org/>
+## 时间轴（TVPaint 风格）
 
-### User Showcase
+- **曝光块模型**：每个关键帧渲染为一张宽卡片（绘图纸），自动带内容裁剪缩略图（白色缩略图底框）、绘图纸序号（1、2、3…自然数，非时间帧号）
+- **块缘拉伸（Trim）**：鼠标悬停块右缘/两块接缝出现 ↔ 光标，按住拖动实时预览调整曝光；中间块为**双向 ripple**（后续块整体跟随让位），**末尾块拖长逐帧生成空白关键帧**、拖短删除实体帧
+- **一拍 N（×1~×4）**：停车法四阶段重排，绝不删帧；选中帧版带 TVP 碰撞推挤（区间内未选中帧按原间距推到尾部）；与 trim 共用同一套曝光语义，单步撤销
+- **"+" 把手拖拽建帧**：末块右上角拖出即可批量创建帧，带 "+Nf" 预览，单步撤销
+- **块拖拽**：层内移动、跨层搬运（同类型层）、Ctrl 整层平移、框选/Ctrl/Shift/Alt 多选
+- **空隙自动吸收**：删帧、移动块、曝光缩短时前一个块自动延长补位（TVP 语义），其余场景保留空隙兼容
+- **循环克隆**：选中帧（或整层）按原间隔重复 N 次（1-99），单步撤销
+- **选中态**：仅边框高亮（内容原样透出），拖动时半透明幽灵预览
+- **指针跟随**：点击/选中块，播放头立即跳到该位置
+- **图层标签色**：点击图层行左缘循环 8 色，轨道全强度着色
+- 其他：Alt+滚轮缩放帧宽（锚定视口中心）、滚轮调行高、标尺每 5 帧编号、缩略图异步分批生成
 
-[![2022 User Showcase](http://img.youtube.com/vi/ma52j9B1kEM/hqdefault.jpg)](https://www.youtube.com/watch?v=ma52j9B1kEM)
+## 撤销系统重构
 
-_User Showcase Reel 2022_
+- 强制启用新撤销系统（原版默认关闭时所有撤销记录均为空操作）
+- 新增 **LayerLayoutCommand 布局事务**：批量操作（一拍N、批量删帧、粘贴帧、跨层移动、图层重排、"+"建帧、循环克隆、口型插入等）恢复完整关键帧布局（位置/曝光长度/增删帧），单步撤销、无需复制像素
+- 像素类操作（粘贴、清空、删选区、导入、翻转）全部补齐撤销记录
 
-## Download
+## 图层面板（TVP 风格）
 
-Download Pencil2D from the [Official Website][p2d-download] or [Github releases][gh-release].
+- 行内**不透明度滑条**（按住实时拖动，画布与导出同步生效、随工程持久化）
+- 行内**锁定开关**：绘画、帧操作、trim、拖拽全部强制拦截
+- 全局"可见/锁定"一键切换（全开→全关）
+- 拖拽重排为插入语义 + 可撤销；**复制清空**：在原图层上方生成同结构空白帧图层（清稿/描线用）
 
-[p2d-download]: https://www.pencil2d.org/download/
-[gh-release]: https://github.com/pencil2d/pencil/releases
+## 播放与时间控制
 
-### Nightly Builds
+- 播放按钮组居中于时间轴工具栏；帧数/倍率输入框贴右边缘（框内数字右对齐）
+- 回放范围、入出点、声音开关、擦洗出声、时间码挂到主窗口状态栏右端
+- 循环图标采用 Friction 风格；实测帧率显示（低于目标变红）
 
-Nightly builds are bleeding-edge versions of Pencil2D that include the most recent fixes and features. They are not as stable as the official releases, but they are a great way to test the latest features and help us find bugs.
+## 工具集（时间轴"工具"菜单 / 图层菜单）
 
-[Download Nightly Buildls](https://www.pencil2d.org/download/nightly/)
+- **口型同步切换器**：图层命名 A/E/I/O/U/N/MBP/FV/L/WQ 自动识别，点击在"口型"层当前帧插入对应口型
+- **调色板提取**：从图片量化主色（5bit 分箱+众数色），生成色块图层 + 写入色彩面板色卡 + 复制色值
+- **对位中割参考**：前后关键帧生成红/绿着色参考层，内容中心自动对齐中点
+- **视频抽帧中割**：ffmpeg 抽帧预览（LRU 缓存/播放/滑动），批量导入为时间轴图层
+- **GapFill 智能补线**（ONNX 后端）
 
-## Using Pencil2D
+## 摄像机
 
-Pencil2D includes a Quick Reference to help you familiarise yourself with the tools and functions available. You can access it through the main menu: Help > Quick Reference Guide.
+- 默认分辨率 **1920×1080**（旧工程一次性迁移）
+- 相机框：虚线边框 + **90% 动作安全框** + **中心十字**
 
-We encourage you to visit our [User Manual][user-man] for a quick guide for novice users, then play around with the program – it's fun!
+## 界面与画布
 
-[user-man]: https://www.pencil2d.org/doc/user-manual.html
+- Procreate Dreams 风深色主题（主题系统含 TVP 绿等多个预设）
+- 移除全部矢量功能，纯位图工作流；有限画布（相机框即工作区）
+- 高 DPI 文字/缓存修复；中键缩放画布；帮助菜单精简（无外链）
+- 文件对话框自带缩略图
 
-After you feel a little more comfortable with the basics, check out these [tutorials][pencil-tutorials] provided by Pencil developers and users. While some of these resources might reference previous versions of Pencil2D, the underlying concepts are still the same.
+## 构建
 
-[pencil-tutorials]: https://www.pencil2d.org/doc/tutorials.html
+Windows / Qt 6.8 / MSVC / Ninja：
 
-If you encounter difficulty or have additional questions, we have a large community of users who are glad to help out. View the [FAQ][p2d-faq] on our website or visit our [discussion forums][p2d-discussion] to post a new question.
+```bash
+cmake -S pencil -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt路径> -DCMAKE_BUILD_TYPE=Release
+ninja
+```
 
-[p2d-faq]: https://www.pencil2d.org/doc/faq.html
-[p2d-discussion]: https://discuss.pencil2d.org/c/support/5
+或直接使用 `build-qt6.bat`（自动配置 vcvars + Qt 路径）。
 
-## Contributing
+---
 
-Interested in contributing to Pencil2D? There are many ways to help. Take a look at our issues and see what you can help out with, check out the developer guide, or help out with making Pencil2D available to more people by contributing to translation.
-
-* [Issue Tracker](https://github.com/pencil2d/pencil/issues) - Report bugs or request features.
-* [Developer Guide](https://dev.pencil2d.org/) - Learn how to compile Pencil2D yourself.
-* [Transifex](https://www.transifex.com/pencil2d/) - You can help translate Pencil2D, too.
-* [Documentation contributions](https://www.pencil2d.org/doc/CONTRIBUTING) - Contributing to documentation.
-
-## Source Code
-
-* GitHub: <https://github.com/pencil2d/pencil> (Primary)
-* Bitbucket: <https://bitbucket.org/chchwy/pencil2d> (Mirror)
-* GitLab: <https://gitlab.com/chchwy/pencil2d> (Mirror 2)
+基于 [Pencil2D](https://github.com/pencil2d/pencil)（GPL-2.0）改造，遵循同一许可证。感谢 Pencil2D 的开发者们；时间轴交互参考了 TVPaint 与 [Friction](https://github.com/friction2d/friction) 的设计。
