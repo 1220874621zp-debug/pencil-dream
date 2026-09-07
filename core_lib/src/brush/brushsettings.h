@@ -42,6 +42,19 @@ struct BrushSettings
         Fixed   // 间距 = 直径 * spacing
     };
 
+    enum class PaintingMode
+    {
+        Wash,     // 涂抹：alpha 向不透明度收敛，同笔不越叠越深（Krita WASH/ALPHA_DARKEN）
+        Buildup   // 叠加：每个 dab 直接累积，反复描会变深（Krita BUILDUP）
+    };
+
+    enum class BlendMode
+    {
+        Normal,   // 正常
+        Multiply, // 正片叠底（笔尖混合，对底色逐像素相乘）
+        Screen    // 滤色
+    };
+
     // ---- 笔尖 ----
     QString name;               // 预设名（序列化进 XML 根属性）
     TipShape tipShape = TipShape::Circle;
@@ -52,10 +65,22 @@ struct BrushSettings
 
     // ---- 描边 ----
     qreal opacity = 1.0;        // 笔刷不透明度 0.05..1（橡皮预设=擦除强度）
+    qreal flow = 1.0;           // 流量 0.01..1：涂抹模式下在"并集"与"收敛"间插值（Krita flow）
     SpacingMode spacingMode = SpacingMode::Auto;
     qreal spacing = 0.25;       // 固定间距（直径的比例）0.02..5
     qreal autoSpacingCoeff = 1.0;
     bool eraser = false;        // 橡皮预设：dab alpha 经 DestinationOut 变成擦除量
+
+    // ---- 笔尖 ----
+    qreal scatter = 0.0;        // 散布 0..5：dab 落点随机偏移量（×直径）
+    PaintingMode paintingMode = PaintingMode::Wash;
+    BlendMode blendMode = BlendMode::Normal;
+    bool mirrorX = false;       // 水平镜像绘画（围绕画布中心）
+    bool mirrorY = false;       // 垂直镜像绘画
+
+    // ---- 喷枪 ----
+    bool airbrushEnabled = false;
+    int airbrushRate = 20;      // 每秒 dab 数 1..100
 
     // ---- 动态（压感）----
     bool pressureSize = true;

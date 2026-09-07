@@ -97,9 +97,9 @@ void TiledBuffer::drawBrush(QPointF point, qreal brushWidth, QPen pen, QBrush br
     }
 }
 
-void TiledBuffer::drawDab(const QImage& dab, const QPoint& topLeft, qreal opacity)
+void TiledBuffer::drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params)
 {
-    if (dab.isNull() || opacity <= 0.0) {
+    if (dab.isNull() || params.opacity <= 0.0) {
         return;
     }
     const qreal tileSize = UNIFORM_TILE_SIZE;
@@ -118,7 +118,7 @@ void TiledBuffer::drawDab(const QImage& dab, const QPoint& topLeft, qreal opacit
             // 64x64 的小图，toImage/fromImage 往返开销可忽略；
             // wash 混合必须逐像素做（QPainter 的 Lighten alpha 会累积）
             QImage tileImage = tile->pixmap().toImage();
-            washBlendImage(tileImage, dab, topLeft - tile->pos(), opacity);
+            washBlendImage(tileImage, dab, topLeft - tile->pos(), params);
             tile->pixmap() = QPixmap::fromImage(tileImage);
 
             mTileBounds.extend(tile->bounds());

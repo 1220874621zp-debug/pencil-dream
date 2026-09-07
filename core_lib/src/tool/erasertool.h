@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "stroketool.h"
 
 #include "brush/brushengine.h"
+#include <QTimer>
 
 class EraserTool : public StrokeTool
 {
@@ -46,6 +47,9 @@ public:
     /** 预设应用：与 BrushTool 同款接口，橡皮预设也走笔刷引擎 */
     void applyBrushPreset(const BrushSettings& preset);
     void initPresetExtras(const BrushSettings& preset);
+    /** 工具选项面板编辑：整套参数生效并持久化 */
+    void applyBrushOptions(const BrushSettings& options);
+    bool hasUserOptions() const { return mUserOptionsRestored; }
     BrushSettings currentBrushSettings();
 
 protected:
@@ -56,10 +60,13 @@ protected:
 
 private:
     void syncEngineSettings();
+    void persistUserOptions();
     BrushEngine::DabPainter dabPainter() const;
 
     BrushEngine mEngine;
     BrushSettings mPresetExtras;
+    QTimer mAirbrushTimer;
+    bool mUserOptionsRestored = false;
 };
 
 #endif // ERASERTOOL_H

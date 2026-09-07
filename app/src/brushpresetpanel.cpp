@@ -132,13 +132,19 @@ void BrushPresetPanel::initUI()
     }
     if (!name.isEmpty()) {
         selectPreset(name);
+        // 用户调过工具选项（QSettings 有整套存档）则跳过预设回灌，
+        // 保持上次会话的完整工作状态；首次启动才应用预设默认值
         const BrushSettings& preset = mStore.presets()[mStore.indexOf(name)].settings;
         if (preset.eraser) {
-            if (EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER))) {
+            EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER));
+            if (tool && !tool->hasUserOptions()) {
                 tool->initPresetExtras(preset);
             }
-        } else if (BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH))) {
-            tool->initPresetExtras(preset);
+        } else {
+            BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH));
+            if (tool && !tool->hasUserOptions()) {
+                tool->initPresetExtras(preset);
+            }
         }
     }
 }

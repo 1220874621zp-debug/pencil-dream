@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include <QDebug>
 
 #include "cameraoptionswidget.h"
+#include "brushoptionswidget.h"
 #include "bucketoptionswidget.h"
 #include "strokeoptionswidget.h"
 #include "transformoptionswidget.h"
@@ -57,10 +58,13 @@ void ToolOptionWidget::initUI()
     mBucketOptionsWidget->setHidden(true);
     mCameraOptionsWidget->setHidden(true);
     
+    mBrushOptionsWidget = new BrushOptionsWidget(editor(), this);
+    mBrushOptionsWidget->setHidden(true);
     mStrokeOptionsWidget = new StrokeOptionsWidget(editor(), this);
     mTransformOptionsWidget = new TransformOptionsWidget(editor(), this);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBucketOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mCameraOptionsWidget);
+    ui->scrollAreaWidgetContents->layout()->addWidget(mBrushOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mStrokeOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mTransformOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Expanding));
@@ -97,7 +101,9 @@ void ToolOptionWidget::updateUIForTool(BaseTool* tool)
 {
     setWidgetVisibility(mBucketOptionsWidget, tool->type() == BUCKET);
     setWidgetVisibility(mCameraOptionsWidget, tool->type() == CAMERA);
-    setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool));
+    const bool isBrushLike = tool->type() == BRUSH || tool->type() == ERASER;
+    setWidgetVisibility(mBrushOptionsWidget, isBrushLike);
+    setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool) && !isBrushLike);
     setWidgetVisibility(mTransformOptionsWidget, editor()->tools()->isTransformTool(tool));
 }
 

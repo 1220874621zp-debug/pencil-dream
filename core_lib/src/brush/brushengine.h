@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #define BRUSHENGINE_H
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QImage>
 #include <QPointF>
@@ -48,6 +49,9 @@ public:
         QPoint topLeft;   // dab 左上角（画布整数坐标，子像素已烤进 dab 图）
         QImage dab;       // 上色后的 dab 图（已含笔尖形状与颜色）
         qreal opacity = 1.0; // 该 dab 的不透明度
+        qreal flow = 1.0;    // 该 dab 的流量
+        bool buildup = false; // 叠加模式（false=涂抹收敛）
+        int blendMode = 0;    // 笔尖混合模式（见 BrushSettings::BlendMode）
     };
 
     using DabPainter = std::function<void(const DabRequest&)>;
@@ -55,9 +59,14 @@ public:
     void setSettings(const BrushSettings& settings) { mSettings = settings; }
     const BrushSettings& settings() const { return mSettings; }
 
+    /** 镜像绘画的对称中心（画布坐标）；不设置则镜像不生效 */
+    void setMirrorCenter(const QPointF& center) { mMirrorCenter = center; mMirrorCenterValid = true; }
+
     void beginStroke(const QPointF& point, qreal pressure, const QColor& color, const DabPainter& painter);
     void strokeTo(const QPointF& point, qreal pressure, const DabPainter& painter);
     void dabAt(const QPointF& point, qreal pressure, const DabPainter& painter);
+    /** 喷枪：按速率在最后落点补 dab（宿主用定时器驱动，静止时持续喷） */
+    void airbrushTick(const DabPainter& painter);
     void endStroke();
     bool isStrokeActive() const { return mStrokeActive; }
 
@@ -73,6 +82,8 @@ private:
     qreal spacingFor(qreal dabDiameter) const;
     void paintDab(const QPointF& point, qreal pressure, const DabPainter& painter);
     const QImage& cachedDab(quint32 cacheKey, qreal diameter, qreal subPixelX, qreal subPixelY);
+    void emitDab(const QImage& dab, const QPoint& topLeft, qreal pressure, const DabPainter& painter);
+    QPointF scatterOffset(qreal diameter) const;
 
     BrushSettings mSettings;
     QColor mColor;
@@ -82,6 +93,11 @@ private:
     QPointF mLastPoint;
     qreal mLastPressure = 1.0;
     qreal mRemainingDistance = 0.0; // 距离下一个 dab 还差的距离
+
+    QPointF mMirrorCenter;
+    bool mMirrorCenterValid = false;
+    qint64 mLastDabTimeMs = 0; // 喷枪：上一枚 dab 的时刻
+    QElapsedTimer mStrokeTimer;
 };
 
 #endif // BRUSHENGINE_H

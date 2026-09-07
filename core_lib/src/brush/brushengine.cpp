@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include <QPainterPath>
 #include <QLineF>
 #include <QtMath>
+#include <QRandomGenerator>
 
 #include "graphics/bitmap/washblend.h"
 
@@ -135,6 +136,8 @@ void BrushEngine::beginStroke(const QPointF& point, qreal pressure, const QColor
     mLastPoint = point;
     mLastPressure = pressure;
     mDabCache.clear();
+    mStrokeTimer.start();
+    mLastDabTimeMs = 0;
 
     // 起笔先落一个 dab（Krita 行为：单击即出点）
     paintDab(point, pressure, painter);
@@ -208,28 +211,85 @@ void BrushEngine::paintDab(const QPointF& point, qreal pressure, const DabPainte
         return;
     }
 
+    // 散布：dab 落点加随机偏移（Krita KisScatterOption），间距仍按未散布路径计
+    const qreal diameterRaw = dabDiameterAt(pressure);
+    QPointF effectivePoint = point;
+    if (mSettings.scatter > 0.0) {
+        effectivePoint += scatterOffset(diameterRaw);
+    }
+
     // 直径量化到 4% 步长（Krita dab 缓存容差的同思路）：压感连续变化时
     // 只有跨步长才重生成掩码，配合 2x2 子像素桶把每笔的缓存规模压在
     // ~100 张以内（200px 软笔压感全程扫一遍也从 200 张降到 ~25 张）
     const qreal step = qMax(1.0, mSettings.diameter * 0.04);
-    const int gridIndex = qMax(1, qRound(dabDiameterAt(pressure) / step));
+    const int gridIndex = qMax(1, qRound(diameterRaw / step));
     const qreal diameter = gridIndex * step;
 
     // 落点吸附半像素网格（误差 ≤0.25px，AA 边缘下不可见），余数作为
     // 子像素偏移烤进掩码；topLeft 因此恒为整数坐标
-    const int snappedX = qRound(point.x() * 2.0);
-    const int snappedY = qRound(point.y() * 2.0);
+    const int snappedX = qRound(effectivePoint.x() * 2.0);
+    const int snappedY = qRound(effectivePoint.y() * 2.0);
     const int subBucketX = snappedX & 1;
     const int subBucketY = snappedY & 1;
 
-    DabRequest request;
-    request.opacity = dabOpacityAt(pressure);
-    request.dab = cachedDab((gridIndex << 2) | (subBucketX << 1) | subBucketY,
-                            diameter, subBucketX * 0.5, subBucketY * 0.5);
+    const QImage& dab = cachedDab((gridIndex << 2) | (subBucketX << 1) | subBucketY,
+                                  diameter, subBucketX * 0.5, subBucketY * 0.5);
     // 掩码中心在图内位于 (imgW/2 + subX)，落图后对准吸附点 (snappedX/2)
-    request.topLeft = QPoint((snappedX >> 1) - request.dab.width() / 2,
-                             (snappedY >> 1) - request.dab.height() / 2);
+    const QPoint topLeft((snappedX >> 1) - dab.width() / 2,
+                         (snappedY >> 1) - dab.height() / 2);
+    emitDab(dab, topLeft, pressure, painter);
+    mLastDabTimeMs = mStrokeTimer.elapsed();
+}
+
+void BrushEngine::emitDab(const QImage& dab, const QPoint& topLeft, qreal pressure,
+                          const DabPainter& painter)
+{
+    DabRequest request;
+    request.dab = dab;
+    request.topLeft = topLeft;
+    request.opacity = dabOpacityAt(pressure);
+    request.flow = qBound(0.01, mSettings.flow, 1.0);
+    request.buildup = mSettings.paintingMode == BrushSettings::PaintingMode::Buildup;
+    request.blendMode = static_cast<int>(mSettings.blendMode);
     painter(request);
+
+    // 镜像绘画：围绕对称中心再盖一枚翻转发（Krita mirror）
+    if (mMirrorCenterValid && (mSettings.mirrorX || mSettings.mirrorY)) {
+        DabRequest mirror = request;
+        QPoint tl = topLeft;
+        if (mSettings.mirrorX) {
+            tl.setX(qRound(2.0 * mMirrorCenter.x()) - (topLeft.x() + dab.width()));
+            mirror.dab = dab.mirrored(true, false);
+        }
+        if (mSettings.mirrorY) {
+            tl.setY(qRound(2.0 * mMirrorCenter.y()) - (topLeft.y() + dab.height()));
+            mirror.dab = mirror.dab.mirrored(false, true);
+        }
+        mirror.topLeft = tl;
+        painter(mirror);
+    }
+}
+
+QPointF BrushEngine::scatterOffset(qreal diameter) const
+{
+    // 均匀散布 ±scatter×直径/2（两轴独立）
+    QRandomGenerator* rng = QRandomGenerator::global();
+    const qreal spread = mSettings.scatter * diameter;
+    return QPointF((rng->generateDouble() - 0.5) * spread,
+                   (rng->generateDouble() - 0.5) * spread);
+}
+
+void BrushEngine::airbrushTick(const DabPainter& painter)
+{
+    if (!mStrokeActive || !mSettings.airbrushEnabled || !painter) {
+        return;
+    }
+    const qint64 intervalMs = qMax<qint64>(1, 1000 / qBound(1, mSettings.airbrushRate, 100));
+    const qint64 now = mStrokeTimer.elapsed();
+    // 静止时按速率补 dab；移动中的 dab 由 spacing 负责（paintDab 会重置时钟）
+    while (now - mLastDabTimeMs >= intervalMs) {
+        paintDab(mLastPoint, mLastPressure, painter);
+    }
 }
 
 const QImage& BrushEngine::cachedDab(quint32 cacheKey, qreal diameter,
@@ -258,6 +318,10 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
         // 扁笔尖旋转后更高，稍微再压一点避免溢出
         preview.diameter = qMax(3.0, preview.diameter * 0.8);
     }
+    // 缩略图要确定性：关掉随机散布/喷枪/镜像（形状语义不变）
+    preview.scatter = 0.0;
+    preview.airbrushEnabled = false;
+    preview.mirrorX = preview.mirrorY = false;
 
     QImage strokeLayer(size, QImage::Format_ARGB32_Premultiplied);
     strokeLayer.fill(Qt::transparent);
@@ -266,7 +330,12 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
     engine.setSettings(preview);
 
     const auto painter = [&strokeLayer](const DabRequest& dab) {
-        washBlendImage(strokeLayer, dab.dab, dab.topLeft, dab.opacity);
+        DabPasteParams params;
+        params.opacity = dab.opacity;
+        params.flow = dab.flow;
+        params.buildup = dab.buildup;
+        params.blendMode = dab.blendMode;
+        washBlendImage(strokeLayer, dab.dab, dab.topLeft, params);
     };
 
     QPainterPath path;

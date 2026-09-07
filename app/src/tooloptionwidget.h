@@ -60,6 +60,7 @@ private:
     BucketOptionsWidget* mBucketOptionsWidget = nullptr;
     CameraOptionsWidget* mCameraOptionsWidget = nullptr;
     StrokeOptionsWidget* mStrokeOptionsWidget = nullptr;
+    class BrushOptionsWidget* mBrushOptionsWidget = nullptr;
     TransformOptionsWidget* mTransformOptionsWidget = nullptr;
 };
 

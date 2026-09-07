@@ -1134,9 +1134,9 @@ void ScribbleArea::drawBrush(QPointF thePoint, qreal brushWidth, qreal mOffset, 
     mTiledBuffer.drawBrush(thePoint, brushWidth, Qt::NoPen, brush, compMode, useAA);
 }
 
-void ScribbleArea::drawDab(const QImage& dab, const QPoint& topLeft, qreal opacity)
+void ScribbleArea::drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params)
 {
-    mTiledBuffer.drawDab(dab, topLeft, opacity);
+    mTiledBuffer.drawDab(dab, topLeft, params);
 }
 
 void ScribbleArea::drawPolyline(QPainterPath path, QPen pen, bool useAA)

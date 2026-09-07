@@ -34,10 +34,20 @@ QDomElement BrushSettings::toXML(QDomDocument& doc) const
 
     QDomElement stroke = doc.createElement("Stroke");
     stroke.setAttribute("opacity", QString::number(opacity, 'f', 3));
+    stroke.setAttribute("flow", QString::number(flow, 'f', 3));
     stroke.setAttribute("spacingMode", spacingMode == SpacingMode::Auto ? "auto" : "fixed");
     stroke.setAttribute("spacing", QString::number(spacing, 'f', 3));
     stroke.setAttribute("autoSpacingCoeff", QString::number(autoSpacingCoeff, 'f', 2));
     stroke.setAttribute("eraser", eraser ? "1" : "0");
+    stroke.setAttribute("scatter", QString::number(scatter, 'f', 3));
+    stroke.setAttribute("paintingMode", paintingMode == PaintingMode::Wash ? "wash" : "buildup");
+    stroke.setAttribute("blendMode",
+                        blendMode == BlendMode::Multiply ? "multiply"
+                        : blendMode == BlendMode::Screen ? "screen" : "normal");
+    stroke.setAttribute("mirrorX", mirrorX ? "1" : "0");
+    stroke.setAttribute("mirrorY", mirrorY ? "1" : "0");
+    stroke.setAttribute("airbrush", airbrushEnabled ? "1" : "0");
+    stroke.setAttribute("airbrushRate", QString::number(airbrushRate));
     root.appendChild(stroke);
 
     QDomElement dynamics = doc.createElement("Dynamics");
@@ -71,11 +81,23 @@ void BrushSettings::fromXML(const QDomElement& root)
     QDomElement stroke = root.firstChildElement("Stroke");
     if (!stroke.isNull()) {
         opacity = qBound(0.05, stroke.attribute("opacity", "1").toDouble(), 1.0);
+        flow = qBound(0.01, stroke.attribute("flow", "1").toDouble(), 1.0);
         spacingMode = (stroke.attribute("spacingMode", "auto") == "fixed")
                       ? SpacingMode::Fixed : SpacingMode::Auto;
         spacing = qBound(0.02, stroke.attribute("spacing", "0.25").toDouble(), 5.0);
         autoSpacingCoeff = qBound(0.25, stroke.attribute("autoSpacingCoeff", "1").toDouble(), 5.0);
         eraser = stroke.attribute("eraser", "0") == "1";
+        scatter = qBound(0.0, stroke.attribute("scatter", "0").toDouble(), 5.0);
+        paintingMode = (stroke.attribute("paintingMode", "wash") == "buildup")
+                       ? PaintingMode::Buildup : PaintingMode::Wash;
+        const QString blend = stroke.attribute("blendMode", "normal");
+        blendMode = (blend == "multiply") ? BlendMode::Multiply
+                    : (blend == "screen") ? BlendMode::Screen
+                    : BlendMode::Normal;
+        mirrorX = stroke.attribute("mirrorX", "0") == "1";
+        mirrorY = stroke.attribute("mirrorY", "0") == "1";
+        airbrushEnabled = stroke.attribute("airbrush", "0") == "1";
+        airbrushRate = qBound(1, stroke.attribute("airbrushRate", "20").toInt(), 100);
     }
 
     QDomElement dynamics = root.firstChildElement("Dynamics");

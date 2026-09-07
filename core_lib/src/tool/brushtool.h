@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "stroketool.h"
 #include "brush/brushengine.h"
 #include <QColor>
+#include <QTimer>
 
 class Layer;
 
@@ -50,6 +51,10 @@ public:
     void applyBrushPreset(const BrushSettings& preset);
     /** 启动恢复用：只装载预设参数，不覆盖用户上次调过的宽度/羽化属性 */
     void initPresetExtras(const BrushSettings& preset);
+    /** 工具选项面板编辑：整套参数生效并持久化（Krita 式选项面板的数据入口） */
+    void applyBrushOptions(const BrushSettings& options);
+    /** 启动时是否恢复了用户保存过的选项（预设面板据此跳过预设回灌） */
+    bool hasUserOptions() const { return mUserOptionsRestored; }
     /** 当前生效的完整笔刷参数（工具属性 + 预设额外参数的合并视图） */
     BrushSettings currentBrushSettings();
 
@@ -64,11 +69,14 @@ protected:
 
 private:
     void syncEngineSettings();
+    void persistUserOptions();
     BrushEngine::DabPainter dabPainter() const;
 
     // 预设里超出工具属性范围的参数（笔尖形状/扁率/角度/间距/曲线等）
     BrushSettings mPresetExtras;
     BrushEngine mEngine;
+    QTimer mAirbrushTimer;
+    bool mUserOptionsRestored = false;
 };
 
 #endif // BRUSHTOOL_H

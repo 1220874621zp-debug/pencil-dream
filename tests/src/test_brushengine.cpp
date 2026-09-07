@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include <QDir>
 #include <QImage>
 #include <QTemporaryDir>
+#include <QThread>
 
 #include "brush/brushengine.h"
 #include "brush/brushpresetstore.h"
@@ -82,6 +83,14 @@ TEST_CASE("BrushSettings XML roundtrip")
     settings.pressureOpacity = true;
     settings.opacityCurve = BrushCurve::fromString("0,0;0.3,1;1,0.2;");
     settings.eraser = true;
+    settings.flow = 0.4;
+    settings.scatter = 1.5;
+    settings.paintingMode = BrushSettings::PaintingMode::Buildup;
+    settings.blendMode = BrushSettings::BlendMode::Multiply;
+    settings.mirrorX = true;
+    settings.mirrorY = false;
+    settings.airbrushEnabled = true;
+    settings.airbrushRate = 60;
 
     const QString xml = settings.toXMLString();
     BrushSettings loaded;
@@ -99,6 +108,14 @@ TEST_CASE("BrushSettings XML roundtrip")
     REQUIRE(loaded.pressureSize == settings.pressureSize);
     REQUIRE(loaded.pressureOpacity == settings.pressureOpacity);
     REQUIRE(loaded.eraser == true);
+    REQUIRE(loaded.flow == Approx(0.4));
+    REQUIRE(loaded.scatter == Approx(1.5));
+    REQUIRE(loaded.paintingMode == BrushSettings::PaintingMode::Buildup);
+    REQUIRE(loaded.blendMode == BrushSettings::BlendMode::Multiply);
+    REQUIRE(loaded.mirrorX == true);
+    REQUIRE(loaded.mirrorY == false);
+    REQUIRE(loaded.airbrushEnabled == true);
+    REQUIRE(loaded.airbrushRate == 60);
     REQUIRE(loaded.sizeCurve.value(0.25) == Approx(settings.sizeCurve.value(0.25)).margin(1e-4));
     REQUIRE(loaded.opacityCurve.value(0.8) == Approx(settings.opacityCurve.value(0.8)).margin(1e-4));
 }
@@ -195,6 +212,48 @@ TEST_CASE("BrushEngine sub-pixel snapping and quantized dab cache")
     engine.dabAt(p, 0.90, [&](const BrushEngine::DabRequest& r) { cacheKeyBig = r.dab.cacheKey(); });
     REQUIRE(cacheKeySmall == cacheKeyNearby);
     REQUIRE(cacheKeySmall != cacheKeyBig);
+}
+
+TEST_CASE("BrushEngine mirror and airbrush")
+{
+    BrushSettings settings;
+    settings.diameter = 10.0;
+    settings.pressureSize = false;
+
+    // 镜像：开启 mirrorX 后每枚 dab 发两份（原图 + 水平翻转），位置关于中心对称
+    {
+        settings.mirrorX = true;
+        BrushEngine engine;
+        engine.setSettings(settings);
+        engine.setMirrorCenter(QPointF(200, 0));
+        QImage dab;
+        QPoint tl1, tl2; int count = 0;
+        engine.dabAt(QPointF(100, 0), 1.0, [&](const BrushEngine::DabRequest& r) {
+            if (count == 0) { tl1 = r.topLeft; dab = r.dab; }
+            if (count == 1) tl2 = r.topLeft;
+            ++count;
+        });
+        REQUIRE(count == 2);
+        REQUIRE(tl2.x() == qRound(2.0 * 200.0) - (tl1.x() + dab.width()));
+        REQUIRE(tl1.y() == tl2.y());
+    }
+
+    // 喷枪：静止时按速率补 dab
+    {
+        settings.mirrorX = false;
+        settings.airbrushEnabled = true;
+        settings.airbrushRate = 100; // 10ms 一枚
+        BrushEngine engine;
+        engine.setSettings(settings);
+        int count = 0;
+        const auto painter = [&](const BrushEngine::DabRequest&) { ++count; };
+        engine.beginStroke(QPointF(50, 50), 1.0, QColor(0, 0, 0), painter);
+        REQUIRE(count == 1); // 起笔一枚
+        QThread::msleep(30);
+        engine.airbrushTick(painter);
+        REQUIRE(count >= 2); // 静止补喷
+        engine.endStroke();
+    }
 }
 
 TEST_CASE("BrushEngine pressure dynamics")
@@ -337,8 +396,10 @@ TEST_CASE("TiledBuffer drawDab wash blending")
     TiledBuffer buffer;
     // 整数对齐落点：掩码中心对准画布 (100,100)
     const QPoint placeTopLeft(100 - dabImage.width() / 2, 100 - dabImage.height() / 2);
-    buffer.drawDab(dabImage, placeTopLeft, 0.5);
-    buffer.drawDab(dabImage, placeTopLeft, 0.5); // 同位置再落一笔
+    DabPasteParams half;
+    half.opacity = 0.5;
+    buffer.drawDab(dabImage, placeTopLeft, half);
+    buffer.drawDab(dabImage, placeTopLeft, half); // 同位置再落一笔
 
     // wash 语义：同处重复落 dab 不叠加不透明度
     Tile* tile = buffer.tiles().value(TileIndex{ 1, 1 }, nullptr);
@@ -350,6 +411,71 @@ TEST_CASE("TiledBuffer drawDab wash blending")
     const int resultAlpha = qAlpha(result);
     REQUIRE(resultAlpha > 0);
     REQUIRE(resultAlpha <= 150); // wash 语义：两次半透明 dab 不叠加变深（0.5*255≈128）
+}
+
+TEST_CASE("washBlendImage converge, buildup and erase semantics")
+{
+    // 硬 dab 掩码
+    BrushSettings settings;
+    settings.diameter = 20.0;
+    settings.hardness = 1.0;
+    BrushEngine engine;
+    engine.setSettings(settings);
+    QImage dab;
+    engine.dabAt(QPointF(0, 0), 1.0, [&](const BrushEngine::DabRequest& r) { dab = r.dab; });
+    REQUIRE(qAlpha(dab.pixel(dab.width() / 2, dab.height() / 2)) == 255);
+
+    const QPoint at(50 - dab.width() / 2, 50 - dab.height() / 2);
+
+    // 涂抹收敛：同处反复落半透明 dab，alpha 收敛到 opacity 封顶不加深
+    {
+        QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
+        canvas.fill(Qt::transparent);
+        DabPasteParams p;
+        p.opacity = 0.5;
+        for (int i = 0; i < 5; ++i) washBlendImage(canvas, dab, at, p);
+        const int a = qAlpha(canvas.pixel(50, 50));
+        REQUIRE(a == Approx(128).margin(2));
+    }
+    // 叠加：并集累积，两枚后超过单枚的 128
+    {
+        QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
+        canvas.fill(Qt::transparent);
+        DabPasteParams p;
+        p.opacity = 0.5;
+        p.buildup = true;
+        washBlendImage(canvas, dab, at, p);
+        const int a1 = qAlpha(canvas.pixel(50, 50));
+        washBlendImage(canvas, dab, at, p);
+        const int a2 = qAlpha(canvas.pixel(50, 50));
+        REQUIRE(a1 == Approx(128).margin(2));
+        REQUIRE(a2 == Approx(191).margin(3)); // 128 + 128*(1-128/255)
+    }
+    // 流量：涂抹模式 flow=0.5 时落在"并集"与"收敛"之间
+    {
+        QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
+        canvas.fill(Qt::transparent);
+        DabPasteParams p;
+        p.opacity = 0.5;
+        p.flow = 0.5;
+        washBlendImage(canvas, dab, at, p);
+        const int a = qAlpha(canvas.pixel(50, 50));
+        REQUIRE(a == Approx(64).margin(2)); // 首枚 = aZero*(0.5)+aFull*0.5 = 64
+    }
+    // 擦除：涂抹擦把已有 alpha 收缩向 (255-op)
+    {
+        QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
+        canvas.fill(Qt::transparent);
+        DabPasteParams solid;
+        washBlendImage(canvas, dab, at, solid); // 不透明底
+        REQUIRE(qAlpha(canvas.pixel(50, 50)) == 255);
+        DabPasteParams erase;
+        erase.erase = true;
+        erase.opacity = 0.5;
+        for (int i = 0; i < 5; ++i) washBlendImage(canvas, dab, at, erase);
+        const int a = qAlpha(canvas.pixel(50, 50));
+        REQUIRE(a == Approx(127).margin(3)); // 收敛到 255-128=127，不擦穿
+    }
 }
 
 TEST_CASE("EraserTool preset application")

@@ -35,6 +35,12 @@ EraserTool::EraserTool(QObject* parent) : StrokeTool(parent)
     // 擦除本身由绘制缓冲的 alpha + ScribbleArea 终局 DestinationOut 完成
     mPresetExtras.eraser = true;
     mEngine.setSettings(mPresetExtras);
+
+    // 喷枪：静止悬停时按速率补 dab
+    mAirbrushTimer.setInterval(16);
+    connect(&mAirbrushTimer, &QTimer::timeout, this, [this]() {
+        mEngine.airbrushTick(dabPainter());
+    });
 }
 
 ToolType EraserTool::type() const
@@ -83,6 +89,18 @@ void EraserTool::loadSettings()
     mQuickSizingProperties.insert(Qt::ShiftModifier, StrokeToolProperties::WIDTH_VALUE);
     mQuickSizingProperties.insert(Qt::ControlModifier, StrokeToolProperties::FEATHER_VALUE);
 
+    // Krita 式工具选项的持久化恢复（XML 整套存取）
+    QSettings brushOptions(PENCIL2D, PENCIL2D);
+    const QString saved = brushOptions.value("BrushOptions/ERASER").toString();
+    if (!saved.isEmpty()) {
+        BrushSettings restored;
+        if (BrushSettings::fromXMLString(saved, restored)) {
+            restored.eraser = true;
+            mPresetExtras = restored;
+            mUserOptionsRestored = true;
+        }
+    }
+
     syncEngineSettings();
 }
 
@@ -107,9 +125,17 @@ void EraserTool::pointerPressEvent(PointerEvent *event)
     if (layer->type() == Layer::BITMAP)
     {
         syncEngineSettings();
+        // 镜像绘画对称中心 = 视口中心（画布坐标）
+        if (mEngine.settings().mirrorX || mEngine.settings().mirrorY) {
+            mEngine.setMirrorCenter(mEditor->view()->mapScreenToCanvas(
+                QPointF(mScribbleArea->width(), mScribbleArea->height()) * 0.5));
+        }
         // 擦除的 dab 颜色无关紧要（DestinationOut 只用 alpha），给黑色即可
         mEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
                             Qt::black, dabPainter());
+        if (mEngine.settings().airbrushEnabled) {
+            mAirbrushTimer.start();
+        }
     }
 
     StrokeTool::pointerPressEvent(event);
@@ -158,6 +184,7 @@ void EraserTool::pointerReleaseEvent(PointerEvent *event)
 
     endStroke();
     mEngine.endStroke();
+    mAirbrushTimer.stop();
 
     StrokeTool::pointerReleaseEvent(event);
 }
@@ -199,6 +226,7 @@ void EraserTool::applyBrushPreset(const BrushSettings& preset)
     setPressureEnabled(preset.pressureSize || preset.pressureOpacity);
 
     syncEngineSettings();
+    persistUserOptions();
 }
 
 void EraserTool::initPresetExtras(const BrushSettings& preset)
@@ -206,6 +234,23 @@ void EraserTool::initPresetExtras(const BrushSettings& preset)
     mPresetExtras = preset;
     mPresetExtras.eraser = true;
     syncEngineSettings();
+}
+
+void EraserTool::applyBrushOptions(const BrushSettings& options)
+{
+    mPresetExtras = options;
+    mPresetExtras.eraser = true;
+    setWidth(options.diameter);
+    setFeather((1.0 - qBound(0.01, options.hardness, 1.0)) * 100.0);
+    syncEngineSettings();
+    persistUserOptions();
+    mUserOptionsRestored = true;
+}
+
+void EraserTool::persistUserOptions()
+{
+    QSettings brushOptions(PENCIL2D, PENCIL2D);
+    brushOptions.setValue("BrushOptions/ERASER", currentBrushSettings().toXMLString());
 }
 
 BrushSettings EraserTool::currentBrushSettings()
@@ -231,6 +276,11 @@ void EraserTool::syncEngineSettings()
 BrushEngine::DabPainter EraserTool::dabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
-        mScribbleArea->drawDab(dab.dab, dab.topLeft, dab.opacity);
+        DabPasteParams params;
+        params.opacity = dab.opacity;
+        params.flow = dab.flow;
+        params.erase = true; // 擦除方向：缓冲 alpha 收缩，终局 DestinationOut
+        params.buildup = dab.buildup;
+        mScribbleArea->drawDab(dab.dab, dab.topLeft, params);
     };
 }

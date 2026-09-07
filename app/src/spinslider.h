@@ -45,6 +45,7 @@ public:
     SpinSlider(QWidget* parent = nullptr);
     void init(QString text, GROWTH_TYPE, qreal min, qreal max);
     void setValue(qreal);
+    qreal value() const { return mValue; }
     void setPixelPos(qreal min, qreal max, int val, int space, bool upsideDown);
     void setExponent(const qreal);
     void setLabel(QString newText);

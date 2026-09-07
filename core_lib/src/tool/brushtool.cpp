@@ -26,6 +26,7 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "colormanager.h"
 #include "layermanager.h"
+#include "viewmanager.h"
 #include "undoredomanager.h"
 #include "scribblearea.h"
 #include "pointerevent.h"
@@ -35,6 +36,12 @@ BrushTool::BrushTool(QObject* parent) : StrokeTool(parent)
 {
     mPresetExtras.name = QStringLiteral("圆头笔");
     mEngine.setSettings(mPresetExtras);
+
+    // 喷枪：静止悬停时按速率补 dab
+    mAirbrushTimer.setInterval(16);
+    connect(&mAirbrushTimer, &QTimer::timeout, this, [this]() {
+        mEngine.airbrushTick(dabPainter());
+    });
 }
 
 ToolType BrushTool::type() const
@@ -78,6 +85,18 @@ void BrushTool::loadSettings()
     mQuickSizingProperties.insert(Qt::ShiftModifier, StrokeToolProperties::WIDTH_VALUE);
     mQuickSizingProperties.insert(Qt::ControlModifier, StrokeToolProperties::FEATHER_VALUE);
 
+    // Krita 式工具选项的持久化恢复（XML 整套存取）
+    QSettings brushOptions(PENCIL2D, PENCIL2D);
+    const QString saved = brushOptions.value("BrushOptions/BRUSH").toString();
+    if (!saved.isEmpty()) {
+        BrushSettings restored;
+        if (BrushSettings::fromXMLString(saved, restored)) {
+            restored.eraser = false;
+            mPresetExtras = restored;
+            mUserOptionsRestored = true;
+        }
+    }
+
     syncEngineSettings();
 }
 
@@ -106,8 +125,16 @@ void BrushTool::pointerPressEvent(PointerEvent *event)
     if (layer->type() == Layer::BITMAP)
     {
         syncEngineSettings();
+        // 镜像绘画对称中心 = 视口中心（画布坐标）
+        if (mEngine.settings().mirrorX || mEngine.settings().mirrorY) {
+            mEngine.setMirrorCenter(mEditor->view()->mapScreenToCanvas(
+                QPointF(mScribbleArea->width(), mScribbleArea->height()) * 0.5));
+        }
         mEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
                             mEditor->color()->frontColor(), dabPainter());
+        if (mEngine.settings().airbrushEnabled) {
+            mAirbrushTimer.start();
+        }
     }
 
     StrokeTool::pointerPressEvent(event);
@@ -156,6 +183,7 @@ void BrushTool::pointerReleaseEvent(PointerEvent *event)
 
     endStroke();
     mEngine.endStroke();
+    mAirbrushTimer.stop();
 
     StrokeTool::pointerReleaseEvent(event);
 }
@@ -189,6 +217,7 @@ void BrushTool::drawStroke()
 void BrushTool::applyBrushPreset(const BrushSettings& preset)
 {
     mPresetExtras = preset;
+    mPresetExtras.eraser = false;
 
     setWidth(preset.diameter);
     // 硬度与羽化互为倒数映射：硬度 1 → 羽化 1，硬度 0.05 → 羽化 95
@@ -196,12 +225,31 @@ void BrushTool::applyBrushPreset(const BrushSettings& preset)
     setPressureEnabled(preset.pressureSize || preset.pressureOpacity);
 
     syncEngineSettings();
+    persistUserOptions();
 }
 
 void BrushTool::initPresetExtras(const BrushSettings& preset)
 {
     mPresetExtras = preset;
+    mPresetExtras.eraser = false;
     syncEngineSettings();
+}
+
+void BrushTool::applyBrushOptions(const BrushSettings& options)
+{
+    mPresetExtras = options;
+    mPresetExtras.eraser = false;
+    setWidth(options.diameter);
+    setFeather((1.0 - qBound(0.01, options.hardness, 1.0)) * 100.0);
+    syncEngineSettings();
+    persistUserOptions();
+    mUserOptionsRestored = true;
+}
+
+void BrushTool::persistUserOptions()
+{
+    QSettings brushOptions(PENCIL2D, PENCIL2D);
+    brushOptions.setValue("BrushOptions/BRUSH", currentBrushSettings().toXMLString());
 }
 
 BrushSettings BrushTool::currentBrushSettings()
@@ -224,6 +272,11 @@ void BrushTool::syncEngineSettings()
 BrushEngine::DabPainter BrushTool::dabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
-        mScribbleArea->drawDab(dab.dab, dab.topLeft, dab.opacity);
+        DabPasteParams params;
+        params.opacity = dab.opacity;
+        params.flow = dab.flow;
+        params.buildup = dab.buildup;
+        params.blendMode = dab.blendMode;
+        mScribbleArea->drawDab(dab.dab, dab.topLeft, params);
     };
 }
