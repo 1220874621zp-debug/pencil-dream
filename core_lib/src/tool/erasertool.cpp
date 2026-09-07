@@ -276,10 +276,12 @@ void EraserTool::syncEngineSettings()
 BrushEngine::DabPainter EraserTool::dabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
+        // 橡皮与画笔共用合成路径：缓冲 alpha 累积 = 擦除量
+        // （涂抹=封顶 opacity，叠加=越擦越净），实时预览与终局
+        // paste 的 DestinationOut 负责反转语义
         DabPasteParams params;
         params.opacity = dab.opacity;
         params.flow = dab.flow;
-        params.erase = true; // 擦除方向：缓冲 alpha 收缩，终局 DestinationOut
         params.buildup = dab.buildup;
         mScribbleArea->drawDab(dab.dab, dab.topLeft, params);
     };

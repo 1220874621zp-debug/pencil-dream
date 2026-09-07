@@ -538,19 +538,21 @@ TEST_CASE("washBlendImage converge, buildup and erase semantics")
         // 第二枚：aZero=191、aFull=128，flow=0.5 → ≈160（flow=1 则封在 128）
         REQUIRE(qAlpha(canvas.pixel(50, 50)) == Approx(160).margin(3));
     }
-    // 擦除：涂抹擦把已有 alpha 收缩向 (255-op)
+    // 橡皮真实管线：dab 画进"空白缓冲"（普通累积），终局 DestinationOut 反转语义。
+    // 曾因擦除分支写成"收缩已有 alpha"而空缓冲全跳过 → 橡皮无效果（回归测试）
     {
-        QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
-        canvas.fill(Qt::transparent);
-        DabPasteParams solid;
-        washBlendImage(canvas, dab, at, solid); // 不透明底
-        REQUIRE(qAlpha(canvas.pixel(50, 50)) == 255);
+        QImage buffer(100, 100, QImage::Format_ARGB32_Premultiplied);
+        buffer.fill(Qt::transparent);
         DabPasteParams erase;
-        erase.erase = true;
         erase.opacity = 0.5;
-        for (int i = 0; i < 5; ++i) washBlendImage(canvas, dab, at, erase);
-        // 几何收敛到 255-128=127：每枚 dab 余量减半，5 枚后 131
-        REQUIRE(qAlpha(canvas.pixel(50, 50)) == Approx(131).margin(2));
+        for (int i = 0; i < 5; ++i) washBlendImage(buffer, dab, at, erase);
+        // 缓冲 alpha = 擦除量，涂抹模式封顶在 opacity（128），不越擦越深
+        REQUIRE(qAlpha(buffer.pixel(50, 50)) == Approx(128).margin(2));
+        // 终局 DestinationOut 合并到不透明图层：255·(1-128/255) ≈ 127
+        QImage layer(100, 100, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(QColor(90, 60, 30, 255));
+        const int keptA = qRound(255 * (1.0 - qAlpha(buffer.pixel(50, 50)) / 255.0));
+        REQUIRE(keptA == Approx(127).margin(2));
     }
 }
 

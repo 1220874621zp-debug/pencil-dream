@@ -29,7 +29,9 @@ GNU General Public License for more details.
  *  - Buildup（叠加）：每个 dab 按并集累积，反复描逐渐变深（Krita 默认 BUILDUP）
  *  - flow：涂抹模式下在"零流量并集"与"满流量收敛"间插值（Krita flow 语义）
  *  - blendMode：笔尖混合模式，先对底色混合再参与 alpha 合成
- *  - erase：擦除方向（绘制缓冲的 alpha 收缩，配合终局 DestinationOut）
+ *  - 橡皮复用同一路径：缓冲 alpha 累积 = 擦除量（涂抹=封顶 opacity，
+ *    叠加=越擦越净），ScribbleArea 的实时预览与终局 paste 用
+ *    DestinationOut 反转语义，故这里不需要 erase 分支
  *
  * 子像素定位在 dab 生成阶段烤进掩码（BrushEngine::paintDab 的半像素
  * 网格吸附），这里只做整数对齐写入，无重采样。
@@ -38,7 +40,6 @@ struct DabPasteParams
 {
     qreal opacity = 1.0;  // 笔刷不透明度 0..1
     qreal flow = 1.0;     // 流量 0..1
-    bool erase = false;   // 擦除方向
     bool buildup = false; // false=涂抹(Wash) true=叠加(Buildup)
     int blendMode = 0;    // 0=正常 1=正片叠底 2=滤色
 };
@@ -92,35 +93,6 @@ inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft
             }
             const QRgb dp = *d;
             const int dA = qAlpha(dp);
-
-            if (params.erase) {
-                // ---- 擦除：缓冲 alpha 收缩，终局 DestinationOut 生效 ----
-                int aNew;
-                if (params.buildup) {
-                    // 叠加擦：每 dab 乘性削减
-                    aNew = dA - qRound(dA * (msk * opacity * flow) / 255.0);
-                } else {
-                    // 涂抹擦：向 (255-op255) 收敛，alpha 只降不升
-                    const int floorA = 255 - op255;
-                    const int aFull = dA > floorA
-                                      ? floorA + qRound((dA - floorA) * (255 - msk * opacity) / 255.0)
-                                      : dA;
-                    aNew = dA + qRound((aFull - dA) * flow);
-                }
-                if (aNew >= dA) {
-                    continue; // 没擦掉（或已到底）
-                }
-                if (dA == 0) {
-                    continue;
-                }
-                // 预乘各分量按 alpha 比例缩放
-                const int scale = qRound(255.0 * aNew / dA);
-                *d = (aNew << 24)
-                     | (qRound(qRed(dp) * scale / 255.0) << 16)
-                     | (qRound(qGreen(dp) * scale / 255.0) << 8)
-                     | qRound(qBlue(dp) * scale / 255.0);
-                continue;
-            }
 
             // ---- 绘制 ----
             // 有效源 alpha = 掩码 × 不透明度
