@@ -976,8 +976,9 @@ void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, 
 
 bool TimeLineCells::rowHasInlineControls(int rowWidth) const
 {
-    // the slider needs room beside the name; the lock icon alone fits narrower rows
-    return rowWidth >= 240;
+    // controls sit on their own line below the name, so they only need room
+    // for themselves: slider track + percentage + lock (starts at width-160)
+    return rowWidth >= 170;
 }
 
 QRect TimeLineCells::opacitySliderRect(int rowWidth) const
@@ -1068,11 +1069,13 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.setPen(palette.color(QPalette::Text));
     }
-    painter.drawEllipse(QRectF(x + 10, y + (height - 9) / 2.0, 9.0, 9.0));
+    // two-line row: name line in the upper third, inline controls below
+    const int nameCenterY = y + qRound(height * 0.32);
+    painter.drawEllipse(QRectF(x + 10, nameCenterY - 4.5, 9.0, 9.0));
 
-    if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
-    if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-sound.svg").scaledToHeight(18, Qt::SmoothTransformation));
-    if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(28, y + (height - 20) / 2), QPixmap(":icons/themes/playful/timeline/cell-camera.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-sound.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-camera.svg").scaledToHeight(18, Qt::SmoothTransformation));
 
     if (selected)
     {
@@ -1082,16 +1085,17 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.setPen(palette.color(QPalette::Text));
     }
-    // keep the name clear of the inline slider
-    const int nameRight = rowHasInlineControls(width) ? (opacitySliderRect(width).x() - 64) : (width - 30);
+    // the name owns the full top line (controls live on the line below)
+    const int nameRight = width - 30;
     const QString shownName = QFontMetrics(painter.font()).elidedText(layer->name(), Qt::ElideMiddle, qMax(20, nameRight - 52));
-    painter.drawText(QPoint(52, y + height / 2 + 4), shownName);
+    painter.drawText(QPoint(52, nameCenterY + 5), shownName);
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     // --- TVP inline row controls: opacity slider, percentage, lock toggle ---
-    if (!rowHasInlineControls(width)) { return; }
+    // rendered on their own line under the name; skipped on very short rows
+    if (!rowHasInlineControls(width) || height < 40) { return; }
 
-    const int sliderY = y + height / 2;
+    const int sliderY = y + qRound(height * 0.72);
     const QRect slider = opacitySliderRect(width);
 
     // percentage label right-aligned before the slider
@@ -1433,10 +1437,11 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             const int rowH = rowHeightOf(layerNumber);
             const bool expandedRow = rowH > 20;
 
-            // TVP inline controls: lock toggle and opacity slider (expanded rows only)
-            if (expandedRow && rowHasInlineControls(width()))
+            // TVP inline controls: lock toggle and opacity slider (own line under the name)
+            if (expandedRow && rowH >= 40 && rowHasInlineControls(width()))
             {
-                const QRect lock = lockIconRect(width()).adjusted(0, rowY + rowH / 2 - 11, 0, rowY + rowH / 2 + 11);
+                const int ctrlY = rowY + qRound(rowH * 0.72);
+                const QRect lock = lockIconRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
                 if (lock.contains(event->pos().x(), event->pos().y()))
                 {
                     hitLayer->setLocked(!hitLayer->locked());
@@ -1444,7 +1449,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     updateContent();
                     break;
                 }
-                const QRect slider = opacitySliderRect(width()).adjusted(0, rowY + rowH / 2 - 11, 0, rowY + rowH / 2 + 11);
+                const QRect slider = opacitySliderRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
                 if (slider.contains(event->pos().x(), event->pos().y()))
                 {
                     mOpacityDragLayer = layerNumber;

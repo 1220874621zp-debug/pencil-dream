@@ -127,6 +127,8 @@ QPushButton {
 QPushButton:hover { background-color: #28282E; border-color: #3A3A40; }
 QPushButton:pressed { background-color: #16161A; }
 QPushButton:disabled { color: #5A5A60; background-color: #16161A; }
+QPushButton:checked { background-color: #E8385A; border-color: #FF4D6D; color: #FFFFFF; }
+QPushButton:checked:hover { background-color: #FF4D6D; border-color: #FF4D6D; }
 
 /* ===== Inputs ===== */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
