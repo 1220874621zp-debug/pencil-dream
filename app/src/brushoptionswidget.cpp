@@ -38,6 +38,8 @@ BrushOptionsWidget::BrushOptionsWidget(Editor* editor, QWidget* parent)
     : BaseWidget(parent),
       mEditor(editor)
 {
+    // 控件必须在构造期建好：点工具切换会立刻触发 updateUI()
+    initUI();
 }
 
 BrushOptionsWidget::~BrushOptionsWidget()
@@ -179,6 +181,9 @@ void BrushOptionsWidget::initUI()
 
 void BrushOptionsWidget::updateUI()
 {
+    if (!mSizeSlider) {
+        return; // 构造早期信号（initUI 未跑完）
+    }
     BaseTool* baseTool = currentPresetCapableTool();
     if (!baseTool) {
         return;
