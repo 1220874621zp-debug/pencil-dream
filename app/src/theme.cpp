@@ -54,7 +54,7 @@ namespace Theme
     const QColor TimelineFrameBorder        = QColor(0x2A, 0x2A, 0x2E);
     const QColor TimelineFrameFill          = QColor(0x12, 0x12, 0x16);
     const QColor TimelineSelectedFrameFill  = QColor(0x3A, 0x24, 0x2C);
-    const QColor TimelineCurrentFrameBorder = QColor(0xE8, 0xE8, 0xEA);
+    const QColor TimelineCurrentFrameBorder = QColor(0xE8, 0x38, 0x5A); // system accent
     const QColor TimelinePlayhead           = QColor(0xE8, 0x38, 0x5A);
 
     static const char* kStyleSheet = R"STYLE(

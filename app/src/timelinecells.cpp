@@ -487,25 +487,27 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     }
     const QPalette palette = QApplication::palette();
     QColor col;
-    // Color each track according to the layer type
+    // the layer type color only feeds the block cards / accents, the track
+    // itself stays dark (TVP) so the label color reads clearly
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
     if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
-    // Dim invisible layers
-    if (!layer->visible()) col.setAlpha(64);
 
     painter.save();
-    painter.setBrush(col);
+    // dark track base
+    painter.setBrush(layer->visible() ? QColor(0x17, 0x17, 0x1B) : QColor(0x11, 0x11, 0x14));
     painter.setPen(QPen(QBrush(Theme::Border), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    if (layer->colorIndex() >= 0 && layer->colorIndex() < 8)
-    {
-        // TVP: the label color fills the whole track strongly; the black
-        // block cards sit on top and the color reads in the margins
-        QColor tint = Theme::LayerLabelColors[layer->colorIndex()];
-        tint.setAlpha(220);
-        painter.fillRect(QRectF(x, y - 1, width, height), tint);
-    }
     painter.drawRoundedRect(QRectF(x, y - 1, width, height), 4.0, 4.0);
+    if (layer->colorIndex() >= 0 && layer->colorIndex() < 8 && layer->visible())
+    {
+        // TVP: the label color washes over the track; the black block cards
+        // sit on top and the color reads between them
+        QColor tint = Theme::LayerLabelColors[layer->colorIndex()];
+        tint.setAlpha(180);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(tint);
+        painter.drawRoundedRect(QRectF(x + 2.0, y + 1.0, width - 4.0, height - 2.0), 3.0, 3.0);
+    }
 
     if (!layer->visible())
     {
@@ -775,10 +777,10 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         painter.drawText(QRectF(recLeft, recTop + recHeight - 17.0, static_cast<qreal>(recWidth), 14.0),
                          Qt::AlignCenter, QString::number(sheetNumber.value(framePos, framePos)));
 
-        // right-edge trim handle indicator (3px bar, TVP draws it neutral gray)
+        // right-edge trim handle indicator: 2px, flush against the edge
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(0x9A, 0x9A, 0xA4));
-        painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
+        painter.drawRoundedRect(QRectF(recLeft + recWidth - 2.0, recTop + 6.0, 2.0, recHeight - 12.0), 1.0, 1.0);
 
         // TVP create handle: "+" on the top-right of the trailing block;
         // drag it out to create consecutive new frames
@@ -897,7 +899,9 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
     // translucent ghost keeps the carried outline readable. The brush must be
     // set explicitly in both cases — a stale brush from the block painting
     // leaked a white/blue fill over the selection.
-    painter.setBrush(previewing ? Theme::TimelineSelectedFrameFill : Qt::NoBrush);
+    QColor ghostTint = Theme::Accent;
+    ghostTint.setAlpha(30);
+    painter.setBrush(previewing ? QBrush(ghostTint) : Qt::NoBrush);
     const QBrush selectionFill = painter.brush();
     painter.setPen(QPen(QBrush(Theme::Accent), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
