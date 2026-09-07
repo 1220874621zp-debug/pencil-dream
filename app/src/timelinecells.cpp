@@ -976,20 +976,23 @@ void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, 
 
 bool TimeLineCells::rowHasInlineControls(int rowWidth) const
 {
-    // controls sit on their own line below the name, so they only need room
-    // for themselves: slider track + percentage + lock (starts at width-160)
-    return rowWidth >= 170;
+    // controls sit on their own line under the name: slider(64) + %(38) +
+    // lock(16) anchored at x=52, ending around x=174
+    return rowWidth >= 185;
 }
 
 QRect TimeLineCells::opacitySliderRect(int rowWidth) const
 {
-    // 64px track left of the percentage label and the lock icon
-    return QRect(rowWidth - 160, 0, 64, 0);
+    Q_UNUSED(rowWidth)
+    // bottom-left cluster, slider aligned under the name text (name starts at x=52)
+    return QRect(52, 0, 64, 0);
 }
 
 QRect TimeLineCells::lockIconRect(int rowWidth) const
 {
-    return QRect(rowWidth - 38, 0, 16, 0);
+    Q_UNUSED(rowWidth)
+    // right after the percentage label: 52 + 64 slider + 4 gap + 34 label + 4 gap
+    return QRect(158, 0, 16, 0);
 }
 
 void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
