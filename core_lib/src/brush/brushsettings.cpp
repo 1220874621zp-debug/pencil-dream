@@ -37,6 +37,7 @@ QDomElement BrushSettings::toXML(QDomDocument& doc) const
     stroke.setAttribute("spacingMode", spacingMode == SpacingMode::Auto ? "auto" : "fixed");
     stroke.setAttribute("spacing", QString::number(spacing, 'f', 3));
     stroke.setAttribute("autoSpacingCoeff", QString::number(autoSpacingCoeff, 'f', 2));
+    stroke.setAttribute("eraser", eraser ? "1" : "0");
     root.appendChild(stroke);
 
     QDomElement dynamics = doc.createElement("Dynamics");
@@ -74,6 +75,7 @@ void BrushSettings::fromXML(const QDomElement& root)
                       ? SpacingMode::Fixed : SpacingMode::Auto;
         spacing = qBound(0.02, stroke.attribute("spacing", "0.25").toDouble(), 5.0);
         autoSpacingCoeff = qBound(0.25, stroke.attribute("autoSpacingCoeff", "1").toDouble(), 5.0);
+        eraser = stroke.attribute("eraser", "0") == "1";
     }
 
     QDomElement dynamics = root.firstChildElement("Dynamics");

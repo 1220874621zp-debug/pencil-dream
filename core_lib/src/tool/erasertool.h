@@ -20,6 +20,8 @@ GNU General Public License for more details.
 
 #include "stroketool.h"
 
+#include "brush/brushengine.h"
+
 class EraserTool : public StrokeTool
 {
     Q_OBJECT
@@ -40,13 +42,24 @@ public:
 
     void drawStroke();
     void paintAt(QPointF point);
-    void updateStrokes();
+
+    /** 预设应用：与 BrushTool 同款接口，橡皮预设也走笔刷引擎 */
+    void applyBrushPreset(const BrushSettings& preset);
+    void initPresetExtras(const BrushSettings& preset);
+    BrushSettings currentBrushSettings();
 
 protected:
     QPointF mLastBrushPoint;
     QPointF mMouseDownPoint;
 
     StrokeToolProperties mSettings;
+
+private:
+    void syncEngineSettings();
+    BrushEngine::DabPainter dabPainter() const;
+
+    BrushEngine mEngine;
+    BrushSettings mPresetExtras;
 };
 
 #endif // ERASERTOOL_H

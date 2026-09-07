@@ -59,21 +59,28 @@ qreal normalizedDistanceAA(qreal dx, qreal dy, qreal rx, qreal ry,
  *   n  = 归一化距离；n >= 1 → 全透明
  *   nf = n / hardness（实心核比例，对应 Krita 的 fade 系数的倒数关系）
  *   不透明度 = 1 - n * (nf - 1) / (nf - n)
+ * subPixelX/Y ∈ {0, 0.5}：落点的半像素余数，烤进掩码中心位置
+ * （Krita KisAutoBrush 的 subPixel 做法），合成侧因此整数对齐免重采样。
  */
-QImage makeDabImage(const BrushSettings& settings, const QColor& color, int diameterPx)
+QImage makeDabImage(const BrushSettings& settings, const QColor& color,
+                    qreal diameter, qreal subPixelX, qreal subPixelY)
 {
-    const qreal major = qMax<qreal>(1, diameterPx);
-    const qreal minor = qMax<qreal>(1, qRound(diameterPx * settings.ratio));
+    const qreal major = qMax<qreal>(1, diameter);
+    const qreal minor = qMax<qreal>(1, qRound(diameter * settings.ratio));
     const qreal rad = qDegreesToRadians(settings.angle);
     const qreal cosA = qCos(rad);
     const qreal sinA = qSin(rad);
 
-    // 旋转后的外接矩形
+    // 旋转后的外接矩形；尺寸保持偶数，让"图中心 + 半像素"仍是整数落点
     const qreal boxW = major * qAbs(cosA) + minor * qAbs(sinA);
     const qreal boxH = major * qAbs(sinA) + minor * qAbs(cosA);
-    const int imgW = qCeil(boxW) + 2;
-    const int imgH = qCeil(boxH) + 2;
+    int imgW = qCeil(boxW) + 2;
+    int imgH = qCeil(boxH) + 2;
+    if (imgW & 1) ++imgW;
+    if (imgH & 1) ++imgH;
 
+    const qreal cx = imgW * 0.5 + subPixelX;
+    const qreal cy = imgH * 0.5 + subPixelY;
     const qreal rx = major * 0.5;
     const qreal ry = minor * 0.5;
     const qreal hardness = qBound(0.01, settings.hardness, 1.0);
@@ -88,9 +95,9 @@ QImage makeDabImage(const BrushSettings& settings, const QColor& color, int diam
 
     for (int py = 0; py < imgH; ++py) {
         QRgb* line = reinterpret_cast<QRgb*>(dab.scanLine(py));
-        const qreal dy = py + 0.5 - imgH * 0.5;
+        const qreal dy = py + 0.5 - cy;
         for (int px = 0; px < imgW; ++px) {
-            const qreal dx = px + 0.5 - imgW * 0.5;
+            const qreal dx = px + 0.5 - cx;
 
             // 逆旋转回笔尖坐标系
             const qreal xr = dx * cosA + dy * sinA;
@@ -200,18 +207,42 @@ void BrushEngine::paintDab(const QPointF& point, qreal pressure, const DabPainte
     if (!painter) {
         return;
     }
+
+    // 直径量化到 4% 步长（Krita dab 缓存容差的同思路）：压感连续变化时
+    // 只有跨步长才重生成掩码，配合 2x2 子像素桶把每笔的缓存规模压在
+    // ~100 张以内（200px 软笔压感全程扫一遍也从 200 张降到 ~25 张）
+    const qreal step = qMax(1.0, mSettings.diameter * 0.04);
+    const int gridIndex = qMax(1, qRound(dabDiameterAt(pressure) / step));
+    const qreal diameter = gridIndex * step;
+
+    // 落点吸附半像素网格（误差 ≤0.25px，AA 边缘下不可见），余数作为
+    // 子像素偏移烤进掩码；topLeft 因此恒为整数坐标
+    const int snappedX = qRound(point.x() * 2.0);
+    const int snappedY = qRound(point.y() * 2.0);
+    const int subBucketX = snappedX & 1;
+    const int subBucketY = snappedY & 1;
+
     DabRequest request;
-    request.center = point;
     request.opacity = dabOpacityAt(pressure);
-    request.dab = cachedDab(qMax(1, qRound(dabDiameterAt(pressure))));
+    request.dab = cachedDab((gridIndex << 2) | (subBucketX << 1) | subBucketY,
+                            diameter, subBucketX * 0.5, subBucketY * 0.5);
+    // 掩码中心在图内位于 (imgW/2 + subX)，落图后对准吸附点 (snappedX/2)
+    request.topLeft = QPoint((snappedX >> 1) - request.dab.width() / 2,
+                             (snappedY >> 1) - request.dab.height() / 2);
     painter(request);
 }
 
-const QImage& BrushEngine::cachedDab(int diameterPx)
+const QImage& BrushEngine::cachedDab(quint32 cacheKey, qreal diameter,
+                                     qreal subPixelX, qreal subPixelY)
 {
-    auto it = mDabCache.find(diameterPx);
+    auto it = mDabCache.find(cacheKey);
     if (it == mDabCache.end()) {
-        it = mDabCache.insert(diameterPx, makeDabImage(mSettings, mColor, diameterPx));
+        // 保险丝：极端压感抖动下防止缓存无限增长（正常一笔远到不了）
+        if (mDabCache.size() > 96) {
+            mDabCache.clear();
+        }
+        it = mDabCache.insert(cacheKey,
+                              makeDabImage(mSettings, mColor, diameter, subPixelX, subPixelY));
     }
     return it.value();
 }
@@ -235,10 +266,7 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
     engine.setSettings(preview);
 
     const auto painter = [&strokeLayer](const DabRequest& dab) {
-        washBlendImage(strokeLayer, dab.dab,
-                       QPointF(dab.center.x() - dab.dab.width() * 0.5,
-                               dab.center.y() - dab.dab.height() * 0.5),
-                       dab.opacity);
+        washBlendImage(strokeLayer, dab.dab, dab.topLeft, dab.opacity);
     };
 
     QPainterPath path;

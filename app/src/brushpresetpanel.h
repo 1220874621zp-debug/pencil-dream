@@ -51,7 +51,7 @@ private:
     void onImportPreset();
     void onExportPreset();
 
-    class BrushTool* currentBrushTool();
+    class BaseTool* currentPresetTool();
 
     BrushPresetStore mStore;
     QListWidget* mList = nullptr;

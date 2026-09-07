@@ -61,8 +61,8 @@ public:
 
     /** Draws a brush with the specified parameters to the tiled buffer */
     void drawBrush(QPointF point, qreal brushWidth, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);
-    /** Stamps a pre-rendered brush dab centered at the given point (Krita 式 wash 混合：同笔不叠加变深) */
-    void drawDab(const QImage& dab, const QPointF& center, qreal opacity);
+    /** Stamps a pre-rendered brush dab at the integer-aligned top-left (Krita 式 wash 混合：同笔不叠加变深) */
+    void drawDab(const QImage& dab, const QPoint& topLeft, qreal opacity);
     /** Draws a path with the specified parameters to the tiled buffer */
     void drawPath(QPainterPath path, QPen pen, QBrush brush,
                   QPainter::CompositionMode cm, bool antialiasing);

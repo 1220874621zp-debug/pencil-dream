@@ -35,15 +35,17 @@ GNU General Public License for more details.
  * strokeTo 沿线段按间距切分 dab（Krita KisPaintOpUtils::paintLine 的
  * 距离累加算法 + 自动间距），每个 dab 通过回调交给宿主落到画布上。
  *
- * dab 是一张 ARGB32_Premultiplied 的上色小图（笔尖掩码 × 颜色），
- * 按整数直径缓存，压感只影响直径/不透明度，不重新生成掩码。
+ * dab 是一张 ARGB32_Premultiplied 的上色小图（笔尖掩码 × 颜色）。
+ * 直径量化到 4% 步长缓存（Krita dab 缓存容差的同思路），压感微调
+ * 直接复用缓存图；落点吸附半像素网格，余下的子像素偏移在生成时
+ * 烤进掩码（Krita subPixel 的做法），合成侧因此整数对齐免重采样。
  */
 class BrushEngine
 {
 public:
     struct DabRequest
     {
-        QPointF center;   // dab 中心（画布坐标）
+        QPoint topLeft;   // dab 左上角（画布整数坐标，子像素已烤进 dab 图）
         QImage dab;       // 上色后的 dab 图（已含笔尖形状与颜色）
         qreal opacity = 1.0; // 该 dab 的不透明度
     };
@@ -70,11 +72,11 @@ public:
 private:
     qreal spacingFor(qreal dabDiameter) const;
     void paintDab(const QPointF& point, qreal pressure, const DabPainter& painter);
-    const QImage& cachedDab(int diameterPx);
+    const QImage& cachedDab(quint32 cacheKey, qreal diameter, qreal subPixelX, qreal subPixelY);
 
     BrushSettings mSettings;
     QColor mColor;
-    QHash<int, QImage> mDabCache;
+    QHash<quint32, QImage> mDabCache;
 
     bool mStrokeActive = false;
     QPointF mLastPoint;

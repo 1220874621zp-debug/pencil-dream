@@ -51,10 +51,11 @@ struct BrushSettings
     qreal hardness = 0.65;      // 硬度 0.01..1：实心核占半径的比例（= Krita 1-fade）
 
     // ---- 描边 ----
-    qreal opacity = 1.0;        // 笔刷不透明度 0.05..1
+    qreal opacity = 1.0;        // 笔刷不透明度 0.05..1（橡皮预设=擦除强度）
     SpacingMode spacingMode = SpacingMode::Auto;
     qreal spacing = 0.25;       // 固定间距（直径的比例）0.02..5
     qreal autoSpacingCoeff = 1.0;
+    bool eraser = false;        // 橡皮预设：dab alpha 经 DestinationOut 变成擦除量
 
     // ---- 动态（压感）----
     bool pressureSize = true;

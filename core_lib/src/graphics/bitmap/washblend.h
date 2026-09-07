@@ -18,19 +18,23 @@ GNU General Public License for more details.
 #define WASHBLEND_H
 
 #include <QImage>
-#include <QPointF>
+#include <QPoint>
 #include <QtMath>
 
 /**
- * Krita wash 语义的图像盖章：逐像素取"更不透明"的一方（预乘 ARGB32）。
+ * Krita wash 语义的整数对齐盖章：逐像素取"更不透明"的一方（预乘 ARGB32）。
  * QPainter 的 CompositionMode_Lighten 只对颜色取 max、alpha 仍按
  * SourceOver 累积（重叠会变深），做不出 wash，故手写像素混合。
  * 同一笔内半透明 dab 重叠不叠加变深、交叉不留洞。
  *
- * dab 落点按亚像素坐标做双线性 4 抽头采样——若把落点吸附到整数像素，
- * 斜线笔画的边缘会量化成台阶（锯齿）。
+ * 子像素定位在 dab 生成阶段烤进掩码（BrushEngine::paintDab 的半像素
+ * 网格吸附），这里只做整数对齐的单次比较写入，无重采样。
+ *
+ * dab 的 RGB = 颜色 × 掩码 alpha（生成时预乘烤死），所以输出像素只依赖
+ * 源 alpha 字节——按 alpha 查表（256 项）即得整个输出像素，热循环退化为
+ * "取 alpha → 查表 → 比较 → 可能写一次"。
  */
-inline void washBlendImage(QImage& dst, const QImage& src, const QPointF& topLeft, qreal opacity = 1.0)
+inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft, qreal opacity = 1.0)
 {
     if (dst.isNull() || src.isNull() || opacity <= 0.0) {
         return;
@@ -39,63 +43,54 @@ inline void washBlendImage(QImage& dst, const QImage& src, const QPointF& topLef
     if (dst.format() != QImage::Format_ARGB32_Premultiplied) {
         dst = dst.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     }
+    opacity = qBound(0.0, opacity, 1.0);
 
-    const int srcW = src.width();
-    const int srcH = src.height();
+    const int x0 = qMax(0, topLeft.x());
+    const int y0 = qMax(0, topLeft.y());
+    const int x1 = qMin(dst.width(), topLeft.x() + src.width());
+    const int y1 = qMin(dst.height(), topLeft.y() + src.height());
+    if (x0 >= x1 || y0 >= y1) {
+        return;
+    }
 
-    const int x0 = qMax(0, int(qFloor(topLeft.x())));
-    const int y0 = qMax(0, int(qFloor(topLeft.y())));
-    const int x1 = qMin(dst.width(), int(qCeil(topLeft.x())) + srcW);
-    const int y1 = qMin(dst.height(), int(qCeil(topLeft.y())) + srcH);
-
-    for (int y = y0; y < y1; ++y) {
-        auto dstLine = reinterpret_cast<QRgb*>(dst.scanLine(y));
-
-        // 目标像素中心 (x+0.5, y+0.5) 映射到源图像素索引空间
-        const qreal v = (y + 0.5) - topLeft.y() - 0.5;
-        const int j0 = int(qFloor(v));
-        const qreal fv = v - j0;
-
-        for (int x = x0; x < x1; ++x) {
-            const qreal u = (x + 0.5) - topLeft.x() - 0.5;
-            const int i0 = int(qFloor(u));
-            const qreal fu = u - i0;
-
-            const qreal w00 = (1.0 - fu) * (1.0 - fv);
-            const qreal w10 = fu * (1.0 - fv);
-            const qreal w01 = (1.0 - fu) * fv;
-            const qreal w11 = fu * fv;
-
-            QRgb taps[4] = { 0, 0, 0, 0 };
-            const int xs[4] = { i0, i0 + 1, i0, i0 + 1 };
-            const int ys[4] = { j0, j0, j0 + 1, j0 + 1 };
-            const qreal ws[4] = { w00, w10, w01, w11 };
-
-            qreal r = 0.0, g = 0.0, b = 0.0, a = 0.0;
-            for (int k = 0; k < 4; ++k) {
-                if (xs[k] < 0 || xs[k] >= srcW || ys[k] < 0 || ys[k] >= srcH || ws[k] == 0.0) {
-                    continue;
-                }
-                const QRgb s = reinterpret_cast<const QRgb*>(src.constScanLine(ys[k]))[xs[k]];
-                r += qRed(s) * ws[k];
-                g += qGreen(s) * ws[k];
-                b += qBlue(s) * ws[k];
-                a += qAlpha(s) * ws[k];
-            }
-
-            const quint32 sa = qRound(a * opacity);
-            if (sa == 0) {
-                continue;
-            }
-            // 预乘格式下各分量按不透明度缩放/双线性组合后仍是合法预乘值
-            const QRgb scaled = (sa << 24)
-                                | (qRound(r * opacity) << 16)
-                                | (qRound(g * opacity) << 8)
-                                | qRound(b * opacity);
-
-            const QRgb d = dstLine[x];
-            dstLine[x] = (sa >= qAlpha(d)) ? scaled : d;
+    // 从最不透明的源像素反推笔色（src = qPremultiply(color, a) 的整数近似）
+    const QRgb* srcBits = reinterpret_cast<const QRgb*>(src.constBits());
+    const int srcCount = src.width() * src.height();
+    int best = 0;
+    for (int i = 1; i < srcCount; ++i) {
+        if (qAlpha(srcBits[i]) > qAlpha(srcBits[best])) {
+            best = i;
         }
+    }
+    const int maxAlpha = qAlpha(srcBits[best]);
+    if (maxAlpha <= 0) {
+        return;
+    }
+    const int cr = qRound(qBound(0.0, ((srcBits[best] >> 16) & 0xFF) * 255.0 / maxAlpha, 255.0));
+    const int cg = qRound(qBound(0.0, ((srcBits[best] >> 8) & 0xFF) * 255.0 / maxAlpha, 255.0));
+    const int cb = qRound(qBound(0.0, (srcBits[best] & 0xFF) * 255.0 / maxAlpha, 255.0));
+
+    // alpha 字节 → 缩放不透明度后的输出 alpha / 整个输出像素（预乘）
+    quint32 outAlphaLut[256];
+    quint32 outPixelLut[256];
+    for (int a = 0; a <= 255; ++a) {
+        const int scaled = qRound(a * opacity);
+        outAlphaLut[a] = static_cast<quint32>(scaled);
+        outPixelLut[a] = qPremultiply(qRgba(cr, cg, cb, scaled));
+    }
+
+    const int srcRowSkip = src.width() - (x1 - x0);
+    const QRgb* s = reinterpret_cast<const QRgb*>(src.constScanLine(y0 - topLeft.y()))
+                    + (x0 - topLeft.x());
+    for (int y = y0; y < y1; ++y) {
+        QRgb* d = reinterpret_cast<QRgb*>(dst.scanLine(y)) + x0;
+        for (int x = x0; x < x1; ++x, ++s, ++d) {
+            const quint32 outA = outAlphaLut[qAlpha(*s)];
+            if (outA >= qAlpha(*d)) {
+                *d = outPixelLut[qAlpha(*s)];
+            }
+        }
+        s += srcRowSkip;
     }
 }
 

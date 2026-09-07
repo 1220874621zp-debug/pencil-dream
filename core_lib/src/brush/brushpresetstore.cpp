@@ -151,6 +151,16 @@ void BrushPresetStore::load()
         s.opacityCurve = BrushCurve::fromString("0,0;0.5,1;1,0;");
         addBuiltin(QStringLiteral("压感淡出"), s);
     }
+    {
+        BrushSettings s; // 软橡皮：dab alpha 经 DestinationOut 变成擦除量
+        s.tipShape = BrushSettings::TipShape::Circle;
+        s.diameter = 40.0;
+        s.hardness = 0.5;
+        s.opacity = 1.0;
+        s.pressureSize = true;
+        s.eraser = true;
+        addBuiltin(QStringLiteral("软橡皮"), s);
+    }
 
     // ---- 用户预设目录 ----
     QList<BrushPreset> userPresets;

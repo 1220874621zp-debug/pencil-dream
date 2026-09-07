@@ -224,6 +224,6 @@ void BrushTool::syncEngineSettings()
 BrushEngine::DabPainter BrushTool::dabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
-        mScribbleArea->drawDab(dab.dab, dab.center, dab.opacity);
+        mScribbleArea->drawDab(dab.dab, dab.topLeft, dab.opacity);
     };
 }

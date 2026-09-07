@@ -31,6 +31,10 @@ GNU General Public License for more details.
 
 EraserTool::EraserTool(QObject* parent) : StrokeTool(parent)
 {
+    // 橡皮走笔刷引擎生成 dab（硬度/压感曲线/自动间距/子像素与画笔同源），
+    // 擦除本身由绘制缓冲的 alpha + ScribbleArea 终局 DestinationOut 完成
+    mPresetExtras.eraser = true;
+    mEngine.setSettings(mPresetExtras);
 }
 
 ToolType EraserTool::type() const
@@ -51,14 +55,12 @@ void EraserTool::loadSettings()
     mPropertyUsed[StrokeToolProperties::FEATHER_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::PRESSURE_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[StrokeToolProperties::STABILIZATION_VALUE] = { Layer::BITMAP };
-    mPropertyUsed[StrokeToolProperties::ANTI_ALIASING_ENABLED] = { Layer::BITMAP };
 
     info[StrokeToolProperties::WIDTH_VALUE] = { WIDTH_MIN, WIDTH_MAX, 24.0 };
     info[StrokeToolProperties::FEATHER_VALUE] = { FEATHER_MIN, FEATHER_MAX, 48.0 };
     info[StrokeToolProperties::FEATHER_ENABLED] = true;
     info[StrokeToolProperties::PRESSURE_ENABLED] = true;
     info[StrokeToolProperties::STABILIZATION_VALUE] = { StabilizationLevel::NONE, StabilizationLevel::STRONG, StabilizationLevel::NONE };
-    info[StrokeToolProperties::ANTI_ALIASING_ENABLED] = true;
 
     toolProperties().insertProperties(info);
     toolProperties().loadFrom(typeName(), pencilSettings);
@@ -69,7 +71,6 @@ void EraserTool::loadSettings()
         toolProperties().setBaseValue(StrokeToolProperties::STABILIZATION_VALUE, pencilSettings.value("stabilizerLevel", StabilizationLevel::NONE).toInt());
         toolProperties().setBaseValue(StrokeToolProperties::FEATHER_ENABLED, pencilSettings.value("eraserUseFeather", true).toBool());
         toolProperties().setBaseValue(StrokeToolProperties::PRESSURE_ENABLED, pencilSettings.value("eraserPressure", true).toBool());
-        toolProperties().setBaseValue(StrokeToolProperties::ANTI_ALIASING_ENABLED, pencilSettings.value("eraserAA", true).toBool());
 
         pencilSettings.remove("eraserWidth");
         pencilSettings.remove("eraserFeather");
@@ -81,6 +82,8 @@ void EraserTool::loadSettings()
 
     mQuickSizingProperties.insert(Qt::ShiftModifier, StrokeToolProperties::WIDTH_VALUE);
     mQuickSizingProperties.insert(Qt::ControlModifier, StrokeToolProperties::FEATHER_VALUE);
+
+    syncEngineSettings();
 }
 
 QCursor EraserTool::cursor()
@@ -95,9 +98,19 @@ void EraserTool::pointerPressEvent(PointerEvent *event)
         return;
     }
 
-    startStroke(event->inputType());
-    mLastBrushPoint = getCurrentPoint();
     mMouseDownPoint = getCurrentPoint();
+    mLastBrushPoint = getCurrentPoint();
+
+    startStroke(event->inputType());
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer->type() == Layer::BITMAP)
+    {
+        syncEngineSettings();
+        // 擦除的 dab 颜色无关紧要（DestinationOut 只用 alpha），给黑色即可
+        mEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
+                            Qt::black, dabPainter());
+    }
 
     StrokeTool::pointerPressEvent(event);
 }
@@ -112,7 +125,7 @@ void EraserTool::pointerMoveEvent(PointerEvent* event)
     if (event->buttons() & Qt::LeftButton && event->inputType() == mCurrentInputType)
     {
         mCurrentPressure = mInterpolator.getPressure();
-        updateStrokes();
+        drawStroke();
         if (mSettings.stabilizerLevel() != mInterpolator.getStabilizerLevel())
         {
             mInterpolator.setStabilizerLevel(mSettings.stabilizerLevel());
@@ -144,6 +157,7 @@ void EraserTool::pointerReleaseEvent(PointerEvent *event)
     }
 
     endStroke();
+    mEngine.endStroke();
 
     StrokeTool::pointerReleaseEvent(event);
 }
@@ -154,19 +168,9 @@ void EraserTool::paintAt(QPointF point)
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer->type() == Layer::BITMAP)
     {
-        qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
-        qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
-        qreal brushWidth = mSettings.width() * pressure;
-        mCurrentWidth = brushWidth;
-
-        mScribbleArea->drawBrush(point,
-                                 brushWidth,
-                                 mSettings.feather(),
-                                 QColor(255, 255, 255, 255),
-                                 QPainter::CompositionMode_SourceOver,
-                                 opacity,
-                                 mSettings.featherEnabled(),
-                                 mSettings.AntiAliasingEnabled() == ON);
+        syncEngineSettings();
+        mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
+        mEngine.dabAt(point, mCurrentPressure, dabPainter());
     }
 }
 
@@ -178,47 +182,55 @@ void EraserTool::drawStroke()
 
     if (layer->type() == Layer::BITMAP)
     {
-        qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
-        qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
-        qreal brushWidth = mSettings.width() * pressure;
-        mCurrentWidth = brushWidth;
-
-        qreal brushStep = (0.5 * brushWidth);
-        brushStep = qMax(1.0, brushStep);
-
-        BlitRect rect;
-
-        QPointF a = mLastBrushPoint;
-        QPointF b = getCurrentPoint();
-
-        qreal distance = 4 * QLineF(b, a).length();
-        int steps = qRound(distance / brushStep);
-
-        for (int i = 0; i < steps; i++)
-        {
-            QPointF point = mLastBrushPoint + (i + 1) * brushStep * (getCurrentPoint() - mLastBrushPoint) / distance;
-
-            mScribbleArea->drawBrush(point,
-                                     brushWidth,
-                                     mSettings.feather(),
-                                     Qt::white,
-                                     QPainter::CompositionMode_SourceOver,
-                                     opacity,
-                                     mSettings.featherEnabled(),
-                                     mSettings.AntiAliasingEnabled() == ON);
-            if (i == (steps - 1))
-            {
-                mLastBrushPoint = getCurrentPoint();
-            }
-        }
+        syncEngineSettings();
+        mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
+        mEngine.strokeTo(getCurrentPoint(), mCurrentPressure, dabPainter());
     }
 }
 
-void EraserTool::updateStrokes()
+void EraserTool::applyBrushPreset(const BrushSettings& preset)
 {
-    Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
-    {
-        drawStroke();
-    }
+    mPresetExtras = preset;
+    mPresetExtras.eraser = true;
+
+    setWidth(preset.diameter);
+    // 硬度与羽化互为倒数映射：硬度 1 → 羽化 1，硬度 0.05 → 羽化 95
+    setFeather((1.0 - preset.hardness) * 100.0);
+    setPressureEnabled(preset.pressureSize || preset.pressureOpacity);
+
+    syncEngineSettings();
+}
+
+void EraserTool::initPresetExtras(const BrushSettings& preset)
+{
+    mPresetExtras = preset;
+    mPresetExtras.eraser = true;
+    syncEngineSettings();
+}
+
+BrushSettings EraserTool::currentBrushSettings()
+{
+    syncEngineSettings();
+    return mEngine.settings();
+}
+
+void EraserTool::syncEngineSettings()
+{
+    BrushSettings merged = mPresetExtras;
+    merged.eraser = true;
+    merged.diameter = mSettings.width();
+    merged.hardness = mSettings.featherEnabled()
+                      ? 1.0 - qBound(FEATHER_MIN, mSettings.feather(), FEATHER_MAX) / 100.0
+                      : 1.0;
+    // 工具选项里的"压感"勾选框是总开关；预设只决定用压感控什么
+    merged.pressureSize = mPresetExtras.pressureSize && mSettings.pressureEnabled();
+    merged.pressureOpacity = mPresetExtras.pressureOpacity && mSettings.pressureEnabled();
+    mEngine.setSettings(merged);
+}
+
+BrushEngine::DabPainter EraserTool::dabPainter() const
+{
+    return [this](const BrushEngine::DabRequest& dab) {
+        mScribbleArea->drawDab(dab.dab, dab.topLeft, dab.opacity);
+    };
 }

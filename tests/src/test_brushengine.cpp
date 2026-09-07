@@ -28,6 +28,7 @@ GNU General Public License for more details.
 #include "object.h"
 #include "pencildef.h"
 #include "tool/brushtool.h"
+#include "tool/erasertool.h"
 #include "graphics/bitmap/tile.h"
 #include "graphics/bitmap/tiledbuffer.h"
 
@@ -80,6 +81,7 @@ TEST_CASE("BrushSettings XML roundtrip")
     settings.sizeCurve = BrushCurve::fromString("0,0.1;0.5,0.8;1,1;");
     settings.pressureOpacity = true;
     settings.opacityCurve = BrushCurve::fromString("0,0;0.3,1;1,0.2;");
+    settings.eraser = true;
 
     const QString xml = settings.toXMLString();
     BrushSettings loaded;
@@ -96,6 +98,7 @@ TEST_CASE("BrushSettings XML roundtrip")
     REQUIRE(loaded.spacing == Approx(settings.spacing));
     REQUIRE(loaded.pressureSize == settings.pressureSize);
     REQUIRE(loaded.pressureOpacity == settings.pressureOpacity);
+    REQUIRE(loaded.eraser == true);
     REQUIRE(loaded.sizeCurve.value(0.25) == Approx(settings.sizeCurve.value(0.25)).margin(1e-4));
     REQUIRE(loaded.opacityCurve.value(0.8) == Approx(settings.opacityCurve.value(0.8)).margin(1e-4));
 }
@@ -139,7 +142,9 @@ TEST_CASE("BrushEngine stroke dabbing")
     QPointF lastDabCenter;
     auto painter = [&](const BrushEngine::DabRequest& dab) {
         ++dabCount;
-        lastDabCenter = dab.center;
+        // 子像素烤进掩码后 topLeft 是整数，掩码中心 = topLeft + 图心
+        lastDabCenter = QPointF(dab.topLeft)
+                        + QPointF(dab.dab.width(), dab.dab.height()) * 0.5;
         REQUIRE(dab.opacity > 0.0);
         REQUIRE_FALSE(dab.dab.isNull());
     };
@@ -156,6 +161,40 @@ TEST_CASE("BrushEngine stroke dabbing")
 
     engine.endStroke();
     REQUIRE_FALSE(engine.isStrokeActive());
+}
+
+TEST_CASE("BrushEngine sub-pixel snapping and quantized dab cache")
+{
+    BrushSettings settings;
+    settings.diameter = 40.0;
+    settings.pressureSize = true;
+
+    BrushEngine engine;
+    engine.setSettings(settings);
+
+    // 半像素网格吸附：10.24 → 10.0，10.76 → 11.0，整数落点差一格
+    QPoint topLeftA, topLeftB;
+    QImage dabA;
+    engine.dabAt(QPointF(10.24, 10.24), 1.0, [&](const BrushEngine::DabRequest& r) {
+        topLeftA = r.topLeft;
+        dabA = r.dab;
+    });
+    engine.dabAt(QPointF(10.76, 10.76), 1.0, [&](const BrushEngine::DabRequest& r) {
+        topLeftB = r.topLeft;
+    });
+    REQUIRE((topLeftB - topLeftA) == QPoint(1, 1));
+    // 吸附点即掩码中心：topLeft + 图心 = 吸附后的落点
+    REQUIRE(topLeftA + QPoint(dabA.width() / 2, dabA.height() / 2) == QPoint(10, 10));
+
+    // 直径量化：4% 步长内的压感变化复用同一张缓存 dab，跨步长才重生成
+    qint64 cacheKeySmall = 0, cacheKeyBig = 0;
+    const QPointF p(50, 50);
+    engine.dabAt(p, 0.50, [&](const BrushEngine::DabRequest& r) { cacheKeySmall = r.dab.cacheKey(); });
+    qint64 cacheKeyNearby = 0;
+    engine.dabAt(p, 0.51, [&](const BrushEngine::DabRequest& r) { cacheKeyNearby = r.dab.cacheKey(); });
+    engine.dabAt(p, 0.90, [&](const BrushEngine::DabRequest& r) { cacheKeyBig = r.dab.cacheKey(); });
+    REQUIRE(cacheKeySmall == cacheKeyNearby);
+    REQUIRE(cacheKeySmall != cacheKeyBig);
 }
 
 TEST_CASE("BrushEngine pressure dynamics")
@@ -278,13 +317,11 @@ TEST_CASE("TiledBuffer drawDab wash blending")
     const QRgb center = dabImage.pixel(dabImage.width() / 2, dabImage.height() / 2);
     REQUIRE(qAlpha(center) == 255); // 硬笔中心全不透明
 
-    // —— 对照组：Lighten+opacity 与 SourceOver 在透明底上单次落点等价 ——
+    // —— 对照组：SourceOver 与 wash 单次落点在透明底上等价 ——
     struct Variant { QPainter::CompositionMode mode; qreal opacity; int expectedAlpha; };
     const Variant variants[] = {
         { QPainter::CompositionMode_SourceOver, 1.0, 255 },
         { QPainter::CompositionMode_SourceOver, 0.5, 127 },
-        { QPainter::CompositionMode_Lighten, 1.0, 255 },
-        { QPainter::CompositionMode_Lighten, 0.5, 127 },
     };
     for (const Variant& v : variants) {
         QImage canvas(200, 200, QImage::Format_ARGB32_Premultiplied);
@@ -292,28 +329,16 @@ TEST_CASE("TiledBuffer drawDab wash blending")
         QPainter p(&canvas);
         p.setCompositionMode(v.mode);
         p.setOpacity(v.opacity);
-        p.drawImage(QPointF(89.5, 89.5), dabImage);
+        p.drawImage(QPoint(89, 89), dabImage);
         p.end();
         REQUIRE(qAlpha(canvas.pixel(100, 100)) == Approx(v.expectedAlpha).margin(3));
     }
 
-    // —— 手动复刻 drawDab 的 tile 绘制路径，验证 tile 绘制本身可行 ——
-    {
-        Tile manualTile(QPoint(64, 64), QSize(64, 64));
-        QPainter p(&manualTile.pixmap());
-        p.translate(-manualTile.pos());
-        p.setCompositionMode(QPainter::CompositionMode_Lighten);
-        p.setOpacity(0.5);
-        p.drawImage(QPointF(89.5, 89.5), dabImage);
-        p.end();
-        const QImage manualImage = manualTile.pixmap().toImage();
-        REQUIRE(qAlpha(manualImage.pixel(36, 36)) == Approx(127).margin(3));
-    }
-
     TiledBuffer buffer;
-    const QPointF dabCenter(100.5, 100.5);
-    buffer.drawDab(dabImage, dabCenter, 0.5);
-    buffer.drawDab(dabImage, dabCenter + QPointF(0.5, 0), 0.5); // 同位置再落一笔
+    // 整数对齐落点：掩码中心对准画布 (100,100)
+    const QPoint placeTopLeft(100 - dabImage.width() / 2, 100 - dabImage.height() / 2);
+    buffer.drawDab(dabImage, placeTopLeft, 0.5);
+    buffer.drawDab(dabImage, placeTopLeft, 0.5); // 同位置再落一笔
 
     // wash 语义：同处重复落 dab 不叠加不透明度
     Tile* tile = buffer.tiles().value(TileIndex{ 1, 1 }, nullptr);
@@ -324,5 +349,42 @@ TEST_CASE("TiledBuffer drawDab wash blending")
     const QRgb result = tileImage.pixel(local);
     const int resultAlpha = qAlpha(result);
     REQUIRE(resultAlpha > 0);
-    REQUIRE(resultAlpha <= 150); // wash 语义：两次半透明 dab 不叠加变深（0.5*255≈127）
+    REQUIRE(resultAlpha <= 150); // wash 语义：两次半透明 dab 不叠加变深（0.5*255≈128）
+}
+
+TEST_CASE("EraserTool preset application")
+{
+    // 完整 Editor 台架：橡皮与画笔共用笔刷引擎，预设整链生效
+    Object* object = new Object;
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->init();
+    editor->setObject(object);
+
+    EraserTool* tool = dynamic_cast<EraserTool*>(editor->tools()->getTool(ERASER));
+    REQUIRE(tool != nullptr);
+
+    BrushSettings soft;
+    soft.eraser = true;
+    soft.diameter = 50.0;
+    soft.hardness = 0.25;
+    soft.pressureSize = true;
+    soft.pressureOpacity = false;
+
+    tool->applyBrushPreset(soft);
+    const BrushSettings current = tool->currentBrushSettings();
+    REQUIRE(current.eraser == true);
+    REQUIRE(current.diameter == Approx(50.0));
+    REQUIRE(current.hardness == Approx(0.25).epsilon(0.01)); // 硬度↔羽化往返
+    REQUIRE(current.pressureSize == true);
+    REQUIRE(current.pressureOpacity == false);
+
+    // 引擎侧的 dab 尺寸也要跟着预设走
+    BrushEngine probeEngine;
+    probeEngine.setSettings(tool->currentBrushSettings());
+    REQUIRE(probeEngine.dabDiameterAt(1.0) == Approx(50.0));
+
+    // 台架各部件与全局单例（PixmapCache/QSettings 等）有交叉引用，
+    // 进程退出时统一回收，测试内不手动 delete
 }

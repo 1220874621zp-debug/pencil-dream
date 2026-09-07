@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QVBoxLayout>
 
 #include "brushtool.h"
+#include "erasertool.h"
 #include "editor.h"
 #include "managers/toolmanager.h"
 #include "pencildef.h"
@@ -42,7 +43,8 @@ QString presetTooltip(const BrushPreset& preset)
     if (s.pressureOpacity) dyn << QObject::tr("不透明度");
     const QString dynamics = dyn.isEmpty() ? QObject::tr("无")
                                            : dyn.join(QObject::tr("、"));
-    return QObject::tr("直径 %1px｜硬度 %2%\n笔尖：%3｜压感控制：%4\n%5")
+    return QObject::tr("%1｜直径 %2px｜硬度 %3%\n笔尖：%4｜压感控制：%5\n%6")
+           .arg(s.eraser ? QObject::tr("橡皮") : QObject::tr("画笔"))
            .arg(qRound(s.diameter))
            .arg(qRound(s.hardness * 100))
            .arg(s.tipShape == BrushSettings::TipShape::Circle ? QObject::tr("圆形") : QObject::tr("方形"))
@@ -130,9 +132,13 @@ void BrushPresetPanel::initUI()
     }
     if (!name.isEmpty()) {
         selectPreset(name);
-        BrushTool* tool = currentBrushTool();
-        if (tool) {
-            tool->initPresetExtras(mStore.presets()[mStore.indexOf(name)].settings);
+        const BrushSettings& preset = mStore.presets()[mStore.indexOf(name)].settings;
+        if (preset.eraser) {
+            if (EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER))) {
+                tool->initPresetExtras(preset);
+            }
+        } else if (BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH))) {
+            tool->initPresetExtras(preset);
         }
     }
 }
@@ -187,12 +193,18 @@ void BrushPresetPanel::onSelectionChanged()
     if (index < 0) {
         return;
     }
-    // 点笔刷即切到画笔工具：程序默认工具是铅笔（不走笔刷引擎），
-    // 不主动切换的话预设改了也看不出效果
-    editor()->tools()->setCurrentTool(BRUSH);
-    BrushTool* tool = currentBrushTool();
-    if (tool) {
-        tool->applyBrushPreset(mStore.presets()[index].settings);
+    // 点预设即切到对应工具：橡皮预设→橡皮，其余→画笔。
+    // 程序默认工具是铅笔（不走笔刷引擎），不主动切换的话预设改了也看不出效果
+    const ToolType target = mStore.presets()[index].settings.eraser ? ERASER : BRUSH;
+    editor()->tools()->setCurrentTool(target);
+    if (target == ERASER) {
+        if (EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER))) {
+            tool->applyBrushPreset(mStore.presets()[index].settings);
+        }
+    } else {
+        if (BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH))) {
+            tool->applyBrushPreset(mStore.presets()[index].settings);
+        }
     }
     QSettings settings(PENCIL2D, PENCIL2D);
     settings.setValue("Brush/Preset", name);
@@ -200,10 +212,14 @@ void BrushPresetPanel::onSelectionChanged()
 
 void BrushPresetPanel::onCreatePreset()
 {
-    BrushTool* tool = currentBrushTool();
-    if (!tool) {
+    BaseTool* current = currentPresetTool();
+    if (!current) {
         return;
     }
+    // 橡皮工具激活时新建的是橡皮预设（eraser 标记随保存进文件）
+    const BrushSettings currentSettings = (current->type() == ERASER)
+        ? dynamic_cast<EraserTool*>(current)->currentBrushSettings()
+        : dynamic_cast<BrushTool*>(current)->currentBrushSettings();
     bool ok = false;
     const QString name = QInputDialog::getText(this, tr("新建笔刷预设"),
                                                tr("预设名称:"), QLineEdit::Normal,
@@ -227,7 +243,7 @@ void BrushPresetPanel::onCreatePreset()
         }
     }
 
-    if (!mStore.saveUserPreset(name, tool->currentBrushSettings())) {
+    if (!mStore.saveUserPreset(name, currentSettings)) {
         QMessageBox::warning(this, tr("新建笔刷预设"), tr("预设保存失败。"));
         return;
     }
@@ -298,10 +314,15 @@ void BrushPresetPanel::onExportPreset()
     }
 }
 
-BrushTool* BrushPresetPanel::currentBrushTool()
+BaseTool* BrushPresetPanel::currentPresetTool()
 {
     if (!editor()) {
         return nullptr;
     }
-    return dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH));
+    // 预设按当前工具取参数：画笔与橡皮都走笔刷引擎；其余工具退回画笔
+    BaseTool* tool = editor()->tools()->currentTool();
+    if (tool && (tool->type() == BRUSH || tool->type() == ERASER)) {
+        return tool;
+    }
+    return editor()->tools()->getTool(BRUSH);
 }
