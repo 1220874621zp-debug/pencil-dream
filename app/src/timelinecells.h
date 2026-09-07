@@ -191,6 +191,7 @@ private:
     int mTrimKeyPos = -1;
     int mTrimOriginalLength = 1;
     int mTrimPreviewLength = 1;
+    int mTrimRippleOffset = 0; // live shift (frames) applied to later blocks while trimming
 
     // Whole-layer grab (Ctrl + drag a block moves every frame of the layer)
     bool mWholeLayerMode = false;

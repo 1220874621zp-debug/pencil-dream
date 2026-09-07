@@ -667,6 +667,9 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     {
         int framePos = key->pos();
         int recLeft = getFrameX(framePos) - standardWidth;
+        // live ripple: while trimming, later blocks follow the drag in real time
+        if (mTrimming && framePos > mTrimKeyPos)
+            recLeft += mTrimRippleOffset * mFrameSize;
 
         // Selected frames are painted separately
         if (selectedFrames.contains(framePos)) {
@@ -1256,6 +1259,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     mDropShiftFrames = 0;
     mTrimming = false;
     mTrimKeyPos = -1;
+    mTrimRippleOffset = 0;
     mPlusCreating = false;
     mPlusPreviewCount = 0;
 
@@ -1514,6 +1518,7 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                 const int maxLen = mFrameLength - mTrimKeyPos + 1;
                 int newLen = mFramePosMoveX - mTrimKeyPos + 1;
                 mTrimPreviewLength = qBound(1, newLen, maxLen);
+                mTrimRippleOffset = mTrimPreviewLength - mTrimOriginalLength;
                 updateContent();
             }
             return;
@@ -1668,17 +1673,20 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 mEditor->scrubTo(mTrimKeyPos);
                 SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
                 const int delta = mTrimPreviewLength - mTrimOriginalLength;
-                if (delta > 0)
+                if (delta != 0)
                 {
-                    // TVP-style ripple: growing into neighbours pushes the
-                    // subsequent keyframes right (far ones first) instead of
-                    // silently clamping the block back down
+                    // TVP-style bidirectional ripple: trimming inserts or
+                    // removes time, later keyframes follow the drag either way.
+                    // grow -> move far ones first; shrink -> move near ones first
                     QList<int> laterPos;
                     currentLayer->foreachKeyFrame([&](KeyFrame* k)
                     {
                         if (k->pos() > mTrimKeyPos) laterPos << k->pos();
                     });
-                    std::sort(laterPos.begin(), laterPos.end(), std::greater<int>());
+                    if (delta > 0)
+                        std::sort(laterPos.begin(), laterPos.end(), std::greater<int>());
+                    else
+                        std::sort(laterPos.begin(), laterPos.end());
                     for (int p : laterPos)
                         currentLayer->moveKeyFrame(p, delta);
                 }

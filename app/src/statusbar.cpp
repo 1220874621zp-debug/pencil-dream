@@ -46,7 +46,7 @@ StatusBar::StatusBar(QWidget *parent) : QStatusBar(parent)
 
     QToolButton* debugLogButton = new QToolButton(this);
     debugLogButton->setIcon(QIcon(":/icons/themes/playful/misc/search-log.svg"));
-    debugLogButton->setToolTip(tr("View and copy the recent debug log"));
+    debugLogButton->setToolTip(tr("查看并复制最近的调试日志"));
     debugLogButton->setAutoRaise(true);
     connect(debugLogButton, &QToolButton::clicked, this, &StatusBar::showDebugLog);
     addWidget(debugLogButton);
@@ -203,7 +203,7 @@ void StatusBar::updateZoomStatus()
 void StatusBar::showDebugLog()
 {
     QDialog dlg(this);
-    dlg.setWindowTitle(tr("Debug Log"));
+    dlg.setWindowTitle(tr("调试日志"));
     dlg.resize(760, 480);
 
     QPlainTextEdit* text = new QPlainTextEdit(&dlg);
@@ -212,17 +212,17 @@ void StatusBar::showDebugLog()
     text->setPlainText(DebugLog::dump());
     text->setLineWrapMode(QPlainTextEdit::NoWrap);
 
-    QPushButton* copyButton = new QPushButton(tr("Copy All"), &dlg);
+    QPushButton* copyButton = new QPushButton(tr("全部复制"), &dlg);
     connect(copyButton, &QPushButton::clicked, [text]()
     {
         QApplication::clipboard()->setText(text->toPlainText());
     });
 
-    QPushButton* saveButton = new QPushButton(tr("Save to File..."), &dlg);
+    QPushButton* saveButton = new QPushButton(tr("保存到文件..."), &dlg);
     connect(saveButton, &QPushButton::clicked, [this, text]()
     {
-        const QString path = QFileDialog::getSaveFileName(this, tr("Save Debug Log"),
-                                                          QString(), tr("Text Files (*.txt)"));
+        const QString path = QFileDialog::getSaveFileName(this, tr("保存调试日志"),
+                                                          QString(), tr("文本文件 (*.txt)"));
         if (!path.isEmpty())
         {
             QFile f(path);
@@ -231,7 +231,7 @@ void StatusBar::showDebugLog()
         }
     });
 
-    QPushButton* closeButton = new QPushButton(tr("Close"), &dlg);
+    QPushButton* closeButton = new QPushButton(tr("关闭"), &dlg);
     connect(closeButton, &QPushButton::clicked, &dlg, &QDialog::accept);
 
     QDialogButtonBox* btns = new QDialogButtonBox(&dlg);
