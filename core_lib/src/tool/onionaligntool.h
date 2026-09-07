@@ -48,6 +48,9 @@ public:
 
     bool leaveEvent(QEvent* event) override;
 
+    /** 拖拽中视为活动工具：paintEvent 走实时重绘路径而非贴帧级缓存 */
+    bool isActive() const override { return mDragSide != GhostSide::NONE; }
+
 private:
     enum class GhostSide { NONE, PREV, NEXT };
 

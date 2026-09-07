@@ -1139,6 +1139,12 @@ void ScribbleArea::drawDab(const QImage& dab, const QPoint& topLeft, const DabPa
     mTiledBuffer.drawDab(dab, topLeft, params);
 }
 
+void ScribbleArea::drawSmudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
+                                 qreal rate, const QImage& layerImage, const QPoint& layerOrigin)
+{
+    mTiledBuffer.smudgeDab(mask, topLeft, delta, rate, layerImage, layerOrigin);
+}
+
 void ScribbleArea::drawPolyline(QPainterPath path, QPen pen, bool useAA)
 {
     BlitRect blitRect;
@@ -1354,6 +1360,14 @@ void ScribbleArea::clearOnionGhostOffsets(int layerId)
 void ScribbleArea::invalidateOnionGhostVisual()
 {
     mCanvasPainter.resetLayerCache();
+    // paintEvent 非活动态直接贴帧级 QPixmapCache 旧画面，须一并作废
+    const int currentFrame = mEditor->currentFrame();
+    invalidateCacheForFrame(currentFrame);
+    const int coveringFrame = mEditor->layers()->lastFrameAtFrame(currentFrame);
+    if (coveringFrame >= 0 && coveringFrame != currentFrame)
+    {
+        invalidateCacheForFrame(coveringFrame);
+    }
     updateFrame();
 }
 
