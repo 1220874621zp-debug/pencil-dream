@@ -177,4 +177,71 @@ inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft
     }
 }
 
+/**
+ * Krita 混合笔刷（smudge/Smearing）核心公式，KisColorSmudgeStrategyBase 的化简：
+ *   new(x) = lerp( tile(x), canvas(x − Δ), rate · mask(x) )
+ * tile = 笔画缓冲瓦片（预乘）；canvas = 图层+缓冲的合成采样图（同画布坐标，
+ * 内容沿笔画链式更新 → 拖尾）；Δ = 相邻 dab 中心位移（采样自上一 dab 位置）；
+ * mask = 笔尖掩码的 alpha（决定边缘软硬与中心作用强度——Krita 默认
+ * 混合预设 fade 0.9，边缘极软）。位移为亚像素，采样双线性插值。
+ */
+inline void smudgeBlendImage(QImage& tile, const QPoint& tileOrigin,
+                             const QImage& canvas, const QPoint& canvasOrigin,
+                             const QImage& mask, const QPoint& maskOrigin,
+                             const QPointF& delta, qreal rate)
+{
+    if (tile.isNull() || canvas.isNull() || mask.isNull() || rate <= 0.0) {
+        return;
+    }
+    Q_ASSERT(tile.format() == QImage::Format_ARGB32_Premultiplied
+             && canvas.format() == QImage::Format_ARGB32_Premultiplied);
+    rate = qBound(0.0, rate, 1.0);
+
+    const int cw = canvas.width(), ch = canvas.height();
+    for (int my = 0; my < mask.height(); ++my) {
+        const QRgb* mrow = reinterpret_cast<const QRgb*>(mask.constScanLine(my));
+        for (int mx = 0; mx < mask.width(); ++mx) {
+            const qreal m = qAlpha(mrow[mx]) / 255.0;
+            const qreal a = rate * m;
+            if (a <= 0.0) {
+                continue;
+            }
+            const int tx = maskOrigin.x() + mx - tileOrigin.x();
+            const int ty = maskOrigin.y() + my - tileOrigin.y();
+            if (tx < 0 || tx >= tile.width() || ty < 0 || ty >= tile.height()) {
+                continue;
+            }
+            // 采样画布像素中心 (x+0.5) − Δ 处的内容，双线性
+            const qreal sx = maskOrigin.x() + mx - delta.x() - canvasOrigin.x();
+            const qreal sy = maskOrigin.y() + my - delta.y() - canvasOrigin.y();
+            const int ix = int(qFloor(sx)), iy = int(qFloor(sy));
+            const qreal fx = sx - ix, fy = sy - iy;
+            auto sampleAt = [&](int x, int y) -> QRgb {
+                if (x < 0 || x >= cw || y < 0 || y >= ch) {
+                    return 0;
+                }
+                return reinterpret_cast<const QRgb*>(canvas.constScanLine(y))[x];
+            };
+            const QRgb s00 = sampleAt(ix, iy), s10 = sampleAt(ix + 1, iy);
+            const QRgb s01 = sampleAt(ix, iy + 1), s11 = sampleAt(ix + 1, iy + 1);
+            const qreal w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy);
+            const qreal w01 = (1 - fx) * fy, w11 = fx * fy;
+            const qreal sr = qRed(s00) * w00 + qRed(s10) * w10 + qRed(s01) * w01 + qRed(s11) * w11;
+            const qreal sg = qGreen(s00) * w00 + qGreen(s10) * w10 + qGreen(s01) * w01 + qGreen(s11) * w11;
+            const qreal sb = qBlue(s00) * w00 + qBlue(s10) * w10 + qBlue(s01) * w01 + qBlue(s11) * w11;
+            const qreal sa = qAlpha(s00) * w00 + qAlpha(s10) * w10 + qAlpha(s01) * w01 + qAlpha(s11) * w11;
+            if (sa <= 0.5 && qRound(sa) == 0) {
+                continue; // 采样处无内容，不引入透明
+            }
+            // 预乘各通道线性插值合法
+            QRgb* d = reinterpret_cast<QRgb*>(tile.scanLine(ty)) + tx;
+            const qreal ia = 1.0 - a;
+            *d = qRgba(qRound(qRed(*d) * ia + sr * a),
+                       qRound(qGreen(*d) * ia + sg * a),
+                       qRound(qBlue(*d) * ia + sb * a),
+                       qRound(qAlpha(*d) * ia + sa * a));
+        }
+    }
+}
+
 #endif // WASHBLEND_H

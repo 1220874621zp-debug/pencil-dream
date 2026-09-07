@@ -62,6 +62,11 @@ public:
     /** 镜像绘画的对称中心（画布坐标）；不设置则镜像不生效 */
     void setMirrorCenter(const QPointF& center) { mMirrorCenter = center; mMirrorCenterValid = true; }
 
+    /** 混合笔刷模式：起笔只定位不作画（Krita smudge 首 dab 行为），
+     *  采样/拖尾公式由宿主在 DabPainter 回调里实现 */
+    void setSmudgeMode(bool on) { mSmudgeMode = on; }
+    bool smudgeMode() const { return mSmudgeMode; }
+
     void beginStroke(const QPointF& point, qreal pressure, const QColor& color, const DabPainter& painter);
     void strokeTo(const QPointF& point, qreal pressure, const DabPainter& painter);
     void dabAt(const QPointF& point, qreal pressure, const DabPainter& painter);
@@ -96,6 +101,7 @@ private:
 
     QPointF mMirrorCenter;
     bool mMirrorCenterValid = false;
+    bool mSmudgeMode = false;
     qint64 mLastDabTimeMs = 0; // 喷枪：上一枚 dab 的时刻
     QElapsedTimer mStrokeTimer;
 };

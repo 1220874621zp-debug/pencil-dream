@@ -74,8 +74,10 @@ private:
     QCheckBox* mAirbrushBox = nullptr;
     SpinSlider* mAirbrushRateSlider = nullptr;
     QComboBox* mPaintingModeCombo = nullptr;
+    QWidget* mPaintingModeRow = nullptr;
     QComboBox* mBlendModeCombo = nullptr;
     QGroupBox* mBlendModeGroup = nullptr;
+    QWidget* mMirrorRow = nullptr;
     QCheckBox* mMirrorXBox = nullptr;
     QCheckBox* mMirrorYBox = nullptr;
 

@@ -101,7 +101,7 @@ void ToolOptionWidget::updateUIForTool(BaseTool* tool)
 {
     setWidgetVisibility(mBucketOptionsWidget, tool->type() == BUCKET);
     setWidgetVisibility(mCameraOptionsWidget, tool->type() == CAMERA);
-    const bool isBrushLike = tool->type() == BRUSH || tool->type() == ERASER;
+    const bool isBrushLike = tool->type() == BRUSH || tool->type() == ERASER || tool->type() == SMUDGE;
     setWidgetVisibility(mBrushOptionsWidget, isBrushLike);
     setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool) && !isBrushLike);
     setWidgetVisibility(mTransformOptionsWidget, editor()->tools()->isTransformTool(tool));

@@ -25,6 +25,7 @@ GNU General Public License for more details.
 
 #include "brushtool.h"
 #include "erasertool.h"
+#include "smudgetool.h"
 #include "editor.h"
 #include "managers/toolmanager.h"
 #include "pencildef.h"
@@ -114,7 +115,9 @@ void BrushOptionsWidget::initUI()
     mScatterSlider = makeSlider(tr("散布 %（直径比例）"), 0.0, 500.0);
     mAirbrushBox = new QCheckBox(tr("喷枪"), this);
     mAirbrushRateSlider = makeSlider(tr("喷枪速率 /秒"), 1.0, 100.0);
-    QHBoxLayout* paintModeRow = new QHBoxLayout();
+    mPaintingModeRow = new QWidget(this);
+    QHBoxLayout* paintModeRow = new QHBoxLayout(mPaintingModeRow);
+    paintModeRow->setContentsMargins(0, 0, 0, 0);
     paintModeRow->addWidget(new QLabel(tr("涂料模式"), this));
     mPaintingModeCombo = new QComboBox(this);
     mPaintingModeCombo->addItem(tr("涂抹（同笔不变深）"));
@@ -127,7 +130,9 @@ void BrushOptionsWidget::initUI()
     mBlendModeCombo->addItem(tr("正片叠底"));
     mBlendModeCombo->addItem(tr("滤色"));
     blendRow->addWidget(mBlendModeCombo);
-    QHBoxLayout* mirrorRow = new QHBoxLayout();
+    mMirrorRow = new QWidget(this);
+    QHBoxLayout* mirrorRow = new QHBoxLayout(mMirrorRow);
+    mirrorRow->setContentsMargins(0, 0, 0, 0);
     QLabel* mirrorLabel = new QLabel(tr("镜像"), this);
     mMirrorXBox = new QCheckBox(tr("水平"), this);
     mMirrorYBox = new QCheckBox(tr("垂直"), this);
@@ -138,9 +143,9 @@ void BrushOptionsWidget::initUI()
     advLayout->addWidget(mScatterSlider);
     advLayout->addWidget(mAirbrushBox);
     advLayout->addWidget(mAirbrushRateSlider);
-    advLayout->addLayout(paintModeRow);
+    advLayout->addWidget(mPaintingModeRow);
     advLayout->addWidget(mBlendModeGroup);
-    advLayout->addLayout(mirrorRow);
+    advLayout->addWidget(mMirrorRow);
     layout->addWidget(advGroup);
 
     layout->addStretch();
@@ -190,12 +195,14 @@ void BrushOptionsWidget::updateUI()
     }
     BrushTool* brushTool = dynamic_cast<BrushTool*>(baseTool);
     EraserTool* eraserTool = dynamic_cast<EraserTool*>(baseTool);
-    if (!brushTool && !eraserTool) {
+    SmudgeTool* smudgeTool = dynamic_cast<SmudgeTool*>(baseTool);
+    if (!brushTool && !eraserTool && !smudgeTool) {
         return;
     }
     StrokeTool* strokeTool = static_cast<StrokeTool*>(baseTool);
     const BrushSettings s = brushTool ? brushTool->currentBrushSettings()
-                                      : eraserTool->currentBrushSettings();
+                          : eraserTool ? eraserTool->currentBrushSettings()
+                          : smudgeTool->currentBrushSettings();
 
     mApplying = true;
     mSizeSlider->setValue(s.diameter);
@@ -220,7 +227,13 @@ void BrushOptionsWidget::updateUI()
     mAirbrushRateSlider->setEnabled(s.airbrushEnabled);
     mPaintingModeCombo->setCurrentIndex(s.paintingMode == BrushSettingsPM::Buildup ? 1 : 0);
     mBlendModeCombo->setCurrentIndex(static_cast<int>(s.blendMode));
-    mBlendModeGroup->setVisible(brushTool != nullptr); // 擦除不吃颜色混合
+    // 擦除/混合不吃颜色混合；混合笔刷另隐藏涂料模式/散布/镜像（走采样公式）
+    const bool isSmudge = smudgeTool != nullptr;
+    mBlendModeGroup->setVisible(brushTool != nullptr);
+    mPaintingModeRow->setVisible(!isSmudge);
+    mScatterSlider->setVisible(!isSmudge);
+    mMirrorRow->setVisible(!isSmudge);
+    mFlowSlider->setLabel(isSmudge ? tr("混合速率 %") : tr("流量 %"));
     mMirrorXBox->setChecked(s.mirrorX);
     mMirrorYBox->setChecked(s.mirrorY);
     mApplying = false;
@@ -232,7 +245,7 @@ BaseTool* BrushOptionsWidget::currentPresetCapableTool() const
         return nullptr;
     }
     BaseTool* tool = mEditor->tools()->currentTool();
-    if (tool && (tool->type() == BRUSH || tool->type() == ERASER)) {
+    if (tool && (tool->type() == BRUSH || tool->type() == ERASER || tool->type() == SMUDGE)) {
         return tool;
     }
     return mEditor->tools()->getTool(BRUSH);
@@ -251,6 +264,8 @@ void BrushOptionsWidget::applyFromWidgets()
     if (BrushTool* tool = dynamic_cast<BrushTool*>(baseTool)) {
         s = tool->currentBrushSettings();
     } else if (EraserTool* tool = dynamic_cast<EraserTool*>(baseTool)) {
+        s = tool->currentBrushSettings();
+    } else if (SmudgeTool* tool = dynamic_cast<SmudgeTool*>(baseTool)) {
         s = tool->currentBrushSettings();
     } else {
         return;
@@ -281,6 +296,8 @@ void BrushOptionsWidget::applyFromWidgets()
     if (BrushTool* tool = dynamic_cast<BrushTool*>(baseTool)) {
         tool->applyBrushOptions(s);
     } else if (EraserTool* tool = dynamic_cast<EraserTool*>(baseTool)) {
+        tool->applyBrushOptions(s);
+    } else if (SmudgeTool* tool = dynamic_cast<SmudgeTool*>(baseTool)) {
         tool->applyBrushOptions(s);
     }
     mAirbrushRateSlider->setEnabled(s.airbrushEnabled);

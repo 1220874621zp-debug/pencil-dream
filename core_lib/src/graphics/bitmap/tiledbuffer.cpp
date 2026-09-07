@@ -97,6 +97,54 @@ void TiledBuffer::drawBrush(QPointF point, qreal brushWidth, QPen pen, QBrush br
     }
 }
 
+void TiledBuffer::smudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
+                            qreal rate, const QImage& layerImage, const QPoint& layerOrigin)
+{
+    if (mask.isNull() || rate <= 0.0 || layerImage.isNull()) {
+        return;
+    }
+    const qreal tileSize = UNIFORM_TILE_SIZE;
+    const QRect dabRect(topLeft, mask.size());
+    // 采样区 = dab 区 ∪ 平移 −Δ 的 dab 区，外扩 2px 供双线性
+    const QRect sampleRect = dabRect.translated(-qRound(delta.x()), -qRound(delta.y()))
+                             .united(dabRect).adjusted(-2, -2, 2, 2);
+
+    // 合成采样图：图层 + 笔画缓冲（缓冲内容沿笔画链式更新 → 拖尾）
+    QImage canvas(sampleRect.size(), QImage::Format_ARGB32_Premultiplied);
+    canvas.fill(Qt::transparent);
+    QPainter canvasPainter(&canvas);
+    const QRect layerSrc = QRect(sampleRect.topLeft() - layerOrigin, sampleRect.size())
+                           .intersected(layerImage.rect());
+    if (!layerSrc.isEmpty()) {
+        canvasPainter.drawImage(QRect(layerSrc.topLeft() + layerOrigin - sampleRect.topLeft(),
+                                      layerSrc.size()),
+                                layerImage, QRectF(layerSrc));
+    }
+    for (const Tile* tile : mTiles) {
+        if (!tile->bounds().intersects(sampleRect)) {
+            continue;
+        }
+        canvasPainter.drawImage(tile->pos() - sampleRect.topLeft(), tile->pixmap().toImage());
+    }
+    canvasPainter.end();
+
+    const int xLeft = qFloor(dabRect.left() / tileSize);
+    const int xRight = qFloor(dabRect.right() / tileSize);
+    const int yTop = qFloor(dabRect.top() / tileSize);
+    const int yBottom = qFloor(dabRect.bottom() / tileSize);
+
+    for (int tileY = yTop; tileY <= yBottom; ++tileY) {
+        for (int tileX = xLeft; tileX <= xRight; ++tileX) {
+            Tile* tile = getTileFromIndex({ tileX, tileY });
+            QImage tileImage = tile->pixmap().toImage();
+            smudgeBlendImage(tileImage, tile->pos(), canvas, sampleRect.topLeft(),
+                             mask, topLeft, delta, rate);
+            tile->pixmap() = QPixmap::fromImage(tileImage);
+            mTileBounds.extend(tile->bounds());
+        }
+    }
+}
+
 void TiledBuffer::drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params)
 {
     if (dab.isNull() || params.opacity <= 0.0) {

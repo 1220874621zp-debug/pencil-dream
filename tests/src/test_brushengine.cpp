@@ -30,6 +30,7 @@ GNU General Public License for more details.
 #include "pencildef.h"
 #include "tool/brushtool.h"
 #include "tool/erasertool.h"
+#include "tool/smudgetool.h"
 #include "graphics/bitmap/tile.h"
 #include "graphics/bitmap/tiledbuffer.h"
 
@@ -256,6 +257,77 @@ TEST_CASE("BrushEngine mirror and airbrush")
     }
 }
 
+TEST_CASE("BrushEngine smudge mode skips first dab")
+{
+    BrushSettings settings;
+    settings.diameter = 20.0;
+    settings.pressureSize = false;
+    BrushEngine engine;
+    engine.setSettings(settings);
+    engine.setSmudgeMode(true);
+    int count = 0;
+    const auto painter = [&](const BrushEngine::DabRequest&) { ++count; };
+    engine.beginStroke(QPointF(0, 0), 1.0, QColor(0, 0, 0), painter);
+    REQUIRE(count == 0); // Krita smudge：起笔只定位不作画
+    engine.strokeTo(QPointF(50, 0), 1.0, painter);
+    REQUIRE(count >= 2); // 后续 dab 正常布点
+    engine.endStroke();
+}
+
+TEST_CASE("smudgeBlendImage lerp semantics")
+{
+    // tile 全黑；canvas 左半红右半蓝；Δ=(10,0)、rate=1、全透掩码
+    // → tile(x) 取 canvas(x−10)
+    QImage tile(30, 10, QImage::Format_ARGB32_Premultiplied);
+    tile.fill(QColor(0, 0, 0, 255));
+    QImage canvas(30, 10, QImage::Format_ARGB32_Premultiplied);
+    QPainter cp(&canvas);
+    cp.fillRect(QRect(0, 0, 15, 10), QColor(255, 0, 0, 255));
+    cp.fillRect(QRect(15, 0, 15, 10), QColor(0, 0, 255, 255));
+    cp.end();
+    QImage mask(10, 10, QImage::Format_ARGB32_Premultiplied);
+    mask.fill(QColor(255, 255, 255, 255));
+
+    smudgeBlendImage(tile, QPoint(0, 0), canvas, QPoint(0, 0),
+                     mask, QPoint(10, 0), QPointF(10, 0), 1.0);
+    // tile(10,5) ← canvas(0,5) 红
+    REQUIRE(qRed(tile.pixel(10, 5)) == 255);
+    REQUIRE(qBlue(tile.pixel(10, 5)) == 0);
+    // 掩码挪到 20..29：tile(25,5) ← canvas(15,5) 蓝、tile(20,5) ← canvas(10,5) 红
+    smudgeBlendImage(tile, QPoint(0, 0), canvas, QPoint(0, 0),
+                     mask, QPoint(20, 0), QPointF(10, 0), 1.0);
+    REQUIRE(qBlue(tile.pixel(25, 5)) == 255);
+    REQUIRE(qRed(tile.pixel(25, 5)) == 0);
+    REQUIRE(qRed(tile.pixel(20, 5)) == 255);
+
+    // rate=0.5：黑红对半
+    QImage tile2(30, 10, QImage::Format_ARGB32_Premultiplied);
+    tile2.fill(QColor(0, 0, 0, 255));
+    smudgeBlendImage(tile2, QPoint(0, 0), canvas, QPoint(0, 0),
+                     mask, QPoint(10, 0), QPointF(10, 0), 0.5);
+    REQUIRE(qRed(tile2.pixel(10, 5)) == Approx(127).margin(3));
+    REQUIRE(qBlue(tile2.pixel(10, 5)) == 0);
+}
+
+TEST_CASE("SmudgeTool options integration")
+{
+    Object* object = new Object;
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->init();
+    editor->setObject(object);
+
+    SmudgeTool* tool = dynamic_cast<SmudgeTool*>(editor->tools()->getTool(SMUDGE));
+    REQUIRE(tool != nullptr);
+    const BrushSettings s = tool->currentBrushSettings();
+    REQUIRE(s.flow == Approx(0.5));          // 混合速率默认 50%
+    REQUIRE(s.spacingMode == BrushSettings::SpacingMode::Fixed);
+    REQUIRE(s.spacing == Approx(0.1));       // Krita 混合预设 10% 间距
+    REQUIRE(s.pressureSize == false);        // 压感控速率不控大小
+    // 硬度由羽化映射，受本机已保存设置影响，不作定值断言
+}
+
 TEST_CASE("BrushEngine pressure dynamics")
 {
     BrushSettings settings;
@@ -451,7 +523,9 @@ TEST_CASE("washBlendImage converge, buildup and erase semantics")
         REQUIRE(a1 == Approx(128).margin(2));
         REQUIRE(a2 == Approx(191).margin(3)); // 128 + 128*(1-128/255)
     }
-    // 流量：涂抹模式 flow=0.5 时落在"并集"与"收敛"之间
+    // 流量：涂抹模式 flow 在"并集"与"收敛"间插值。
+    // 首枚 dab 落在空底上 aZero==aFull==srcA'（flow 无差别）；
+    // 第二枚起 aZero(并集) 继续涨、aFull 收敛封顶，flow 决定落点
     {
         QImage canvas(100, 100, QImage::Format_ARGB32_Premultiplied);
         canvas.fill(Qt::transparent);
@@ -459,8 +533,10 @@ TEST_CASE("washBlendImage converge, buildup and erase semantics")
         p.opacity = 0.5;
         p.flow = 0.5;
         washBlendImage(canvas, dab, at, p);
-        const int a = qAlpha(canvas.pixel(50, 50));
-        REQUIRE(a == Approx(64).margin(2)); // 首枚 = aZero*(0.5)+aFull*0.5 = 64
+        REQUIRE(qAlpha(canvas.pixel(50, 50)) == Approx(128).margin(2)); // 首枚
+        washBlendImage(canvas, dab, at, p);
+        // 第二枚：aZero=191、aFull=128，flow=0.5 → ≈160（flow=1 则封在 128）
+        REQUIRE(qAlpha(canvas.pixel(50, 50)) == Approx(160).margin(3));
     }
     // 擦除：涂抹擦把已有 alpha 收缩向 (255-op)
     {
@@ -473,8 +549,8 @@ TEST_CASE("washBlendImage converge, buildup and erase semantics")
         erase.erase = true;
         erase.opacity = 0.5;
         for (int i = 0; i < 5; ++i) washBlendImage(canvas, dab, at, erase);
-        const int a = qAlpha(canvas.pixel(50, 50));
-        REQUIRE(a == Approx(127).margin(3)); // 收敛到 255-128=127，不擦穿
+        // 几何收敛到 255-128=127：每枚 dab 余量减半，5 枚后 131
+        REQUIRE(qAlpha(canvas.pixel(50, 50)) == Approx(131).margin(2));
     }
 }
 

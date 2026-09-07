@@ -177,6 +177,9 @@ public:
     void drawBrush(QPointF thePoint, qreal brushWidth, qreal offset, QColor fillColor, QPainter::CompositionMode compMode, qreal opacity, bool usingFeather = true, bool useAA = false);
     /** 笔刷引擎专用：把一个上好色的 dab 盖到绘制缓冲（Krita 式合成参数，整数对齐） */
     void drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params);
+    /** 混合笔刷：图层+缓冲采样回写（工具每笔缓存图层图与原点，避免逐 dab autoCrop） */
+    void drawSmudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
+                       qreal rate, const QImage& layerImage, const QPoint& layerOrigin);
     void blurBrush(BitmapImage *bmiSource_, QPointF srcPoint_, QPointF thePoint_, qreal brushWidth_, qreal offset_, qreal opacity_);
     void liquifyBrush(BitmapImage *bmiSource_, QPointF srcPoint_, QPointF thePoint_, qreal brushWidth_, qreal offset_, qreal opacity_);
 

@@ -139,8 +139,12 @@ void BrushEngine::beginStroke(const QPointF& point, qreal pressure, const QColor
     mStrokeTimer.start();
     mLastDabTimeMs = 0;
 
-    // 起笔先落一个 dab（Krita 行为：单击即出点）
-    paintDab(point, pressure, painter);
+    // 混合笔刷：首 dab 只定位不作画（kis_colorsmudgeop.cpp:196-199），
+    // 采样基准由宿主在回调里记录
+    if (!mSmudgeMode) {
+        // 起笔先落一个 dab（Krita 行为：单击即出点）
+        paintDab(point, pressure, painter);
+    }
     mRemainingDistance = spacingFor(dabDiameterAt(pressure));
 }
 
