@@ -37,6 +37,18 @@ namespace Theme
     const QColor LayerSound     = QColor(0xFF, 0x8D, 0x70);
     const QColor LayerCamera    = QColor(0xFD, 0xCA, 0x5C);
 
+    const QColor LayerLabelColors[8] =
+    {
+        QColor(0x22, 0xC5, 0x5E), // 0 green
+        QColor(0x06, 0xB6, 0xD4), // 1 cyan
+        QColor(0xA8, 0x55, 0xF7), // 2 purple
+        QColor(0xF9, 0x73, 0x16), // 3 orange
+        QColor(0xF4, 0x3F, 0x5E), // 4 rose
+        QColor(0x3B, 0x82, 0xF6), // 5 blue
+        QColor(0xEA, 0xB3, 0x08), // 6 yellow
+        QColor(0xEC, 0x48, 0x99), // 7 pink
+    };
+
     const QColor TimelineBackground         = QColor(0x16, 0x16, 0x18);
     const QColor TimelineRowAlternate       = QColor(0x1A, 0x1A, 0x1E);
     const QColor TimelineFrameBorder        = QColor(0x2A, 0x2A, 0x2E);

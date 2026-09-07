@@ -28,8 +28,10 @@ GNU General Public License for more details.
 #include <QWheelEvent>
 #include <QSlider>
 #include <QTimer>
+#include <algorithm>
 
 #include "editor.h"
+#include "keyframe.h"
 #include "layermanager.h"
 #include "timecontrols.h"
 #include "timelinecells.h"
@@ -144,11 +146,31 @@ void TimeLine::initUI()
     duplicateKeyButton->setIconSize(QSize(26, 26));
     duplicateKeyButton->setMinimumSize(QSize(34, 34));
 
+    QToolButton* holdOneButton = new QToolButton(this);
+    holdOneButton->setText(QString("×1"));
+    holdOneButton->setToolTip(tr("Hold 1 frame per key"));
+    holdOneButton->setMinimumSize(QSize(34, 34));
+
+    QToolButton* holdTwoButton = new QToolButton(this);
+    holdTwoButton->setText(QString("×2"));
+    holdTwoButton->setToolTip(tr("Hold 2 frames per key"));
+    holdTwoButton->setMinimumSize(QSize(34, 34));
+
+    QToolButton* holdThreeButton = new QToolButton(this);
+    holdThreeButton->setText(QString("×3"));
+    holdThreeButton->setToolTip(tr("Hold 3 frames per key"));
+    holdThreeButton->setMinimumSize(QSize(34, 34));
+
+    QToolButton* holdFourButton = new QToolButton(this);
+    holdFourButton->setText(QString("×4"));
+    holdFourButton->setToolTip(tr("Hold 4 frames per key"));
+    holdFourButton->setMinimumSize(QSize(34, 34));
+
     QLabel* zoomLabel = new QLabel(tr("Zoom:"));
     zoomLabel->setIndent(5);
 
     QSlider* zoomSlider = new QSlider(this);
-    zoomSlider->setRange(4, 40);
+    zoomSlider->setRange(6, 120);
     zoomSlider->setFixedWidth(74);
     zoomSlider->setValue(mTracks->getFrameSize());
     zoomSlider->setToolTip(tr("Adjust frame width"));
@@ -159,6 +181,11 @@ void TimeLine::initUI()
     timelineButtons->addWidget(addKeyButton);
     timelineButtons->addWidget(removeKeyButton);
     timelineButtons->addWidget(duplicateKeyButton);
+    timelineButtons->addSeparator();
+    timelineButtons->addWidget(holdOneButton);
+    timelineButtons->addWidget(holdTwoButton);
+    timelineButtons->addWidget(holdThreeButton);
+    timelineButtons->addWidget(holdFourButton);
     timelineButtons->addSeparator();
     timelineButtons->addWidget(zoomLabel);
     timelineButtons->addWidget(zoomSlider);
@@ -220,7 +247,17 @@ void TimeLine::initUI()
     connect(removeKeyButton, &QToolButton::clicked, this, &TimeLine::removeKeyClick);
     connect(duplicateLayerButton, &QToolButton::clicked, this , &TimeLine::duplicateLayerClick);
     connect(duplicateKeyButton, &QToolButton::clicked, this, &TimeLine::duplicateKeyClick);
+    connect(holdOneButton, &QToolButton::clicked, this, [this]() { applyHoldLength(1); });
+    connect(holdTwoButton, &QToolButton::clicked, this, [this]() { applyHoldLength(2); });
+    connect(holdThreeButton, &QToolButton::clicked, this, [this]() { applyHoldLength(3); });
+    connect(holdFourButton, &QToolButton::clicked, this, [this]() { applyHoldLength(4); });
     connect(zoomSlider, &QSlider::valueChanged, mTracks, &TimeLineCells::setFrameSize);
+    // wheel-driven scaling keeps the slider and the layer list in sync
+    connect(mTracks, &TimeLineCells::frameSizeChanged, zoomSlider, &QSlider::setValue);
+    connect(mTracks, &TimeLineCells::layerHeightChanged, mLayerList, &TimeLineCells::setLayerHeight);
+    // collapse state stays in sync between the layer list and the track view
+    connect(mLayerList, &TimeLineCells::layerCollapsedChanged, mTracks, &TimeLineCells::setLayerCollapsed);
+    connect(mTracks, &TimeLineCells::layerCollapsedChanged, mLayerList, &TimeLineCells::setLayerCollapsed);
 
     connect(mTimeControls, &TimeControls::soundToggled, this, &TimeLine::soundClick);
     connect(mTimeControls, &TimeControls::fpsChanged, this, &TimeLine::fpsChanged);
@@ -402,4 +439,71 @@ void TimeLine::updateVerticalScrollbarPosition()
     {
         mVScrollbar->setValue(idx - height + 1);
     }
+}
+
+/** Redistributes keyframes of the current layer so that each one holds n frames
+ *  (TVP-style exposure). Selected frames are re-spaced starting at the leftmost
+ *  selected frame; when nothing is selected, every frame of the layer is used.
+ */
+void TimeLine::applyHoldLength(int n)
+{
+    if (n < 1) { return; }
+
+    Layer* layer = editor()->layers()->currentLayer();
+    if (layer == nullptr || layer->type() == Layer::SOUND) { return; }
+
+    QList<int> positions = layer->getSelectedFramesByPos();
+    if (positions.isEmpty())
+    {
+        layer->foreachKeyFrame([&positions](KeyFrame* key) { positions.append(key->pos()); });
+        std::sort(positions.begin(), positions.end());
+    }
+    if (positions.count() < 2) { return; }
+
+    // The i-th frame (in the original order) lands on start + i*n
+    const int start = positions.first();
+    QList<int> targets;
+    for (int i = 0; i < positions.count(); i++)
+    {
+        targets.append(start + i * n);
+    }
+
+    bool anyMove = false;
+    for (int i = 0; i < positions.count(); i++)
+    {
+        if (targets[i] != positions[i]) { anyMove = true; break; }
+    }
+    if (!anyMove) { return; }
+
+    editor()->backup(tr("Hold %1").arg(n));
+
+    // Two-phase move to avoid collisions between the frames being rearranged:
+    // 1. park every frame that has to move far beyond the last keyframe
+    // 2. drop them back onto their targets, farthest target first
+    const int parkBase = layer->getMaxKeyFramePosition() + 10000;
+
+    for (int i = 0; i < positions.count(); i++)
+    {
+        if (targets[i] != positions[i])
+        {
+            layer->moveKeyFrame(positions[i], parkBase + i - positions[i]);
+        }
+    }
+
+    for (int i = positions.count() - 1; i >= 0; i--)
+    {
+        if (targets[i] == positions[i]) { continue; }
+
+        // An unselected frame sitting on our target: the redistribution wins
+        if (layer->keyExists(targets[i]))
+        {
+            layer->removeKeyFrame(targets[i]);
+        }
+        layer->moveKeyFrame(parkBase + i, targets[i] - (parkBase + i));
+    }
+
+    editor()->layers()->notifyAnimationLengthChanged();
+    emit editor()->framesModified();
+    updateContent();
+    editor()->updateFrame();
 }

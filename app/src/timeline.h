@@ -85,6 +85,9 @@ protected:
     void resizeEvent( QResizeEvent* event ) override;
     void wheelEvent( QWheelEvent* ) override;
 
+private slots:
+    void applyHoldLength(int n);
+
 private:
     void updateVerticalScrollbarPosition();
 

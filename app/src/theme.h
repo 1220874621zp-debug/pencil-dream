@@ -45,6 +45,9 @@ namespace Theme
     extern const QColor LayerSound;
     extern const QColor LayerCamera;
 
+    // Preset color labels for layers (indexed by Layer::colorIndex(), 0-7)
+    extern const QColor LayerLabelColors[8];
+
     // Timeline specifics (custom-painted, does not follow QSS)
     extern const QColor TimelineBackground;
     extern const QColor TimelineRowAlternate;

@@ -19,6 +19,9 @@ GNU General Public License for more details.
 #define TIMELINECELLS_H
 
 #include <QString>
+#include <QHash>
+#include <QPixmap>
+#include <QSet>
 #include <QWidget>
 #include "layercamera.h"
 
@@ -57,6 +60,8 @@ public:
 
     void setFrameLength(int n) { mFrameLength = n; }
     void setFrameSize(int size);
+    void setLayerHeight(int h);
+    void setLayerCollapsed(int layerId, bool collapsed);
     void clearCache() { delete mCache; mCache = nullptr; }
 
     bool didDetachLayer() const;
@@ -69,6 +74,9 @@ signals:
     void offsetChanged(int);
     void selectionChanged();
     void insertNewKeyFrame();
+    void layerHeightChanged(int h);
+    void layerCollapsedChanged(int layerId, bool collapsed);
+    void frameSizeChanged(int size);
 
 public slots:
     void updateContent();
@@ -86,6 +94,7 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
 
 private slots:
     void loadSetting(SETTING setting);
@@ -94,6 +103,9 @@ private:
     int getLayerNumber(int y) const;
     int getInbetweenLayerNumber(int y) const;
     int getLayerY(int layerNumber) const;
+    int rowHeightOf(int layerNumber) const;
+    bool isLayerCollapsed(int layerNumber) const;
+    void toggleLayerCollapsed(int layerNumber);
     int getFrameX(int frameNumber) const;
     int getFrameNumber(int x) const;
 
@@ -102,6 +114,10 @@ private:
     int blockLengthFor(const Layer* layer, const KeyFrame* key) const;
     /** Returns the keyframe pos whose block's right edge is under the given position, or -1. */
     int hitTestTrimHandle(const QPoint& pos) const;
+    /** Returns the layer index whose trailing "+" handle is under the position, or -1. */
+    int hitTestPlusHandle(const QPoint& pos) const;
+    void paintPlusPreview(QPainter& painter) const;
+    QPixmap thumbnailFor(const Layer* layer, int framePos) const;
     /** Move the selected frames of the source layer to the target layer (same type only). */
     void moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex);
 
@@ -113,6 +129,8 @@ private:
     void paintOnionSkin(QPainter& painter) const;
     void paintLayerGutter(QPainter& painter) const;
     void paintTrack(QPainter& painter, const Layer* layer, int x, int y, int width, int height, bool selected, int frameSize) const;
+    void paintCollapsedTrack(QPainter& painter, const Layer* layer, int x, int y, int width) const;
+    void drawCollapseTriangle(QPainter& painter, const Layer* layer, int x, int y, int width, int height) const;
     void paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const;
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintFrameCursorOnCurrentLayer(QPainter& painter, int recTop, int recWidth, int recHeight) const;
@@ -132,6 +150,8 @@ private:
     TIMELINE_CELL_TYPE mType;
 
     QPixmap* mCache = nullptr;
+    mutable QHash<QString, QPixmap> mThumbCache;
+    QSet<int> mCollapsedLayerIds;
     bool mRedrawContent = false;
     bool mDrawFrameNumber = true;
     bool mbShortScrub = false;
@@ -141,7 +161,7 @@ private:
     bool mScrubbing = false;
     bool mHighlightFrameEnabled = false;
     int mHighlightedFrame = -1;
-    int mLayerHeight = 26;
+    int mLayerHeight = 72;
     int mStartY = 0;
     int mEndY   = 0;
 
@@ -175,6 +195,10 @@ private:
     // Whole-layer grab (Ctrl + drag a block moves every frame of the layer)
     bool mWholeLayerMode = false;
 
+    // Trailing "+" handle drag-create (TVP-style)
+    bool mPlusCreating = false;
+    int mPlusPreviewCount = 0;
+
     // Cross-layer drag & drop
     int mDropTargetLayer = -1;
     int mDropShiftFrames = 0;
@@ -191,7 +215,7 @@ private:
     int mMousePressX = 0;
 
     const static int mOffsetX = 0;
-    const static int mOffsetY = 24;
+    const static int mOffsetY = 28;
     const static int mLayerDetachThreshold = 5;
 
 };

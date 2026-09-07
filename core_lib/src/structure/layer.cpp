@@ -756,6 +756,10 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     layerTag.setAttribute("name", name());
     layerTag.setAttribute("visibility", visible());
     layerTag.setAttribute("type", type());
+    if (mColorIndex >= 0)
+    {
+        layerTag.setAttribute("colorIndex", mColorIndex);
+    }
     return layerTag;
 }
 
@@ -768,4 +772,5 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     }
     setName(elem.attribute("name", "untitled"));
     setVisible(elem.attribute("visibility", "1").toInt());
+    mColorIndex = elem.attribute("colorIndex", "-1").toInt();
 }

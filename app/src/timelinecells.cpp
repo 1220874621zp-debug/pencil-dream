@@ -24,6 +24,11 @@ GNU General Public License for more details.
 #include <QRegularExpression>
 #include <QSettings>
 #include <QDebug>
+#include <QWheelEvent>
+#include <QThreadPool>
+#include <QRunnable>
+#include "layerbitmap.h"
+#include "bitmapimage.h"
 
 #include "camerapropertiesdialog.h"
 #include "theme.h"
@@ -46,6 +51,8 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     mTimeLine = parent;
     mEditor = editor;
     mPrefs = editor->preference();
+    // frame contents changed -> thumbnails must be regenerated
+    connect(mEditor, &Editor::framesModified, this, [this]() { mThumbCache.clear(); });
     mType = type;
 
     mFrameLength = mPrefs->getInt(SETTING::TIMELINE_SIZE);
@@ -114,7 +121,16 @@ void TimeLineCells::setFrameSize(int size)
 
 int TimeLineCells::getLayerNumber(int y) const
 {
-    int layerNumber = mLayerOffset + (y - mOffsetY) / mLayerHeight;
+    // walk variable row heights (collapsed rows are thinner)
+    const int n = mEditor->object()->getLayerCount();
+    int rowLayer = n - 1 - mLayerOffset;
+    int yy = mOffsetY;
+    while (rowLayer >= 0 && yy + rowHeightOf(rowLayer) <= y)
+    {
+        yy += rowHeightOf(rowLayer);
+        --rowLayer;
+    }
+    int layerNumber = rowLayer;
 
     int totalLayerCount = mEditor->object()->getLayerCount();
 
@@ -158,9 +174,46 @@ int TimeLineCells::getInbetweenLayerNumber(int y) const {
     return layerNumber;
 }
 
+int TimeLineCells::rowHeightOf(int layerNumber) const
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    return (l != nullptr && mCollapsedLayerIds.contains(l->id())) ? 18 : mLayerHeight;
+}
+
+bool TimeLineCells::isLayerCollapsed(int layerNumber) const
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    return l != nullptr && mCollapsedLayerIds.contains(l->id());
+}
+
+void TimeLineCells::toggleLayerCollapsed(int layerNumber)
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    if (l == nullptr) return;
+    const int id = l->id();
+    const bool nowCollapsed = !mCollapsedLayerIds.contains(id);
+    setLayerCollapsed(id, nowCollapsed);
+    emit layerCollapsedChanged(id, nowCollapsed);
+}
+
+void TimeLineCells::setLayerCollapsed(int layerId, bool collapsed)
+{
+    if (collapsed)
+        mCollapsedLayerIds.insert(layerId);
+    else
+        mCollapsedLayerIds.remove(layerId);
+    clearCache();
+    updateContent();
+    update();
+}
+
 int TimeLineCells::getLayerY(int layerNumber) const
 {
-    return mOffsetY + (mEditor->object()->getLayerCount() - 1 - layerNumber - mLayerOffset)*mLayerHeight;
+    const int n = mEditor->object()->getLayerCount();
+    int y = mOffsetY;
+    for (int i = n - 1 - mLayerOffset; i > layerNumber; --i)
+        y += rowHeightOf(i);
+    return y;
 }
 
 void TimeLineCells::updateFrame(int frameNumber)
@@ -171,6 +224,7 @@ void TimeLineCells::updateFrame(int frameNumber)
 
 void TimeLineCells::updateContent()
 {
+    mThumbCache.clear();
     mRedrawContent = true;
     update();
 }
@@ -258,13 +312,13 @@ void TimeLineCells::drawContent()
             case TIMELINE_CELL_TYPE::Tracks:
                 paintTrack(painter, layeri, mOffsetX,
                            layerY, widgetWidth - mOffsetX,
-                           mLayerHeight, false, mFrameSize);
+                           rowHeightOf(i), false, mFrameSize);
                 break;
 
             case TIMELINE_CELL_TYPE::Layers:
                 paintLabel(painter, layeri, 0,
                            layerY, widgetWidth - 1,
-                           mLayerHeight, false, mEditor->layerVisibility());
+                           rowHeightOf(i), false, mEditor->layerVisibility());
                 break;
             }
         }
@@ -279,14 +333,17 @@ void TimeLineCells::drawContent()
         {
             paintTrack(painter, currentLayer,
                        mOffsetX, layerYMouseMove,
-                       widgetWidth - mOffsetX, mLayerHeight,
+                       widgetWidth - mOffsetX,
+                       rowHeightOf(mEditor->layers()->currentLayerIndex()),
                        true, mFrameSize);
         }
         else if (mType == TIMELINE_CELL_TYPE::Layers)
         {
             paintLabel(painter, currentLayer,
                        0, layerYMouseMove,
-                       widgetWidth - 1, mLayerHeight, true, mEditor->layerVisibility());
+                       widgetWidth - 1,
+                       rowHeightOf(mEditor->layers()->currentLayerIndex()),
+                       true, mEditor->layerVisibility());
 
             paintLayerGutter(painter);
         }
@@ -300,7 +357,7 @@ void TimeLineCells::drawContent()
                        mOffsetX,
                        getLayerY(mEditor->layers()->currentLayerIndex()),
                        widgetWidth - mOffsetX,
-                       mLayerHeight,
+                       rowHeightOf(mEditor->layers()->currentLayerIndex()),
                        true,
                        mFrameSize);
         }
@@ -311,7 +368,7 @@ void TimeLineCells::drawContent()
                        0,
                        getLayerY(mEditor->layers()->currentLayerIndex()),
                        widgetWidth - 1,
-                       mLayerHeight,
+                       rowHeightOf(mEditor->layers()->currentLayerIndex()),
                        true,
                        mEditor->layerVisibility());
         }
@@ -396,10 +453,26 @@ void TimeLineCells::paintTicks(QPainter& painter, const QPalette& palette) const
     }
 }
 
+void TimeLineCells::paintCollapsedTrack(QPainter& painter, const Layer* layer, int x, int y, int width) const
+{
+    QColor col;
+    if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
+    if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(col);
+    painter.drawRoundedRect(QRectF(x + 1.0, y + 7.0, width - 2.0, 4.0), 2.0, 2.0);
+}
+
 void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
                        int x, int y, int width, int height,
                        bool selected, int frameSize) const
 {
+    if (height <= 20)
+    {
+        paintCollapsedTrack(painter, layer, x, y, width);
+        return;
+    }
     const QPalette palette = QApplication::palette();
     QColor col;
     // Color each track according to the layer type
@@ -412,6 +485,12 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     painter.save();
     painter.setBrush(col);
     painter.setPen(QPen(QBrush(Theme::Border), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    if (layer->colorIndex() >= 0 && layer->colorIndex() < 8)
+    {
+        QColor tint = Theme::LayerLabelColors[layer->colorIndex()];
+        tint.setAlpha(46);
+        painter.fillRect(QRectF(x, y - 1, width, height), tint);
+    }
     painter.drawRoundedRect(QRectF(x, y - 1, width, height), 4.0, 4.0);
 
     if (!layer->visible())
@@ -456,6 +535,93 @@ int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
     return qMax(1, end - key->pos());
 }
 
+int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
+{
+    const int layerIndex = getLayerNumber(pos.y());
+    if (layerIndex < 0 || layerIndex >= mEditor->object()->getLayerCount()) return -1;
+    Layer* layer = mEditor->object()->getLayer(layerIndex);
+    if (layer->type() != Layer::BITMAP) return -1;
+
+    int lastPos = -1;
+    layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
+    if (lastPos < 0) return -1;
+
+    KeyFrame* key = layer->getKeyFrameAt(lastPos);
+    const int standardWidth = mFrameSize - 2;
+    const int recLeft = getFrameX(lastPos) - standardWidth;
+    const int blockLen = blockLengthFor(layer, key);
+    const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
+    const int y = getLayerY(layerIndex);
+    const QRectF handle(recLeft + recWidth - 16.0, y + 1.0, 15.0, 15.0);
+    return handle.contains(QPointF(pos)) ? layerIndex : -1;
+}
+
+QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
+{
+    const QString key = QString("%1_%2").arg(layer->id()).arg(framePos);
+    const auto it = mThumbCache.constFind(key);
+    if (it != mThumbCache.constEnd())
+        return it.value();
+
+    QPixmap thumb;
+    LayerBitmap* bitmapLayer = const_cast<LayerBitmap*>(dynamic_cast<const LayerBitmap*>(layer));
+    if (bitmapLayer != nullptr)
+    {
+        BitmapImage* img = bitmapLayer->getBitmapImageAtFrame(framePos);
+        if (img == nullptr)
+            img = bitmapLayer->getLastBitmapImageAtFrame(framePos);
+        if (img != nullptr && !img->image()->isNull())
+        {
+            // crop to actual content, then letterbox into a 16:9 card
+            const QImage src = img->image()->copy(img->bounds());
+            QImage card(160, 90, QImage::Format_ARGB32_Premultiplied);
+            card.fill(Qt::transparent);
+            QPainter cp(&card);
+            const QSize scaled = src.size().scaled(160, 90, Qt::KeepAspectRatio);
+            const int dx = (160 - scaled.width()) / 2;
+            const int dy = (90 - scaled.height()) / 2;
+            cp.drawImage(QRect(dx, dy, scaled.width(), scaled.height()), src);
+            cp.end();
+            thumb = QPixmap::fromImage(card);
+        }
+    }
+    mThumbCache.insert(key, thumb);
+    if (mThumbCache.size() > 400)
+        mThumbCache.erase(mThumbCache.begin()); // simple bound; refresh clears it anyway
+    return thumb;
+}
+
+void TimeLineCells::paintPlusPreview(QPainter& painter) const
+{
+    if (!mPlusCreating || mPlusPreviewCount <= 0) return;
+    Layer* layer = mEditor->object()->getLayer(mCurrentLayerNumber);
+    if (layer == nullptr || layer->type() != Layer::BITMAP) return;
+
+    int lastPos = -1;
+    layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
+    if (lastPos < 0) return;
+    KeyFrame* key = layer->getKeyFrameAt(lastPos);
+    const int standardWidth = mFrameSize - 2;
+    const int recLeft = getFrameX(lastPos) - standardWidth;
+    const int blockLen = blockLengthFor(layer, key);
+    const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
+    const int y = getLayerY(mCurrentLayerNumber);
+
+    const qreal startX = recLeft + recWidth + 2.0;
+    const qreal w = mPlusPreviewCount * mFrameSize;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QPen dash(Theme::Accent, 1.6, Qt::DashLine);
+    painter.setPen(dash);
+    painter.setBrush(QColor(0xE8, 0x38, 0x5A, 36));
+    painter.drawRoundedRect(QRectF(startX, y + 2.0, w, mLayerHeight - 6.0), 6.0, 6.0);
+    painter.setPen(Theme::AccentHover);
+    painter.drawText(QRectF(startX, y + 2.0, w, mLayerHeight - 6.0),
+                     Qt::AlignCenter, QString("+%1f").arg(mPlusPreviewCount));
+    painter.restore();
+}
+
 void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const
 {
     painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -494,9 +660,12 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         return;
     }
 
-    // Bitmap & sound layers render Dreams-style exposure blocks:
-    // the block spans from the keyframe position to the start of the next keyframe
-    // (auto length) or exactly its trimmed length (explicit).
+    // Bitmap & sound layers render TVPaint-style exposure blocks:
+    // a wide card per keyframe spanning its exposure length, with a
+    // thumbnail zone, frame number, trim-handle bar and a trailing "+".
+    int lastPos = -1;
+    layer->foreachKeyFrame([&](KeyFrame* key) { lastPos = qMax(lastPos, key->pos()); });
+
     layer->foreachKeyFrame([&](KeyFrame* key)
     {
         int framePos = key->pos();
@@ -519,12 +688,46 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
             painter.setBrush(Theme::TimelineFrameFill);
         }
 
-        painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
+        painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 6.0, 6.0);
 
-        // Keyframe marker at the block start
+        // thumbnail card zone inside the block (TVP-style)
+        const qreal thumbH = recHeight - 22.0;
+        const qreal thumbW = qMin(static_cast<qreal>(recWidth) - 8.0, thumbH * 16.0 / 9.0);
+        if (thumbW > 14.0 && thumbH > 10.0)
+        {
+            painter.setPen(Qt::NoPen);
+            const QPixmap thumb = thumbnailFor(layer, framePos);
+            if (!thumb.isNull())
+            {
+                painter.drawPixmap(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), thumb, QRectF(thumb.rect()));
+            }
+            else
+            {
+                painter.setBrush(QColor(0xE8, 0xE8, 0xEA));
+                painter.drawRoundedRect(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), 4.0, 4.0);
+            }
+        }
+
+        // frame number at block bottom center
+        painter.setPen(selected ? QColor(0xE8, 0xE8, 0xEA) : QColor(0x8A, 0x8A, 0x90));
+        painter.drawText(QRectF(recLeft, recTop + recHeight - 17.0, static_cast<qreal>(recWidth), 14.0),
+                         Qt::AlignCenter, QString::number(framePos));
+
+        // right-edge trim handle indicator (3px bar)
         painter.setPen(Qt::NoPen);
         painter.setBrush(trackCol);
-        painter.drawEllipse(QRectF(recLeft + 3.0, recTop + recHeight / 2.0 - 2.0, 4.0, 4.0));
+        painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
+
+        // trailing block: "+" creation handle at top-right corner
+        if (framePos == lastPos)
+        {
+            painter.setBrush(Theme::PanelRaised);
+            painter.setPen(QPen(trackCol, 1.4));
+            painter.drawEllipse(QRectF(recLeft + recWidth - 15.0, recTop + 1.0, 12.0, 12.0));
+            painter.drawLine(QPointF(recLeft + recWidth - 12.2, recTop + 7.0), QPointF(recLeft + recWidth - 5.8, recTop + 7.0));
+            painter.drawLine(QPointF(recLeft + recWidth - 9.0, recTop + 3.8), QPointF(recLeft + recWidth - 9.0, recTop + 10.2));
+        }
+
         painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     });
 }
@@ -649,11 +852,48 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
     painter.restore();
 }
 
+void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, int x, int y, int width, int height) const
+{
+    Q_UNUSED(layer)
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x8A, 0x8A, 0x90));
+    const QPointF c(x + width - 13.0, y + height / 2.0);
+    QPolygonF tri2;
+    // collapsed -> right-pointing, expanded -> down-pointing
+    if (height <= 20)
+    {
+        tri2 << QPointF(c.x() - 3.0, c.y() - 4.0) << QPointF(c.x() + 4.0, c.y()) << QPointF(c.x() - 3.0, c.y() + 4.0);
+    }
+    else
+    {
+        tri2 << QPointF(c.x() - 4.0, c.y() - 3.0) << QPointF(c.x() + 4.0, c.y() - 3.0) << QPointF(c.x(), c.y() + 4.0);
+    }
+    painter.drawPolygon(tri2);
+    painter.restore();
+}
+
 void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
                        int x, int y, int width, int height,
                        bool selected, LayerVisibility layerVisibility) const
 {
     const QPalette palette = QApplication::palette();
+
+    if (height <= 20) // collapsed row: color chip + name + expand triangle
+    {
+        if (layer->colorIndex() >= 0 && layer->colorIndex() < 8)
+        {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(Theme::LayerLabelColors[layer->colorIndex()]);
+            painter.drawRoundedRect(QRectF(x + 1.0, y + 5.0, 4.0, height - 10), 2.0, 2.0);
+        }
+        painter.setPen(selected ? Theme::AccentHover : QColor(0x8A, 0x8A, 0x90));
+        painter.drawText(QPoint(x + 12, y + height - 6), layer->name());
+        drawCollapseTriangle(painter, layer, x, y, width, height);
+        return;
+    }
+    drawCollapseTriangle(painter, layer, x, y, width, height);
 
     // Row background: rounded card, selected rows get a subtle raised tone
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -673,6 +913,13 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.setBrush(Theme::Accent);
         painter.drawRoundedRect(QRectF(x + 2, y + 6, 3.0, height - 12), 1.5, 1.5);
+    }
+
+    // TVP-style 8-color label bar (click cycles through colors)
+    if (layer->colorIndex() >= 0 && layer->colorIndex() < 8)
+    {
+        painter.setBrush(Theme::LayerLabelColors[layer->colorIndex()]);
+        painter.drawRoundedRect(QRectF(x + 0.5, y + 4, 5.0, height - 8), 2.0, 2.0);
     }
 
     if (!layer->visible())
@@ -823,6 +1070,28 @@ void TimeLineCells::paintEvent(QPaintEvent*)
 
     if (mType == TIMELINE_CELL_TYPE::Tracks)
     {
+        // selected frames highlighted on the ruler (TVP-style)
+        Layer* rulerLayer = mEditor->layers()->currentLayer();
+        if (rulerLayer != nullptr && rulerLayer->hasAnySelectedFrames())
+        {
+            painter.setPen(Qt::NoPen);
+            QColor hl = Theme::Accent;
+            hl.setAlpha(40);
+            painter.setBrush(hl);
+            const int standardWidth = mFrameSize - 2;
+            for (int framePos : rulerLayer->getSelectedFramesByPos())
+            {
+                const int x = getFrameX(framePos) - standardWidth;
+                painter.drawRect(QRect(x, 1, mFrameSize + 1, 4));
+            }
+        }
+
+        // "+" handle drag-create preview
+        paintPlusPreview(painter);
+    }
+
+    if (mType == TIMELINE_CELL_TYPE::Tracks)
+    {
         if (!isPlaying) {
             paintOnionSkin(painter);
         }
@@ -894,6 +1163,44 @@ void TimeLineCells::paintEvent(QPaintEvent*)
     }
 }
 
+void TimeLineCells::setLayerHeight(int h)
+{
+    mLayerHeight = qBound(26, h, 110);
+    clearCache();
+    updateContent();
+    update();
+}
+
+void TimeLineCells::wheelEvent(QWheelEvent* event)
+{
+    // Track view only: wheel scales the row height, Alt+wheel scales the frame width
+    if (mType != TIMELINE_CELL_TYPE::Tracks)
+    {
+        QWidget::wheelEvent(event);
+        return;
+    }
+    const int delta = event->angleDelta().y();
+    if (event->modifiers() & Qt::AltModifier)
+    {
+        const int newSize = qBound(6, mFrameSize + (delta > 0 ? 4 : -4), 120);
+        if (newSize != mFrameSize)
+        {
+            setFrameSize(newSize);
+            emit frameSizeChanged(newSize);
+        }
+    }
+    else
+    {
+        const int newHeight = qBound(26, mLayerHeight + (delta > 0 ? 8 : -8), 110);
+        if (newHeight != mLayerHeight)
+        {
+            setLayerHeight(newHeight);
+            emit layerHeightChanged(newHeight);
+        }
+    }
+    event->accept();
+}
+
 void TimeLineCells::resizeEvent(QResizeEvent* event)
 {
     clearCache();
@@ -940,6 +1247,8 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     mDropShiftFrames = 0;
     mTrimming = false;
     mTrimKeyPos = -1;
+    mPlusCreating = false;
+    mPlusPreviewCount = 0;
 
     primaryButton = event->button();
 
@@ -948,7 +1257,18 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     case TIMELINE_CELL_TYPE::Layers:
         if (layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
         {
-            if (event->pos().x() < 15)
+            if (event->pos().x() < 9)
+            {
+                // cycle the 8-color label: -1 -> 0 -> ... -> 7 -> -1
+                Layer* labelLayer = mEditor->object()->getLayer(layerNumber);
+                labelLayer->setColorIndex((labelLayer->colorIndex() + 2) % 9 - 1);
+                updateContent();
+            }
+            else if (event->pos().x() > width() - 24)
+            {
+                toggleLayerCollapsed(layerNumber);
+            }
+            else if (event->pos().x() < 30)
             {
                 mEditor->switchVisibilityOfLayer(layerNumber);
             }
@@ -960,7 +1280,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         if (layerNumber == -1)
         {
-            if (event->pos().x() < 15)
+            if (event->pos().x() < 30)
             {
                 if (event->button() == Qt::LeftButton) {
                     mEditor->increaseLayerVisibilityIndex();
@@ -977,6 +1297,24 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         else
         {
+            // TVP-style trailing "+": dragging it out creates consecutive new frames
+            if (event->button() == Qt::LeftButton)
+            {
+                const int plusLayer = hitTestPlusHandle(event->pos());
+                if (plusLayer != -1)
+                {
+                    if (mEditor->currentLayerIndex() != plusLayer)
+                    {
+                        mEditor->layers()->currentLayer()->deselectAll();
+                        mEditor->layers()->setCurrentLayer(plusLayer);
+                    }
+                    mPlusCreating = true;
+                    mPlusPreviewCount = 0;
+                    update();
+                    break;
+                }
+            }
+
             // Dreams-style trim: grabbing the right edge of a bitmap block adjusts its length
             if (event->button() == Qt::LeftButton && layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
             {
@@ -1120,6 +1458,30 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 {
     mMouseMoveX = event->pos().x();
+
+    if (mPlusCreating && mType == TIMELINE_CELL_TYPE::Tracks)
+    {
+        Layer* layer = mEditor->object()->getLayer(mCurrentLayerNumber);
+        if (layer != nullptr && layer->type() == Layer::BITMAP)
+        {
+            int lastPos = -1;
+            layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
+            if (lastPos >= 0)
+            {
+                const int blockLen = blockLengthFor(layer, layer->getKeyFrameAt(lastPos));
+                const int endFrame = lastPos + blockLen;
+                const int n = qMax(0, getFrameNumber(event->pos().x()) - endFrame + 1);
+                if (n != mPlusPreviewCount)
+                {
+                    mPlusPreviewCount = n;
+                    update();
+                }
+            }
+        }
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
     mFramePosMoveX = getFrameNumber(mMouseMoveX);
     mLayerPosMoveY = getLayerNumber(event->pos().y());
 
@@ -1262,7 +1624,32 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         Layer* currentLayer = mEditor->layers()->getLayer(mCurrentLayerNumber);
         Q_ASSERT(currentLayer);
 
-        if (mTrimming)
+        if (mPlusCreating)
+        {
+            mPlusCreating = false;
+            const int n = mPlusPreviewCount;
+            mPlusPreviewCount = 0;
+            if (n > 0)
+            {
+                Layer* layer = mEditor->layers()->getLayer(mCurrentLayerNumber);
+                if (layer != nullptr && layer->type() == Layer::BITMAP)
+                {
+                    int lastPos = -1;
+                    layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
+                    const int blockLen = (lastPos >= 0) ? blockLengthFor(layer, layer->getKeyFrameAt(lastPos)) : 1;
+                    const int startFrame = (lastPos >= 0) ? lastPos + blockLen : getFrameNumber(mMousePressX);
+                    for (int i = 0; i < n; i++)
+                    {
+                        mEditor->scrubTo(startFrame + i);
+                        mEditor->addNewKey();
+                    }
+                    mEditor->layers()->notifyAnimationLengthChanged();
+                    emit mEditor->framesModified();
+                }
+            }
+            updateContent();
+        }
+        else if (mTrimming)
         {
             mTrimming = false;
             KeyFrame* trimKey = currentLayer->getKeyFrameAt(mTrimKeyPos);

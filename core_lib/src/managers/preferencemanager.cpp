@@ -94,6 +94,7 @@ void PreferenceManager::loadPrefs()
     set(SETTING::UNDO_REDO_MAX_STEPS,      settings.value(SETTING_UNDO_REDO_MAX_STEPS,    100).toInt());
 
     set(SETTING::FPS,                      settings.value(SETTING_FPS,                    12).toInt());
+    set(SETTING::PLAYBACK_SPEED,           settings.value(SETTING_PLAYBACK_SPEED,         1.0).toFloat());
     set(SETTING::FIELD_W,                  settings.value(SETTING_FIELD_W,                800).toInt());
     set(SETTING::FIELD_H,                  settings.value(SETTING_FIELD_H,                600).toInt());
     set(SETTING::TIMECODE_TEXT,            settings.value(SETTING_TIMECODE_TEXT,          1).toInt());
@@ -110,7 +111,7 @@ void PreferenceManager::loadPrefs()
 
     // Timeline
     set(SETTING::SHORT_SCRUB,              settings.value(SETTING_SHORT_SCRUB,            false ).toBool());
-    set(SETTING::FRAME_SIZE,               settings.value(SETTING_FRAME_SIZE,             12).toInt());
+    set(SETTING::FRAME_SIZE,               settings.value(SETTING_FRAME_SIZE,             56).toInt());
     set(SETTING::TIMELINE_SIZE,            settings.value(SETTING_TIMELINE_SIZE,          240).toInt());
     set(SETTING::DRAW_LABEL,               settings.value(SETTING_DRAW_LABEL,             false ).toBool());
     set(SETTING::LABEL_FONT_SIZE,          settings.value(SETTING_LABEL_FONT_SIZE,        12).toInt());
@@ -223,6 +224,9 @@ void PreferenceManager::set(SETTING option, float value)
     QSettings settings(PENCIL2D, PENCIL2D);
     switch(option)
     {
+    case SETTING::PLAYBACK_SPEED:
+        settings.setValue(SETTING_PLAYBACK_SPEED, value);
+        break;
     case SETTING::LAYER_VISIBILITY_THRESHOLD:
         settings.setValue(SETTING_LAYER_VISIBILITY_THRESHOLD, value);
         break;

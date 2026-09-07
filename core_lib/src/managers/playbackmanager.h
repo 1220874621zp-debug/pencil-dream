@@ -60,6 +60,10 @@ public:
     int markOutFrame() { return mMarkOutFrame; }
 
     void setFps(int fps);
+    void setPlaybackSpeed(qreal speed);
+    qreal playbackSpeed() const { return mPlaybackSpeed; }
+    void setDropFrames(bool b) { mDropFrames = b; }
+    bool dropFrames() const { return mDropFrames; }
     void setLooping(bool isLoop);
     void enableRangedPlayback(bool b);
     void setRangedStartFrame(int frame);
@@ -73,6 +77,7 @@ private slots:
 
 signals:
     void fpsChanged(int fps);
+    void fpsMeasured(qreal actualFps);
     void loopStateChanged(bool b);
     void rangedPlaybackStateChanged(bool b);
     void playStateChanged(bool isPlaying);
@@ -82,6 +87,7 @@ private:
     void flipTimerTick();
     void playSounds(int frame);
     bool skipFrame();
+    qreal playbackInterval() const;
 
     int mStartFrame = 1;
     int mEndFrame = 60;
@@ -98,6 +104,8 @@ private:
     int mActiveSoundFrame = 0;
 
     int mFps = 12;
+    qreal mPlaybackSpeed = 1.0;
+    bool mDropFrames = false;
 
     int mFlipRollInterval = 100;
     int mFlipInbetweenInterval = 100;
@@ -110,6 +118,8 @@ private:
     QTimer* mScrubTimer = nullptr;
     QElapsedTimer* mElapsedTimer = nullptr;
     int mPlayingFrameCounter = 0; // how many frames has passed after pressing play
+    int mFpsWindowFrameCount = 0; // frames played within the current fps measurement window
+    qint64 mFpsWindowStartMsec = 0; // start time of the fps measurement window (msec, relative to mElapsedTimer)
 
     bool mCheckForSoundsHalfway = false;
     QVector<int> mListOfActiveSoundFrames;

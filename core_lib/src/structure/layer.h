@@ -53,6 +53,10 @@ public:
     void setName(QString name) { mName = name; }
     QString name() const { return mName; }
 
+    /** Color label index of the layer (-1 = none, 0-7 = preset label colors) */
+    int colorIndex() const { return mColorIndex; }
+    void setColorIndex(int colorIndex) { mColorIndex = colorIndex; }
+
     void switchVisibility() { mVisible = !mVisible; }
 
     bool visible() const { return mVisible; }
@@ -192,6 +196,7 @@ private:
     int        mId = 0;
     bool       mVisible = true;
     QString    mName;
+    int        mColorIndex = -1;
 
     std::map<int, KeyFrame*, std::greater<int>> mKeyFrames;
 

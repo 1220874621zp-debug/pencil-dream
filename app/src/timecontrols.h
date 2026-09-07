@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QToolButton>
 #include <QSpinBox>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
 
 class Editor;
@@ -70,6 +71,8 @@ private:
     void loopStartValueChanged(int);
     void loopEndValueChanged(int);
     void updateSoundScrubIcon(bool soundScrubEnabled);
+    void playbackSpeedChanged(int index);
+    void updateFpsLabel(qreal actualFps);
 
     void noTimecodeText();
     void onlyFramesText();
@@ -84,6 +87,8 @@ private:
     QPushButton* mSoundButton = nullptr;
     QPushButton* mSoundScrubButton = nullptr;
     QSpinBox*    mFpsBox = nullptr;
+    QComboBox*   mPlaybackSpeedBox = nullptr;
+    QLabel*      mFpsLabel = nullptr;
     QCheckBox*   mPlaybackRangeCheckBox = nullptr;
     QSpinBox*    mLoopStartSpinBox = nullptr;
     QSpinBox*    mLoopEndSpinBox = nullptr;

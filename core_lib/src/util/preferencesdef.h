@@ -40,6 +40,7 @@ enum class SETTING
     AUTO_SAVE_BY_TIME_TIMER,
     SHORT_SCRUB,
     FPS,
+    PLAYBACK_SPEED,
     FIELD_W,
     FIELD_H,
     FRAME_SIZE,

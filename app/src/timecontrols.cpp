@@ -88,6 +88,29 @@ void TimeControls::initUI()
         mTimecodeLabel->setToolTip("");
     }
 
+    mPlaybackSpeedBox = new QComboBox(this);
+    mPlaybackSpeedBox->setFixedHeight(24);
+    mPlaybackSpeedBox->setToolTip(tr("Playback speed"));
+    mPlaybackSpeedBox->setFocusPolicy(Qt::WheelFocus);
+    mPlaybackSpeedBox->addItem("0.25x", 0.25);
+    mPlaybackSpeedBox->addItem("0.5x", 0.5);
+    mPlaybackSpeedBox->addItem("1x", 1.0);
+    mPlaybackSpeedBox->addItem("1.5x", 1.5);
+    mPlaybackSpeedBox->addItem("2x", 2.0);
+    mPlaybackSpeedBox->addItem("4x", 4.0);
+    qreal savedSpeed = mEditor->preference()->getFloat(SETTING::PLAYBACK_SPEED);
+    if (savedSpeed <= 0) { savedSpeed = 1.0; }
+    int speedIndex = mPlaybackSpeedBox->findData(savedSpeed);
+    if (speedIndex < 0) { speedIndex = 2; } // default: 1x
+    mPlaybackSpeedBox->setCurrentIndex(speedIndex);
+    mEditor->playback()->setPlaybackSpeed(mPlaybackSpeedBox->currentData().toDouble());
+
+    mFpsLabel = new QLabel(this);
+    mFpsLabel->setFixedWidth(60);
+    mFpsLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    mFpsLabel->setToolTip(tr("Measured frames per second during playback"));
+    mFpsLabel->setStyleSheet("color: #8A8A90;");
+
     mLoopStartSpinBox = new QSpinBox(this);
     mLoopStartSpinBox->setFixedHeight(24);
     mLoopStartSpinBox->setValue(settings.value("loopStart").toInt());
@@ -154,6 +177,8 @@ void TimeControls::initUI()
     addWidget(mJumpToEndButton);
     addWidget(mLoopButton);
     addWidget(mFpsBox);
+    addWidget(mPlaybackSpeedBox);
+    addWidget(mFpsLabel);
     addWidget(mPlaybackRangeCheckBox);
     addWidget(mLoopStartSpinBox);
     addWidget(mLoopEndSpinBox);
@@ -235,6 +260,9 @@ void TimeControls::makeConnections()
 
     connect(mFpsBox, spinBoxValueChanged, this, &TimeControls::fpsChanged);
     connect(mFpsBox, &QSpinBox::editingFinished, this, &TimeControls::onFpsEditingFinished);
+
+    connect(mPlaybackSpeedBox, &QComboBox::currentIndexChanged, this, &TimeControls::playbackSpeedChanged);
+    connect(mEditor->playback(), &PlaybackManager::fpsMeasured, this, &TimeControls::updateFpsLabel);
 
     connect(mFpsBox, spinBoxValueChanged, this, &TimeControls::setFps);
     connect(mEditor, &Editor::fpsChanged, this, &TimeControls::setFps);
@@ -364,6 +392,22 @@ void TimeControls::onFpsEditingFinished()
     mFpsBox->clearFocus();
     emit fpsChanged(mFpsBox->value());
     mFps = mFpsBox->value();
+}
+
+void TimeControls::playbackSpeedChanged(int index)
+{
+    qreal speed = mPlaybackSpeedBox->itemData(index, Qt::UserRole).toDouble();
+    mEditor->playback()->setPlaybackSpeed(speed);
+    mEditor->preference()->set(SETTING::PLAYBACK_SPEED, static_cast<float>(speed));
+}
+
+void TimeControls::updateFpsLabel(qreal actualFps)
+{
+    const qreal targetFps = mEditor->playback()->fps() * mEditor->playback()->playbackSpeed();
+    // warn in red when the measured rate falls below 80 percent of the target
+    const QString color = (actualFps < targetFps * 0.8) ? QString("#F43F5E") : QString("#8A8A90");
+    mFpsLabel->setText(QString("%1fps").arg(QString::number(actualFps, 'f', 1)));
+    mFpsLabel->setStyleSheet(QString("color: %1;").arg(color));
 }
 
 void TimeControls::updateTimecodeLabel(int frame)

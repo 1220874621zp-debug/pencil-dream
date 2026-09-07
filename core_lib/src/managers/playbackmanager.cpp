@@ -55,6 +55,7 @@ bool PlaybackManager::init()
     mMsecSoundScrub = settings.value(SETTING_SOUND_SCRUB_MSEC).toInt();
     if (mMsecSoundScrub == 0) { mMsecSoundScrub = 100; }
     mSoundScrub = settings.value(SETTING_SOUND_SCRUB_ACTIVE).toBool();
+    mPlaybackSpeed = qBound(0.25, settings.value(SETTING_PLAYBACK_SPEED, 1.0).toDouble(), 4.0);
 
     mElapsedTimer = new QElapsedTimer;
     connect(mTimer, &QTimer::timeout, this, &PlaybackManager::timerTick);
@@ -112,12 +113,16 @@ void PlaybackManager::play()
     mCheckForSoundsHalfway = true;
     playSounds(frame);
 
-    mTimer->setInterval(static_cast<int>(1000.f / mFps));
+    mTimer->setInterval(qMax(1, qRound(playbackInterval())));
     mTimer->start();
 
     // for error correction, please ref skipFrame()
     mPlayingFrameCounter = 1;
     mElapsedTimer->start();
+
+    // reset real-time fps statistics
+    mFpsWindowStartMsec = 0;
+    mFpsWindowFrameCount = 0;
 
     emit playStateChanged(true);
 }
@@ -246,6 +251,39 @@ void PlaybackManager::setFps(int fps)
     }
 }
 
+qreal PlaybackManager::playbackInterval() const
+{
+    Q_ASSERT(mFps > 0);
+    return 1000.0 / (mFps * mPlaybackSpeed);
+}
+
+void PlaybackManager::setPlaybackSpeed(qreal speed)
+{
+    const qreal clamped = qBound(0.25, speed, 4.0);
+
+    if (qFuzzyCompare(mPlaybackSpeed, clamped))
+    {
+        return;
+    }
+
+    mPlaybackSpeed = clamped;
+
+    if (mTimer->isActive())
+    {
+        // Restart the timer with the new interval (QTimer::setInterval
+        // restarts an active timer). The pacing references must be reset
+        // too, otherwise the error correction in skipFrame() and the
+        // drop-frame catch-up in timerTick() would misinterpret the
+        // frames played so far as a huge lag.
+        mTimer->setInterval(qMax(1, qRound(playbackInterval())));
+        mPlayingFrameCounter = 1;
+        mElapsedTimer->start();
+
+        mFpsWindowStartMsec = 0;
+        mFpsWindowFrameCount = 0;
+    }
+}
+
 void PlaybackManager::playSounds(int frame)
 {
     // If sound is turned off, don't play anything.
@@ -342,7 +380,7 @@ bool PlaybackManager::skipFrame()
     //qDebug("Expected:  %.2f ms", expectedTime);
     //qDebug("Actual:    %d   ms", mElapsedTimer->elapsed());
 
-    int t = qRound((mPlayingFrameCounter - 1) * (1000.f / mFps));
+    int t = qRound((mPlayingFrameCounter - 1) * playbackInterval());
     if (mElapsedTimer->elapsed() < t)
     {
         qDebug() << "skip";
@@ -407,8 +445,35 @@ void PlaybackManager::timerTick()
     if (skipFrame())
         return;
 
-    // keep going
-    editor()->scrubForward();
+    // Number of frames to advance this tick. In drop-frames mode we catch up
+    // when rendering falls behind, otherwise we always advance a single frame.
+    int framesToAdvance = 1;
+    if (mDropFrames)
+    {
+        const qreal interval = playbackInterval();
+        const int playedFrames = mPlayingFrameCounter - 1;
+        const qreal lagMsec = mElapsedTimer->elapsed() - playedFrames * interval;
+        if (lagMsec > 2.0 * interval)
+        {
+            framesToAdvance += static_cast<int>(lagMsec / interval);
+        }
+    }
+
+    editor()->scrubTo(qMin(currentFrame + framesToAdvance, mEndFrame));
+
+    // keep skipFrame()'s error correction in sync with the frames played
+    mPlayingFrameCounter += framesToAdvance - 1;
+
+    // real-time fps statistics, emitted every 500 ms
+    ++mFpsWindowFrameCount;
+    const qint64 nowMsec = mElapsedTimer->elapsed();
+    const qint64 windowElapsed = nowMsec - mFpsWindowStartMsec;
+    if (windowElapsed >= 500)
+    {
+        emit fpsMeasured(mFpsWindowFrameCount * 1000.0 / windowElapsed);
+        mFpsWindowStartMsec = nowMsec;
+        mFpsWindowFrameCount = 0;
+    }
 
     int newFrame = editor()->currentFrame();
     playSounds(newFrame);
