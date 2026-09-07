@@ -81,6 +81,12 @@ public:
     bool locked() const { return mLocked; }
     void setLocked(bool b) { mLocked = b; }
 
+    /** Clipping mask (PS-style): the layer is clipped to the alpha of the
+     *  accumulated layers below it. Consecutive clipped layers share the same
+     *  base (the first non-clipped layer below the run). Bitmap layers only. */
+    bool clipMask() const { return mClipMask; }
+    void setClipMask(bool b) { mClipMask = b; }
+
     /** Get selected keyframe positions sorted by position */
     QList<int> selectedKeyFramesPositions() const { return mSelectedFrames_byPosition; }
 
@@ -245,6 +251,7 @@ private:
     bool       mVisible = true;
     qreal      mOpacity = 1.0;
     bool       mLocked = false;
+    bool       mClipMask = false;
     QString    mName;
     int        mColorIndex = -1;
 

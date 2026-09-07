@@ -87,11 +87,34 @@ void CanvasPainter::paintCached(const QRect& blitRect)
 {
     if (!mPreLayersPixmapCacheValid)
     {
+        if (mAnyClipMask)
+        {
+            ensureClipAccum();
+            clearClipAccum(blitRect);
+            mClipGroupValid = false;
+        }
         QPainter preLayerPainter;
         initializePainter(preLayerPainter, mPreLayersPixmap, blitRect);
         renderPreLayers(preLayerPainter, blitRect);
         preLayerPainter.end();
         mPreLayersPixmapCacheValid = true;
+        if (mAnyClipMask)
+        {
+            // snapshot for cached-pre passes: the current layer still needs
+            // the alpha of everything below it
+            mClipAccumAfterPre = mClipAccum;
+            mClipAfterPreValid = true;
+        }
+    }
+    else if (mAnyClipMask)
+    {
+        ensureClipAccum();
+        if (mClipAfterPreValid)
+        {
+            // restore the after-pre state; QImage assignment is copy-on-write
+            mClipAccum = mClipAccumAfterPre;
+        }
+        mClipGroupValid = false;
     }
 
     QPainter mainPainter;
@@ -163,6 +186,16 @@ void CanvasPainter::setPaintSettings(const Object* object, int currentLayer, int
 {
     Q_ASSERT(object);
     mObject = object;
+    mAnyClipMask = false;
+    for (int i = 0; i < object->getLayerCount(); ++i)
+    {
+        Layer* layer = object->getLayer(i);
+        if (layer && layer->type() == Layer::BITMAP && layer->clipMask())
+        {
+            mAnyClipMask = true;
+            break;
+        }
+    }
 
     CANVASPAINTER_LOG("Set CurrentLayerIndex = %d", currentLayer);
     mCurrentLayerIndex = currentLayer;
@@ -176,11 +209,23 @@ void CanvasPainter::paint(const QRect& blitRect)
     QPainter mainPainter;
     QPainter postLayerPainter;
 
+    if (mAnyClipMask)
+    {
+        ensureClipAccum();
+        clearClipAccum(blitRect);
+        mClipGroupValid = false;
+    }
+
     initializePainter(mainPainter, mCanvas, blitRect);
 
     initializePainter(preLayerPainter, mPreLayersPixmap, blitRect);
     renderPreLayers(preLayerPainter, blitRect);
     preLayerPainter.end();
+    if (mAnyClipMask)
+    {
+        mClipAccumAfterPre = mClipAccum;
+        mClipAfterPreValid = true;
+    }
 
     mainPainter.setWorldMatrixEnabled(false);
     mainPainter.drawPixmap(mPointZero, mPreLayersPixmap);
@@ -278,7 +323,7 @@ void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPa
     painter.drawPixmap(mPointZero, mOnionSkinPixmap);
 }
 
-void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer)
+void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask)
 {
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
     // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing
@@ -312,7 +357,50 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
         paintTransformedSelection(currentBitmapPainter, paintedImage, mSelection);
     }
 
+    // the layer pixmap can only host one painter at a time
+    currentBitmapPainter.end();
+
+    if (clipMask)
+    {
+        // keep the layer content only where the accumulated alpha below is
+        // present (both share the canvas geometry and device pixel ratio)
+        QPainter maskPainter(&mCurrentLayerPixmap);
+        maskPainter.setWorldMatrixEnabled(false);
+        maskPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+        maskPainter.drawImage(mPointZero, *clipMask);
+    }
+
     painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
+}
+
+void CanvasPainter::ensureClipAccum()
+{
+    const qreal dpr = mCanvas.devicePixelRatioF();
+    if (mClipAccum.size() != mCanvas.size()
+        || !qFuzzyCompare(mClipAccum.devicePixelRatio(), dpr))
+    {
+        mClipAccum = QImage(mCanvas.size(), QImage::Format_ARGB32_Premultiplied);
+        mClipAccum.setDevicePixelRatio(dpr);
+        mClipAccum.fill(Qt::transparent);
+        mClipGroupValid = false;
+        mClipAfterPreValid = false;
+    }
+}
+
+void CanvasPainter::clearClipAccum(const QRect& blitRect)
+{
+    QPainter accumPainter(&mClipAccum);
+    accumPainter.setWorldMatrixEnabled(false);
+    accumPainter.setCompositionMode(QPainter::CompositionMode_Clear);
+    accumPainter.fillRect(blitRect, Qt::transparent);
+}
+
+void CanvasPainter::clipAccumulate(const QPixmap& layerContent, qreal opacity)
+{
+    QPainter accumPainter(&mClipAccum);
+    accumPainter.setWorldMatrixEnabled(false);
+    accumPainter.setOpacity(opacity);
+    accumPainter.drawPixmap(mPointZero, layerContent);
 }
 
 void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bitmapImage, const QRect& selection) const
@@ -381,7 +469,34 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         CANVASPAINTER_LOG("  Render Layer[%d] %s", i, layer->name());
         switch (layer->type())
         {
-        case Layer::BITMAP: { paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer); break; }
+        case Layer::BITMAP: {
+            if (mAnyClipMask)
+            {
+                QImage* clip = nullptr;
+                if (layer->clipMask())
+                {
+                    // a run of clipped layers shares one base snapshot
+                    if (!mClipGroupValid)
+                    {
+                        mClipGroupMask = mClipAccum.copy();
+                        mClipGroupMask.setDevicePixelRatio(mClipAccum.devicePixelRatio());
+                        mClipGroupValid = true;
+                    }
+                    clip = &mClipGroupMask;
+                }
+                else
+                {
+                    mClipGroupValid = false;
+                }
+                paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer, clip);
+                clipAccumulate(mCurrentLayerPixmap, painter.opacity());
+            }
+            else
+            {
+                paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer);
+            }
+            break;
+        }
         default: break;
         }
     }

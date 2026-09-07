@@ -725,28 +725,107 @@ void Object::paintImage(QPainter& painter,int frameNumber,
         painter.setWorldMatrixEnabled(true);
     }
 
+    bool anyClipMask = false;
     for (Layer* layer : mLayers)
     {
-        if (!layer->visible())
+        if (layer->type() == Layer::BITMAP && layer->clipMask())
+        {
+            anyClipMask = true;
+            break;
+        }
+    }
+
+    if (!anyClipMask)
+    {
+        for (Layer* layer : mLayers)
+        {
+            if (!layer->visible())
+            {
+                continue;
+            }
+
+            painter.setOpacity(1.0);
+
+            if (layer->type() == Layer::BITMAP)
+            {
+
+                LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
+                BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
+                if (bitmap)
+                {
+                    // same layer-opacity blend as CanvasPainter::paintCurrentBitmapFrame
+                    painter.setOpacity(bitmap->getOpacity() - (1.0 - layer->opacity()));
+                    bitmap->paintImage(painter);
+                }
+
+            }
+        }
+        return;
+    }
+
+    // Clipping-mask compositing: each layer is rasterized through the caller's
+    // combined transform into a device-space buffer, masked by the alpha of
+    // the accumulated layers below (CanvasPainter semantics), then blitted.
+    const QTransform deviceTransform = painter.combinedTransform();
+    const QRect deviceRect(0, 0, painter.device()->width(), painter.device()->height());
+    QImage accum(deviceRect.size(), QImage::Format_ARGB32_Premultiplied);
+    accum.fill(Qt::transparent);
+    QImage groupMask;
+    bool groupValid = false;
+
+    for (Layer* layer : mLayers)
+    {
+        if (!layer->visible() || layer->type() != Layer::BITMAP)
         {
             continue;
         }
 
-        painter.setOpacity(1.0);
-
-        if (layer->type() == Layer::BITMAP)
+        // a non-clipped layer terminates the clipped run above it
+        if (!layer->clipMask())
         {
-
-            LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
-            BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
-            if (bitmap)
-            {
-                // same layer-opacity blend as CanvasPainter::paintCurrentBitmapFrame
-                painter.setOpacity(bitmap->getOpacity() - (1.0 - layer->opacity()));
-                bitmap->paintImage(painter);
-            }
-
+            groupValid = false;
         }
+
+        LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
+        BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
+        if (bitmap == nullptr)
+        {
+            continue;
+        }
+
+        QImage layerBuffer(deviceRect.size(), QImage::Format_ARGB32_Premultiplied);
+        layerBuffer.fill(Qt::transparent);
+        {
+            QPainter bufferPainter(&layerBuffer);
+            bufferPainter.setRenderHint(QPainter::Antialiasing, true);
+            bufferPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+            bufferPainter.setTransform(deviceTransform);
+            // same layer-opacity blend as CanvasPainter::paintCurrentBitmapFrame
+            bufferPainter.setOpacity(qBound(0.0, bitmap->getOpacity() - (1.0 - layer->opacity()), 1.0));
+            bitmap->paintImage(bufferPainter);
+        }
+
+        if (layer->clipMask())
+        {
+            if (!groupValid)
+            {
+                groupMask = accum.copy();
+                groupValid = true;
+            }
+            QPainter maskPainter(&layerBuffer);
+            maskPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+            maskPainter.drawImage(QPoint(0, 0), groupMask);
+        }
+
+        painter.save();
+        painter.setWorldMatrixEnabled(false);
+        painter.setOpacity(1.0);
+        painter.drawImage(painter.viewport(), layerBuffer, deviceRect);
+        painter.restore();
+
+        QPainter accumPainter(&accum);
+        accumPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        accumPainter.drawImage(QPoint(0, 0), layerBuffer);
     }
 }
 

@@ -977,8 +977,8 @@ void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, 
 bool TimeLineCells::rowHasInlineControls(int rowWidth) const
 {
     // controls sit on their own line under the name: slider(64) + %(38) +
-    // lock(16) anchored at x=52, ending around x=174
-    return rowWidth >= 185;
+    // lock(16) + clip(16) anchored at x=52, ending around x=194
+    return rowWidth >= 205;
 }
 
 QRect TimeLineCells::opacitySliderRect(int rowWidth) const
@@ -993,6 +993,13 @@ QRect TimeLineCells::lockIconRect(int rowWidth) const
     Q_UNUSED(rowWidth)
     // right after the percentage label: 52 + 64 slider + 4 gap + 34 label + 4 gap
     return QRect(158, 0, 16, 0);
+}
+
+QRect TimeLineCells::clipIconRect(int rowWidth) const
+{
+    Q_UNUSED(rowWidth)
+    // right after the padlock: 158 + 16 lock + 4 gap
+    return QRect(178, 0, 16, 0);
 }
 
 void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
@@ -1132,6 +1139,27 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 9.0), 180 * 16, -160 * 16);
     }
+
+    // clipping-mask toggle: downward arrow, active = clipped to the layers below
+    const QRect clipR = clipIconRect(width);
+    const QPointF clipC(clipR.x() + 8.0, sliderY);
+    const bool clipActive = layer->clipMask() && layer->type() == Layer::BITMAP;
+    QColor clipColor = clipActive ? Theme::Accent : QColor(0x66, 0x66, 0x6E);
+    if (layer->type() != Layer::BITMAP)
+    {
+        // bitmap-only feature: keep the control visible but inert
+        clipColor = QColor(0x3A, 0x3A, 0x40);
+    }
+    painter.setPen(QPen(clipColor, 1.6));
+    painter.drawLine(QPointF(clipC.x(), clipC.y() - 7.0), QPointF(clipC.x(), clipC.y() + 1.0));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(clipColor);
+    QPolygonF clipHead;
+    clipHead << QPointF(clipC.x() - 4.0, clipC.y() + 1.0)
+             << QPointF(clipC.x() + 4.0, clipC.y() + 1.0)
+             << QPointF(clipC.x(), clipC.y() + 7.0);
+    painter.drawPolygon(clipHead);
+    painter.setBrush(Qt::NoBrush);
     painter.setRenderHint(QPainter::Antialiasing, false);
 }
 
@@ -1450,6 +1478,19 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     hitLayer->setLocked(!hitLayer->locked());
                     qDebug() << "[ui] layer" << layerNumber << "locked ->" << hitLayer->locked();
                     updateContent();
+                    break;
+                }
+                const QRect clip = clipIconRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
+                if (clip.contains(event->pos().x(), event->pos().y()))
+                {
+                    if (hitLayer->type() == Layer::BITMAP)
+                    {
+                        hitLayer->setClipMask(!hitLayer->clipMask());
+                        qDebug() << "[ui] layer" << layerNumber << "clipMask ->" << hitLayer->clipMask();
+                        // clipping changes how pre/post layers composite: drop all caches
+                        mEditor->getScribbleArea()->onLayerChanged();
+                        updateContent();
+                    }
                     break;
                 }
                 const QRect slider = opacitySliderRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);

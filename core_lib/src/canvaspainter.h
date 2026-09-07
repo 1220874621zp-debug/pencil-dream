@@ -94,7 +94,16 @@ private:
     void paintBitmapOnionSkinFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int nFrame, bool colorize);
     void paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity);
 
-    void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer);
+    void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
+
+    // --- clipping-mask compositing ----------------------------------------
+    /** (Re)creates the accumulated-below image to match the canvas geometry. */
+    void ensureClipAccum();
+    /** Clears the accumulated-below image in the blit area (device-space 1:1). */
+    void clearClipAccum(const QRect& blitRect);
+    /** Mirrors the finished layer content (device space) into the accumulator,
+     *  applying the same opacity the target blit used. */
+    void clipAccumulate(const QPixmap& layerContent, qreal opacity);
 
     CanvasPainterOptions mOptions;
 
@@ -121,6 +130,17 @@ private:
     QPixmap mOnionSkinPixmap;
     bool mPreLayersPixmapCacheValid = false;
     bool mPostLayersPixmapCacheValid = false;
+
+    // --- clipping-mask compositing state ----------------------------------
+    // Only active when at least one bitmap layer has clipMask enabled; the
+    // pre/current/post pixmap split above spans layer ranges, so the alpha
+    // of "everything below" is tracked in a dedicated image.
+    bool mAnyClipMask = false;             // fast-path switch, from setPaintSettings
+    QImage mClipAccum;                     // accumulated content of layers below (device space)
+    QImage mClipAccumAfterPre;             // snapshot taken when the pre phase finishes
+    bool mClipAfterPreValid = false;
+    QImage mClipGroupMask;                 // base alpha shared by a run of clipped layers
+    bool mClipGroupValid = false;
 
     // There's a considerable amount of overhead in simply allocating a QPointF on the fly.
     // Since we just need to draw it at 0,0, we might as well make a const value for that purpose

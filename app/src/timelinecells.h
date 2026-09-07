@@ -145,9 +145,10 @@ private:
     void editLayerProperties(LayerCamera *layer) const;
     void editLayerName(Layer* layer) const;
 
-    // TVP layer-row inline controls: opacity slider + lock toggle
+    // TVP layer-row inline controls: opacity slider + lock toggle + clip toggle
     QRect opacitySliderRect(int rowWidth) const;
     QRect lockIconRect(int rowWidth) const;
+    QRect clipIconRect(int rowWidth) const;
     bool rowHasInlineControls(int rowWidth) const;
 
     TimeLine* mTimeLine;
