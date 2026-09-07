@@ -187,6 +187,9 @@ void BrushPresetPanel::onSelectionChanged()
     if (index < 0) {
         return;
     }
+    // 点笔刷即切到画笔工具：程序默认工具是铅笔（不走笔刷引擎），
+    // 不主动切换的话预设改了也看不出效果
+    editor()->tools()->setCurrentTool(BRUSH);
     BrushTool* tool = currentBrushTool();
     if (tool) {
         tool->applyBrushPreset(mStore.presets()[index].settings);

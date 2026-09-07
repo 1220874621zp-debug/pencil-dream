@@ -22,6 +22,12 @@ GNU General Public License for more details.
 
 #include "brush/brushengine.h"
 #include "brush/brushpresetstore.h"
+#include "editor.h"
+#include "interface/scribblearea.h"
+#include "managers/toolmanager.h"
+#include "object.h"
+#include "pencildef.h"
+#include "tool/brushtool.h"
 #include "graphics/bitmap/tile.h"
 #include "graphics/bitmap/tiledbuffer.h"
 
@@ -198,6 +204,61 @@ TEST_CASE("BrushEngine preview rendering")
         }
     }
     REQUIRE(hasStrokePixels);
+}
+
+TEST_CASE("BrushTool preset application")
+{
+    // 完整 Editor 台架：init 创建全套管理器与工具，用生产同款 BrushTool 实例
+    Object* object = new Object;
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->init();
+    editor->setObject(object);
+
+    BrushTool* tool = dynamic_cast<BrushTool*>(editor->tools()->getTool(BRUSH));
+    REQUIRE(tool != nullptr);
+
+    // 换两支差异大的笔，验证 applyBrushPreset → 引擎参数整链生效
+    BrushSettings fine;
+    fine.diameter = 3.0;
+    fine.hardness = 1.0;
+    fine.pressureSize = false;
+
+    BrushSettings fat;
+    fat.diameter = 90.0;
+    fat.hardness = 0.35;
+    fat.tipShape = BrushSettings::TipShape::Rectangle;
+    fat.ratio = 0.45;
+    fat.angle = 42.0;
+
+    tool->applyBrushPreset(fine);
+    {
+        const BrushSettings current = tool->currentBrushSettings();
+        REQUIRE(current.diameter == Approx(3.0));
+        REQUIRE(current.hardness == Approx(1.0 - 1.0 / 100.0)); // 羽化钳到 1 → 硬度 0.99
+        REQUIRE(current.tipShape == BrushSettings::TipShape::Circle);
+        REQUIRE(current.pressureSize == false);
+    }
+
+    tool->applyBrushPreset(fat);
+    {
+        const BrushSettings current = tool->currentBrushSettings();
+        REQUIRE(current.diameter == Approx(90.0));
+        REQUIRE(current.hardness == Approx(1.0 - 65.0 / 100.0).epsilon(0.01));
+        REQUIRE(current.tipShape == BrushSettings::TipShape::Rectangle);
+        REQUIRE(current.ratio == Approx(0.45));
+        REQUIRE(current.angle == Approx(42.0));
+    }
+
+    // 引擎侧的 dab 尺寸也要跟着预设走
+    BrushEngine probeEngine;
+    probeEngine.setSettings(tool->currentBrushSettings());
+    REQUIRE(probeEngine.dabDiameterAt(1.0) == Approx(90.0));
+
+    // 台架各部件与全局单例（PixmapCache/QSettings 等）有交叉引用，
+    // 进程退出时统一回收，测试内不手动 delete（与其它 Editor 测试不同，
+    // init() 过的 Editor 析构链在某些 manager 上不稳定）
 }
 
 TEST_CASE("TiledBuffer drawDab wash blending")
