@@ -95,24 +95,38 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
 
-    // canvas base: a white rectangle under the camera frame — same mapping
-    // as the camera border line (camera inverse transform + view transform),
-    // so it follows zoom/pan and camera animation exactly
+    // canvas base: white rounded rectangle, 50% larger than the camera frame
+    // and centered on it (the camera border sits inside the white base);
+    // same mapping as the camera border line, so it follows zoom/pan and
+    // camera animation exactly
     if (mEditor != nullptr && mEditor->layers() != nullptr)
     {
         LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
         if (cam != nullptr)
         {
             const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
-            QPolygonF paperPoly;
             const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
+            const QPointF center = camPoly.boundingRect().center();
+
+            constexpr qreal baseScale = 1.5;
+            QPolygonF basePoly;
             for (const QPointF& pnt : camPoly)
-                paperPoly << mEditor->view()->mapCanvasToScreen(pnt);
+                basePoly << mEditor->view()->mapCanvasToScreen(center + baseScale * (pnt - center));
+
+            const QRectF b = basePoly.boundingRect();
+            const bool axisAligned = basePoly.size() == 4
+                && qFuzzyCompare(basePoly.at(0).x(), b.left()) && qFuzzyCompare(basePoly.at(0).y(), b.top())
+                && qFuzzyCompare(basePoly.at(1).x(), b.right()) && qFuzzyCompare(basePoly.at(1).y(), b.top())
+                && qFuzzyCompare(basePoly.at(2).x(), b.right()) && qFuzzyCompare(basePoly.at(2).y(), b.bottom())
+                && qFuzzyCompare(basePoly.at(3).x(), b.left()) && qFuzzyCompare(basePoly.at(3).y(), b.bottom());
 
             painter.setRenderHint(QPainter::Antialiasing, true);
             painter.setPen(Qt::NoPen);
             painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
-            painter.drawPolygon(paperPoly);
+            if (axisAligned)
+                painter.drawRoundedRect(b, 12.0, 12.0);
+            else
+                painter.drawPolygon(basePoly);
             painter.setRenderHint(QPainter::Antialiasing, false);
         }
     }
