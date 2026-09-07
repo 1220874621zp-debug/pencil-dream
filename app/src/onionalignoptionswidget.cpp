@@ -17,10 +17,10 @@ GNU General Public License for more details.
 
 #include "onionalignoptionswidget.h"
 
-#include <QHBoxLayout>
 #include <QPushButton>
 #include <QToolTip>
 
+#include "flowlayout.h"
 #include "editor.h"
 #include "toolmanager.h"
 #include "onionaligntool.h"
@@ -37,9 +37,8 @@ void OnionAlignOptionsWidget::initUI()
     mTool = static_cast<OnionAlignTool*>(mEditor->tools()->getTool(ONION_ALIGN));
     Q_ASSERT(mTool != nullptr);
 
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    layout->setSpacing(4);
+    // 流式布局：面板宽度不够时按钮自动换行（与工具箱按钮同机制）
+    auto* layout = new FlowLayout(this, 4, 4, 4);
 
     auto addToolButton = [this, layout](const QString& text, const QString& tip, auto slot)
     {
@@ -54,8 +53,6 @@ void OnionAlignOptionsWidget::initUI()
     addToolButton(tr("复位前帧"), tr("归零红色（前帧）幽灵的偏移"), &OnionAlignTool::resetPrevGhostOffset);
     addToolButton(tr("复位后帧"), tr("归零蓝色（后帧）幽灵的偏移"), &OnionAlignTool::resetNextGhostOffset);
     addToolButton(tr("全部复位"), tr("清空当前图层全部幽灵偏移（等同 Alt+点空白）"), &OnionAlignTool::resetAllGhostOffsets);
-
-    layout->addStretch();
 }
 
 void OnionAlignOptionsWidget::updateUI()
