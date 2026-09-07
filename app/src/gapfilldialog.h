@@ -53,7 +53,6 @@ private:
 
     std::vector<gap_assist::GapCandidate> mGaps;
     QRect mCanvasRect;      // detection canvas, document coordinates
-    QPoint mColoringOrigin; // coloring-layer bounds topLeft at detect time
     int mColoringLayerId = -1;
     int mColoringKeyPos = 0;
     bool mSuppressCellChanged = false;

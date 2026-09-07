@@ -305,7 +305,6 @@ void GapFillDialog::detectGaps()
     progress.cancel();
 
     mGaps = std::move(analysisResult.gaps);
-    mColoringOrigin = coloringBounds.topLeft() - mCanvasRect.topLeft();
     mColoringLayerId = coloringLayer->id();
     mColoringKeyPos = coloringKeyframe->pos();
     mApplied.assign(mGaps.size(), false);
@@ -411,7 +410,10 @@ void GapFillDialog::cellChanged(int, int column)
 
 void GapFillDialog::applySelected()
 {
-    if (mColoringLayerId < 0 || mGaps.empty()) { return; }
+    if (mColoringLayerId < 0 || mGaps.empty()) {
+        setStatus(tr("请先检测间隙。"));
+        return;
+    }
     Object* object = mEditor->object();
     int layerIndex = -1;
     Layer* layer = nullptr;
@@ -434,11 +436,15 @@ void GapFillDialog::applySelected()
         return;
     }
     QImage* image = keyframe->image();
-    const QPoint origin = keyframe->bounds().topLeft() - mCanvasRect.topLeft();
 
     // legacyBackup() snapshots relative to the editor's current frame;
     // scrub to the target keyframe so the backup lands on the right one.
     mEditor->scrubTo(mColoringKeyPos);
+
+    // Gap pixel indices are canvas coordinates; convert to the
+    // keyframe image via its current top-left offset inside the canvas.
+    const QPoint canvasOffset = keyframe->bounds().topLeft() - mCanvasRect.topLeft();
+    const int canvasWidth = mCanvasRect.width();
 
     int appliedGaps = 0;
     for (int row = 0; row < static_cast<int>(mGaps.size()); ++row) {
@@ -458,23 +464,26 @@ void GapFillDialog::applySelected()
             setStatus(tr("无法创建撤销备份，已取消应用。"));
             return;
         }
+        int written = 0;
         for (const std::uint32_t rawIndex : pixels) {
-            const int x = mColoringOrigin.x() +
-                    static_cast<int>(rawIndex % static_cast<std::uint32_t>(mCanvasRect.width()));
-            const int y = mColoringOrigin.y() +
-                    static_cast<int>(rawIndex / static_cast<std::uint32_t>(mCanvasRect.width()));
-            const QPoint pos = QPoint(x, y) + origin;
+            const int cx = static_cast<int>(
+                        rawIndex % static_cast<std::uint32_t>(canvasWidth));
+            const int cy = static_cast<int>(
+                        rawIndex / static_cast<std::uint32_t>(canvasWidth));
+            const QPoint pos = QPoint(cx, cy) - canvasOffset;
             if (!image->rect().contains(pos)) { continue; }
             image->setPixel(pos, qRgba(gap.suggestedColor->r,
                                        gap.suggestedColor->g,
                                        gap.suggestedColor->b, 255));
+            ++written;
         }
+        if (written == 0) { continue; }
         mApplied[gapIndex] = true;
         ++appliedGaps;
     }
 
     if (appliedGaps == 0) {
-        setStatus(tr("没有勾选任何可应用的间隙。"));
+        setStatus(tr("选中的间隙没有写入任何像素（图层内容可能已变化），请重新检测。"));
         return;
     }
     keyframe->modification();
