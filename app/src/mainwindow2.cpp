@@ -223,6 +223,10 @@ void MainWindow2::createDockWidgets()
         qDebug() << "Init Dock widget: " << pWidget->objectName();
     }
 
+    // TVP: the playback-range row lives at the right end of the status bar
+    // (the debug-log row), next to the zoom controls
+    ui->statusBar->addPermanentWidget(mTimeLine->playbackBottomBar());
+
     addDockWidget(Qt::LeftDockWidgetArea, mToolBox);
     addDockWidget(Qt::LeftDockWidgetArea, mToolOptions);
     addDockWidget(Qt::RightDockWidgetArea, mColorPalette);

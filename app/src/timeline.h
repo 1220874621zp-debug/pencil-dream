@@ -62,6 +62,9 @@ public:
     void onCurrentLayerChanged();
     void onScrollbarValueChanged();
 
+    /** Playback-range row hosted in the main status bar (right end, TVP). */
+    QWidget* playbackBottomBar() const;
+
 signals:
     void selectionChanged();
     void modification();
