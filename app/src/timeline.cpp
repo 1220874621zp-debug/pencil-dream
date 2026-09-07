@@ -254,25 +254,16 @@ void TimeLine::initUI()
     mTimeControls->initUI();
     updateLength();
 
-    // the transport cluster is centered on the FULL toolbar width (overlay
-    // layout): side groups share the same grid cell and align outwards
-    auto* rightToolBarLayout = new QGridLayout(rightToolBar);
+    QHBoxLayout* rightToolBarLayout = new QHBoxLayout();
+    rightToolBarLayout->addWidget(timelineButtons);
+    rightToolBarLayout->addStretch();
+    rightToolBarLayout->addWidget(mTimeControls->transportBar());
+    rightToolBarLayout->addStretch();
+    // fps / speed boxes flush against the right edge
+    rightToolBarLayout->addWidget(mTimeControls->fpsBar());
     rightToolBarLayout->setContentsMargins(0, 0, 0, 0);
     rightToolBarLayout->setSpacing(0);
-    rightToolBarLayout->setColumnStretch(0, 1);
-
-    QWidget* centerRow = new QWidget(rightToolBar);
-    centerRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    auto* centerLayout = new QHBoxLayout(centerRow);
-    centerLayout->setContentsMargins(0, 0, 0, 0);
-    centerLayout->setSpacing(0);
-    centerLayout->addStretch();
-    centerLayout->addWidget(mTimeControls->transportBar());
-    centerLayout->addStretch();
-
-    rightToolBarLayout->addWidget(centerRow, 0, 0);
-    rightToolBarLayout->addWidget(timelineButtons, 0, 0, Qt::AlignLeft | Qt::AlignVCenter);
-    rightToolBarLayout->addWidget(mTimeControls->fpsBar(), 0, 0, Qt::AlignRight | Qt::AlignVCenter);
+    rightToolBar->setLayout(rightToolBarLayout);
 
     QGridLayout* rightLayout = new QGridLayout();
     rightLayout->addWidget(rightToolBar, 0, 0);
