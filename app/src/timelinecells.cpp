@@ -25,6 +25,7 @@ GNU General Public License for more details.
 #include <QSettings>
 #include <QDebug>
 #include <QWheelEvent>
+#include <algorithm>
 #include <QThreadPool>
 #include <QRunnable>
 #include "layerbitmap.h"
@@ -1655,6 +1656,21 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 // so the scrubber must sit on the trimmed block before recording
                 mEditor->scrubTo(mTrimKeyPos);
                 SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+                const int delta = mTrimPreviewLength - mTrimOriginalLength;
+                if (delta > 0)
+                {
+                    // TVP-style ripple: growing into neighbours pushes the
+                    // subsequent keyframes right (far ones first) instead of
+                    // silently clamping the block back down
+                    QList<int> laterPos;
+                    currentLayer->foreachKeyFrame([&](KeyFrame* k)
+                    {
+                        if (k->pos() > mTrimKeyPos) laterPos << k->pos();
+                    });
+                    std::sort(laterPos.begin(), laterPos.end(), std::greater<int>());
+                    for (int p : laterPos)
+                        currentLayer->moveKeyFrame(p, delta);
+                }
                 trimKey->setLength(mTrimPreviewLength);
                 trimKey->setLengthExplicit(true);
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
@@ -1847,7 +1863,7 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
 
     // The visual right edge of the block is the right border of its last frame cell
     const int edgeX = getFrameX(blockEnd - 1);
-    return (qAbs(pos.x() - edgeX) <= 4) ? key->pos() : -1;
+    return (qAbs(pos.x() - edgeX) <= 7) ? key->pos() : -1;
 }
 
 void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
