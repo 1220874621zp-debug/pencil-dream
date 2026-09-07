@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "toolmanager.h"
 #include "transformtool.h"
 #include "deformtool.h"
+#include "lassotool.h"
 
 TransformOptionsWidget::TransformOptionsWidget(Editor* editor, QWidget *parent) :
     BaseWidget(parent),
@@ -78,6 +79,12 @@ void TransformOptionsWidget::updatePropertyVisibility()
     ui->deformModeLabel->setVisible(isDeform);
     ui->deformModeComboBox->setVisible(isDeform);
     ui->modeStackedWidget->setVisible(isDeform);
+
+    const bool isLasso = currentTool->type() == LASSO;
+    ui->selectionActionLabel->setVisible(isLasso);
+    ui->selectionActionComboBox->setVisible(isLasso);
+    ui->selectionGrowLabel->setVisible(isLasso);
+    ui->selectionGrowSpinBox->setVisible(isLasso);
 }
 
 void TransformOptionsWidget::updateToolConnections(BaseTool* tool)
@@ -134,6 +141,20 @@ void TransformOptionsWidget::makeConnectionsFromUIToModel()
         // the combo lists affine/similitude/rigid in Krita's enum order
         if (DeformTool* t = deformTool(mTransformTool)) { t->setWarpType(index); }
     });
+
+    connect(ui->selectionActionComboBox, &QComboBox::currentIndexChanged, this, [=](int index) {
+        LassoTool* lassoTool = dynamic_cast<LassoTool*>(mTransformTool);
+        if (lassoTool != nullptr && lassoTool->type() == LASSO) {
+            lassoTool->setSelectionAction(index);
+        }
+    });
+
+    connect(ui->selectionGrowSpinBox, &QSpinBox::valueChanged, this, [=](int value) {
+        LassoTool* lassoTool = dynamic_cast<LassoTool*>(mTransformTool);
+        if (lassoTool != nullptr && lassoTool->type() == LASSO) {
+            lassoTool->setGrowValue(value);
+        }
+    });
 }
 
 void TransformOptionsWidget::makeConnectionFromModelToUI(TransformTool* transformTool)
@@ -160,6 +181,14 @@ void TransformOptionsWidget::makeConnectionFromModelToUI(TransformTool* transfor
         setLiquifyReverse(deformTool->liquifyReverse());
         setWarpAlpha(deformTool->warpAlpha());
         setWarpType(deformTool->warpType());
+    }
+
+    LassoTool* lassoTool = dynamic_cast<LassoTool*>(transformTool);
+    if (lassoTool != nullptr && lassoTool->type() == LASSO) {
+        connect(lassoTool, &LassoTool::selectionActionChanged, this, &TransformOptionsWidget::setSelectionAction);
+        connect(lassoTool, &LassoTool::growValueChanged, this, &TransformOptionsWidget::setSelectionGrow);
+        setSelectionAction(lassoTool->selectionAction());
+        setSelectionGrow(lassoTool->growValue());
     }
 }
 
@@ -222,4 +251,16 @@ void TransformOptionsWidget::setWarpType(int type)
 {
     QSignalBlocker b(ui->warpTypeComboBox);
     ui->warpTypeComboBox->setCurrentIndex(type);
+}
+
+void TransformOptionsWidget::setSelectionAction(int action)
+{
+    QSignalBlocker b(ui->selectionActionComboBox);
+    ui->selectionActionComboBox->setCurrentIndex(action);
+}
+
+void TransformOptionsWidget::setSelectionGrow(int grow)
+{
+    QSignalBlocker b(ui->selectionGrowSpinBox);
+    ui->selectionGrowSpinBox->setValue(grow);
 }

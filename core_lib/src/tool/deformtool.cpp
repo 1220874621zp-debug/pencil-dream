@@ -122,10 +122,17 @@ bool DeformTool::enteringThisTool()
     // desync the preview from the layer: drop it losslessly
     mActiveConnections.append(connect(mEditor, &Editor::scrubbed, this, [this](int) {
         if (mDeformActive) { cancelDeform(); }
+        // re-arm the session on the new frame's content, like Krita does
+        if (!mDeformActive) { beginSession(); }
     }));
     mActiveConnections.append(connect(mEditor->layers(), &LayerManager::currentLayerChanged, this, [this](int) {
         if (mDeformActive) { cancelDeform(); }
+        if (!mDeformActive) { beginSession(); }
     }));
+
+    // show the controls right away: entering the deform tool is enough
+    // (Krita's transform tool behaves the same way)
+    if (!mDeformActive) { beginSession(); }
     return true;
 }
 
@@ -421,12 +428,8 @@ void DeformTool::pointerPressEvent(PointerEvent* event)
             mDragIndex = hit;
             mScribbleArea->updateToolCursor();
         }
-        else
-        {
-            // click on empty space: bake the current warp and start over
-            commitDeform();
-            beginSession();
-        }
+        // clicks that miss a control point keep the session running; use
+        // Enter / double-click to apply (Krita semantics)
         break;
     }
     case 2: // cage
@@ -586,6 +589,7 @@ void DeformTool::pointerDoubleClickEvent(PointerEvent* event)
     if (mDeformActive && mAnyPointMoved)
     {
         commitDeform();
+        beginSession();
     }
 }
 
@@ -598,6 +602,7 @@ bool DeformTool::keyPressEvent(QKeyEvent* event)
         if (mDeformActive && mAnyPointMoved)
         {
             commitDeform();
+            beginSession();
             return true;
         }
         break;

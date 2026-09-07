@@ -155,7 +155,7 @@ void StatusBar::updateToolStatus(ToolType tool)
             mToolLabel->setText(tr("Click to paint. Hold Ctrl and Shift to erase or Alt to select a color from the canvas."));
             break;
         case LASSO:
-            mToolLabel->setText(tr("拖动绘制自由形状选区；松开闭合生效。"));
+            mToolLabel->setText(tr("拖动绘制自由形状选区；Shift=加选, Alt=减选, Shift+Alt=相交, Ctrl+Alt=对称差, Ctrl=替换（可拖动途中按）；动作与扩展/收缩在工具选项。"));
             break;
         case DEFORM:
             mToolLabel->setText(tr("变形工具：液化=笔刷推挤像素，弯曲=拖网格点，笼罩=画轮廓拖顶点，透视=拖四角；模式与参数在工具选项；回车/双击=应用，Esc=取消，Backspace=复位。"));

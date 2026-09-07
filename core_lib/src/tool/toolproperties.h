@@ -574,6 +574,8 @@ struct TransformToolProperties: public ToolPropertiesBase
         LIQUIFY_REVERSE_ENABLED      = 507,
         WARP_ALPHA_VALUE             = 508,
         WARP_TYPE_VALUE              = 509,
+        SELECTION_ACTION_VALUE       = 510,
+        SELECTION_GROW_VALUE         = 511,
         END                          = 599,
     };
 
@@ -590,7 +592,9 @@ struct TransformToolProperties: public ToolPropertiesBase
             { LIQUIFY_AMOUNT_VALUE,         "LiquifyAmountValue" },
             { LIQUIFY_REVERSE_ENABLED,      "LiquifyReverseEnabled" },
             { WARP_ALPHA_VALUE,             "WarpAlphaValue" },
-            { WARP_TYPE_VALUE,              "WarpTypeValue" }
+            { WARP_TYPE_VALUE,              "WarpTypeValue" },
+            { SELECTION_ACTION_VALUE,       "SelectionActionValue" },
+            { SELECTION_GROW_VALUE,         "SelectionGrowValue" }
         });
     }
 

@@ -58,6 +58,8 @@ private:
     void setLiquifyReverse(bool reverse);
     void setWarpAlpha(qreal alpha);
     void setWarpType(int type);
+    void setSelectionAction(int action);
+    void setSelectionGrow(int grow);
 
     Ui::TransformOptionsWidget *ui;
 

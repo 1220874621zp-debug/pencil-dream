@@ -87,6 +87,71 @@
       </layout>
      </item>
      <item>
+      <widget class="QWidget" name="lassoOptionsPage" native="true">
+       <layout class="QFormLayout" name="lassoFormLayout">
+        <property name="fieldGrowthPolicy">
+         <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+        </property>
+        <item row="0" column="0">
+         <widget class="QLabel" name="selectionActionLabel">
+          <property name="text">
+           <string>Action</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QComboBox" name="selectionActionComboBox">
+          <item>
+           <property name="text">
+            <string>Replace</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Add</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Subtract</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Intersect</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Symmetric Difference</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="selectionGrowLabel">
+          <property name="text">
+           <string>Grow / Shrink</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QSpinBox" name="selectionGrowSpinBox">
+          <property name="minimum">
+           <number>-50</number>
+          </property>
+          <property name="maximum">
+           <number>50</number>
+          </property>
+          <property name="value">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
       <widget class="QStackedWidget" name="modeStackedWidget">
        <property name="currentIndex">
         <number>0</number>

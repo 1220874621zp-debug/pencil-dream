@@ -19,6 +19,8 @@ GNU General Public License for more details.
 
 #include <QSettings>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPainterPathStroker>
 
 #include "pointerevent.h"
 #include "editor.h"
@@ -29,6 +31,52 @@ GNU General Public License for more details.
 #include "undoredomanager.h"
 #include "viewmanager.h"
 
+namespace
+{
+    QPainterPath polygonToPath(const QPolygonF& polygon)
+    {
+        QPainterPath path;
+        if (polygon.size() >= 3)
+        {
+            path.moveTo(polygon.first());
+            for (int i = 1; i < polygon.size(); i++)
+            {
+                path.lineTo(polygon.at(i));
+            }
+            path.closeSubpath();
+            path.setFillRule(Qt::OddEvenFill);
+        }
+        return path;
+    }
+
+    QPolygonF pathToPolygon(const QPainterPath& path)
+    {
+        // flatten to one polygon: concatenate the closed subpaths, an
+        // even-odd fill of the concatenated polygon fills the same area
+        QPolygonF combined;
+        const QList<QPolygonF> subpaths = path.toSubpathPolygons();
+        for (const QPolygonF& sub : subpaths)
+        {
+            if (sub.size() < 3) { continue; }
+            if (!combined.isEmpty())
+            {
+                combined << sub.first(); // implicit close of the previous lobe
+            }
+            combined << sub;
+        }
+        return combined;
+    }
+
+    QPainterPath boundaryBand(const QPainterPath& path, qreal width)
+    {
+        QPainterPathStroker stroker;
+        stroker.setWidth(width);
+        stroker.setJoinStyle(Qt::RoundJoin);
+        stroker.setCapStyle(Qt::RoundCap);
+        return stroker.createStroke(path);
+    }
+}
+
 LassoTool::LassoTool(QObject* parent) : TransformTool(parent)
 {
 }
@@ -38,12 +86,19 @@ void LassoTool::loadSettings()
     QSettings pencilSettings(PENCIL2D, PENCIL2D);
 
     mPropertyUsed[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = { Layer::BITMAP };
+    mPropertyUsed[TransformToolProperties::SELECTION_ACTION_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[TransformToolProperties::SELECTION_GROW_VALUE] = { Layer::BITMAP };
 
     QHash<int, PropertyInfo> info;
     info[TransformToolProperties::SHOWSELECTIONINFO_ENABLED] = false;
+    info[TransformToolProperties::SELECTION_ACTION_VALUE] = { 0, 4, 0 };
+    info[TransformToolProperties::SELECTION_GROW_VALUE] = { -50, 50, 0 };
 
     toolProperties().insertProperties(info);
     toolProperties().loadFrom(typeName(), pencilSettings);
+
+    mSelectionAction = toolProperties().getInfo(TransformToolProperties::SELECTION_ACTION_VALUE).intValue();
+    mGrowValue = toolProperties().getInfo(TransformToolProperties::SELECTION_GROW_VALUE).intValue();
 }
 
 QCursor LassoTool::cursor()
@@ -55,6 +110,38 @@ QCursor LassoTool::cursor()
 bool LassoTool::isActive() const
 {
     return mLassoActive;
+}
+
+void LassoTool::setSelectionAction(int action)
+{
+    action = qBound(0, action, 4);
+    if (action == mSelectionAction) { return; }
+
+    mSelectionAction = action;
+    toolProperties().setBaseValue(TransformToolProperties::SELECTION_ACTION_VALUE, action);
+    emit selectionActionChanged(action);
+}
+
+void LassoTool::setGrowValue(int grow)
+{
+    grow = qBound(-50, grow, 50);
+    if (grow == mGrowValue) { return; }
+
+    mGrowValue = grow;
+    toolProperties().setBaseValue(TransformToolProperties::SELECTION_GROW_VALUE, grow);
+    emit growValueChanged(grow);
+}
+
+int LassoTool::actionFromModifiers(Qt::KeyboardModifiers modifiers) const
+{
+    // Krita defaults (no remap): Ctrl=replace, Shift=add, Alt=subtract,
+    // Shift+Alt=intersect, Ctrl+Alt=symmetric difference
+    if (modifiers == (Qt::ShiftModifier | Qt::AltModifier)) { return 3; }
+    if (modifiers == (Qt::ControlModifier | Qt::AltModifier)) { return 4; }
+    if (modifiers == Qt::ShiftModifier) { return 1; }
+    if (modifiers == Qt::AltModifier) { return 2; }
+    if (modifiers == Qt::ControlModifier) { return 0; }
+    return -1; // keep the tool-option action
 }
 
 void LassoTool::paint(QPainter& painter, const QRect& blitRect)
@@ -91,6 +178,8 @@ void LassoTool::pointerPressEvent(PointerEvent* event)
 
     mUndoStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
 
+    mActiveAction = mSelectionAction;
+
     beginLasso(event->canvasPos());
 }
 
@@ -102,6 +191,10 @@ void LassoTool::pointerMoveEvent(PointerEvent* event)
 
     if (mLassoActive && mScribbleArea->isPointerInUse())
     {
+        // Krita allows changing the action mid-stroke with modifier keys
+        const int fromMods = actionFromModifiers(event->modifiers());
+        if (fromMods >= 0) { mActiveAction = fromMods; }
+
         extendLasso(event->canvasPos());
     }
 }
@@ -155,12 +248,68 @@ void LassoTool::endLasso(const QPointF& pos)
     if (mLassoPoints.size() < 3 || bounds.width() < 2.0 || bounds.height() < 2.0)
     {
         mEditor->deselectAll();
+        mLassoPoints.clear();
+        mScribbleArea->updateFrame();
+        return;
+    }
+
+    auto selectMan = mEditor->select();
+    QPainterPath newPath = polygonToPath(mLassoPoints);
+    mLassoPoints.clear();
+
+    // combine with the existing selection according to the action
+    QPainterPath result;
+    const bool hasOld = selectMan->somethingSelected() && !selectMan->mySelectionPolygon().isEmpty();
+    switch (mActiveAction)
+    {
+    case 1: // add
+        result = hasOld ? polygonToPath(selectMan->mySelectionPolygon()).united(newPath) : newPath;
+        break;
+    case 2: // subtract
+        result = hasOld ? polygonToPath(selectMan->mySelectionPolygon()).subtracted(newPath) : QPainterPath();
+        break;
+    case 3: // intersect
+        result = hasOld ? polygonToPath(selectMan->mySelectionPolygon()).intersected(newPath) : QPainterPath();
+        break;
+    case 4: // symmetric difference: (a - b) union (b - a)
+    {
+        const QPainterPath oldPath = hasOld ? polygonToPath(selectMan->mySelectionPolygon()) : QPainterPath();
+        if (hasOld)
+        {
+            result = oldPath.subtracted(newPath).united(newPath.subtracted(oldPath));
+        }
+        else
+        {
+            result = newPath;
+        }
+        break;
+    }
+    case 0: // replace
+    default:
+        result = newPath;
+        break;
+    }
+
+    // grow / shrink the combined shape
+    if (mGrowValue > 0)
+    {
+        result = result.united(boundaryBand(result, 2.0 * mGrowValue));
+    }
+    else if (mGrowValue < 0)
+    {
+        result = result.subtracted(boundaryBand(result, 2.0 * (-mGrowValue)));
+    }
+
+    const QPolygonF combined = pathToPolygon(result);
+    const QRectF resultBounds = combined.boundingRect();
+    if (combined.size() < 3 || resultBounds.width() < 1.0 || resultBounds.height() < 1.0)
+    {
+        mEditor->deselectAll();
     }
     else
     {
-        mEditor->select()->setSelection(mLassoPoints, roundPixels);
+        selectMan->setSelection(combined, roundPixels);
     }
 
-    mLassoPoints.clear();
     mScribbleArea->updateFrame();
 }

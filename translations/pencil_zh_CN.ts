@@ -7801,6 +7801,48 @@ or cancel</source>
     <name>TransformOptionsWidget</name>
     <message>
         <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Grow / Shrink</source>
+        <translation>扩展 / 收缩</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Symmetric Difference</source>
+        <translation>对称差</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Intersect</source>
+        <translation>相交</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Subtract</source>
+        <translation>减去</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Add</source>
+        <translation>添加</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Replace</source>
+        <translation>替换</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Action</source>
+        <translation>动作</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
         <source>Drag the four corners to adjust the perspective. Enter/double-click applies, Esc cancels.</source>
         <translation>拖动四角调整透视。回车/双击应用，Esc 取消。</translation>
     </message>

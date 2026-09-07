@@ -25,8 +25,11 @@ GNU General Public License for more details.
 
 class PointerEvent;
 
-/** Freehand (lasso) selection tool: drag to draw a closed outline,
- *  release to commit the polygonal selection. */
+/** Freehand (lasso) selection tool with Krita-style selection actions:
+ *  replace / add / subtract / intersect / symmetric difference, picked in
+ *  the tool options or mid-stroke with modifier keys
+ *  (Ctrl=replace, Shift=add, Alt=subtract, Shift+Alt=intersect,
+ *  Ctrl+Alt=symmetric difference), plus grow/shrink of the result. */
 class LassoTool : public TransformTool
 {
     Q_OBJECT
@@ -43,6 +46,16 @@ public:
 
     void paint(QPainter& painter, const QRect& blitRect) override;
 
+    int selectionAction() const { return mSelectionAction; }
+    void setSelectionAction(int action);
+
+    int growValue() const { return mGrowValue; }
+    void setGrowValue(int grow);
+
+signals:
+    void selectionActionChanged(int action);
+    void growValueChanged(int grow);
+
 private:
     void pointerPressEvent(PointerEvent*) override;
     void pointerMoveEvent(PointerEvent*) override;
@@ -52,8 +65,16 @@ private:
     void extendLasso(const QPointF& pos);
     void endLasso(const QPointF& pos);
 
+    /** Krita KisSelectionModifierMapper defaults (no-remap config) */
+    int actionFromModifiers(Qt::KeyboardModifiers modifiers) const;
+
     QPolygonF mLassoPoints;
     bool mLassoActive = false;
+
+    // 0 replace / 1 add / 2 subtract / 3 intersect / 4 symmetric difference
+    int mSelectionAction = 0;
+    int mActiveAction = 0;
+    int mGrowValue = 0;
 
     SAVESTATE_ID mUndoStateId = 0;
 };

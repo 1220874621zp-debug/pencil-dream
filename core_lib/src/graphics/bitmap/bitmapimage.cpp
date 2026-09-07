@@ -204,8 +204,10 @@ BitmapImage BitmapImage::copy(QPolygonF polygon)
     BitmapImage rectCopy = copy(bounding);
     if (rectCopy.width() <= 0 || rectCopy.height() <= 0) return BitmapImage();
 
-    // Mask the copied region to the polygon shape
+    // Mask the copied region to the polygon shape (anti-aliased edge,
+    // matching Krita's default anti-aliased outline selections)
     QPainter painter(rectCopy.image());
+    painter.setRenderHint(QPainter::Antialiasing, true);
     QPainterPath maskPath;
     maskPath.addPolygon(polygon.translated(-QPointF(bounding.topLeft())));
     maskPath.setFillRule(Qt::OddEvenFill);
@@ -926,6 +928,7 @@ void BitmapImage::clear(QPolygonF polygon)
     setCompositionModeBounds(bounding, true, QPainter::CompositionMode_Clear);
 
     QPainter painter(image());
+    painter.setRenderHint(QPainter::Antialiasing, true);
     painter.translate(-mBounds.topLeft());
     painter.setCompositionMode(QPainter::CompositionMode_Clear);
     QPainterPath clearPath;
