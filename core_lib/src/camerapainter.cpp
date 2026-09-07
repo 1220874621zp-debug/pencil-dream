@@ -147,35 +147,12 @@ void CameraPainter::paintVisuals(QPainter& painter, const QRect& blitRect)
 
     if (!cameraLayerBelow->visible()) { return; }
 
-    QTransform camTransform = cameraLayerBelow->getViewAtFrame(mFrameIndex);
-    QRect cameraRect = cameraLayerBelow->getViewRect();
-    paintBorder(visualsPainter, camTransform, cameraRect);
-
+    // Krita-style canvas presentation: the paper floats clean on the
+    // workspace background — no darkening veil outside the camera rect.
+    // The camera frame itself stays visible as the unconditional black
+    // border painted by paintOnionSkinning's CURRENT state.
     painter.setWorldMatrixEnabled(false);
     painter.drawPixmap(mZeroPoint, mCameraPixmap);
-}
-
-void CameraPainter::paintBorder(QPainter& painter, const QTransform& camTransform, const QRect& camRect)
-{
-    painter.save();
-    QRect viewRect = painter.viewport();
-
-    painter.setOpacity(1.0);
-    painter.setWorldMatrixEnabled(true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0, 0, 0, 80));
-    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-
-    QTransform viewInverse = mViewTransform.inverted();
-    QRect boundingRect = viewInverse.mapRect(viewRect);
-
-    QPolygon camPoly = camTransform.inverted().map(QPolygon(camRect));
-    QPolygon boundingRectPoly = boundingRect;
-    QPolygon visibleCanvasPoly = boundingRectPoly.subtracted(camPoly);
-
-    painter.drawPolygon(visibleCanvasPoly);
-
-    painter.restore();
 }
 
 void CameraPainter::paintOnionSkinning(QPainter& painter, const LayerCamera* cameraLayer)
