@@ -43,8 +43,11 @@ public:
     void setLoop(bool);
     void setRangeState(bool);
 
-    /** Playback-range row and everything after it: hosted at the bottom of
-     *  the timeline (TVP layout) instead of the top toolbar. */
+    /** Jump/play/loop cluster: centered in the timeline toolbar. */
+    QWidget* transportBar() const { return mTransportBar; }
+    /** FPS / playback speed / live fps label: right end of the toolbar. */
+    QWidget* fpsBar() const { return mFpsBar; }
+    /** Playback-range row hosted in the main status bar (right end, TVP). */
     QWidget* bottomBar() const { return mBottomBar; }
 
     void updateLength(int frameLength);
@@ -103,7 +106,11 @@ private:
     QAction*     mSmpteAction = nullptr;
     QAction*     mSffAction = nullptr;
 
-    // playback range + everything after it lives in this bottom bar
+    // split bars: transport (jump/play/loop) is centered in the timeline
+    // toolbar, fps/speed sits at its right end, the range row lives in the
+    // main status bar (TVP layout)
+    QWidget* mTransportBar = nullptr;
+    QWidget* mFpsBar = nullptr;
     QWidget* mBottomBar = nullptr;
 
     QIcon mStartIcon;

@@ -174,13 +174,24 @@ void TimeControls::initUI()
     mSoundScrubButton->setChecked(mEditor->preference()->isOn(SETTING::SOUND_SCRUB_ACTIVE));
 
 
-    addWidget(mJumpToStartButton);
-    addWidget(mPlayButton);
-    addWidget(mJumpToEndButton);
-    addWidget(mLoopButton);
-    addWidget(mFpsBox);
-    addWidget(mPlaybackSpeedBox);
-    addWidget(mFpsLabel);
+    // transport cluster (jump/play/loop): centered in the timeline toolbar
+    mTransportBar = new QWidget(this);
+    auto* transportLayout = new QHBoxLayout(mTransportBar);
+    transportLayout->setContentsMargins(0, 0, 0, 0);
+    transportLayout->setSpacing(2);
+    transportLayout->addWidget(mJumpToStartButton);
+    transportLayout->addWidget(mPlayButton);
+    transportLayout->addWidget(mJumpToEndButton);
+    transportLayout->addWidget(mLoopButton);
+
+    // fps / speed cluster: right end of the timeline toolbar
+    mFpsBar = new QWidget(this);
+    auto* fpsLayout = new QHBoxLayout(mFpsBar);
+    fpsLayout->setContentsMargins(0, 0, 0, 0);
+    fpsLayout->setSpacing(4);
+    fpsLayout->addWidget(mFpsBox);
+    fpsLayout->addWidget(mPlaybackSpeedBox);
+    fpsLayout->addWidget(mFpsLabel);
 
     // TVP layout: the playback range and everything after it moves to a
     // slim bar at the bottom of the timeline

@@ -117,6 +117,19 @@ void TimeLine::initUI()
     allLockedButton->setToolTip(tr("全部图层锁定切换（全解锁→全锁，有锁→全解锁）"));
     allLockedButton->setMinimumSize(QSize(38, 30));
 
+    // TVP satellite tools dropdown: right beside the lock toggle
+    QToolButton* toolsButton = new QToolButton(this);
+    toolsButton->setText(tr("工具"));
+    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 对位中割 / 视频抽帧"));
+    toolsButton->setMinimumSize(QSize(38, 34));
+    QMenu* toolsMenu = new QMenu(this);
+    QAction* lipsyncAct = toolsMenu->addAction(tr("口型同步切换器"));
+    QAction* paletteAct = toolsMenu->addAction(tr("调色板提取"));
+    QAction* inbetweenAct = toolsMenu->addAction(tr("对位中割参考"));
+    QAction* videoAct = toolsMenu->addAction(tr("视频抽帧中割"));
+    toolsButton->setMenu(toolsMenu);
+    toolsButton->setPopupMode(QToolButton::InstantPopup);
+
     layerButtons->addWidget(layerLabel);
     layerButtons->addWidget(addLayerButton);
     layerButtons->addWidget(mLayerDeleteButton);
@@ -125,6 +138,7 @@ void TimeLine::initUI()
     layerButtons->addSeparator();
     layerButtons->addWidget(allVisibleButton);
     layerButtons->addWidget(allLockedButton);
+    layerButtons->addWidget(toolsButton);
     layerButtons->setFixedHeight(42);
 
     QHBoxLayout* leftToolBarLayout = new QHBoxLayout();
@@ -208,22 +222,6 @@ void TimeLine::initUI()
     loopCloneButton->setToolTip(tr("循环克隆帧：把选中的帧（未选中则整层）按原间隔重复指定次数"));
     loopCloneButton->setMinimumSize(QSize(38, 34));
 
-    // TVP satellite tools (lazy, non-modal)
-    QToolButton* toolsButton = new QToolButton(this);
-    toolsButton->setText(tr("工具"));
-    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 对位中割 / 视频抽帧"));
-    toolsButton->setMinimumSize(QSize(38, 34));
-    QMenu* toolsMenu = new QMenu(this);
-    QAction* lipsyncAct = toolsMenu->addAction(tr("口型同步切换器"));
-    QAction* paletteAct = toolsMenu->addAction(tr("调色板提取"));
-    QAction* inbetweenAct = toolsMenu->addAction(tr("对位中割参考"));
-    QAction* videoAct = toolsMenu->addAction(tr("视频抽帧中割"));
-    toolsButton->setMenu(toolsMenu);
-    toolsButton->setPopupMode(QToolButton::InstantPopup);
-
-    QLabel* zoomLabel = new QLabel(tr("Zoom:"));
-    zoomLabel->setIndent(5);
-
     QSlider* zoomSlider = new QSlider(this);
     zoomSlider->setRange(6, 120);
     zoomSlider->setFixedWidth(74);
@@ -232,6 +230,9 @@ void TimeLine::initUI()
     zoomSlider->setOrientation(Qt::Horizontal);
     zoomSlider->setFocusPolicy(Qt::TabFocus);
 
+    // zoom slider to the LEFT of the keyframe buttons (TVP)
+    timelineButtons->addWidget(zoomSlider);
+    timelineButtons->addSeparator();
     timelineButtons->addWidget(keyLabel);
     timelineButtons->addWidget(addKeyButton);
     timelineButtons->addWidget(removeKeyButton);
@@ -244,11 +245,6 @@ void TimeLine::initUI()
     timelineButtons->addSeparator();
     timelineButtons->addWidget(loopCloneButton);
     timelineButtons->addWidget(loopCloneSpin);
-    timelineButtons->addSeparator();
-    timelineButtons->addWidget(toolsButton);
-    timelineButtons->addSeparator();
-    timelineButtons->addWidget(zoomLabel);
-    timelineButtons->addWidget(zoomSlider);
     timelineButtons->setFixedHeight(42);
 
     // --------- Time controls ---------
@@ -260,8 +256,11 @@ void TimeLine::initUI()
 
     QHBoxLayout* rightToolBarLayout = new QHBoxLayout();
     rightToolBarLayout->addWidget(timelineButtons);
-    rightToolBarLayout->setAlignment(Qt::AlignLeft);
-    rightToolBarLayout->addWidget(mTimeControls);
+    // playback buttons centered, fps/speed pushed to the right end (TVP)
+    rightToolBarLayout->addStretch();
+    rightToolBarLayout->addWidget(mTimeControls->transportBar());
+    rightToolBarLayout->addStretch();
+    rightToolBarLayout->addWidget(mTimeControls->fpsBar());
     rightToolBarLayout->setContentsMargins(0, 0, 0, 0);
     rightToolBarLayout->setSpacing(0);
     rightToolBar->setLayout(rightToolBarLayout);
