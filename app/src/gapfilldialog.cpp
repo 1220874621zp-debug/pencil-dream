@@ -325,12 +325,12 @@ void GapFillDialog::detectGaps()
 
         auto* applyItem = new QTableWidgetItem;
         applyItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
-        // Pre-check learned suggestions at medium confidence or above;
-        // low-confidence and rule-based rows need explicit review.
-        const bool preCheck = gap.suggestedColor.has_value() &&
-                gap.predictionProvenance == PredictionProvenance::Learned &&
-                gap.confidenceBand != ConfidenceBand::Low;
-        applyItem->setCheckState(preCheck ? Qt::Checked : Qt::Unchecked);
+        // The frozen model's absolute confidence rarely exceeds the
+        // official 0.55/0.85 bands (0.3~0.5 is typical even when the
+        // color is right), so pre-check every row that has a
+        // suggestion; review happens by unchecking in the list.
+        applyItem->setCheckState(gap.suggestedColor.has_value()
+                                     ? Qt::Checked : Qt::Unchecked);
         ui->gapsTable->setItem(row, 0, applyItem);
 
         ui->gapsTable->setItem(row, 1,
