@@ -102,20 +102,23 @@ void TimeLine::initUI()
     // TVP "copy clear": duplicate the layer structure above the original
     // with blank frames (cleanup / trace-over workflow)
     QToolButton* copyClearButton = new QToolButton(this);
-    copyClearButton->setText(tr("复制清空"));
+    copyClearButton->setIcon(QIcon(":icons/themes/playful/timeline/layer-copyclear.svg"));
     copyClearButton->setToolTip(tr("在原图层上方复制一个同结构图层，关键帧内容全部为空白（清稿/描线用）"));
-    copyClearButton->setMinimumSize(QSize(38, 30));
+    copyClearButton->setIconSize(QSize(26, 26));
+    copyClearButton->setMinimumSize(QSize(34, 34));
 
     // TVP global toggles: every layer on -> every layer off (and back)
     QToolButton* allVisibleButton = new QToolButton(this);
-    allVisibleButton->setText(tr("可见"));
+    allVisibleButton->setIcon(QIcon(":icons/themes/playful/timeline/all-visible.svg"));
     allVisibleButton->setToolTip(tr("全部图层可见性切换（全开→全关，有关→全开）"));
-    allVisibleButton->setMinimumSize(QSize(38, 30));
+    allVisibleButton->setIconSize(QSize(26, 26));
+    allVisibleButton->setMinimumSize(QSize(34, 34));
 
     QToolButton* allLockedButton = new QToolButton(this);
-    allLockedButton->setText(tr("锁定"));
+    allLockedButton->setIcon(QIcon(":icons/themes/playful/timeline/all-locked.svg"));
     allLockedButton->setToolTip(tr("全部图层锁定切换（全解锁→全锁，有锁→全解锁）"));
-    allLockedButton->setMinimumSize(QSize(38, 30));
+    allLockedButton->setIconSize(QSize(26, 26));
+    allLockedButton->setMinimumSize(QSize(34, 34));
 
     // TVP satellite tools dropdown: right beside the lock toggle
     QToolButton* toolsButton = new QToolButton(this);
@@ -168,8 +171,6 @@ void TimeLine::initUI()
     // --------- key buttons ---------
     QToolBar* timelineButtons = new QToolBar(this);
     timelineButtons->setIconSize(QSize(22,22));
-    QLabel* keyLabel = new QLabel(tr("Keys:"));
-    keyLabel->setIndent(5);
 
     QToolButton* addKeyButton = new QToolButton(this);
     addKeyButton->setIcon(QIcon(":icons/themes/playful/timeline/frame-add.svg"));
@@ -209,6 +210,14 @@ void TimeLine::initUI()
     holdFourButton->setToolTip(tr("Hold 4 frames per key"));
     holdFourButton->setMinimumSize(QSize(34, 34));
 
+    QFont holdFont = holdOneButton->font();
+    holdFont.setPointSize(13);
+    holdFont.setBold(true);
+    holdOneButton->setFont(holdFont);
+    holdTwoButton->setFont(holdFont);
+    holdThreeButton->setFont(holdFont);
+    holdFourButton->setFont(holdFont);
+
     // TVP loop-clone: repeat the selected frames (or the whole layer) N times
     QSpinBox* loopCloneSpin = new QSpinBox(this);
     loopCloneSpin->setRange(1, 99);
@@ -233,7 +242,6 @@ void TimeLine::initUI()
     // zoom slider to the LEFT of the keyframe buttons (TVP)
     timelineButtons->addWidget(zoomSlider);
     timelineButtons->addSeparator();
-    timelineButtons->addWidget(keyLabel);
     timelineButtons->addWidget(addKeyButton);
     timelineButtons->addWidget(removeKeyButton);
     timelineButtons->addWidget(duplicateKeyButton);

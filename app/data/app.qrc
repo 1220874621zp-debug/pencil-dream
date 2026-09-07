@@ -10,6 +10,9 @@
         <file>icons/themes/playful/timeline/frame-duplicate.svg</file>
         <file>icons/themes/playful/timeline/frame-remove.svg</file>
         <file>icons/themes/playful/timeline/layer-add.svg</file>
+        <file>icons/themes/playful/timeline/layer-copyclear.svg</file>
+        <file>icons/themes/playful/timeline/all-visible.svg</file>
+        <file>icons/themes/playful/timeline/all-locked.svg</file>
         <file>icons/themes/playful/timeline/layer-remove.svg</file>
         <file>icons/themes/playful/dialog-error.svg</file>
         <file>icons/themes/playful/display/perspective-angle.svg</file>
