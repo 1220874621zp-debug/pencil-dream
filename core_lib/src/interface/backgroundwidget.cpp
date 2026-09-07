@@ -115,7 +115,8 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
 
-    // clean light paper for drawing (strokes stay readable on it)
+    // clean light paper for drawing (strokes stay readable on it);
+    // sharp corners — plain paper, no scene-card styling
     painter.setClipRect(event->rect());
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setPen(Qt::NoPen);
@@ -129,13 +130,13 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
             && qFuzzyCompare(paperPoly.at(2).x(), b.right()) && qFuzzyCompare(paperPoly.at(2).y(), b.bottom())
             && qFuzzyCompare(paperPoly.at(3).x(), b.left()) && qFuzzyCompare(paperPoly.at(3).y(), b.bottom());
         if (axisAligned)
-            painter.drawRoundedRect(b, 12.0, 12.0);
+            painter.drawRect(b);
         else
             painter.drawPolygon(paperPoly);
     }
     else
     {
-        painter.drawRoundedRect(paper, 12.0, 12.0);
+        painter.drawRect(paper);
     }
     painter.setRenderHint(QPainter::Antialiasing, false);
 
