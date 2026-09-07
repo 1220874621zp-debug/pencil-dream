@@ -146,6 +146,11 @@ void PreferenceManager::loadPrefs()
         }
         settings.setValue("FrameSize120Migrated", true);
     }
+    // write-through: the key must exist after every launch, so an externally
+    // wiped settings store (or a stale instance flushing an old cache) can
+    // never leave the frame width unset
+    settings.setValue(SETTING_FRAME_SIZE, frameSize);
+    settings.sync();
     set(SETTING::FRAME_SIZE, frameSize);
     set(SETTING::TIMELINE_SIZE,            settings.value(SETTING_TIMELINE_SIZE,          240).toInt());
     set(SETTING::DRAW_LABEL,               settings.value(SETTING_DRAW_LABEL,             false ).toBool());
