@@ -1140,9 +1140,8 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 9.0), 180 * 16, -160 * 16);
     }
 
-    // clipping-mask toggle: downward arrow, active = clipped to the layers below
+    // clipping-mask toggle: Krita inherit-alpha glyph (swoosh, strike = off), tinted by state
     const QRect clipR = clipIconRect(width);
-    const QPointF clipC(clipR.x() + 8.0, sliderY);
     const bool clipActive = layer->clipMask() && layer->type() == Layer::BITMAP;
     QColor clipColor = clipActive ? Theme::Accent : QColor(0x66, 0x66, 0x6E);
     if (layer->type() != Layer::BITMAP)
@@ -1150,16 +1149,19 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         // bitmap-only feature: keep the control visible but inert
         clipColor = QColor(0x3A, 0x3A, 0x40);
     }
-    painter.setPen(QPen(clipColor, 1.6));
-    painter.drawLine(QPointF(clipC.x(), clipC.y() - 7.0), QPointF(clipC.x(), clipC.y() + 1.0));
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(clipColor);
-    QPolygonF clipHead;
-    clipHead << QPointF(clipC.x() - 4.0, clipC.y() + 1.0)
-             << QPointF(clipC.x() + 4.0, clipC.y() + 1.0)
-             << QPointF(clipC.x(), clipC.y() + 7.0);
-    painter.drawPolygon(clipHead);
-    painter.setBrush(Qt::NoBrush);
+    QPixmap clipPix(layer->clipMask() ? ":/icons/themes/playful/timeline/clip-on.svg"
+                                      : ":/icons/themes/playful/timeline/clip-off.svg");
+    if (!clipPix.isNull())
+    {
+        QPixmap clipTinted(clipPix.size());
+        clipTinted.fill(Qt::transparent);
+        QPainter clipTintPainter(&clipTinted);
+        clipTintPainter.drawPixmap(0, 0, clipPix);
+        clipTintPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        clipTintPainter.fillRect(clipTinted.rect(), clipColor);
+        clipTintPainter.end();
+        painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
+    }
     painter.setRenderHint(QPainter::Antialiasing, false);
 }
 

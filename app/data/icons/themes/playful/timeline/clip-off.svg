@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Krita transparency-disabled glyph (Timothée Giet, CC-BY-SA 4.0), recolored white for runtime tinting -->
+  <path d="M15 3c-3 6-5 10-10 10S1 3 8 3c6 0 1 9 7 9-7 5-4-7.48-7-7.48-4 0-5 6.96-2 6.96S12 5 13 3z" fill="#FFFFFF"/>
+  <rect y="7" x="0" height="2" width="16" fill="#FFFFFF"/>
+</svg>

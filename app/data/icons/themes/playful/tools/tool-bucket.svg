@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 22 22" fill="none" stroke="#E8E8EA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4 L15 4 L19 8 L11.5 15.5 a2.3 2.3 0 0 1-3.2 0 L4 11 Z"/><path d="M15 4 L19 8"/><path d="M17.2 13.2 c.9 1 .9 2.4 0 3.3 -.9 .9-2.3 .9-3.1 0 -.9-1-.9-2.4 0-3.3 .8-.9 2.2-.9 3.1 0 Z" fill="#E8E8EA" stroke="none"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 32 32">
+  <!-- Krita krita_tool_color_fill glyph (Timothée Giet, CC-BY-SA 4.0), recolored for the dark toolbox -->
+  <path d="m7.071 3.272 2.121-2.121 19.092 19.092-3.535.707z" fill="#E8E8EA"/>
+  <path d="M10.607 5.393 0 16l13.435 13.435 10.607-10.607L21.213 16H4.243l8.485-8.485z" fill="#E8E8EA"/>
+  <path d="M28 21c3 3 4 9 0 9s0-6 0-9z" fill="#E8E8EA"/>
+</svg>
