@@ -22,6 +22,7 @@ GNU General Public License for more details.
 
 template<typename T> class QList;
 class QActionGroup;
+class QMenu;
 class QToolBar;
 class Object;
 class Editor;
@@ -143,6 +144,17 @@ private:
     void readSettings();
     void writeSettings();
     void resetAndDockAllSubWidgets();
+
+    // named panel-layout workspaces (friction-style):
+    // snapshots of saveState() stored per name in QSettings,
+    // re-applied on startup when one is active
+    QStringList savedWorkspaceNames() const;
+    void rebuildWorkspaceMenu();
+    void saveCurrentWorkspaceAs();
+    void applyWorkspace(const QString& name);
+    void deleteWorkspace(const QString& name);
+    void applyDefaultWorkspace();
+    QMenu* mWorkspaceMenu = nullptr;
 
     void changePlayState(bool isPlaying);
 

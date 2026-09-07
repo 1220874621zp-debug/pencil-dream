@@ -26,6 +26,7 @@ GNU General Public License for more details.
 #include <QMenu>
 #include <QFile>
 #include <QMessageBox>
+#include <QInputDialog>
 #include <QProgressDialog>
 #include <QTabletEvent>
 #include <QStandardPaths>
@@ -506,6 +507,11 @@ void MainWindow2::createMenus()
     ui->menuFile->insertMenu(ui->actionSave, mRecentFileMenu);
 
     connect(mRecentFileMenu, &RecentFileMenu::loadRecentFile, this, &MainWindow2::openFile);
+
+    //--- Workspace Menu (named panel-layout snapshots) ---
+    mWorkspaceMenu = new QMenu(tr("工作区"), this);
+    connect(mWorkspaceMenu, &QMenu::aboutToShow, this, &MainWindow2::rebuildWorkspaceMenu);
+    ui->menuBar->insertMenu(ui->menuHelp->menuAction(), mWorkspaceMenu);
 }
 
 void MainWindow2::replaceUndoRedoActions()
@@ -1129,6 +1135,138 @@ void MainWindow2::resetAndDockAllSubWidgets()
     mColorPalette->raise();
 }
 
+static QString workspaceStateKey(const QString& name)
+{
+    // base64url keeps the settings key ASCII-safe for any (also CJK) name
+    return QStringLiteral("workspaces/state_") +
+           QString::fromLatin1(name.toUtf8().toBase64(
+                                   QByteArray::Base64UrlEncoding |
+                                   QByteArray::OmitTrailingEquals));
+}
+
+QStringList MainWindow2::savedWorkspaceNames() const
+{
+    QSettings settings(PENCIL2D, PENCIL2D);
+    return settings.value("workspaces/names").toStringList();
+}
+
+void MainWindow2::saveCurrentWorkspaceAs()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this,
+                                               tr("保存工作区"),
+                                               tr("工作区名称："),
+                                               QLineEdit::Normal,
+                                               QString(),
+                                               &ok).trimmed();
+    if (!ok || name.isEmpty()) { return; }
+
+    QSettings settings(PENCIL2D, PENCIL2D);
+    QStringList names = savedWorkspaceNames();
+    if (names.contains(name))
+    {
+        const auto ret = QMessageBox::question(
+                             this, tr("覆盖工作区"),
+                             tr("工作区“%1”已存在，是否覆盖？").arg(name));
+        if (ret != QMessageBox::Yes) { return; }
+    }
+    else
+    {
+        names.append(name);
+        settings.setValue("workspaces/names", names);
+    }
+    settings.setValue(workspaceStateKey(name), saveState());
+    // the saved workspace becomes the one re-applied on startup
+    settings.setValue("workspaces/active", name);
+}
+
+void MainWindow2::applyWorkspace(const QString& name)
+{
+    QSettings settings(PENCIL2D, PENCIL2D);
+    const QByteArray state = settings.value(workspaceStateKey(name)).toByteArray();
+    if (state.isEmpty()) { return; }
+    restoreState(state);
+    // remember the applied workspace so it is restored on startup
+    settings.setValue("workspaces/active", name);
+}
+
+void MainWindow2::deleteWorkspace(const QString& name)
+{
+    const auto ret = QMessageBox::question(
+                         this, tr("删除工作区"),
+                         tr("确定删除工作区“%1”？").arg(name));
+    if (ret != QMessageBox::Yes) { return; }
+
+    QSettings settings(PENCIL2D, PENCIL2D);
+    QStringList names = savedWorkspaceNames();
+    if (names.removeAll(name) == 0) { return; }
+    settings.setValue("workspaces/names", names);
+    settings.remove(workspaceStateKey(name));
+    if (settings.value("workspaces/active").toString() == name)
+    {
+        settings.remove("workspaces/active");
+    }
+}
+
+void MainWindow2::applyDefaultWorkspace()
+{
+    // the default layout is not a saved workspace: stop auto-applying
+    // the previous custom workspace on startup
+    QSettings settings(PENCIL2D, PENCIL2D);
+    settings.remove("workspaces/active");
+
+    for (BaseDockWidget* dock : mDockWidgets)
+    {
+        dock->setFloating(false);
+        dock->show();
+    }
+
+    addDockWidget(Qt::LeftDockWidgetArea, mToolBox);
+    addDockWidget(Qt::LeftDockWidgetArea, mToolOptions);
+    addDockWidget(Qt::RightDockWidgetArea, mColorPalette);
+    tabifyDockWidget(mColorPalette, mColorBox);
+    tabifyDockWidget(mColorPalette, mColorInspector);
+    addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
+    resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
+    mColorPalette->raise();
+}
+
+void MainWindow2::rebuildWorkspaceMenu()
+{
+    if (!mWorkspaceMenu) { return; }
+    mWorkspaceMenu->clear();
+
+    mWorkspaceMenu->addAction(tr("重置默认布局"),
+                              this, &MainWindow2::applyDefaultWorkspace);
+    mWorkspaceMenu->addAction(tr("保存当前工作区…"),
+                              this, &MainWindow2::saveCurrentWorkspaceAs);
+
+    QSettings settings(PENCIL2D, PENCIL2D);
+    const QString active = settings.value("workspaces/active").toString();
+    const QStringList names = savedWorkspaceNames();
+    if (!names.isEmpty())
+    {
+        mWorkspaceMenu->addSeparator();
+        for (const auto& name : names)
+        {
+            QAction* act = mWorkspaceMenu->addAction(name, this, [this, name]() {
+                applyWorkspace(name);
+            });
+            act->setCheckable(true);
+            act->setChecked(name == active);
+        }
+
+        QMenu* deleteMenu = mWorkspaceMenu->addMenu(tr("删除工作区"));
+        for (const auto& name : names)
+        {
+            deleteMenu->addAction(name, this, [this, name]() {
+                deleteWorkspace(name);
+            });
+        }
+    }
+}
+
 void MainWindow2::newObject()
 {
     auto object = new Object();
@@ -1240,6 +1378,17 @@ void MainWindow2::readSettings()
     restoreGeometry(winGeometry.toByteArray());
 
     QVariant winState = settings.value(SETTING_WINDOW_STATE);
+    // an active named workspace takes priority over the ad-hoc
+    // last-session layout, so it is re-applied on every startup
+    const QString activeWorkspace = settings.value("workspaces/active").toString();
+    if (!activeWorkspace.isEmpty())
+    {
+        const QByteArray workspaceState = settings.value(workspaceStateKey(activeWorkspace)).toByteArray();
+        if (!workspaceState.isEmpty())
+        {
+            winState = workspaceState;
+        }
+    }
     restoreState(winState.toByteArray());
 
     int opacity = mEditor->preference()->getInt(SETTING::WINDOW_OPACITY);
