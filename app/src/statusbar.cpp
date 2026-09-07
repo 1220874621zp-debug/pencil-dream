@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QGridLayout>
+#include <QIcon>
 #include <QToolButton>
 #include <QLabel>
 #include <QLineEdit>
@@ -166,24 +167,33 @@ void StatusBar::updateToolStatus(ToolType tool)
             Q_ASSERT(false);
     }
 
-    static QPixmap toolIcons[TOOL_TYPE_COUNT]{
-        {":icons/themes/playful/tools/tool-pencil.svg"},
-        {":icons/themes/playful/tools/tool-eraser.svg"},
-        {":icons/themes/playful/tools/tool-select.svg"},
-        {":icons/themes/playful/tools/tool-move.svg"},
-        {":icons/themes/playful/tools/tool-hand.svg"},
-        {":icons/themes/playful/tools/tool-smudge.svg"},
-        {""}, // Camera tool does not have an icon
-        {":icons/themes/playful/tools/tool-pen.svg"},
-        {":icons/themes/playful/tools/tool-polyline.svg"},
-        {":icons/themes/playful/tools/tool-bucket.svg"},
-        {":icons/themes/playful/tools/tool-eyedropper.svg"},
-        {":icons/themes/playful/tools/tool-brush.svg"},
-        {":icons/themes/playful/tools/tool-lasso.svg"}, // Lasso
-        {":icons/themes/playful/tools/tool-deform.svg"}, // Deform
-        {":icons/themes/playful/tools/tool-onionalign.svg"}
+    // iconfont SVG 无 width/height，QPixmap(路径) 会按 viewBox 固有尺寸(1024x1024)整图加载，
+    // 撑爆状态栏 minimum size → 主窗口布局崩坏；必须经 QIcon 按目标像素矢量渲染
+    static const QString toolIconPaths[TOOL_TYPE_COUNT]{
+        ":icons/themes/playful/tools/tool-pencil.svg",
+        ":icons/themes/playful/tools/tool-eraser.svg",
+        ":icons/themes/playful/tools/tool-select.svg",
+        ":icons/themes/playful/tools/tool-move.svg",
+        ":icons/themes/playful/tools/tool-hand.svg",
+        ":icons/themes/playful/tools/tool-smudge.svg",
+        "", // Camera tool does not have an icon
+        ":icons/themes/playful/tools/tool-pen.svg",
+        ":icons/themes/playful/tools/tool-polyline.svg",
+        ":icons/themes/playful/tools/tool-bucket.svg",
+        ":icons/themes/playful/tools/tool-eyedropper.svg",
+        ":icons/themes/playful/tools/tool-brush.svg",
+        ":icons/themes/playful/tools/tool-lasso.svg", // Lasso
+        ":icons/themes/playful/tools/tool-deform.svg", // Deform
+        ":icons/themes/playful/tools/tool-onionalign.svg"
     };
-    mToolIcon->setPixmap(toolIcons[tool]);
+    const qreal dpr = devicePixelRatioF();
+    const int iconPx = qRound(18 * dpr);
+    QPixmap toolPixmap;
+    if (!toolIconPaths[tool].isEmpty()) {
+        toolPixmap = QIcon(toolIconPaths[tool]).pixmap(QSize(iconPx, iconPx));
+        toolPixmap.setDevicePixelRatio(dpr);
+    }
+    mToolIcon->setPixmap(toolPixmap);
     mToolIcon->setToolTip(BaseTool::TypeName(tool));
 }
 
