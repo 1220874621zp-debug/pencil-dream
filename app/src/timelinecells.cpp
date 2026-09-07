@@ -550,20 +550,10 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int blockLen = blockLengthFor(layer, key);
     const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
     const int y = getLayerY(layerIndex);
-    // circular hit on the top-right grip of the LAST block only is too
-    // restrictive: test every block so any block can be grabbed
-    const int standardWidth2 = mFrameSize - 2;
-    int hit = -1;
-    layer->foreachKeyFrame([&](KeyFrame* k)
-    {
-        const int bl = blockLengthFor(layer, k);
-        const int rw = standardWidth2 + (bl - 1) * mFrameSize;
-        const int rl = getFrameX(k->pos()) - standardWidth2;
-        const QPointF c(rl + rw - 9.0, getLayerY(layerIndex) + 7.0);
-        if (QLineF(c, QPointF(pos)).length() <= 8.0)
-            hit = layerIndex;
-    });
-    return hit;
+    // TVP geometry: last block's top-right corner, 14px handle zone
+    const int edge = recLeft + recWidth - 2; // visual right edge
+    return (pos.x() >= edge - 14 && pos.x() <= edge + 4
+            && pos.y() >= y + 2 && pos.y() <= y + 18) ? layerIndex : -1;
 }
 
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
@@ -731,18 +721,17 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         painter.setBrush(trackCol);
         painter.drawRoundedRect(QRectF(recLeft + recWidth - 7.0, recTop + 6.0, 3.0, recHeight - 12.0), 1.5, 1.5);
 
-        // drag grip at the top-right corner: drag it to move the block
+        // TVP create handle: "+" on the top-right of the trailing block;
+        // drag it out to create consecutive new frames
+        if (framePos == lastPos)
         {
             const QPointF c(recLeft + recWidth - 9.0, recTop + 7.0);
             painter.setBrush(Theme::PanelRaised);
             painter.setPen(QPen(trackCol, 1.2));
             painter.drawEllipse(c, 7.0, 7.0);
             painter.setPen(QPen(trackCol, 1.4));
-            painter.drawLine(QPointF(c.x() - 4.0, c.y()), QPointF(c.x() + 4.0, c.y()));
-            painter.drawLine(QPointF(c.x() - 3.4, c.y() - 2.2), QPointF(c.x() - 4.6, c.y()));
-            painter.drawLine(QPointF(c.x() - 3.4, c.y() + 2.2), QPointF(c.x() - 4.6, c.y()));
-            painter.drawLine(QPointF(c.x() + 3.4, c.y() - 2.2), QPointF(c.x() + 4.6, c.y()));
-            painter.drawLine(QPointF(c.x() + 3.4, c.y() + 2.2), QPointF(c.x() + 4.6, c.y()));
+            painter.drawLine(QPointF(c.x() - 3.6, c.y()), QPointF(c.x() + 3.6, c.y()));
+            painter.drawLine(QPointF(c.x(), c.y() - 3.6), QPointF(c.x(), c.y() + 3.6));
         }
 
         // separator line towards the next consecutive block (TVP-style)
@@ -1342,8 +1331,27 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         else
         {
+            // TVP create handle (checked before resize, matching tvp_timeline)
+            if (event->button() == Qt::LeftButton)
+            {
+                const int plusLayer = hitTestPlusHandle(event->pos());
+                if (plusLayer != -1)
+                {
+                    if (mEditor->currentLayerIndex() != plusLayer)
+                    {
+                        mEditor->layers()->currentLayer()->deselectAll();
+                        mEditor->layers()->setCurrentLayer(plusLayer);
+                    }
+                    mPlusCreating = true;
+                    mPlusPreviewCount = 0;
+                    qDebug() << "[ui] create-drag start: layer" << plusLayer;
+                    update();
+                    break;
+                }
+            }
+
             // Dreams-style trim: grabbing the right edge of a bitmap block
-            // adjusts its length (checked FIRST so the edge bar always wins)
+            // adjusts its length (after the create handle, TVP order)
             if (event->button() == Qt::LeftButton && layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
             {
                 int trimPos = hitTestTrimHandle(event->pos());
@@ -1372,32 +1380,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             }
 
 
-            // grip handle: grab-and-drag to move the block (native frame move)
-            if (event->button() == Qt::LeftButton)
-            {
-                const int gripLayer = hitTestPlusHandle(event->pos());
-                if (gripLayer != -1)
-                {
-                    Layer* gripL = mEditor->object()->getLayer(gripLayer);
-                    const int gripFrame = getFrameNumber(event->pos().x());
-                    // settle focus/selection on the grabbed frame
-                    if (mEditor->currentLayerIndex() != gripLayer)
-                    {
-                        mEditor->layers()->currentLayer()->deselectAll();
-                        mEditor->layers()->setCurrentLayer(gripLayer);
-                    }
-                    if (!gripL->isFrameSelected(gripFrame))
-                    {
-                        gripL->deselectAll();
-                        gripL->toggleFrameSelected(gripFrame, false);
-                    }
-                    emit mEditor->selectedFramesChanged();
-                    mCanMoveFrame = true;
-                    qDebug() << "[ui] grip-drag start: frame" << gripFrame << "layer" << gripLayer;
-                    mTimeLine->updateContent();
-                    break;
-                }
-            }
 
             if (frameNumber == mEditor->currentFrame() && mStartY < 20)
             {
@@ -1550,7 +1532,7 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
     {
         Qt::CursorShape shape = Qt::ArrowCursor;
         if (hitTestPlusHandle(event->pos()) != -1)
-            shape = Qt::SizeAllCursor;
+            shape = Qt::CrossCursor;
         else if (hitTestTrimHandle(event->pos()) != -1)
             shape = Qt::SizeHorCursor;
         else if (event->pos().y() < mOffsetY)
