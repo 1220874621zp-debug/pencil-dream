@@ -197,9 +197,11 @@ void TimeControls::initUI()
     auto* fpsLayout = new QHBoxLayout(mFpsBar);
     fpsLayout->setContentsMargins(0, 0, 0, 0);
     fpsLayout->setSpacing(4);
+    // live-fps label first so the two input boxes sit flush against the
+    // right edge of the timeline toolbar
+    fpsLayout->addWidget(mFpsLabel);
     fpsLayout->addWidget(mFpsBox);
     fpsLayout->addWidget(mPlaybackSpeedBox);
-    fpsLayout->addWidget(mFpsLabel);
 
     // TVP layout: the playback range and everything after it moves to a
     // slim bar at the bottom of the timeline
