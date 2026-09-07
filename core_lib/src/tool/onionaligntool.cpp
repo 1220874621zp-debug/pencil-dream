@@ -139,14 +139,11 @@ void OnionAlignTool::pointerPressEvent(PointerEvent* event)
         // Alt+点击：命中侧归零，空白处清空整层
         if (hit)
         {
-            mDragSide = side;
             resetGhostOffset(side);
-            mDragSide = GhostSide::NONE;
         }
-        else if (LayerBitmap* layer = currentBitmapLayer())
+        else
         {
-            mScribbleArea->clearOnionGhostOffsets(layer->id());
-            mScribbleArea->invalidateOnionGhostVisual();
+            resetAllGhostOffsets();
         }
         return;
     }
@@ -239,6 +236,25 @@ void OnionAlignTool::resetGhostOffset(GhostSide side)
         ghost.nextOffset = QPointF();
     }
     mScribbleArea->invalidateOnionGhostVisual();
+}
+
+void OnionAlignTool::resetPrevGhostOffset()
+{
+    resetGhostOffset(GhostSide::PREV);
+}
+
+void OnionAlignTool::resetNextGhostOffset()
+{
+    resetGhostOffset(GhostSide::NEXT);
+}
+
+void OnionAlignTool::resetAllGhostOffsets()
+{
+    if (LayerBitmap* layer = currentBitmapLayer())
+    {
+        mScribbleArea->clearOnionGhostOffsets(layer->id());
+        mScribbleArea->invalidateOnionGhostVisual();
+    }
 }
 
 void OnionAlignTool::autoAlignCenters()

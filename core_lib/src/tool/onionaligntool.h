@@ -51,6 +51,13 @@ public:
     /** 拖拽中视为活动工具：paintEvent 走实时重绘路径而非贴帧级缓存 */
     bool isActive() const override { return mDragSide != GhostSide::NONE; }
 
+public slots:
+    /** 工具选项面板入口 */
+    void resetPrevGhostOffset();   ///< 归零前帧(红)幽灵偏移
+    void resetNextGhostOffset();   ///< 归零后帧(蓝)幽灵偏移
+    void resetAllGhostOffsets();   ///< 全部复位
+    void autoAlignCenters();       ///< 前后帧内容中心对齐到中点
+
 private:
     enum class GhostSide { NONE, PREV, NEXT };
 
@@ -61,7 +68,6 @@ private:
     bool hitTestGhost(const QPointF& canvasPos, GhostSide& sideOut, int& frameOut) const;
     bool alphaHit(BitmapImage* image, const QPointF& canvasPos, const QPointF& offset) const;
 
-    void autoAlignCenters();
     void resetGhostOffset(GhostSide side);
     void applyOffsetDelta(const QPointF& delta);
 

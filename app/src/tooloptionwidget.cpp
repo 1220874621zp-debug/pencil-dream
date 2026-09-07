@@ -25,6 +25,7 @@ GNU General Public License for more details.
 #include "bucketoptionswidget.h"
 #include "strokeoptionswidget.h"
 #include "transformoptionswidget.h"
+#include "onionalignoptionswidget.h"
 #include "spinslider.h"
 #include "editor.h"
 #include "util.h"
@@ -62,11 +63,14 @@ void ToolOptionWidget::initUI()
     mBrushOptionsWidget->setHidden(true);
     mStrokeOptionsWidget = new StrokeOptionsWidget(editor(), this);
     mTransformOptionsWidget = new TransformOptionsWidget(editor(), this);
+    mOnionAlignOptionsWidget = new OnionAlignOptionsWidget(editor(), this);
+    mOnionAlignOptionsWidget->setHidden(true);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBucketOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mCameraOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBrushOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mStrokeOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mTransformOptionsWidget);
+    ui->scrollAreaWidgetContents->layout()->addWidget(mOnionAlignOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Expanding));
 
     makeConnectionToEditor(editor());
@@ -105,6 +109,7 @@ void ToolOptionWidget::updateUIForTool(BaseTool* tool)
     setWidgetVisibility(mBrushOptionsWidget, isBrushLike);
     setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool) && !isBrushLike);
     setWidgetVisibility(mTransformOptionsWidget, editor()->tools()->isTransformTool(tool));
+    setWidgetVisibility(mOnionAlignOptionsWidget, tool->type() == ONION_ALIGN);
 }
 
 void ToolOptionWidget::onLayerChanged(int layerIndex)

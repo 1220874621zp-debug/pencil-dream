@@ -32,6 +32,7 @@ class BucketOptionsWidget;
 class CameraOptionsWidget;
 class StrokeOptionsWidget;
 class TransformOptionsWidget;
+class OnionAlignOptionsWidget;
 
 class ToolOptionWidget : public BaseDockWidget
 {
@@ -62,6 +63,7 @@ private:
     StrokeOptionsWidget* mStrokeOptionsWidget = nullptr;
     class BrushOptionsWidget* mBrushOptionsWidget = nullptr;
     TransformOptionsWidget* mTransformOptionsWidget = nullptr;
+    OnionAlignOptionsWidget* mOnionAlignOptionsWidget = nullptr;
 };
 
 #endif // TOOLOPTIONDOCKWIDGET_H
