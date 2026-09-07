@@ -139,6 +139,7 @@ public slots:
     void paletteColorChanged(QColor);
 
     void showLayerNotVisibleWarning();
+    void showLayerLockedWarning();
     void onTileUpdated(TiledBuffer* tiledBuffer, Tile* tile);
     void onTileCreated(TiledBuffer* tiledBuffer, Tile* tile);
 

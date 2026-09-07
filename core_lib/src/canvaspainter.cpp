@@ -367,9 +367,14 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         if (!layer->visible())
             continue;
 
+        // the layer-panel opacity multiplies into the layer's overall presence
         if (mOptions.eLayerVisibility == LayerVisibility::RELATED && !isCameraLayer)
         {
-            painter.setOpacity(calculateRelativeOpacityForLayer(mCurrentLayerIndex, i, mOptions.fLayerVisibilityThreshold));
+            painter.setOpacity(layer->opacity() * calculateRelativeOpacityForLayer(mCurrentLayerIndex, i, mOptions.fLayerVisibilityThreshold));
+        }
+        else
+        {
+            painter.setOpacity(layer->opacity());
         }
         bool isCurrentLayer = mCurrentLayerIndex == i;
 

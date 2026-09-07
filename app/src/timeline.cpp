@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QLabel>
 #include <QWheelEvent>
 #include <QSlider>
+#include <QSpinBox>
 #include <QTimer>
 #include <QSet>
 #include <algorithm>
@@ -34,6 +35,8 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "keyframe.h"
 #include "layermanager.h"
+#include "object.h"
+#include "scribblearea.h"
 #include "timecontrols.h"
 #include "timelinecells.h"
 
@@ -93,10 +96,24 @@ void TimeLine::initUI()
     duplicateLayerButton->setIconSize(QSize(26, 26));
     duplicateLayerButton->setMinimumSize(QSize(34, 34));
 
+    // TVP global toggles: every layer on -> every layer off (and back)
+    QToolButton* allVisibleButton = new QToolButton(this);
+    allVisibleButton->setText(tr("可见"));
+    allVisibleButton->setToolTip(tr("全部图层可见性切换（全开→全关，有关→全开）"));
+    allVisibleButton->setMinimumSize(QSize(38, 30));
+
+    QToolButton* allLockedButton = new QToolButton(this);
+    allLockedButton->setText(tr("锁定"));
+    allLockedButton->setToolTip(tr("全部图层锁定切换（全解锁→全锁，有锁→全解锁）"));
+    allLockedButton->setMinimumSize(QSize(38, 30));
+
     layerButtons->addWidget(layerLabel);
     layerButtons->addWidget(addLayerButton);
     layerButtons->addWidget(mLayerDeleteButton);
     layerButtons->addWidget(duplicateLayerButton);
+    layerButtons->addSeparator();
+    layerButtons->addWidget(allVisibleButton);
+    layerButtons->addWidget(allLockedButton);
     layerButtons->setFixedHeight(42);
 
     QHBoxLayout* leftToolBarLayout = new QHBoxLayout();
@@ -167,6 +184,19 @@ void TimeLine::initUI()
     holdFourButton->setToolTip(tr("Hold 4 frames per key"));
     holdFourButton->setMinimumSize(QSize(34, 34));
 
+    // TVP loop-clone: repeat the selected frames (or the whole layer) N times
+    QSpinBox* loopCloneSpin = new QSpinBox(this);
+    loopCloneSpin->setRange(1, 99);
+    loopCloneSpin->setValue(3);
+    loopCloneSpin->setToolTip(tr("循环克隆次数"));
+    loopCloneSpin->setFixedWidth(52);
+    mLoopCloneSpin = loopCloneSpin;
+
+    QToolButton* loopCloneButton = new QToolButton(this);
+    loopCloneButton->setText(tr("循环"));
+    loopCloneButton->setToolTip(tr("循环克隆帧：把选中的帧（未选中则整层）按原间隔重复指定次数"));
+    loopCloneButton->setMinimumSize(QSize(38, 34));
+
     QLabel* zoomLabel = new QLabel(tr("Zoom:"));
     zoomLabel->setIndent(5);
 
@@ -187,6 +217,9 @@ void TimeLine::initUI()
     timelineButtons->addWidget(holdTwoButton);
     timelineButtons->addWidget(holdThreeButton);
     timelineButtons->addWidget(holdFourButton);
+    timelineButtons->addSeparator();
+    timelineButtons->addWidget(loopCloneButton);
+    timelineButtons->addWidget(loopCloneSpin);
     timelineButtons->addSeparator();
     timelineButtons->addWidget(zoomLabel);
     timelineButtons->addWidget(zoomSlider);
@@ -252,6 +285,42 @@ void TimeLine::initUI()
     connect(holdTwoButton, &QToolButton::clicked, this, [this]() { applyHoldLength(2); });
     connect(holdThreeButton, &QToolButton::clicked, this, [this]() { applyHoldLength(3); });
     connect(holdFourButton, &QToolButton::clicked, this, [this]() { applyHoldLength(4); });
+    connect(loopCloneButton, &QToolButton::clicked, this, &TimeLine::cloneLoopFrames);
+
+    // TVP global toggles: unanimous state flips, mixed state resolves to "all on"
+    connect(allVisibleButton, &QToolButton::clicked, this, [this]()
+    {
+        Object* obj = editor()->object();
+        bool anyInvisible = false;
+        for (int i = 0; i < obj->getLayerCount(); ++i)
+        {
+            if (!obj->getLayer(i)->visible()) { anyInvisible = true; break; }
+        }
+        const bool makeVisible = anyInvisible;
+        for (int i = 0; i < obj->getLayerCount(); ++i)
+        {
+            obj->getLayer(i)->setVisible(makeVisible);
+        }
+        emit editor()->updateTimeLine();
+        editor()->getScribbleArea()->update();
+        updateContent();
+    });
+    connect(allLockedButton, &QToolButton::clicked, this, [this]()
+    {
+        Object* obj = editor()->object();
+        bool anyLocked = false;
+        for (int i = 0; i < obj->getLayerCount(); ++i)
+        {
+            if (obj->getLayer(i)->locked()) { anyLocked = true; break; }
+        }
+        const bool makeLocked = !anyLocked;
+        for (int i = 0; i < obj->getLayerCount(); ++i)
+        {
+            obj->getLayer(i)->setLocked(makeLocked);
+        }
+        emit editor()->updateTimeLine();
+        updateContent();
+    });
     connect(zoomSlider, &QSlider::valueChanged, mTracks, &TimeLineCells::setFrameSize);
     // wheel-driven scaling keeps the slider and the layer list in sync
     connect(mTracks, &TimeLineCells::frameSizeChanged, zoomSlider, &QSlider::setValue);
@@ -547,4 +616,54 @@ void TimeLine::applyHoldLength(int n)
     emit editor()->framesModified();
     updateContent();
     editor()->updateFrame();
+}
+
+/** TVP loop-clone: repeats the selected frames (or every frame of the layer
+ *  when nothing is selected) N times, keeping the original spacing. The whole
+ *  duplication is a single undo step. */
+void TimeLine::cloneLoopFrames()
+{
+    Layer* layer = editor()->layers()->currentLayer();
+    if (layer == nullptr || layer->type() == Layer::SOUND || layer->locked()) { return; }
+
+    const int loops = mLoopCloneSpin ? mLoopCloneSpin->value() : 3;
+    if (loops < 1) { return; }
+
+    QList<int> positions;
+    if (layer->hasAnySelectedFrames())
+    {
+        positions = layer->getSelectedFramesByPos();
+        std::sort(positions.begin(), positions.end());
+    }
+    if (positions.isEmpty())
+    {
+        layer->foreachKeyFrame([&positions](KeyFrame* key) { positions.append(key->pos()); });
+        std::sort(positions.begin(), positions.end());
+    }
+    if (positions.isEmpty()) { return; }
+
+    const int first = positions.first();
+    const int span = positions.last() - first + 1;
+
+    editor()->beginLayerLayoutEdit(layer);
+
+    for (int loop = 1; loop <= loops; ++loop)
+    {
+        for (int pos : positions)
+        {
+            const int newPos = pos + span * loop;
+            if (layer->keyExists(newPos)) { continue; }
+            KeyFrame* key = layer->getKeyFrameAt(pos);
+            if (key == nullptr) { continue; }
+            layer->addKeyFrame(newPos, key->clone());
+        }
+    }
+
+    layer->deselectAll();
+    editor()->endLayerLayoutEdit(tr("循环克隆 ×%1").arg(loops));
+
+    editor()->scrubTo(first + span);
+    editor()->layers()->notifyAnimationLengthChanged();
+    emit editor()->framesModified();
+    updateContent();
 }

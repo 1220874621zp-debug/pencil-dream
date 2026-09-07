@@ -540,7 +540,7 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int layerIndex = getLayerNumber(pos.y());
     if (layerIndex < 0 || layerIndex >= mEditor->object()->getLayerCount()) return -1;
     Layer* layer = mEditor->object()->getLayer(layerIndex);
-    if (layer->type() != Layer::BITMAP) return -1;
+    if (layer->type() != Layer::BITMAP || layer->locked()) return -1;
 
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -907,6 +907,23 @@ void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, 
     painter.restore();
 }
 
+bool TimeLineCells::rowHasInlineControls(int rowWidth) const
+{
+    // the slider needs room beside the name; the lock icon alone fits narrower rows
+    return rowWidth >= 240;
+}
+
+QRect TimeLineCells::opacitySliderRect(int rowWidth) const
+{
+    // 64px track left of the percentage label and the lock icon
+    return QRect(rowWidth - 160, 0, 64, 0);
+}
+
+QRect TimeLineCells::lockIconRect(int rowWidth) const
+{
+    return QRect(rowWidth - 38, 0, 16, 0);
+}
+
 void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
                        int x, int y, int width, int height,
                        bool selected, LayerVisibility layerVisibility) const
@@ -998,7 +1015,49 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     {
         painter.setPen(palette.color(QPalette::Text));
     }
-    painter.drawText(QPoint(52, y + height / 2 + 4), layer->name());
+    // keep the name clear of the inline slider
+    const int nameRight = rowHasInlineControls(width) ? (opacitySliderRect(width).x() - 64) : (width - 30);
+    const QString shownName = QFontMetrics(painter.font()).elidedText(layer->name(), Qt::ElideMiddle, qMax(20, nameRight - 52));
+    painter.drawText(QPoint(52, y + height / 2 + 4), shownName);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+
+    // --- TVP inline row controls: opacity slider, percentage, lock toggle ---
+    if (!rowHasInlineControls(width)) { return; }
+
+    const int sliderY = y + height / 2;
+    const QRect slider = opacitySliderRect(width);
+
+    // percentage label right-aligned before the slider
+    painter.setPen(selected ? Theme::AccentHover : QColor(0x8A, 0x8A, 0x90));
+    painter.drawText(QRect(slider.right() + 4, sliderY - 9, 34, 18),
+                     Qt::AlignRight | Qt::AlignVCenter,
+                     QString("%1%").arg(qRound(layer->opacity() * 100)));
+
+    // rounded track + knob
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x3A, 0x3A, 0x40));
+    painter.drawRoundedRect(QRectF(slider.x(), sliderY - 2.5, slider.width(), 5.0), 2.5, 2.5);
+    const qreal knobX = slider.x() + layer->opacity() * (slider.width() - 10) + 5.0;
+    painter.setBrush(layer->opacity() > 0.0 ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
+    painter.drawEllipse(QPointF(knobX, sliderY), 5.0, 5.0);
+
+    // padlock toggle (closed = locked)
+    const QRect lock = lockIconRect(width);
+    const QPointF lockC(lock.x() + 7.5, sliderY);
+    QColor lockColor = layer->locked() ? QColor(0xE8, 0xB4, 0x30) : QColor(0x66, 0x66, 0x6E);
+    painter.setBrush(lockColor);
+    painter.drawRect(QRectF(lockC.x() - 6.0, lockC.y() - 1.0, 12.0, 8.0));
+    painter.setPen(QPen(lockColor, 1.6));
+    painter.setBrush(Qt::NoBrush);
+    if (layer->locked())
+    {
+        painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 8.0), 180 * 16, -180 * 16);
+    }
+    else
+    {
+        painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 9.0), 180 * 16, -160 * 16);
+    }
     painter.setRenderHint(QPainter::Antialiasing, false);
 }
 
@@ -1289,8 +1348,37 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     switch (mType)
     {
     case TIMELINE_CELL_TYPE::Layers:
+        mOpacityDragLayer = -1;
         if (layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
         {
+            Layer* hitLayer = mEditor->object()->getLayer(layerNumber);
+            const int rowY = getLayerY(layerNumber);
+            const int rowH = rowHeightOf(layerNumber);
+            const bool expandedRow = rowH > 20;
+
+            // TVP inline controls: lock toggle and opacity slider (expanded rows only)
+            if (expandedRow && rowHasInlineControls(width()))
+            {
+                const QRect lock = lockIconRect(width()).adjusted(0, rowY + rowH / 2 - 11, 0, rowY + rowH / 2 + 11);
+                if (lock.contains(event->pos().x(), event->pos().y()))
+                {
+                    hitLayer->setLocked(!hitLayer->locked());
+                    qDebug() << "[ui] layer" << layerNumber << "locked ->" << hitLayer->locked();
+                    updateContent();
+                    break;
+                }
+                const QRect slider = opacitySliderRect(width()).adjusted(0, rowY + rowH / 2 - 11, 0, rowY + rowH / 2 + 11);
+                if (slider.contains(event->pos().x(), event->pos().y()))
+                {
+                    mOpacityDragLayer = layerNumber;
+                    const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
+                    hitLayer->setOpacity(value);
+                    mEditor->getScribbleArea()->update();
+                    updateContent();
+                    break;
+                }
+            }
+
             if (event->pos().x() < 9)
             {
                 // cycle the 8-color label: -1 -> 0 -> ... -> 7 -> -1
@@ -1545,6 +1633,21 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
     if (mType == TIMELINE_CELL_TYPE::Layers)
     {
+        if (mOpacityDragLayer != -1)
+        {
+            // live opacity drag on the layer row
+            Layer* layer = mEditor->object()->getLayer(mOpacityDragLayer);
+            if (layer != nullptr)
+            {
+                const QRect slider = opacitySliderRect(width());
+                const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
+                layer->setOpacity(value);
+                mEditor->getScribbleArea()->update();
+                update();
+            }
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
         if (event->buttons() & Qt::LeftButton ) {
             mEndY = event->pos().y();
             emit mouseMovedY(mEndY - mStartY);
@@ -1718,7 +1821,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         {
             mTrimming = false;
             KeyFrame* trimKey = currentLayer->getKeyFrameAt(mTrimKeyPos);
-            if (trimKey != nullptr && mTrimPreviewLength != mTrimOriginalLength)
+            if (trimKey != nullptr && mTrimPreviewLength != mTrimOriginalLength && !currentLayer->locked())
             {
                 // Layout transaction: one undo step restores the new length,
                 // the explicit flag AND the ripple moves of later blocks
@@ -1766,7 +1869,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             int posUnderCursor = getFrameNumber(mMousePressX);
             int offset = frameNumber - posUnderCursor;
 
-            if (currentLayer->canMoveSelectedFramesToOffset(offset)) {
+            if (!currentLayer->locked() && currentLayer->canMoveSelectedFramesToOffset(offset)) {
                 // Layout transaction: one undo step for the whole move, plus
                 // TVP gap absorption for the vacated spots
                 const QList<int> vacated = currentLayer->selectedKeyFramesPositions();
@@ -1815,6 +1918,13 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
 
     if (mType == TIMELINE_CELL_TYPE::Layers && event->button() == Qt::LeftButton)
     {
+        if (mOpacityDragLayer != -1)
+        {
+            // finished an opacity drag: invalidate frame caches and thumbnails
+            emit mEditor->frameModified(mEditor->currentFrame());
+            mOpacityDragLayer = -1;
+            updateContent();
+        }
         emit mouseMovedY(0);
     }
 
@@ -1928,7 +2038,7 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     if (layerNumber < 0 || layerNumber >= mEditor->object()->getLayerCount()) { return -1; }
 
     Layer* layer = mEditor->object()->getLayer(layerNumber);
-    if (layer == nullptr || layer->type() != Layer::BITMAP) { return -1; }
+    if (layer == nullptr || layer->type() != Layer::BITMAP || layer->locked()) { return -1; }
 
     const int frameNumber = getFrameNumber(pos.x());
     KeyFrame* key = layer->getKeyFrameWhichCovers(frameNumber);
@@ -1957,6 +2067,7 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     Layer* target = mEditor->layers()->getLayer(targetIndex);
     if (source == nullptr || target == nullptr || source == target) { return; }
     if (source->type() != target->type()) { return; }
+    if (source->locked() || target->locked()) { return; } // locked layers reject edits
 
     const QList<int> positions = source->selectedKeyFramesPositions();
     if (positions.isEmpty()) { return; }

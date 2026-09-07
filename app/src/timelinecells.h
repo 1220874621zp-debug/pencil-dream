@@ -143,6 +143,11 @@ private:
     void editLayerProperties(LayerCamera *layer) const;
     void editLayerName(Layer* layer) const;
 
+    // TVP layer-row inline controls: opacity slider + lock toggle
+    QRect opacitySliderRect(int rowWidth) const;
+    QRect lockIconRect(int rowWidth) const;
+    bool rowHasInlineControls(int rowWidth) const;
+
     TimeLine* mTimeLine;
     Editor* mEditor; // the editor for which this timeLine operates
     PreferenceManager* mPrefs;
@@ -208,6 +213,9 @@ private:
     bool mBoxSelecting   = false;
 
     bool mClickSelecting = false;
+
+    // layer-row opacity slider drag (index of the dragged layer, -1 = none)
+    int mOpacityDragLayer = -1;
 
     int mFramePosMoveX = 0;
     int mLayerPosMoveY = 0;

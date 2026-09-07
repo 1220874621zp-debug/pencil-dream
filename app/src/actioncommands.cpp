@@ -696,6 +696,7 @@ Status ActionCommands::addNewKey()
 void ActionCommands::exposeSelectedFrames(int offset)
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
+    if (currentLayer->locked()) { return; }
 
     bool hasSelectedFrames = currentLayer->hasAnySelectedFrames();
 
@@ -740,6 +741,11 @@ Status ActionCommands::insertKeyFrameAtCurrentPosition()
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
     if (currentLayer == nullptr) { return Status::SAFE; }
+    if (currentLayer->locked())
+    {
+        mEditor->getScribbleArea()->showLayerLockedWarning();
+        return Status::SAFE;
+    }
     if (!currentLayer->visible())
     {
         mEditor->getScribbleArea()->showLayerNotVisibleWarning();
@@ -771,7 +777,7 @@ void ActionCommands::removeSelectedFrames()
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
 
-    if (!currentLayer->hasAnySelectedFrames()) { return; }
+    if (!currentLayer->hasAnySelectedFrames() || currentLayer->locked()) { return; }
 
     const QList<int> positions = currentLayer->selectedKeyFramesPositions();
 
@@ -799,6 +805,7 @@ void ActionCommands::removeSelectedFrames()
 void ActionCommands::reverseSelectedFrames()
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
+    if (currentLayer->locked()) { return; }
 
     mEditor->beginLayerLayoutEdit(currentLayer);
     const bool reversed = currentLayer->reverseOrderOfSelection();
@@ -843,7 +850,7 @@ void ActionCommands::duplicateLayer()
 void ActionCommands::duplicateKey()
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer == nullptr) return;
+    if (layer == nullptr || layer->locked()) return;
     if (!layer->visible())
     {
         mEditor->getScribbleArea()->showLayerNotVisibleWarning();
@@ -884,7 +891,7 @@ void ActionCommands::duplicateKey()
 void ActionCommands::moveFrameForward()
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer)
+    if (layer && !layer->locked())
     {
         mEditor->beginLayerLayoutEdit(layer);
         const bool moved = layer->moveKeyFrame(mEditor->currentFrame(), 1);
@@ -901,7 +908,7 @@ void ActionCommands::moveFrameForward()
 void ActionCommands::moveFrameBackward()
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer)
+    if (layer && !layer->locked())
     {
         mEditor->beginLayerLayoutEdit(layer);
         const bool moved = layer->moveKeyFrame(mEditor->currentFrame(), -1);

@@ -662,6 +662,12 @@ void ScribbleArea::pointerPressEvent(PointerEvent* event)
             QTimer::singleShot(0, this, &ScribbleArea::showLayerNotVisibleWarning);
             return;
         }
+        if (layer->locked())
+        {
+            event->ignore();
+            QTimer::singleShot(0, this, &ScribbleArea::showLayerLockedWarning);
+            return;
+        }
     }
 
     if (event->buttons() & (Qt::MiddleButton | Qt::RightButton) &&
@@ -766,10 +772,17 @@ void ScribbleArea::resizeEvent(QResizeEvent* event)
     mCameraPainter.reset();
 }
 
-void ScribbleArea::showLayerNotVisibleWarning()
-{
+void ScribbleArea::showLayerNotVisibleWarning(){
     QMessageBox::warning(this, tr("Warning"),
                          tr("You are trying to modify a hidden layer! Please select another layer (or make the current layer visible)."),
+                         QMessageBox::Ok,
+                         QMessageBox::Ok);
+}
+
+void ScribbleArea::showLayerLockedWarning()
+{
+    QMessageBox::warning(this, tr("警告"),
+                         tr("该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。"),
                          QMessageBox::Ok,
                          QMessageBox::Ok);
 }

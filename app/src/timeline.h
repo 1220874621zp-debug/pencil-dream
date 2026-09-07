@@ -26,6 +26,7 @@ class TimeControls;
 
 class QToolButton;
 class QWheelEvent;
+class QSpinBox;
 
 
 class TimeLine : public BaseDockWidget
@@ -87,6 +88,7 @@ protected:
 
 private slots:
     void applyHoldLength(int n);
+    void cloneLoopFrames();
 
 private:
     void updateVerticalScrollbarPosition();
@@ -100,6 +102,7 @@ private:
     QTimer* mScrollingStoppedTimer = nullptr;
 
     QToolButton* mLayerDeleteButton = nullptr;
+    QSpinBox* mLoopCloneSpin = nullptr;
     int mNumLayers = 0;
     int mLastUpdatedFrame = 0;
 };

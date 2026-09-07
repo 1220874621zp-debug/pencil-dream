@@ -842,6 +842,12 @@ KeyFrame* Editor::addKeyFrame(const int layerNumber, int frameIndex)
         return nullptr;
     }
 
+    if (layer->locked())
+    {
+        mScribbleArea->showLayerLockedWarning();
+        return nullptr;
+    }
+
     // Find next available space for a keyframe (where either no key exists or there is an empty sound key)
     while (layer->keyExists(frameIndex))
     {
@@ -879,6 +885,12 @@ void Editor::removeKey()
     if (!layer->visible())
     {
         mScribbleArea->showLayerNotVisibleWarning();
+        return;
+    }
+
+    if (layer->locked())
+    {
+        mScribbleArea->showLayerLockedWarning();
         return;
     }
 
