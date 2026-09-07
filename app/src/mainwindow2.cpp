@@ -122,8 +122,11 @@ MainWindow2::MainWindow2(QWidget* parent) :
     mEditor->setScribbleArea(ui->scribbleArea);
     mEditor->init();
     ui->background->setEditor(mEditor);
-    // canvas is being re-implemented from scratch — the background currently
-    // only paints the static grid backdrop, no view-follow repaint needed
+    // canvas base rectangle follows the view (zoom/pan), frame scrubbing
+    // (camera animation) and layer changes
+    connect(mEditor->view(), &ViewManager::viewChanged, ui->background, qOverload<>(&QWidget::update));
+    connect(mEditor, &Editor::scrubbed, ui->background, qOverload<>(&QWidget::update));
+    connect(mEditor->layers(), &LayerManager::currentLayerChanged, ui->background, qOverload<>(&QWidget::update));
 
     newObject();
 

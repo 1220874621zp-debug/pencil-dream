@@ -95,6 +95,28 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
 
+    // canvas base: a white rectangle under the camera frame — same mapping
+    // as the camera border line (camera inverse transform + view transform),
+    // so it follows zoom/pan and camera animation exactly
+    if (mEditor != nullptr && mEditor->layers() != nullptr)
+    {
+        LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
+        if (cam != nullptr)
+        {
+            const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
+            QPolygonF paperPoly;
+            const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
+            for (const QPointF& pnt : camPoly)
+                paperPoly << mEditor->view()->mapCanvasToScreen(pnt);
+
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
+            painter.drawPolygon(paperPoly);
+            painter.setRenderHint(QPainter::Antialiasing, false);
+        }
+    }
+
     if (mHasShadow)
         drawShadow(painter);
 }
