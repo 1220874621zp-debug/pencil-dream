@@ -2117,7 +2117,25 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     const int nextPos = layer->getNextKeyFramePosition(key->pos());
     const bool nearEdge = qAbs(pos.x() - edgeX) <= 7;
     const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos);
-    return (nearEdge || inGap) ? key->pos() : -1;
+    if (nearEdge || inGap) { return key->pos(); }
+
+    // TVP seam between adjacent blocks: hovering the start edge of a block
+    // whose predecessor ends right there is the same boundary as the
+    // predecessor's end edge — the <-> cursor and the trim drag act on the
+    // preceding block
+    if (frameNumber == key->pos() && qAbs(pos.x() - getFrameX(key->pos())) <= 9)
+    {
+        const int prevPos = layer->getPreviousKeyFramePosition(key->pos());
+        if (prevPos > 0 && prevPos < key->pos())
+        {
+            KeyFrame* prevKey = layer->getKeyFrameAt(prevPos);
+            if (prevKey != nullptr && layer->getBlockEnd(prevKey) == key->pos())
+            {
+                return prevPos;
+            }
+        }
+    }
+    return -1;
 }
 
 void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
