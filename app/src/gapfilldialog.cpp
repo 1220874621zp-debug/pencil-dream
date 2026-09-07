@@ -32,6 +32,7 @@
 #include "layermanager.h"
 #include "bitmapimage.h"
 #include "object.h"
+#include "undoredomanager.h"
 
 #include "gapfill/core/smart_gap_propagation.hpp"
 #include "gapfill/predictors/rule_based_predictor.hpp"
@@ -473,9 +474,13 @@ void GapFillDialog::applySelected()
     qDebug() << "[ui] gapfill apply: checkedRows" << checkedRows
              << "layerId" << mColoringLayerId << "keyPos" << mColoringKeyPos;
 
-    // legacyBackup() snapshots relative to the editor's current frame;
-    // scrub to the target keyframe so the backup lands on the right one.
+    // The new undo system snapshots the CURRENT layer + frame inside
+    // createState(), so make the coloring keyframe current before
+    // snapshotting, then record() after the pixels are written.
+    mEditor->layers()->setCurrentLayer(layer);
     mEditor->scrubTo(mColoringKeyPos);
+    const SAVESTATE_ID undoState = mEditor->undoRedo()->createState(
+                UndoRedoRecordType::KEYFRAME_MODIFY);
 
     // Gap pixel indices are canvas coordinates; convert to the
     // keyframe image via its current top-left offset inside the canvas.
@@ -494,13 +499,6 @@ void GapFillDialog::applySelected()
         const auto& pixels = candidateApplicationPixels(gap);
         if (pixels.empty()) { continue; }
 
-        // One undoable backup per selected gap batch entry: snapshot
-        // before the first pixel of this gap is written.
-        if (appliedGaps == 0 &&
-                !mEditor->backup(layerIndex, mColoringKeyPos, tr("间隙填充"))) {
-            setStatus(tr("无法创建撤销备份，已取消应用。"));
-            return;
-        }
         int written = 0;
         for (const std::uint32_t rawIndex : pixels) {
             const int cx = static_cast<int>(
@@ -527,6 +525,7 @@ void GapFillDialog::applySelected()
         return;
     }
     keyframe->modification();
+    mEditor->undoRedo()->record(undoState, tr("间隙填充"));
     mEditor->updateFrame();
 
     mSuppressCellChanged = true;
