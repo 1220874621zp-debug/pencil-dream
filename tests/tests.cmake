@@ -10,6 +10,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_colormanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layerlayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layerbitmap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layercamera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layermanager.cpp
