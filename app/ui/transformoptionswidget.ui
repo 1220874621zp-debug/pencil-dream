@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>261</width>
+    <height>334</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -49,41 +49,234 @@
       </widget>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="gridSizeLayout">
-       <item>
-        <widget class="QLabel" name="gridSizeLabel">
+      <layout class="QFormLayout" name="formLayout">
+       <property name="fieldGrowthPolicy">
+        <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+       </property>
+       <item row="0" column="0">
+        <widget class="QLabel" name="deformModeLabel">
          <property name="text">
-          <string>Grid Density</string>
+          <string>Mode</string>
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QSpinBox" name="gridSizeSpinBox">
-         <property name="minimum">
-          <number>2</number>
-         </property>
-         <property name="maximum">
-          <number>10</number>
-         </property>
-         <property name="value">
-          <number>4</number>
-         </property>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="deformModeComboBox">
+         <item>
+          <property name="text">
+           <string>Liquify</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Warp</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Cage</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Perspective</string>
+          </property>
+         </item>
         </widget>
-       </item>
-       <item>
-        <spacer name="gridSizeSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>0</width>
-           <height>0</height>
-          </size>
-         </property>
-        </spacer>
        </item>
       </layout>
+     </item>
+     <item>
+      <widget class="QStackedWidget" name="modeStackedWidget">
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <widget class="QWidget" name="liquifyPage">
+        <layout class="QFormLayout" name="formLayout_2">
+         <property name="fieldGrowthPolicy">
+          <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="liquifyOpLabel">
+           <property name="text">
+            <string>Mode</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="liquifyOpComboBox">
+           <item>
+            <property name="text">
+             <string>Move</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Scale</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Rotate</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Offset</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Undo (restore)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="liquifySizeLabel">
+           <property name="text">
+            <string>Brush Size</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="liquifySizeSpinBox">
+           <property name="minimum">
+            <number>5</number>
+           </property>
+           <property name="maximum">
+            <number>1000</number>
+           </property>
+           <property name="value">
+            <number>60</number>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="liquifyAmountLabel">
+           <property name="text">
+            <string>Amount</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QDoubleSpinBox" name="liquifyAmountSpinBox">
+           <property name="singleStep">
+            <double>0.050000000000000</double>
+           </property>
+           <property name="value">
+            <double>0.100000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="2">
+          <widget class="QCheckBox" name="liquifyReverseCheckBox">
+           <property name="text">
+            <string>Reverse Direction</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="warpPage">
+        <layout class="QFormLayout" name="formLayout_3">
+         <property name="fieldGrowthPolicy">
+          <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="gridSizeLabel">
+           <property name="text">
+            <string>Grid Density</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QSpinBox" name="gridSizeSpinBox">
+           <property name="minimum">
+            <number>2</number>
+           </property>
+           <property name="maximum">
+            <number>10</number>
+           </property>
+           <property name="value">
+            <number>4</number>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="warpAlphaLabel">
+           <property name="text">
+            <string>Flexibility (Alpha)</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QDoubleSpinBox" name="warpAlphaSpinBox">
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
+           <property name="value">
+            <double>1.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="warpTypeLabel">
+           <property name="text">
+            <string>Warp Mode</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QComboBox" name="warpTypeComboBox">
+           <item>
+            <property name="text">
+             <string>Affine</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Similitude</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Rigid</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="cagePage">
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="QLabel" name="cageHintLabel">
+           <property name="text">
+            <string>Drag to draw a cage around the area, then drag its vertices to deform. Enter/double-click applies, Esc cancels.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="perspectivePage">
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="QLabel" name="perspectiveHintLabel">
+           <property name="text">
+            <string>Drag the four corners to adjust the perspective. Enter/double-click applies, Esc cancels.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </widget>
      </item>
     </layout>
    </item>

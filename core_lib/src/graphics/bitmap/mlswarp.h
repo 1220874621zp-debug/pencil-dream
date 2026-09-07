@@ -22,32 +22,70 @@ GNU General Public License for more details.
 #include <QPointF>
 #include <QVector>
 #include <QRectF>
+#include <functional>
 
 /**
- * Moving-Least-Squares image deformation, ported from Krita's
- * KisWarpTransformWorker (Schaefer et al., "Image Deformation Using
- * Moving Least Squares"). Rigid mode keeps local scale intact and is
- * the default in Krita's warp transform.
+ * Deformation math ported from Krita:
+ *  - Moving-Least-Squares warp (KisWarpTransformWorker: rigid / similitude / affine)
+ *  - Green Coordinates cage transform (KisGreenCoordinatesMath + KisCageTransformWorker)
+ *  - Liquify brush dabs (KisLiquifyTransformWorker + KisLiquifyPaintop)
+ *  - Perspective quad mapping (QTransform::quadToQuad)
  */
 namespace MlsWarp
 {
-    /** Maps a single point through the MLS deformation defined by control
-     *  point pairs (orig -> moved). */
-    QPointF rigidTransformMath(const QPointF& v,
-                               const QVector<QPointF>& origPoints,
-                               const QVector<QPointF>& transfPoints,
-                               qreal alpha);
+    enum class WarpType { Affine, Similitude, Rigid };
 
-    /** Warps srcImage according to the control point pairs. Control point
-     *  coordinates are local to the source image (0,0 = top-left pixel).
-     *  Returns the warped image; newOffset (if set) receives the top-left
-     *  position of the result relative to the source image origin. */
+    enum class LiquifyOp { Move, Scale, Rotate, Offset, Undo };
+
+    /** MLS control-point deformation. Control point coordinates are local
+     *  to the source image (0,0 = top-left pixel). */
+    QPointF warpTransformMath(WarpType type,
+                              const QPointF& v,
+                              const QVector<QPointF>& origPoints,
+                              const QVector<QPointF>& transfPoints,
+                              qreal alpha);
+
+    /** Warps srcImage with the MLS deformation. newOffset (if set) receives
+     *  the top-left of the result relative to the source image origin. */
     QImage warpImage(const QImage& srcImage,
                      const QVector<QPointF>& origPoints,
                      const QVector<QPointF>& transfPoints,
                      qreal alpha,
                      bool smoothSampling,
-                     QPointF* newOffset = nullptr);
+                     QPointF* newOffset = nullptr,
+                     WarpType type = WarpType::Rigid);
+
+    /** Green-coordinates cage transform: origCage/transfCage vertices are in
+     *  source-image local coordinates. Faithful port of Krita's cage worker
+     *  (only grid points inside the original cage are moved). */
+    QImage cageWarpImage(const QImage& srcImage,
+                         const QVector<QPointF>& origCage,
+                         const QVector<QPointF>& transfCage,
+                         bool smoothSampling,
+                         QPointF* newOffset = nullptr);
+
+    /** One liquify brush dab, applied in place to workImage (local coords).
+     *  base = brush center; sigma = brush size (Krita semantics);
+     *  direction = unit drawing direction (for Move/Offset it is pre-multiplied
+     *  with size*amount by the caller in Krita; here pass the raw dab vector
+     *  for Move/Offset and the scalar amount for Scale/Rotate/Undo);
+     *  original = pre-stroke image for the Undo op (may be null otherwise).
+     *  Gaussian falloff lambda = exp(-0.5*(d/sigma)^2), maxDist = 3*sigma
+     *  exactly like KisLiquifyTransformWorker. */
+    void liquifyDab(QImage& workImage,
+                    const QImage& original,
+                    const QPointF& base,
+                    qreal sigma,
+                    LiquifyOp op,
+                    const QPointF& dabVector,
+                    qreal amount);
+
+    /** Perspective (4-point) mapping: maps the source rectangle quad to the
+     *  given destination quad. Both in source-image local coordinates. */
+    QImage perspectiveWarpImage(const QImage& srcImage,
+                                const QPolygonF& dstQuad,
+                                bool smoothSampling,
+                                QPointF* newOffset = nullptr);
 }
 
 #endif // MLSWARP_H

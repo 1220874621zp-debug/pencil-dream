@@ -7585,6 +7585,12 @@ or cancel</source>
 <context>
     <name>ToolBoxWidget</name>
     <message>
+        <location filename="../app/src/toolboxwidget.cpp" />
+        <source>Deform Tool (%1): Liquify / warp / cage / perspective (see tool options)</source>
+        <translation>变形工具 (%1): 液化/弯曲/笼罩/透视（参数见工具选项）</translation>
+    </message>
+
+    <message>
         <location filename="../app/ui/toolboxwidget.ui" line="20" />
         <source>Tools</source>
         <comment>Window title of tool box</comment>
@@ -7794,6 +7800,132 @@ or cancel</source>
 <context>
     <name>TransformOptionsWidget</name>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Drag the four corners to adjust the perspective. Enter/double-click applies, Esc cancels.</source>
+        <translation>拖动四角调整透视。回车/双击应用，Esc 取消。</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Drag to draw a cage around the area, then drag its vertices to deform. Enter/double-click applies, Esc cancels.</source>
+        <translation>拖动画出笼罩轮廓，再拖动顶点变形。回车/双击应用，Esc 取消。</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Rigid</source>
+        <translation>刚体</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Similitude</source>
+        <translation>相似</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Affine</source>
+        <translation>仿射</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Warp Mode</source>
+        <translation>弯曲方式</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Flexibility (Alpha)</source>
+        <translation>弹性（Alpha）</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Grid Density</source>
+        <translation>网格密度</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Reverse Direction</source>
+        <translation>反向</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Amount</source>
+        <translation>强度</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Brush Size</source>
+        <translation>笔刷大小</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Undo (restore)</source>
+        <translation>撤销（恢复）</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Offset</source>
+        <translation>偏移</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Rotate</source>
+        <translation>旋转</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Scale</source>
+        <translation>缩放</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Move</source>
+        <translation>移动</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Perspective</source>
+        <translation>透视</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Cage</source>
+        <translation>笼罩</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Warp</source>
+        <translation>弯曲</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Liquify</source>
+        <translation>液化</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Mode</source>
+        <translation>模式</translation>
+    </message>
+
+    <message>
         <location filename="../app/ui/transformoptionswidget.ui" line="14" />
         <source>Form</source>
         <translation>窗体</translation>
@@ -7812,11 +7944,6 @@ or cancel</source>
         <location filename="../app/ui/transformoptionswidget.ui" line="47" />
         <source>Anti-Aliasing</source>
         <translation>抗锯齿</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/transformoptionswidget.ui" line="47" />
-        <source>Grid Density</source>
-        <translation>网格密度</translation>
     </message>
 </context>
 <context>

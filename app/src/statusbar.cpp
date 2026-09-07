@@ -158,7 +158,7 @@ void StatusBar::updateToolStatus(ToolType tool)
             mToolLabel->setText(tr("拖动绘制自由形状选区；松开闭合生效。"));
             break;
         case DEFORM:
-            mToolLabel->setText(tr("点击画布生成变形网格，拖动控制点扭曲内容；回车/双击=应用，Esc=取消，Backspace=复位。"));
+            mToolLabel->setText(tr("变形工具：液化=笔刷推挤像素，弯曲=拖网格点，笼罩=画轮廓拖顶点，透视=拖四角；模式与参数在工具选项；回车/双击=应用，Esc=取消，Backspace=复位。"));
             break;
         case ONION_ALIGN:
             mToolLabel->setText(tr("拖动洋葱皮红/蓝幽灵像对位参考；双击=前后帧中心自动对齐；Alt+点击=归零该侧，Alt+点空白=清空全部。"));

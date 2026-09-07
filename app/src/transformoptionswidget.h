@@ -51,6 +51,13 @@ private:
     void setShowSelectionInfo(bool enabled);
     void setAntiAliasingEnabled(bool enabled);
     void setGridSize(int size);
+    void setDeformMode(int mode);
+    void setLiquifyOp(int op);
+    void setLiquifySize(int size);
+    void setLiquifyAmount(qreal amount);
+    void setLiquifyReverse(bool reverse);
+    void setWarpAlpha(qreal alpha);
+    void setWarpType(int type);
 
     Ui::TransformOptionsWidget *ui;
 

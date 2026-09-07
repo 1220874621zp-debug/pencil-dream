@@ -38,6 +38,15 @@ TransformOptionsWidget::~TransformOptionsWidget()
 void TransformOptionsWidget::initUI()
 {
     makeConnectionsFromUIToModel();
+
+    // mode switch drives the parameter stack
+    connect(ui->deformModeComboBox, &QComboBox::currentIndexChanged, this, [=](int index) {
+        ui->modeStackedWidget->setCurrentIndex(index);
+        DeformTool* deformTool = dynamic_cast<DeformTool*>(mTransformTool);
+        if (deformTool != nullptr && deformTool->type() == DEFORM) {
+            deformTool->setDeformMode(index);
+        }
+    });
 }
 
 void TransformOptionsWidget::updateUI()
@@ -66,8 +75,9 @@ void TransformOptionsWidget::updatePropertyVisibility()
     ui->antiAliasingCheckBox->setVisible(currentTool->isPropertyEnabled(TransformToolProperties::ANTI_ALIASING_ENABLED));
 
     const bool isDeform = currentTool->type() == DEFORM;
-    ui->gridSizeLabel->setVisible(isDeform);
-    ui->gridSizeSpinBox->setVisible(isDeform);
+    ui->deformModeLabel->setVisible(isDeform);
+    ui->deformModeComboBox->setVisible(isDeform);
+    ui->modeStackedWidget->setVisible(isDeform);
 }
 
 void TransformOptionsWidget::updateToolConnections(BaseTool* tool)
@@ -91,11 +101,38 @@ void TransformOptionsWidget::makeConnectionsFromUIToModel()
        mTransformTool->setAntiAliasingEnabled(enabled);
     });
 
+    auto deformTool = [] (TransformTool* tool) -> DeformTool* {
+        DeformTool* deformTool = dynamic_cast<DeformTool*>(tool);
+        return (deformTool != nullptr && deformTool->type() == DEFORM) ? deformTool : nullptr;
+    };
+
     connect(ui->gridSizeSpinBox, &QSpinBox::valueChanged, this, [=](int value) {
-        DeformTool* deformTool = dynamic_cast<DeformTool*>(mTransformTool);
-        if (deformTool != nullptr && deformTool->type() == DEFORM) {
-            deformTool->setGridSize(value);
-        }
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setGridSize(value); }
+    });
+
+    connect(ui->liquifyOpComboBox, &QComboBox::currentIndexChanged, this, [=](int index) {
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setLiquifyOp(index); }
+    });
+
+    connect(ui->liquifySizeSpinBox, &QSpinBox::valueChanged, this, [=](int value) {
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setLiquifySize(value); }
+    });
+
+    connect(ui->liquifyAmountSpinBox, &QDoubleSpinBox::valueChanged, this, [=](double value) {
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setLiquifyAmount(value); }
+    });
+
+    connect(ui->liquifyReverseCheckBox, &QCheckBox::clicked, this, [=](bool checked) {
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setLiquifyReverse(checked); }
+    });
+
+    connect(ui->warpAlphaSpinBox, &QDoubleSpinBox::valueChanged, this, [=](double value) {
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setWarpAlpha(value); }
+    });
+
+    connect(ui->warpTypeComboBox, &QComboBox::currentIndexChanged, this, [=](int index) {
+        // the combo lists affine/similitude/rigid in Krita's enum order
+        if (DeformTool* t = deformTool(mTransformTool)) { t->setWarpType(index); }
     });
 }
 
@@ -107,7 +144,22 @@ void TransformOptionsWidget::makeConnectionFromModelToUI(TransformTool* transfor
     DeformTool* deformTool = dynamic_cast<DeformTool*>(transformTool);
     if (deformTool != nullptr && deformTool->type() == DEFORM) {
         connect(deformTool, &DeformTool::gridSizeChanged, this, &TransformOptionsWidget::setGridSize);
+        connect(deformTool, &DeformTool::deformModeChanged, this, &TransformOptionsWidget::setDeformMode);
+        connect(deformTool, &DeformTool::liquifyOpChanged, this, &TransformOptionsWidget::setLiquifyOp);
+        connect(deformTool, &DeformTool::liquifySizeChanged, this, &TransformOptionsWidget::setLiquifySize);
+        connect(deformTool, &DeformTool::liquifyAmountChanged, this, &TransformOptionsWidget::setLiquifyAmount);
+        connect(deformTool, &DeformTool::liquifyReverseChanged, this, &TransformOptionsWidget::setLiquifyReverse);
+        connect(deformTool, &DeformTool::warpAlphaChanged, this, &TransformOptionsWidget::setWarpAlpha);
+        connect(deformTool, &DeformTool::warpTypeChanged, this, &TransformOptionsWidget::setWarpType);
+
         setGridSize(deformTool->gridSize());
+        setDeformMode(deformTool->deformMode());
+        setLiquifyOp(deformTool->liquifyOp());
+        setLiquifySize(deformTool->liquifySize());
+        setLiquifyAmount(deformTool->liquifyAmount());
+        setLiquifyReverse(deformTool->liquifyReverse());
+        setWarpAlpha(deformTool->warpAlpha());
+        setWarpType(deformTool->warpType());
     }
 }
 
@@ -127,4 +179,47 @@ void TransformOptionsWidget::setGridSize(int size)
 {
     QSignalBlocker b(ui->gridSizeSpinBox);
     ui->gridSizeSpinBox->setValue(size);
+}
+
+void TransformOptionsWidget::setDeformMode(int mode)
+{
+    QSignalBlocker b(ui->deformModeComboBox);
+    ui->deformModeComboBox->setCurrentIndex(mode);
+    ui->modeStackedWidget->setCurrentIndex(mode);
+}
+
+void TransformOptionsWidget::setLiquifyOp(int op)
+{
+    QSignalBlocker b(ui->liquifyOpComboBox);
+    ui->liquifyOpComboBox->setCurrentIndex(op);
+}
+
+void TransformOptionsWidget::setLiquifySize(int size)
+{
+    QSignalBlocker b(ui->liquifySizeSpinBox);
+    ui->liquifySizeSpinBox->setValue(size);
+}
+
+void TransformOptionsWidget::setLiquifyAmount(qreal amount)
+{
+    QSignalBlocker b(ui->liquifyAmountSpinBox);
+    ui->liquifyAmountSpinBox->setValue(amount);
+}
+
+void TransformOptionsWidget::setLiquifyReverse(bool reverse)
+{
+    QSignalBlocker b(ui->liquifyReverseCheckBox);
+    ui->liquifyReverseCheckBox->setChecked(reverse);
+}
+
+void TransformOptionsWidget::setWarpAlpha(qreal alpha)
+{
+    QSignalBlocker b(ui->warpAlphaSpinBox);
+    ui->warpAlphaSpinBox->setValue(alpha);
+}
+
+void TransformOptionsWidget::setWarpType(int type)
+{
+    QSignalBlocker b(ui->warpTypeComboBox);
+    ui->warpTypeComboBox->setCurrentIndex(type);
 }

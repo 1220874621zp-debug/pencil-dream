@@ -567,6 +567,13 @@ struct TransformToolProperties: public ToolPropertiesBase
         SHOWSELECTIONINFO_ENABLED    = START,
         ANTI_ALIASING_ENABLED        = 501,
         GRID_SIZE_VALUE              = 502,
+        DEFORM_MODE_VALUE            = 503,
+        LIQUIFY_OP_VALUE             = 504,
+        LIQUIFY_SIZE_VALUE           = 505,
+        LIQUIFY_AMOUNT_VALUE         = 506,
+        LIQUIFY_REVERSE_ENABLED      = 507,
+        WARP_ALPHA_VALUE             = 508,
+        WARP_TYPE_VALUE              = 509,
         END                          = 599,
     };
 
@@ -576,7 +583,14 @@ struct TransformToolProperties: public ToolPropertiesBase
         mProperties.insertIdentifiers({
             { SHOWSELECTIONINFO_ENABLED,    "ShowSelectionInfoEnabled" },
             { ANTI_ALIASING_ENABLED,        "AntiAliasingEnabled" },
-            { GRID_SIZE_VALUE,              "GridSizeValue" }
+            { GRID_SIZE_VALUE,              "GridSizeValue" },
+            { DEFORM_MODE_VALUE,            "DeformModeValue" },
+            { LIQUIFY_OP_VALUE,             "LiquifyOpValue" },
+            { LIQUIFY_SIZE_VALUE,           "LiquifySizeValue" },
+            { LIQUIFY_AMOUNT_VALUE,         "LiquifyAmountValue" },
+            { LIQUIFY_REVERSE_ENABLED,      "LiquifyReverseEnabled" },
+            { WARP_ALPHA_VALUE,             "WarpAlphaValue" },
+            { WARP_TYPE_VALUE,              "WarpTypeValue" }
         });
     }
 

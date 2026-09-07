@@ -20,6 +20,7 @@ GNU General Public License for more details.
 
 #include "transformtool.h"
 #include "undoredomanager.h"
+#include "mlswarp.h"
 
 #include <QImage>
 #include <QPolygonF>
@@ -28,9 +29,14 @@ GNU General Public License for more details.
 
 class PointerEvent;
 
-/** Free-deform tool (Krita-style warp): overlays a control-point grid on the
- *  current selection (or the whole drawing) and warps the region with a
- *  Moving-Least-Squares deformation while dragging points.
+/** Multi-mode deform tool, a port of Krita's transform-tool deformation modes:
+ *  - Liquify: brush dabs push/scale/rotate/offset/restore pixels
+ *    (KisLiquifyTransformWorker semantics)
+ *  - Warp: MLS control-point grid, rigid/similitude/affine + alpha
+ *    (KisWarpTransformWorker)
+ *  - Cage: freehand cage outline + draggable vertices, Green coordinates
+ *    (KisCageTransformWorker / KisGreenCoordinatesMath)
+ *  - Perspective: 4-corner quad mapping
  *
  *  The layer data is only touched on commit; the live preview goes through
  *  ScribbleArea::setDeformPreview, so cancelling (Esc) is loss-free. */
@@ -58,8 +64,36 @@ public:
     int gridSize() const { return mGridSize; }
     void setGridSize(int size);
 
+    int deformMode() const { return mDeformMode; }
+    void setDeformMode(int mode);
+
+    int liquifyOp() const { return mLiquifyOp; }
+    void setLiquifyOp(int op);
+
+    int liquifySize() const { return mLiquifySize; }
+    void setLiquifySize(int size);
+
+    qreal liquifyAmount() const { return mLiquifyAmount; }
+    void setLiquifyAmount(qreal amount);
+
+    bool liquifyReverse() const { return mLiquifyReverse; }
+    void setLiquifyReverse(bool reverse);
+
+    qreal warpAlpha() const { return mWarpAlpha; }
+    void setWarpAlpha(qreal alpha);
+
+    int warpType() const { return mWarpType; }
+    void setWarpType(int type);
+
 signals:
     void gridSizeChanged(int size);
+    void deformModeChanged(int mode);
+    void liquifyOpChanged(int op);
+    void liquifySizeChanged(int size);
+    void liquifyAmountChanged(qreal amount);
+    void liquifyReverseChanged(bool reverse);
+    void warpAlphaChanged(qreal alpha);
+    void warpTypeChanged(int type);
 
 private:
     void pointerPressEvent(PointerEvent*) override;
@@ -69,33 +103,69 @@ private:
 
     bool keyPressEvent(QKeyEvent* event) override;
 
-    void beginDeform(const QPointF& pos);
+    // session shared by all modes
+    void beginSession();
     void teardown();
-    void rebuildLattice();
-    void updateWarpPreview(bool interactive);
     void commitDeform();
     void cancelDeform();
 
+    // per-mode interactions
+    void liquifyStrokeTo(const QPointF& pos);
+    void updateWarpPreview(bool interactive);
+    void rebuildLattice();
+    void finalizeCage(const QPointF& pos);
+    void updateCagePreview();
+    void updatePerspectivePreview();
     int hitTestControlPoint(const QPointF& pos) const;
+    int hitTestCageVertex(const QPointF& pos) const;
+    int hitTestPerspectiveCorner(const QPointF& pos) const;
 
     // deform region in canvas coordinates
     QRect mRegion;
     QPolygonF mRegionPolygon;
     bool mRegionIsPolygon = false;
 
-    QImage mSourceImage;
+    QImage mSourceImage;   // captured once per session (never modified)
+    QImage mWorkImage;     // liquify accumulates dabs here
 
-    // down-scaled copy for interactive dragging of large regions
+    // interactive-warp downscale (warp mode, big regions)
     QImage mPreviewSource;
     qreal mPreviewScale = 1.0;
 
+    // warp mode state
     QVector<QPointF> mOrigPoints;
     QVector<QPointF> mMovedPoints;
     int mGridSize = 4;
 
-    int mDragIndex = -1;
+    // liquify mode state
+    bool mLiquifyStrokeActive = false;
+    QPointF mLiquifyLastPos;
+    QPointF mCursorPos;
+
+    // cage mode state
+    bool mCageSet = false;
+    QPolygonF mCageDrawPoints;          // while drawing the outline
+    QVector<QPointF> mCageOrigVertices; // canvas coords
+    QVector<QPointF> mCageMovedVertices;
+    int mCageDragVertex = -1;
+
+    // perspective mode state
+    QPolygonF mPerspOrig; // 4 corners, canvas coords
+    QPolygonF mPerspMoved;
+    int mPerspDragCorner = -1;
+
+    int mDragIndex = -1; // warp grid drag
     bool mDeformActive = false;
     bool mAnyPointMoved = false;
+
+    // options (persisted via tool properties)
+    int mDeformMode = 0;      // 0 liquify / 1 warp / 2 cage / 3 perspective
+    int mLiquifyOp = 0;       // 0 move / 1 scale / 2 rotate / 3 offset / 4 undo
+    int mLiquifySize = 60;
+    qreal mLiquifyAmount = 0.1;
+    bool mLiquifyReverse = false;
+    qreal mWarpAlpha = 1.0;
+    int mWarpType = 2;        // MlsWarp::WarpType
 
     // cached warp result for commit (full resolution)
     QImage mWarpedResult;
