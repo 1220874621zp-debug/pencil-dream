@@ -77,8 +77,10 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setClipRect(event->rect());
 
-    // Friction-style workspace backdrop: vertical gradient easing into
-    // grey, with a faint fine grid — visible around the paper only
+    // Friction-style workspace backdrop only: vertical gradient easing into
+    // grey, with a faint fine grid filling the whole canvas area.
+    // The canvas itself (paper/bounds) is intentionally not drawn here —
+    // it is being re-implemented from scratch.
     const QRect r = rect();
     QLinearGradient grad(QPointF(0, 0), QPointF(0, r.height()));
     grad.setColorAt(0.0,  QColor(0x0E, 0x0F, 0x11));
@@ -86,59 +88,12 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     grad.setColorAt(1.0,  QColor(0x26, 0x28, 0x2C));
     painter.fillRect(r, grad);
 
-    // Paper follows the camera frame: the camera rect in document space,
-    // mapped through the camera transform and the view transform, so it
-    // scales/pans together with the camera border instead of staying fixed.
-    QPolygonF paperPoly;
-    bool havePaper = false;
-    if (mEditor != nullptr && mEditor->layers() != nullptr)
-    {
-        LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
-        if (cam != nullptr)
-        {
-            const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
-            const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
-            for (const QPointF& pnt : camPoly)
-                paperPoly << mEditor->view()->mapCanvasToScreen(pnt);
-            havePaper = paperPoly.size() == 4;
-        }
-    }
-    const QRect paper = havePaper ? paperPoly.boundingRect().toAlignedRect()
-                                  : r.adjusted(24, 24, -24, -24);
-    const QRect workspace = r;
-
-    painter.setClipRegion(QRegion(workspace).subtracted(QRegion(paper)));
     painter.setPen(QPen(QColor(0x26, 0x26, 0x26), 1.0));
     const int spacing = 16;
     for (int x = 0; x <= r.width(); x += spacing)
         painter.drawLine(x, 0, x, r.height());
     for (int y = 0; y <= r.height(); y += spacing)
         painter.drawLine(0, y, r.width(), y);
-
-    // clean light paper for drawing (strokes stay readable on it);
-    // sharp corners — plain paper, no scene-card styling
-    painter.setClipRect(event->rect());
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
-    if (havePaper)
-    {
-        const QRectF b = paperPoly.boundingRect();
-        const bool axisAligned = paperPoly.size() == 4
-            && qFuzzyCompare(paperPoly.at(0).x(), b.left()) && qFuzzyCompare(paperPoly.at(0).y(), b.top())
-            && qFuzzyCompare(paperPoly.at(1).x(), b.right()) && qFuzzyCompare(paperPoly.at(1).y(), b.top())
-            && qFuzzyCompare(paperPoly.at(2).x(), b.right()) && qFuzzyCompare(paperPoly.at(2).y(), b.bottom())
-            && qFuzzyCompare(paperPoly.at(3).x(), b.left()) && qFuzzyCompare(paperPoly.at(3).y(), b.bottom());
-        if (axisAligned)
-            painter.drawRect(b);
-        else
-            painter.drawPolygon(paperPoly);
-    }
-    else
-    {
-        painter.drawRect(paper);
-    }
-    painter.setRenderHint(QPainter::Antialiasing, false);
 
     if (mHasShadow)
         drawShadow(painter);

@@ -17,11 +17,9 @@ GNU General Public License for more details.
 #include "canvaspainter.h"
 
 #include <QtMath>
-#include <QPainterPath>
 
 #include "object.h"
 #include "layerbitmap.h"
-#include "layercamera.h"
 #include "bitmapimage.h"
 #include "tile.h"
 #include "tiledbuffer.h"
@@ -140,22 +138,6 @@ void CanvasPainter::initializePainter(QPainter& painter, QPaintDevice& device, c
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     painter.setWorldMatrixEnabled(true);
     painter.setWorldTransform(mViewTransform);
-
-    // finite canvas: layer content lives only inside the visible camera rect,
-    // so anything outside the paper (legacy strokes, oversized imports) is hidden.
-    // The clip is stored in device space, so it also constrains the cached
-    // pixmap blits that are drawn with the world matrix disabled.
-    if (mObject != nullptr)
-    {
-        LayerCamera* camera = static_cast<LayerCamera*>(mObject->getLayerBelow(mCurrentLayerIndex, Layer::CAMERA));
-        if (camera != nullptr)
-        {
-            const QTransform cameraInverse = camera->getViewAtFrame(mFrameNumber).inverted();
-            QPainterPath canvasClip;
-            canvasClip.addPolygon(cameraInverse.map(QPolygonF(QRectF(camera->getViewRect()))));
-            painter.setClipPath(canvasClip, Qt::IntersectClip);
-        }
-    }
 }
 
 void CanvasPainter::renderPreLayers(QPainter& painter, const QRect& blitRect)

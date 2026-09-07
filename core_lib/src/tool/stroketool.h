@@ -93,11 +93,6 @@ protected:
 
     QRectF cursorRect(StrokeToolProperties::Type settingType, const QPointF& point);
 
-    // finite canvas: stroke geometry is clamped to the camera-size canvas rect
-    // so strokes stop at the paper edge instead of running into the workspace
-    QPointF clampToCanvas(const QPointF& point) const;
-    bool mClampStrokeToCanvas = true;
-
     static bool mQuickSizingEnabled;
 
     QHash<Qt::KeyboardModifiers, int> mQuickSizingProperties;

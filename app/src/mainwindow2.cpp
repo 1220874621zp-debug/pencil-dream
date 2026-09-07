@@ -122,8 +122,8 @@ MainWindow2::MainWindow2(QWidget* parent) :
     mEditor->setScribbleArea(ui->scribbleArea);
     mEditor->init();
     ui->background->setEditor(mEditor);
-    // paper follows the camera frame: repaint whenever the view zooms/pans
-    connect(mEditor->view(), &ViewManager::viewChanged, ui->background, qOverload<>(&QWidget::update));
+    // canvas is being re-implemented from scratch — the background currently
+    // only paints the static grid backdrop, no view-follow repaint needed
 
     newObject();
 

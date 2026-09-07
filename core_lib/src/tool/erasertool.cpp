@@ -31,9 +31,6 @@ GNU General Public License for more details.
 
 EraserTool::EraserTool(QObject* parent) : StrokeTool(parent)
 {
-    // the eraser stays unclamped so legacy strokes outside the finite canvas
-    // can still be cleaned up
-    mClampStrokeToCanvas = false;
 }
 
 ToolType EraserTool::type() const
