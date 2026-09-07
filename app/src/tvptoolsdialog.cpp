@@ -38,6 +38,8 @@ GNU General Public License for more details.
 #include <QVBoxLayout>
 
 #include "bitmapimage.h"
+#include "colorpalettewidget.h"
+#include "colorref.h"
 #include "editor.h"
 #include "layerbitmap.h"
 #include "layercamera.h"
@@ -327,6 +329,20 @@ void PaletteExtractDialog::pickImageAndExtract()
     if (mLastColors.isEmpty()) { return; }
 
     QApplication::clipboard()->setText(hexList.join(" "));
+
+    // TVP parity: the extracted swatches also go into the color palette panel
+    Object* paletteObject = mEditor->object();
+    for (QRgb rgb : mLastColors)
+    {
+        paletteObject->addColorAtIndex(paletteObject->getColorCount(), ColorRef(QColor::fromRgb(rgb)));
+    }
+    if (QWidget* host = (parentWidget() != nullptr) ? parentWidget()->window() : nullptr)
+    {
+        if (ColorPaletteWidget* paletteWidget = host->findChild<ColorPaletteWidget*>())
+        {
+            paletteWidget->refreshColorList();
+        }
+    }
 
     // build one big swatch grid image, centered on the canvas origin
     const int cols = static_cast<int>(qCeil(qSqrt(static_cast<qreal>(mLastColors.count()))));

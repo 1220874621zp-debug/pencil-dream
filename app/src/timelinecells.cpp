@@ -741,18 +741,15 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         const qreal thumbW = qMin(static_cast<qreal>(recWidth) - 8.0, thumbH * 16.0 / 9.0);
         if (thumbW > 14.0 && thumbH > 10.0)
         {
+            // TVP THUMB_BG: a white thumbnail base is always visible and the
+            // (transparent-letterboxed) frame image sits on top of it
             painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0xE8, 0xE8, 0xEA));
+            painter.drawRoundedRect(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), 4.0, 4.0);
             const QPixmap thumb = thumbnailFor(layer, framePos);
             if (!thumb.isNull())
             {
                 painter.drawPixmap(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), thumb, QRectF(thumb.rect()));
-            }
-            else
-            {
-                // dark placeholder for empty frames (TVP blocks are black-based)
-                painter.setBrush(QColor(0x1E, 0x1E, 0x26));
-                painter.setPen(QPen(QColor(0x3A, 0x3A, 0x44), 1));
-                painter.drawRoundedRect(QRectF(recLeft + 4.0, recTop + 4.0, thumbW, thumbH), 4.0, 4.0);
             }
         }
 
@@ -1616,6 +1613,12 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 
                     if (currentLayer->hasAnySelectedFrames()) {
                         emit selectionChanged();
+                    }
+
+                    // TVP: clicking/selecting a block moves the playhead onto it
+                    if (event->button() == Qt::LeftButton)
+                    {
+                        mEditor->scrubTo(frameNumber);
                     }
 
                     mTimeLine->updateContent();
