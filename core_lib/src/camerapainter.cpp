@@ -185,8 +185,29 @@ void CameraPainter::paintOnionSkinning(QPainter& painter, const LayerCamera* cam
             painter.drawPolygon(cameraPolygon);
         } else if (state == OnionSkinPaintState::CURRENT) {
             painter.save();
-            painter.setPen(Qt::black);
+            // TVP-style safe frame: dashed camera border, a 90% action-safe
+            // box and a center cross
+            QPen borderPen(Qt::black, 1.2, Qt::DashLine);
+            painter.setPen(borderPen);
             painter.drawPolygon(cameraPolygon);
+
+            const QRectF cameraBounds = cameraPolygon.boundingRect();
+            const QPointF center = cameraBounds.center();
+
+            QPolygonF actionSafe;
+            for (const QPointF& point : cameraPolygon)
+            {
+                actionSafe << QPointF(center.x() + (point.x() - center.x()) * 0.9,
+                                      center.y() + (point.y() - center.y()) * 0.9);
+            }
+            QPen safePen(QColor(0x70, 0x70, 0x7A), 1.0, Qt::DashLine);
+            painter.setPen(safePen);
+            painter.drawPolygon(actionSafe);
+
+            QPen centerPen(QColor(0x30, 0x30, 0x38), 1.2);
+            painter.setPen(centerPen);
+            painter.drawLine(center + QPointF(-5.0, 0.0), center + QPointF(5.0, 0.0));
+            painter.drawLine(center + QPointF(0.0, -5.0), center + QPointF(0.0, 5.0));
             painter.restore();
         }
     });

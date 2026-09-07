@@ -67,6 +67,10 @@ void ColorPaletteWidget::initUI()
     mIconSize = QSize(colorGridSize, colorGridSize);
 
     ui->colorListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    // selection feedback is the swatch border itself: no highlight strip
+    ui->colorListWidget->setStyleSheet(
+        QStringLiteral("QListWidget::item:selected { background: transparent; border: none; }"
+                        "QListWidget::item:hover { background: transparent; }"));
 
     QString sViewMode = settings.value("ColorPaletteViewMode", "ListMode").toString();
     if (sViewMode == "ListMode")
@@ -209,14 +213,6 @@ void ColorPaletteWidget::addSwatch(int colorIndex) const
     painter.drawTiledPixmap(0, 0, mIconSize.width(), mIconSize.height(), QPixmap(":/background/checkerboard.png"));
     painter.end();
 
-    QPen borderShadow(QColor(0, 0, 0, 200), 1, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
-    QVector<qreal> dashPattern{ 4, 4 };
-    borderShadow.setDashPattern(dashPattern);
-
-    QPen borderHighlight(borderShadow);
-    borderHighlight.setColor(QColor(255, 255, 255, 200));
-    borderHighlight.setDashOffset(4);
-
     const ColorRef colorRef = mObject->getColor(colorIndex);
     QListWidgetItem* colorItem = new QListWidgetItem(ui->colorListWidget);
 
@@ -236,13 +232,17 @@ void ColorPaletteWidget::addSwatch(int colorIndex) const
     QIcon swatchIcon;
     swatchIcon.addPixmap(colorSwatch, QIcon::Normal);
 
-    // Draw selection border
+    // Selection = a solid border on the swatch itself: white by default,
+    // accent red-pink when the swatch itself is (near) white
     if (ui->colorListWidget->viewMode() == QListView::IconMode)
     {
-        swatchPainter.setPen(borderHighlight);
-        swatchPainter.drawRect(0, 0, mIconSize.width() - 1, mIconSize.height() - 1);
-        swatchPainter.setPen(borderShadow);
-        swatchPainter.drawRect(0, 0, mIconSize.width() - 1, mIconSize.height() - 1);
+        QColor selectionBorder = QColor(255, 255, 255);
+        if (colorRef.color.lightnessF() > 0.82)
+        {
+            selectionBorder = QColor(0xE8, 0x38, 0x5A);
+        }
+        swatchPainter.setPen(QPen(selectionBorder, 2));
+        swatchPainter.drawRect(1, 1, mIconSize.width() - 3, mIconSize.height() - 3);
     }
     swatchIcon.addPixmap(colorSwatch, QIcon::Selected);
 

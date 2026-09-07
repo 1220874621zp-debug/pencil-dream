@@ -31,8 +31,8 @@ LayerCamera::LayerCamera(int id) : Layer(id, Layer::CAMERA)
     mFieldH = settings.value("FieldH").toInt();
     if (mFieldW < 2 || mFieldH < 2)
     {
-        mFieldW = 800;
-        mFieldH = 600;
+        mFieldW = 1920;
+        mFieldH = 1080;
     }
     viewRect = QRect(QPoint(-mFieldW / 2, -mFieldH / 2), QSize(mFieldW, mFieldH));
 }

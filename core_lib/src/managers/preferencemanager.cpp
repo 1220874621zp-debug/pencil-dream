@@ -97,8 +97,29 @@ void PreferenceManager::loadPrefs()
 
     set(SETTING::FPS,                      settings.value(SETTING_FPS,                    12).toInt());
     set(SETTING::PLAYBACK_SPEED,           settings.value(SETTING_PLAYBACK_SPEED,         1.0).toFloat());
-    set(SETTING::FIELD_W,                  settings.value(SETTING_FIELD_W,                800).toInt());
-    set(SETTING::FIELD_H,                  settings.value(SETTING_FIELD_H,                600).toInt());
+    // Full HD camera by default; one-time migration lifts the old 800x600
+    // baseline (sync immediately: LayerCamera reads the field size at
+    // construction, right after this)
+    int fieldW = settings.value(SETTING_FIELD_W, 1920).toInt();
+    int fieldH = settings.value(SETTING_FIELD_H, 1080).toInt();
+    if (!settings.contains("CameraFullHDMigrated"))
+    {
+        if (fieldW == 800 && fieldH == 600)
+        {
+            fieldW = 1920;
+            fieldH = 1080;
+        }
+        settings.setValue("CameraFullHDMigrated", true);
+        settings.sync();
+    }
+    if (fieldW != settings.value(SETTING_FIELD_W, 1920).toInt())
+    {
+        settings.setValue(SETTING_FIELD_W, fieldW);
+        settings.setValue(SETTING_FIELD_H, fieldH);
+        settings.sync();
+    }
+    set(SETTING::FIELD_W, fieldW);
+    set(SETTING::FIELD_H, fieldH);
     set(SETTING::TIMECODE_TEXT,            settings.value(SETTING_TIMECODE_TEXT,          1).toInt());
 
     // Files
