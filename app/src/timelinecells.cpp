@@ -499,8 +499,10 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     painter.setPen(QPen(QBrush(Theme::Border), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     if (layer->colorIndex() >= 0 && layer->colorIndex() < 8)
     {
+        // TVP: the label color fills the whole track strongly; the black
+        // block cards sit on top and the color reads in the margins
         QColor tint = Theme::LayerLabelColors[layer->colorIndex()];
-        tint.setAlpha(46);
+        tint.setAlpha(220);
         painter.fillRect(QRectF(x, y - 1, width, height), tint);
     }
     painter.drawRoundedRect(QRectF(x, y - 1, width, height), 4.0, 4.0);
@@ -736,8 +738,9 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
 
         painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 6.0, 6.0);
 
-        // thumbnail card zone inside the block (TVP-style)
-        const qreal thumbH = recHeight - 22.0;
+        // thumbnail card zone inside the block (TVP proportions: the white
+        // card covers ~45% of the row height, not the whole block face)
+        const qreal thumbH = qRound(recHeight * 0.47);
         const qreal thumbW = qMin(static_cast<qreal>(recWidth) - 8.0, thumbH * 16.0 / 9.0);
         if (thumbW > 14.0 && thumbH > 10.0)
         {
@@ -1441,7 +1444,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 Layer* labelLayer = mEditor->object()->getLayer(layerNumber);
                 labelLayer->setColorIndex((labelLayer->colorIndex() + 2) % 9 - 1);
                 qDebug() << "[ui] layer" << layerNumber << "label color ->" << labelLayer->colorIndex();
-                updateContent();
+                mTimeLine->updateContent(); // both the layer list and the track tint
             }
             else if (event->pos().x() > width() - 24)
             {

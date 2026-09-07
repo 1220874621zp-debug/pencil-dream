@@ -313,34 +313,10 @@ void TimeLine::initUI()
     connect(holdFourButton, &QToolButton::clicked, this, [this]() { applyHoldLength(4); });
     connect(loopCloneButton, &QToolButton::clicked, this, &TimeLine::cloneLoopFrames);
     connect(copyClearButton, &QToolButton::clicked, this, &TimeLine::duplicateLayerCleared);
-    connect(lipsyncAct, &QAction::triggered, this, [this]()
-    {
-        if (mLipsyncDialog == nullptr) { mLipsyncDialog = new LipsyncDialog(editor(), this); }
-        mLipsyncDialog->show();
-        mLipsyncDialog->raise();
-        mLipsyncDialog->activateWindow();
-    });
-    connect(paletteAct, &QAction::triggered, this, [this]()
-    {
-        if (mPaletteDialog == nullptr) { mPaletteDialog = new PaletteExtractDialog(editor(), this); }
-        mPaletteDialog->show();
-        mPaletteDialog->raise();
-        mPaletteDialog->activateWindow();
-    });
-    connect(inbetweenAct, &QAction::triggered, this, [this]()
-    {
-        if (mInbetweenDialog == nullptr) { mInbetweenDialog = new InbetweenRefsDialog(editor(), this); }
-        mInbetweenDialog->show();
-        mInbetweenDialog->raise();
-        mInbetweenDialog->activateWindow();
-    });
-    connect(videoAct, &QAction::triggered, this, [this]()
-    {
-        if (mVideoDialog == nullptr) { mVideoDialog = new VideoExtractDialog(editor(), this); }
-        mVideoDialog->show();
-        mVideoDialog->raise();
-        mVideoDialog->activateWindow();
-    });
+    connect(lipsyncAct, &QAction::triggered, this, &TimeLine::showLipsyncDialog);
+    connect(paletteAct, &QAction::triggered, this, &TimeLine::showPaletteExtractDialog);
+    connect(inbetweenAct, &QAction::triggered, this, &TimeLine::showInbetweenRefsDialog);
+    connect(videoAct, &QAction::triggered, this, &TimeLine::showVideoExtractDialog);
 
     // TVP global toggles: unanimous state flips, mixed state resolves to "all on"
     connect(allVisibleButton, &QToolButton::clicked, this, [this]()
@@ -413,6 +389,38 @@ void TimeLine::initUI()
     mNumLayers = layer->count();
 
     scrubbing = false;
+}
+
+void TimeLine::showLipsyncDialog()
+{
+    if (mLipsyncDialog == nullptr) { mLipsyncDialog = new LipsyncDialog(editor(), this); }
+    mLipsyncDialog->show();
+    mLipsyncDialog->raise();
+    mLipsyncDialog->activateWindow();
+}
+
+void TimeLine::showPaletteExtractDialog()
+{
+    if (mPaletteDialog == nullptr) { mPaletteDialog = new PaletteExtractDialog(editor(), this); }
+    mPaletteDialog->show();
+    mPaletteDialog->raise();
+    mPaletteDialog->activateWindow();
+}
+
+void TimeLine::showInbetweenRefsDialog()
+{
+    if (mInbetweenDialog == nullptr) { mInbetweenDialog = new InbetweenRefsDialog(editor(), this); }
+    mInbetweenDialog->show();
+    mInbetweenDialog->raise();
+    mInbetweenDialog->activateWindow();
+}
+
+void TimeLine::showVideoExtractDialog()
+{
+    if (mVideoDialog == nullptr) { mVideoDialog = new VideoExtractDialog(editor(), this); }
+    mVideoDialog->show();
+    mVideoDialog->raise();
+    mVideoDialog->activateWindow();
 }
 
 void TimeLine::updateUI()

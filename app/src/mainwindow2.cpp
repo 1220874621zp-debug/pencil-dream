@@ -1500,6 +1500,16 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     connect(pTimeline, &TimeLine::fpsChanged, pPlaybackManager, &PlaybackManager::setFps);
     connect(pTimeline, &TimeLine::fpsChanged, pEditor, &Editor::setFps);
 
+    // the TVP satellite tools are always reachable from the Layer menu, even
+    // when the crowded timeline toolbar clips the "工具" dropdown
+    QMenu* tvpToolsMenu = new QMenu(tr("时间轴工具"), this);
+    tvpToolsMenu->addAction(tr("口型同步切换器"), mTimeLine, &TimeLine::showLipsyncDialog);
+    tvpToolsMenu->addAction(tr("调色板提取"), mTimeLine, &TimeLine::showPaletteExtractDialog);
+    tvpToolsMenu->addAction(tr("对位中割参考"), mTimeLine, &TimeLine::showInbetweenRefsDialog);
+    tvpToolsMenu->addAction(tr("视频抽帧中割"), mTimeLine, &TimeLine::showVideoExtractDialog);
+    ui->menuLayer->addSeparator();
+    ui->menuLayer->addMenu(tvpToolsMenu);
+
     connect(pTimeline, &TimeLine::insertKeyClick, mCommands, &ActionCommands::insertKeyFrameAtCurrentPosition);
     connect(pTimeline, &TimeLine::removeKeyClick, mCommands, &ActionCommands::removeKey);
 

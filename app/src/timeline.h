@@ -83,6 +83,13 @@ signals:
     void onionNextClick();
     void playButtonTriggered();
 
+public slots:
+    // TVP satellite tools (lazy, non-modal)
+    void showLipsyncDialog();
+    void showPaletteExtractDialog();
+    void showInbetweenRefsDialog();
+    void showVideoExtractDialog();
+
 public:
     bool scrubbing = false;
 
