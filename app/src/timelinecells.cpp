@@ -130,16 +130,11 @@ int TimeLineCells::getLayerNumber(int y) const
         yy += rowHeightOf(rowLayer);
         --rowLayer;
     }
+    // the walk above already yields the final layer index (top row is the
+    // highest layer); the old descending-order remap must NOT be applied again
     int layerNumber = rowLayer;
 
     int totalLayerCount = mEditor->object()->getLayerCount();
-
-    // Layers numbers are displayed in descending order
-    // The last row is layer 0
-    if (layerNumber <= totalLayerCount)
-        layerNumber = (totalLayerCount - 1) - layerNumber;
-    else
-        layerNumber = 0;
 
     if (y < mOffsetY)
     {
@@ -164,10 +159,11 @@ int TimeLineCells::getInbetweenLayerNumber(int y) const {
     int layerNumber = getLayerNumber(y);
     // Round the layer number towards the drag start
     if(layerNumber != mFromLayer) {
-        if(mMouseMoveY > 0 && y < getLayerY(layerNumber) + mLayerHeight / 2) {
+        const int half = rowHeightOf(layerNumber) / 2;
+        if(mMouseMoveY > 0 && y < getLayerY(layerNumber) + half) {
             layerNumber++;
         }
-        else if(mMouseMoveY < 0 && y > getLayerY(layerNumber) + mLayerHeight / 2) {
+        else if(mMouseMoveY < 0 && y > getLayerY(layerNumber) + half) {
             layerNumber--;
         }
     }
