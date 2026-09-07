@@ -21,6 +21,8 @@ GNU General Public License for more details.
 #include <QSettings>
 #include <QPainter>
 #include <QDomElement>
+#include <QSet>
+#include <algorithm>
 #include "keyframe.h"
 
 // Used to sort the selected frames list
@@ -222,10 +224,15 @@ bool Layer::removeKeyFrame(int position)
 
     if (frame)
     {
-        removeFromSelectionList(frame->pos());
-        mKeyFrames.erase(frame->pos());
-        markFrameAsDirty(frame->pos());
+        const int removedPos = frame->pos();
+        removeFromSelectionList(removedPos);
+        mKeyFrames.erase(removedPos);
+        markFrameAsDirty(removedPos);
         delete frame;
+
+        // TVP semantics: the block before the freed span absorbs it so no
+        // gap is left behind by a plain delete
+        absorbGapAt(removedPos);
     }
     return true;
 }
@@ -745,6 +752,150 @@ KeyFrame* Layer::takeKeyFrame(int position)
     return key;
 }
 
+bool Layer::containsKeyFramePointer(const KeyFrame* key) const
+{
+    for (const auto& pair : mKeyFrames)
+    {
+        if (pair.second == key) { return true; }
+    }
+    return false;
+}
+
+KeyFrame* Layer::takeKeyFrameByPointer(KeyFrame* key)
+{
+    for (auto it = mKeyFrames.begin(); it != mKeyFrames.end(); ++it)
+    {
+        if (it->second == key)
+        {
+            const int pos = it->first;
+            mKeyFrames.erase(it);
+            removeFromSelectionList(pos);
+            markFrameAsDirty(pos);
+            return key;
+        }
+    }
+    return nullptr;
+}
+
+void Layer::repositionKeyFrame(KeyFrame* key, int newPos)
+{
+    Q_ASSERT(key != nullptr && newPos >= 1);
+    for (auto it = mKeyFrames.begin(); it != mKeyFrames.end(); ++it)
+    {
+        if (it->second == key)
+        {
+            const int oldPos = it->first;
+            mKeyFrames.erase(it);
+            key->setPos(newPos);
+            mKeyFrames.emplace(newPos, key);
+            markFrameAsDirty(oldPos);
+            markFrameAsDirty(newPos);
+            return;
+        }
+    }
+    Q_ASSERT_X(false, "Layer::repositionKeyFrame", "keyframe pointer not owned by this layer");
+}
+
+QList<KeyFrameLayoutEntry> Layer::captureKeyFrameLayout() const
+{
+    QList<KeyFrameLayoutEntry> layout;
+    // walk from the lowest position so snapshots apply in ascending order
+    for (auto it = mKeyFrames.rbegin(); it != mKeyFrames.rend(); ++it)
+    {
+        KeyFrameLayoutEntry entry;
+        entry.key = it->second;
+        entry.pos = it->first;
+        entry.length = it->second->length();
+        entry.lengthExplicit = it->second->isLengthExplicit();
+        layout.append(entry);
+    }
+    return layout;
+}
+
+void Layer::applyKeyFrameLayout(const QList<KeyFrameLayoutEntry>& layout, QList<KeyFrame*>& extracted)
+{
+    extracted.clear();
+
+    QSet<KeyFrame*> listed;
+    for (const KeyFrameLayoutEntry& entry : layout)
+    {
+        if (entry.key != nullptr) { listed.insert(entry.key); }
+    }
+
+    // keys currently in the layer but absent from the layout leave the layer
+    QList<KeyFrame*> current;
+    QList<int> oldPositions;
+    for (const auto& pair : mKeyFrames)
+    {
+        current.append(pair.second);
+        oldPositions.append(pair.first);
+    }
+    for (KeyFrame* key : current)
+    {
+        if (!listed.contains(key))
+        {
+            extracted.append(takeKeyFrameByPointer(key));
+        }
+    }
+
+    // wholesale rebuild: no map slot can be claimed twice by a moving key
+    mKeyFrames.clear();
+    for (const KeyFrameLayoutEntry& entry : layout)
+    {
+        if (entry.key == nullptr) { continue; }
+        entry.key->setPos(entry.pos);
+        entry.key->setLength(entry.length);
+        entry.key->setLengthExplicit(entry.lengthExplicit);
+        const auto result = mKeyFrames.emplace(entry.pos, entry.key);
+        Q_ASSERT_X(result.second, "Layer::applyKeyFrameLayout", "duplicate position in layout");
+        if (!result.second)
+        {
+            extracted.append(entry.key); // refuse to host: hand back to the caller
+        }
+    }
+
+    for (int pos : oldPositions) { markFrameAsDirty(pos); }
+    for (const KeyFrameLayoutEntry& entry : layout) { markFrameAsDirty(entry.pos); }
+    deselectAll();
+}
+
+void Layer::absorbGapAt(int fromPos)
+{
+    if (fromPos < 1) { return; }
+
+    const int prevPos = getPreviousKeyFramePosition(fromPos);
+    if (prevPos < 1) { return; }
+    KeyFrame* prevKey = getKeyFrameAt(prevPos);
+    if (prevKey == nullptr) { return; }
+
+    // auto-length blocks already hold until the next keyframe: nothing to do
+    if (!prevKey->isLengthExplicit()) { return; }
+
+    const int nextPos = getNextKeyFramePosition(fromPos);
+    if (nextPos <= prevPos) { return; } // nothing after the gap; trailing block stays
+
+    const int newLen = nextPos - prevPos;
+    if (newLen != prevKey->length())
+    {
+        prevKey->setLength(newLen);
+        prevKey->modification();
+        markFrameAsDirty(prevPos);
+    }
+}
+
+void Layer::absorbGapsAt(const QList<int>& positions)
+{
+    QList<int> sorted = positions;
+    std::sort(sorted.begin(), sorted.end());
+    for (int pos : sorted)
+    {
+        if (!keyExists(pos))
+        {
+            absorbGapAt(pos);
+        }
+    }
+}
+
 QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
 {
     QDomElement layerTag = doc.createElement("layer");
@@ -752,6 +903,14 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     layerTag.setAttribute("name", name());
     layerTag.setAttribute("visibility", visible());
     layerTag.setAttribute("type", type());
+    if (mOpacity < 1.0)
+    {
+        layerTag.setAttribute("opacity", QString::number(mOpacity, 'f', 3));
+    }
+    if (mLocked)
+    {
+        layerTag.setAttribute("locked", 1);
+    }
     if (mColorIndex >= 0)
     {
         layerTag.setAttribute("colorIndex", mColorIndex);
@@ -768,5 +927,7 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     }
     setName(elem.attribute("name", "untitled"));
     setVisible(elem.attribute("visibility", "1").toInt());
+    setOpacity(elem.attribute("opacity", "1").toDouble());
+    setLocked(elem.attribute("locked", "0").toInt() == 1);
     mColorIndex = elem.attribute("colorIndex", "-1").toInt();
 }

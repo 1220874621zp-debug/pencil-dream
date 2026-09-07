@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QDateTime>
 #include <QImageWriter>
 #include <QRegularExpression>
+#include <QHash>
 
 #include "layer.h"
 #include "layerbitmap.h"
@@ -300,6 +301,56 @@ bool Object::swapLayers(int i, int j)
 #endif
     }
     return true;
+}
+
+bool Object::moveLayer(int fromIndex, int toIndex)
+{
+    if (fromIndex < 0 || fromIndex >= mLayers.size()) { return false; }
+    if (toIndex < 0 || toIndex >= mLayers.size()) { return false; }
+    if (fromIndex == toIndex) { return true; }
+
+    Layer* layer = mLayers.takeAt(fromIndex);
+    mLayers.insert(toIndex, layer);
+    return true;
+}
+
+QList<int> Object::layerIdOrder() const
+{
+    QList<int> order;
+    for (Layer* layer : mLayers)
+    {
+        order.append(layer->id());
+    }
+    return order;
+}
+
+void Object::applyLayerOrder(const QList<int>& orderedIds)
+{
+    QHash<int, Layer*> byId;
+    for (Layer* layer : mLayers)
+    {
+        byId.insert(layer->id(), layer);
+    }
+
+    QList<Layer*> reordered;
+    for (int id : orderedIds)
+    {
+        Layer* layer = byId.take(id);
+        if (layer != nullptr)
+        {
+            reordered.append(layer);
+        }
+    }
+    // anything not listed (should not happen) keeps its relative order at the end
+    for (Layer* layer : mLayers)
+    {
+        if (byId.contains(layer->id()) && byId.value(layer->id()) == layer)
+        {
+            reordered.append(layer);
+            byId.remove(layer->id());
+        }
+    }
+    mLayers = reordered;
 }
 
 bool Object::canSwapLayers(int layerIndexLeft, int layerIndexRight) const

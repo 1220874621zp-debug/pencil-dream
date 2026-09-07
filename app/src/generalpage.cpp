@@ -31,6 +31,10 @@ GeneralPage::GeneralPage() : ui(new Ui::GeneralPage)
 {
     ui->setupUi(this);
 
+    // the new undo/redo system is the only system in this fork: hide the toggle
+    ui->newUndoRedoCheckBox->setChecked(true);
+    ui->newUndoRedoCheckBox->setVisible(false);
+
     QSettings settings(PENCIL2D, PENCIL2D);
 
     QString languages [][3]

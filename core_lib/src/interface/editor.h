@@ -206,6 +206,23 @@ public: //slots
     void backup(const QString& undoText);
     bool backup(int layerNumber, int frameNumber, const QString& undoText);
 
+    // --- TVP layout transactions -------------------------------------------
+    /** Begins a layout transaction: captures the full keyframe layout of the
+     *  layer. Call endLayerLayoutEdit() after mutating the layer; the whole
+     *  mutation then becomes one undoable step (positions, lengths, explicit
+     *  flags, added and removed frames). Nested transactions are not supported. */
+    void beginLayerLayoutEdit(Layer* layer);
+
+    /** Adds another layer to the currently open transaction (cross-layer moves). */
+    void addLayerToLayoutEdit(Layer* layer);
+
+    /** Removes a keyframe from a layer inside an open transaction; the frame
+     *  object stays alive under the transaction so undo can restore it. */
+    KeyFrame* takeLayerKeyFrame(Layer* layer, int position);
+
+    /** Finishes the open transaction and pushes the undo command. */
+    void endLayerLayoutEdit(const QString& undoText);
+
     void onCurrentLayerWillChange(int index);
 
     void copy();
@@ -241,6 +258,10 @@ private:
 
     // the object to be edited by the editor
     std::unique_ptr<Object> mObject;
+
+    // open layout transaction (one at a time, user-driven operations)
+    struct LayoutTransaction;
+    LayoutTransaction* mLayoutTransaction = nullptr;
 
     int mFrame = 1; // current frame number.
     int mCurrentLayerIndex = 0; // the current layer to be edited/displayed

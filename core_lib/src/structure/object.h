@@ -108,6 +108,17 @@ public:
 
     bool swapLayers(int i, int j);
 
+    /** Insert-style layer move: the layer at fromIndex is placed at toIndex,
+     *  shifting the layers in between (TVP reorder semantics). */
+    bool moveLayer(int fromIndex, int toIndex);
+
+    /** Current layer order as a list of layer ids (for undo snapshots). */
+    QList<int> layerIdOrder() const;
+
+    /** Rebuilds the layer list to match the given id order; ids that no
+     *  longer exist are skipped. */
+    void applyLayerOrder(const QList<int>& orderedIds);
+
     /** Allows you to check whether two layers can be swappped, before doing the actual operation
      *
      *  @param[in] layerIndexLeft The first layer to compare

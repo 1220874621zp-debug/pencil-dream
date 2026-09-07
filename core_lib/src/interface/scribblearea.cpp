@@ -29,6 +29,7 @@ GNU General Public License for more details.
 #include "pointerevent.h"
 #include "object.h"
 #include "editor.h"
+#include "undoredomanager.h"
 #include "layerbitmap.h"
 #include "layercamera.h"
 #include "bitmapimage.h"
@@ -1341,7 +1342,7 @@ void ScribbleArea::deleteSelection()
 
         handleDrawingOnEmptyFrame();
 
-        mEditor->backup(tr("Delete Selection", "Undo Step: clear the selection area."));
+        SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
 
         if (layer->type() == Layer::BITMAP)
         {
@@ -1350,6 +1351,7 @@ void ScribbleArea::deleteSelection()
             bitmapImage->clear(selectMan->mySelectionRect());
         }
         mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
+        mEditor->undoRedo()->record(saveStateId, tr("Delete Selection", "Undo Step: clear the selection area."));
     }
 }
 
@@ -1360,11 +1362,12 @@ void ScribbleArea::clearImage()
 
     if (layer->type() == Layer::BITMAP)
     {
-        mEditor->backup(tr("Clear Image", "Undo step text"));
+        SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
 
         BitmapImage* bitmapImage = currentBitmapImage(layer);
         if (bitmapImage == nullptr) return;
         bitmapImage->clear();
+        mEditor->undoRedo()->record(saveStateId, tr("Clear Image", "Undo step text"));
     }
     else
     {

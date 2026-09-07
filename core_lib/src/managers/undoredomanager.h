@@ -149,6 +149,10 @@ public:
      */
     void addUserState(SAVESTATE_ID SaveStateId, const UserSaveState& userState);
 
+    /** Pushes a self-contained command (e.g. LayerLayoutCommand) onto the
+     *  shared undo stack. Ownership passes to the stack. */
+    void pushUndoCommand(QUndoCommand* command);
+
     QAction* createUndoAction(QObject* parent, const QIcon& icon);
     QAction* createRedoAction(QObject* parent, const QIcon& icon);
 

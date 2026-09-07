@@ -29,6 +29,16 @@ class Status;
 
 typedef std::function<void()> ProgressCallback;
 
+/** One keyframe's placement inside a layer, used by layout snapshots
+ *  (TVP batch operations: hold-N, batch delete, paste, move, trim ripple). */
+struct KeyFrameLayoutEntry
+{
+    KeyFrame* key = nullptr;
+    int pos = 0;
+    int length = 1;
+    bool lengthExplicit = false;
+};
+
 class Layer
 {
     Q_DECLARE_TR_FUNCTIONS(Layer)
@@ -61,6 +71,15 @@ public:
 
     bool visible() const { return mVisible; }
     void setVisible(bool b) { mVisible = b; }
+
+    /** Layer opacity in the 0..1 range (TVP layer-panel slider; multiplies
+     *  the per-frame image opacity when the layer is composited). */
+    qreal opacity() const { return mOpacity; }
+    void setOpacity(qreal opacity) { mOpacity = qBound(0.0, opacity, 1.0); }
+
+    /** A locked layer rejects painting and timeline frame edits (TVP padlock). */
+    bool locked() const { return mLocked; }
+    void setLocked(bool b) { mLocked = b; }
 
     /** Get selected keyframe positions sorted by position */
     QList<int> selectedKeyFramesPositions() const { return mSelectedFrames_byPosition; }
@@ -125,6 +144,35 @@ public:
     /** Removes the keyframe at the given position and transfers ownership to the caller
      *  (unlike removeKeyFrame, the frame is not deleted and the last-frame restriction does not apply). */
     KeyFrame* takeKeyFrame(int position);
+
+    // --- TVP layout-transaction support -----------------------------------
+    /** Whether the given keyframe pointer currently lives in this layer. */
+    bool containsKeyFramePointer(const KeyFrame* key) const;
+
+    /** Removes the keyframe identified by pointer (ownership passes to the caller). */
+    KeyFrame* takeKeyFrameByPointer(KeyFrame* key);
+
+    /** Moves a keyframe already owned by the layer to a new position
+     *  (raw map move, no selection bookkeeping). */
+    void repositionKeyFrame(KeyFrame* key, int newPos);
+
+    /** Captures the full keyframe layout (pointer, position, length, explicit flag). */
+    QList<KeyFrameLayoutEntry> captureKeyFrameLayout() const;
+
+    /** Restores a captured layout: keys listed but currently absent must be owned
+     *  by the caller and are inserted (ownership passes to the layer); keys currently
+     *  in the layer but absent from the layout are extracted into `extracted`
+     *  (ownership passes to the caller). */
+    void applyKeyFrameLayout(const QList<KeyFrameLayoutEntry>& layout, QList<KeyFrame*>& extracted);
+
+    /** TVP-style gap absorption: the explicit block ending before `fromPos`
+     *  extends to the next keyframe so the freed span is covered.
+     *  Auto-length blocks absorb implicitly, so this is a no-op for them. */
+    void absorbGapAt(int fromPos);
+
+    /** Absorbs gaps left behind at every given position (skip positions that
+     *  still hold a keyframe). */
+    void absorbGapsAt(const QList<int>& positions);
 
     void foreachKeyFrame(std::function<void(KeyFrame*)>) const;
 
@@ -195,6 +243,8 @@ private:
     LAYER_TYPE meType = UNDEFINED;
     int        mId = 0;
     bool       mVisible = true;
+    qreal      mOpacity = 1.0;
+    bool       mLocked = false;
     QString    mName;
     int        mColorIndex = -1;
 

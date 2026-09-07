@@ -29,6 +29,7 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "layercamera.h"
 #include "undoredocommand.h"
+#include "layerlayoutcommand.h"
 
 #include "movetool.h"
 
@@ -188,8 +189,6 @@ void Editor::copy()
 
     if (!canCopy()) { return; }
 
-    backup(tr("Copy"));
-
     if (currentLayer->hasAnySelectedFrames() && !select()->somethingSelected()) {
         clipboards()->copySelectedFrames(currentLayer);
     } else if (currentLayer->type() == Layer::BITMAP) {
@@ -208,11 +207,17 @@ void Editor::copyAndCut()
     Layer* currentLayer = layers()->currentLayer();
 
     if (currentLayer->hasAnySelectedFrames() && !select()->somethingSelected()) {
-        for (int pos : currentLayer->selectedKeyFramesPositions()) {
-            currentLayer->removeKeyFrame(pos);
+        const QList<int> positions = currentLayer->selectedKeyFramesPositions();
+        beginLayerLayoutEdit(currentLayer);
+        for (int pos : positions) {
+            takeLayerKeyFrame(currentLayer, pos);
         }
+        currentLayer->absorbGapsAt(positions);
+        currentLayer->deselectAll();
+        endLayerLayoutEdit(tr("Cut frames"));
         emit layers()->currentLayerChanged(currentLayerIndex());
         emit updateTimeLine();
+        emit layers()->notifyAnimationLengthChanged();
         return;
     }
 
@@ -233,7 +238,7 @@ void Editor::pasteFromPreviousFrame()
 
     if (currentLayer->type() == Layer::BITMAP)
     {
-        backup(tr("Paste from Previous Keyframe"));
+        SAVESTATE_ID saveStateId = undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
         BitmapImage* bitmapImage = static_cast<BitmapImage*>(currentLayer->getKeyFrameAt(prevFrame));
         if (select()->somethingSelected())
         {
@@ -244,6 +249,7 @@ void Editor::pasteFromPreviousFrame()
         {
             pasteToCanvas(bitmapImage, mFrame);
         }
+        undoRedo()->record(saveStateId, tr("Paste from Previous Keyframe"));
     }
 }
 
@@ -283,6 +289,8 @@ void Editor::pasteToFrames()
     Q_ASSERT(!clipboardFrames.empty());
     Layer* currentLayer = layers()->currentLayer();
 
+    beginLayerLayoutEdit(currentLayer);
+
     currentLayer->deselectAll();
 
     int newPositionOffset = mFrame - clipboardFrames.cbegin()->first;
@@ -303,7 +311,6 @@ void Editor::pasteToFrames()
         // It's a bug if the keyframe is nullptr at this point...
         Q_ASSERT(key != nullptr);
 
-        // TODO: undo/redo implementation
         currentLayer->addKeyFrame(newPosition, key);
         if (currentLayer->type() == Layer::SOUND)
         {
@@ -313,6 +320,8 @@ void Editor::pasteToFrames()
 
         currentLayer->setFrameSelected(key->pos(), true);
     }
+
+    endLayerLayoutEdit(tr("Paste frames"));
 
     layers()->notifyAnimationLengthChanged();
 }
@@ -327,16 +336,16 @@ void Editor::paste()
 
     if (clipboards()->framesIsEmpty()) {
 
-        backup(tr("Paste"));
+        SAVESTATE_ID saveStateId = undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
 
         clipboards()->setFromSystemClipboard(mScribbleArea->getCentralPoint(), currentLayer);
 
         BitmapImage clipboardImage = clipboards()->getBitmapClipboard();
         if (currentLayer->type() == Layer::BITMAP && clipboardImage.isLoaded()) {
             pasteToCanvas(&clipboardImage, mFrame);
+            undoRedo()->record(saveStateId, tr("Paste"));
         }
     } else {
-        // TODO: implement undo/redo
         pasteToFrames();
     }
 
@@ -345,12 +354,9 @@ void Editor::paste()
 
 void Editor::flipSelection(bool flipVertical)
 {
-    if (flipVertical) {
-        backup(tr("Flip selection vertically"));
-    } else {
-        backup(tr("Flip selection horizontally"));
-    }
+    SAVESTATE_ID saveStateId = undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
     mScribbleArea->flipSelection(flipVertical);
+    undoRedo()->record(saveStateId, flipVertical ? tr("Flip selection vertically") : tr("Flip selection horizontally"));
 }
 
 void Editor::repositionImage(QPoint transform, int frame)
@@ -519,6 +525,10 @@ Status Editor::setObject(Object* newObject)
         return Status::SAFE;
     }
 
+    // Discard the undo history before the previous object dies: layout
+    // commands still hold keyframe pointers of the old document
+    undoRedo()->clearStack();
+
     mObject.reset(newObject);
 
     updateObject();
@@ -600,14 +610,14 @@ Status Editor::importBitmapImage(const QString& filePath, const QTransform& impo
         const bool ok = addNewKey();
         Q_ASSERT(ok);
     }
+    SAVESTATE_ID saveStateId = undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
     BitmapImage* bitmapImage = layer->getBitmapImageAtFrame(mFrame);
     BitmapImage importedBitmapImage(pos, img);
     bitmapImage->paste(&importedBitmapImage);
     emit frameModified(bitmapImage->pos());
+    undoRedo()->record(saveStateId, tr("Import Image"));
 
     scrubTo(mFrame+1);
-
-    backup(tr("Import Image"));
 
     return status;
 }
@@ -709,10 +719,12 @@ Status Editor::importAnimatedImage(const QString& filePath, int frameSpacing, co
         {
             addNewKey();
         }
+        SAVESTATE_ID saveStateId = undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
         BitmapImage* bitmapImage = bitmapLayer->getBitmapImageAtFrame(mFrame);
         BitmapImage importedBitmapImage(pos, img);
         bitmapImage->paste(&importedBitmapImage);
         emit frameModified(bitmapImage->pos());
+        undoRedo()->record(saveStateId, tr("Import Image"));
 
         if (wasCanceled())
         {
@@ -720,8 +732,6 @@ Status Editor::importAnimatedImage(const QString& filePath, int frameSpacing, co
         }
 
         scrubTo(mFrame + frameSpacing);
-
-        backup(tr("Import Image"));
 
         progressChanged(qFloor(qMin(static_cast<double>(reader.currentImageNumber()) / totalFrames, 1.0) * 100));
     }
@@ -1002,4 +1012,91 @@ bool Editor::backup(int layerNumber, int frameNumber, const QString &undoText)
 
     updateAutoSaveCounter();
     return didBackup;
+}
+
+struct Editor::LayoutTransaction
+{
+    struct PerLayer
+    {
+        int layerId = 0;
+        QList<KeyFrameLayoutEntry> before;
+    };
+    QList<PerLayer> layers;
+    QList<KeyFrame*> ownedKeys; // removed frames kept alive for undo
+};
+
+void Editor::beginLayerLayoutEdit(Layer* layer)
+{
+    Q_ASSERT(layer != nullptr);
+    if (mLayoutTransaction != nullptr)
+    {
+        // stale transaction without end: its extracted frames are abandoned
+        for (KeyFrame* key : mLayoutTransaction->ownedKeys) { delete key; }
+        delete mLayoutTransaction;
+        mLayoutTransaction = nullptr;
+    }
+
+    mLayoutTransaction = new LayoutTransaction();
+    LayoutTransaction::PerLayer entry;
+    entry.layerId = layer->id();
+    entry.before = layer->captureKeyFrameLayout();
+    mLayoutTransaction->layers.append(entry);
+}
+
+void Editor::addLayerToLayoutEdit(Layer* layer)
+{
+    if (mLayoutTransaction == nullptr || layer == nullptr) { return; }
+    const int layerId = layer->id();
+    for (const LayoutTransaction::PerLayer& perLayer : mLayoutTransaction->layers)
+    {
+        if (perLayer.layerId == layerId) { return; } // already captured
+    }
+    LayoutTransaction::PerLayer entry;
+    entry.layerId = layerId;
+    entry.before = layer->captureKeyFrameLayout();
+    mLayoutTransaction->layers.append(entry);
+}
+
+KeyFrame* Editor::takeLayerKeyFrame(Layer* layer, int position)
+{
+    if (mLayoutTransaction == nullptr || layer == nullptr) { return nullptr; }
+    KeyFrame* key = layer->takeKeyFrame(position);
+    if (key != nullptr)
+    {
+        mLayoutTransaction->ownedKeys.append(key);
+    }
+    return key;
+}
+
+void Editor::endLayerLayoutEdit(const QString& undoText)
+{
+    if (mLayoutTransaction == nullptr) { return; }
+
+    QList<LayerLayoutCommand::LayerLayouts> layouts;
+    for (const LayoutTransaction::PerLayer& perLayer : mLayoutTransaction->layers)
+    {
+        Layer* layer = layers()->findLayerById(perLayer.layerId);
+        if (layer == nullptr) { continue; }
+
+        LayerLayoutCommand::LayerLayouts entry;
+        entry.layerId = perLayer.layerId;
+        entry.undoLayout = perLayer.before;
+        entry.redoLayout = layer->captureKeyFrameLayout();
+        layouts.append(entry);
+    }
+
+    if (!layouts.isEmpty())
+    {
+        auto command = new LayerLayoutCommand(this, layouts, mLayoutTransaction->ownedKeys, undoText);
+        undoRedo()->pushUndoCommand(command);
+    }
+    else
+    {
+        // nothing to record: the caller keeps ownership of extracted frames
+        for (KeyFrame* key : mLayoutTransaction->ownedKeys) { delete key; }
+    }
+
+    delete mLayoutTransaction;
+    mLayoutTransaction = nullptr;
+    updateAutoSaveCounter();
 }

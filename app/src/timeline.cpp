@@ -28,6 +28,7 @@ GNU General Public License for more details.
 #include <QWheelEvent>
 #include <QSlider>
 #include <QTimer>
+#include <QSet>
 #include <algorithm>
 
 #include "editor.h"
@@ -441,9 +442,13 @@ void TimeLine::updateVerticalScrollbarPosition()
     }
 }
 
-/** Redistributes keyframes of the current layer so that each one holds n frames
- *  (TVP-style exposure). Selected frames are re-spaced starting at the leftmost
- *  selected frame; when nothing is selected, every frame of the layer is used.
+/** Redistributes keyframes so each one holds n frames (TVP "set duration").
+ *  Selected frames (>=2) are re-spaced from the leftmost one; unselected
+ *  keyframes caught inside the re-spaced span are pushed after it, keeping
+ *  their original spacing (TVP bridge collision push). The rearrangement goes
+ *  through a parking zone so no frame is ever destroyed, and the whole
+ *  operation is one undoable step that also resets trimmed (explicit) lengths
+ *  back to auto: after hold-N the spacing alone is the exposure.
  */
 void TimeLine::applyHoldLength(int n)
 {
@@ -452,55 +457,91 @@ void TimeLine::applyHoldLength(int n)
     Layer* layer = editor()->layers()->currentLayer();
     if (layer == nullptr || layer->type() == Layer::SOUND) { return; }
 
-    QList<int> positions = layer->getSelectedFramesByPos();
-    if (positions.isEmpty())
-    {
-        layer->foreachKeyFrame([&positions](KeyFrame* key) { positions.append(key->pos()); });
-        std::sort(positions.begin(), positions.end());
-    }
-    if (positions.count() < 2) { return; }
+    QList<int> all;
+    layer->foreachKeyFrame([&all](KeyFrame* key) { all.append(key->pos()); });
+    std::sort(all.begin(), all.end());
 
-    // The i-th frame (in the original order) lands on start + i*n
-    const int start = positions.first();
-    QList<int> targets;
-    for (int i = 0; i < positions.count(); i++)
+    QList<int> selected = layer->getSelectedFramesByPos();
+    std::sort(selected.begin(), selected.end());
+    if (selected.count() < 2) { selected = all; }
+    if (selected.count() < 2) { return; }
+
+    const int start = selected.first();
+
+    // Equally spaced targets: the first frame keeps its spot
+    QVector<QPair<int, int>> moves; // oldPos -> newPos
+    for (int i = 0; i < selected.count(); i++)
     {
-        targets.append(start + i * n);
+        moves.append(qMakePair(selected[i], start + i * n));
+    }
+    const int tailNew = start + (selected.count() - 1) * n;
+
+    // Collision push: unselected keys that would end up inside the re-spaced
+    // span (and everything behind the first one hit) are appended after the
+    // span, preserving their original relative spacing
+    QSet<int> selSet(selected.cbegin(), selected.cend());
+    bool pushing = false;
+    int cursor = tailNew;
+    int prevOld = selected.last();
+    for (int pos : all)
+    {
+        if (selSet.contains(pos) || pos <= start) { continue; }
+        if (!pushing && pos > tailNew) { break; } // safely beyond the span
+        pushing = true;
+        int target = cursor + (pos - prevOld);
+        target = qMax(target, cursor + 1); // keep the sequence monotonic
+        moves.append(qMakePair(pos, target));
+        cursor = target;
+        prevOld = pos;
     }
 
     bool anyMove = false;
-    for (int i = 0; i < positions.count(); i++)
+    for (const auto& move : moves)
     {
-        if (targets[i] != positions[i]) { anyMove = true; break; }
+        if (move.first != move.second) { anyMove = true; break; }
     }
     if (!anyMove) { return; }
 
-    editor()->backup(tr("Hold %1").arg(n));
+    editor()->beginLayerLayoutEdit(layer);
 
-    // Two-phase move to avoid collisions between the frames being rearranged:
-    // 1. park every frame that has to move far beyond the last keyframe
-    // 2. drop them back onto their targets, farthest target first
-    const int parkBase = layer->getMaxKeyFramePosition() + 10000;
+    // Parking-lot rearrangement: stash every moving frame far beyond the
+    // layer, then drop each one on its target. Targets are unique and never
+    // occupied by a frame that stays behind, so nothing is overwritten.
+    const int parkBase = layer->getMaxKeyFramePosition() + moves.count() + 1000;
 
-    for (int i = 0; i < positions.count(); i++)
+    for (int i = 0; i < moves.count(); i++)
     {
-        if (targets[i] != positions[i])
+        if (moves[i].first == moves[i].second) { continue; }
+        KeyFrame* key = layer->takeKeyFrame(moves[i].first);
+        Q_ASSERT(key != nullptr);
+        layer->addKeyFrame(parkBase + i, key);
+    }
+    for (int i = 0; i < moves.count(); i++)
+    {
+        if (moves[i].first == moves[i].second) { continue; }
+        KeyFrame* key = layer->takeKeyFrame(parkBase + i);
+        Q_ASSERT(key != nullptr);
+        layer->addKeyFrame(moves[i].second, key);
+    }
+
+    // spacing is the exposure now: drop stale explicit (trimmed) lengths
+    for (int i = 0; i < selected.count(); i++)
+    {
+        KeyFrame* key = layer->getKeyFrameAt(start + i * n);
+        if (key != nullptr)
         {
-            layer->moveKeyFrame(positions[i], parkBase + i - positions[i]);
+            key->setLengthExplicit(false);
+            key->setLength(1);
         }
     }
 
-    for (int i = positions.count() - 1; i >= 0; i--)
+    layer->deselectAll();
+    for (int i = 0; i < selected.count(); i++)
     {
-        if (targets[i] == positions[i]) { continue; }
-
-        // An unselected frame sitting on our target: the redistribution wins
-        if (layer->keyExists(targets[i]))
-        {
-            layer->removeKeyFrame(targets[i]);
-        }
-        layer->moveKeyFrame(parkBase + i, targets[i] - (parkBase + i));
+        layer->setFrameSelected(start + i * n, true);
     }
+
+    editor()->endLayerLayoutEdit(tr("一拍 %1").arg(n));
 
     editor()->layers()->notifyAnimationLengthChanged();
     emit editor()->framesModified();

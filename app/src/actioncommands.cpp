@@ -708,7 +708,14 @@ void ActionCommands::exposeSelectedFrames(int offset)
         currentLayer->setFrameSelected(key->pos(), true);
     }
 
+    // One transaction = one undo step for the whole exposure change
+    const QList<int> oldPositions = currentLayer->getSelectedFramesByPos();
+    mEditor->beginLayerLayoutEdit(currentLayer);
     currentLayer->setExposureForSelectedFrames(offset);
+    // TVP gap absorption for the spots the frames moved away from
+    currentLayer->absorbGapsAt(oldPositions);
+    mEditor->endLayerLayoutEdit(offset > 0 ? tr("增加曝光") : tr("减少曝光"));
+
     emit mEditor->updateTimeLine();
     emit mEditor->framesModified();
 
@@ -732,10 +739,32 @@ void ActionCommands::subtractExposureFromSelectedFrames()
 Status ActionCommands::insertKeyFrameAtCurrentPosition()
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
-    int currentPosition = mEditor->currentFrame();
+    if (currentLayer == nullptr) { return Status::SAFE; }
+    if (!currentLayer->visible())
+    {
+        mEditor->getScribbleArea()->showLayerNotVisibleWarning();
+        return Status::SAFE;
+    }
 
+    const int currentPosition = mEditor->currentFrame();
+
+    // One transaction = one undo step covering the exposure shift AND the new frame
+    mEditor->beginLayerLayoutEdit(currentLayer);
     currentLayer->insertExposureAt(currentPosition);
-    return addNewKey();
+    const bool added = currentLayer->addNewKeyFrameAt(currentPosition);
+    mEditor->endLayerLayoutEdit(tr("Insert frame"));
+
+    if (added)
+    {
+        mEditor->scrubTo(currentPosition);
+        emit mEditor->frameModified(currentPosition);
+        mEditor->layers()->notifyAnimationLengthChanged();
+        if (currentLayer->type() == Layer::CAMERA)
+        {
+            mEditor->view()->forceUpdateViewTransform();
+        }
+    }
+    return Status::OK;
 }
 
 void ActionCommands::removeSelectedFrames()
@@ -744,28 +773,38 @@ void ActionCommands::removeSelectedFrames()
 
     if (!currentLayer->hasAnySelectedFrames()) { return; }
 
-    int ret = QMessageBox::warning(mParent,
-                                   tr("Remove selected frames", "Windows title of remove selected frames pop-up."),
-                                   tr("Are you sure you want to remove the selected frames? This action is irreversible currently!"),
-                                   QMessageBox::Ok | QMessageBox::Cancel,
-                                   QMessageBox::Ok);
+    const QList<int> positions = currentLayer->selectedKeyFramesPositions();
 
-    if (ret != QMessageBox::Ok)
-    {
-        return;
-    }
+    // Non-sound layers always keep their last keyframe
+    const bool keepLastFrame = (currentLayer->type() != Layer::SOUND
+                                && positions.count() >= currentLayer->keyFrameCount());
 
-    for (int pos : currentLayer->selectedKeyFramesPositions()) {
-        currentLayer->removeKeyFrame(pos);
+    // One transaction = one undo step that restores every deleted frame
+    mEditor->beginLayerLayoutEdit(currentLayer);
+    int removed = 0;
+    for (int pos : positions) {
+        if (keepLastFrame && removed >= positions.count() - 1) { break; }
+        if (mEditor->takeLayerKeyFrame(currentLayer, pos) != nullptr) { removed++; }
     }
+    // TVP gap absorption: the block before each vacated spot takes over
+    currentLayer->absorbGapsAt(positions);
+    currentLayer->deselectAll();
+    mEditor->endLayerLayoutEdit(tr("删除选中帧"));
+
     mEditor->layers()->notifyLayerChanged(currentLayer);
+    mEditor->layers()->notifyAnimationLengthChanged();
+    emit mEditor->framesModified();
 }
 
 void ActionCommands::reverseSelectedFrames()
 {
     Layer* currentLayer = mEditor->layers()->currentLayer();
 
-    if (!currentLayer->reverseOrderOfSelection()) {
+    mEditor->beginLayerLayoutEdit(currentLayer);
+    const bool reversed = currentLayer->reverseOrderOfSelection();
+    mEditor->endLayerLayoutEdit(tr("Reverse frames"));
+
+    if (!reversed) {
         return;
     }
 
@@ -826,7 +865,9 @@ void ActionCommands::duplicateKey()
         nextEmptyFrame += 1;
     }
 
+    mEditor->beginLayerLayoutEdit(layer);
     layer->addKeyFrame(nextEmptyFrame, dupKey);
+    mEditor->endLayerLayoutEdit(tr("Duplicate frame"));
     mEditor->scrubTo(nextEmptyFrame);
     emit mEditor->frameModified(nextEmptyFrame);
 
@@ -845,7 +886,10 @@ void ActionCommands::moveFrameForward()
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer)
     {
-        if (layer->moveKeyFrame(mEditor->currentFrame(), 1))
+        mEditor->beginLayerLayoutEdit(layer);
+        const bool moved = layer->moveKeyFrame(mEditor->currentFrame(), 1);
+        mEditor->endLayerLayoutEdit(tr("Move frame forward"));
+        if (moved)
         {
             mEditor->scrubForward();
         }
@@ -859,7 +903,10 @@ void ActionCommands::moveFrameBackward()
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer)
     {
-        if (layer->moveKeyFrame(mEditor->currentFrame(), -1))
+        mEditor->beginLayerLayoutEdit(layer);
+        const bool moved = layer->moveKeyFrame(mEditor->currentFrame(), -1);
+        mEditor->endLayerLayoutEdit(tr("Move frame backward"));
+        if (moved)
         {
             mEditor->scrubBackward();
         }

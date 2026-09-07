@@ -42,7 +42,9 @@ GNU General Public License for more details.
 #include "preferencemanager.h"
 #include "soundclip.h"
 #include "soundmanager.h"
+#include "scribblearea.h"
 #include "undoredomanager.h"
+#include "layerlayoutcommand.h"
 #include "timeline.h"
 
 #include "cameracontextmenu.h"
@@ -1696,11 +1698,16 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     const int blockLen = (lastPos >= 0) ? blockLengthFor(layer, layer->getKeyFrameAt(lastPos)) : 1;
                     const int startFrame = (lastPos >= 0) ? lastPos + blockLen : getFrameNumber(mMousePressX);
                     qDebug() << "[ui] plus-create" << n << "frames from" << startFrame;
+
+                    // one transaction = one undo step for the whole batch
+                    mEditor->beginLayerLayoutEdit(layer);
                     for (int i = 0; i < n; i++)
                     {
-                        mEditor->scrubTo(startFrame + i);
-                        mEditor->addNewKey();
+                        layer->addNewKeyFrameAt(startFrame + i);
                     }
+                    mEditor->endLayerLayoutEdit(tr("新建 %1 帧").arg(n));
+                    mEditor->scrubTo(startFrame + n - 1);
+
                     mEditor->layers()->notifyAnimationLengthChanged();
                     emit mEditor->framesModified();
                 }
@@ -1713,10 +1720,9 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             KeyFrame* trimKey = currentLayer->getKeyFrameAt(mTrimKeyPos);
             if (trimKey != nullptr && mTrimPreviewLength != mTrimOriginalLength)
             {
-                // BitmapReplaceCommand snapshots the redo state at the current frame,
-                // so the scrubber must sit on the trimmed block before recording
-                mEditor->scrubTo(mTrimKeyPos);
-                SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+                // Layout transaction: one undo step restores the new length,
+                // the explicit flag AND the ripple moves of later blocks
+                mEditor->beginLayerLayoutEdit(currentLayer);
                 const int delta = mTrimPreviewLength - mTrimOriginalLength;
                 if (delta != 0)
                 {
@@ -1740,7 +1746,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 trimKey->setLength(mTrimPreviewLength);
                 trimKey->setLengthExplicit(true);
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
-                mEditor->undoRedo()->record(saveStateId, tr("Trim Frame"));
+                mEditor->endLayerLayoutEdit(tr("拉伸帧块"));
             }
             mTrimKeyPos = -1;
             mEditor->layers()->notifyAnimationLengthChanged();
@@ -1761,14 +1767,16 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             int offset = frameNumber - posUnderCursor;
 
             if (currentLayer->canMoveSelectedFramesToOffset(offset)) {
-                SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MOVE);
-                UserSaveState userState;
-                userState.moveFramesState = MoveFramesSaveState(offset, currentLayer->selectedKeyFramesPositions());
-                mEditor->undoRedo()->addUserState(saveStateId, userState);
+                // Layout transaction: one undo step for the whole move, plus
+                // TVP gap absorption for the vacated spots
+                const QList<int> vacated = currentLayer->selectedKeyFramesPositions();
+                mEditor->beginLayerLayoutEdit(currentLayer);
 
                 qDebug() << "[ui] frames moved by" << offset;
                 currentLayer->moveSelectedFrames(offset);
-                mEditor->undoRedo()->record(saveStateId, tr("Move Frames"));
+                currentLayer->absorbGapsAt(vacated);
+
+                mEditor->endLayerLayoutEdit(tr("移动帧"));
             }
             mEditor->layers()->notifyAnimationLengthChanged();
             emit mEditor->framesModified();
@@ -1791,16 +1799,16 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         mToLayer = getInbetweenLayerNumber(event->pos().y());
         if (mToLayer != mFromLayer && mToLayer > -1 && mToLayer < mEditor->layers()->count())
         {
-            // Bubble the from layer up or down to the to layer
-            if (mToLayer < mFromLayer) // bubble up
+            // Insert-style reorder (TVP semantics) with a single undo step
+            const QList<int> orderBefore = mEditor->object()->layerIdOrder();
+            if (mEditor->object()->moveLayer(mFromLayer, mToLayer))
             {
-                for (int i = mFromLayer - 1; i >= mToLayer; i--)
-                    mEditor->swapLayers(i, i + 1);
-            }
-            else // bubble down
-            {
-                for (int i = mFromLayer + 1; i <= mToLayer; i++)
-                    mEditor->swapLayers(i, i - 1);
+                const QList<int> orderAfter = mEditor->object()->layerIdOrder();
+                mEditor->undoRedo()->pushUndoCommand(
+                    new LayerOrderCommand(mEditor, orderBefore, orderAfter, tr("重排图层")));
+                mEditor->layers()->setCurrentLayer(mToLayer);
+                emit mEditor->updateTimeLine();
+                mEditor->getScribbleArea()->onLayerChanged();
             }
         }
     }
@@ -1953,7 +1961,9 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     const QList<int> positions = source->selectedKeyFramesPositions();
     if (positions.isEmpty()) { return; }
 
-    mEditor->backup(tr("Move Frames to Layer"));
+    // Two layers take part in the transaction: one undo step restores both
+    mEditor->beginLayerLayoutEdit(source);
+    mEditor->addLayerToLayoutEdit(target);
 
     const int posUnderCursor = getFrameNumber(mMousePressX);
     int dx = mFramePosMoveX - posUnderCursor + mDropShiftFrames;
@@ -1968,7 +1978,7 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     QVector<QPair<int, KeyFrame*>> taken;
     for (int pos : positions)
     {
-        KeyFrame* key = source->takeKeyFrame(pos);
+        KeyFrame* key = mEditor->takeLayerKeyFrame(source, pos);
         if (key != nullptr)
         {
             taken.append(qMakePair(pos, key));
@@ -1996,7 +2006,12 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
         target->setFrameSelected(newPos, true);
     }
 
+    // the vacated span in the source layer is absorbed by its previous block
+    source->absorbGapsAt(positions);
+
     source->deselectAll();
+
+    mEditor->endLayerLayoutEdit(tr("跨层移动帧"));
 }
 
 void TimeLineCells::vScrollChange(int x)

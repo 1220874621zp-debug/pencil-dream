@@ -60,7 +60,12 @@ bool UndoRedoManager::init()
     qDebug() << "UndoRedoManager: init";
 
     mUndoStack.setUndoLimit(editor()->preference()->getInt(SETTING::UNDO_REDO_MAX_STEPS));
-    mNewBackupSystemEnabled = editor()->preference()->isOn(SETTING::NEW_UNDO_REDO_SYSTEM_ON);
+    // This fork always runs the new undo/redo system: the legacy backup can
+    // only restore single-frame pixels, while the TVP timeline batch
+    // operations (hold-N, batch delete, paste, trim ripple, reorder) are
+    // QUndoCommands that restore full keyframe layouts. The legacy
+    // pixel-only path silently disabled them (its default preference was off).
+    mNewBackupSystemEnabled = true;
 
     return true;
 }
@@ -250,6 +255,12 @@ void UndoRedoManager::addUserState(SAVESTATE_ID saveStateId, const UserSaveState
 {
     if (!mSaveStates.contains(saveStateId)) { return; }
     mSaveStates[saveStateId]->userState = userState;
+}
+
+void UndoRedoManager::pushUndoCommand(QUndoCommand* command)
+{
+    if (command == nullptr) { return; }
+    pushCommand(command);
 }
 
 void UndoRedoManager::initCommonKeyFrameState(UndoSaveState* undoSaveState) const
