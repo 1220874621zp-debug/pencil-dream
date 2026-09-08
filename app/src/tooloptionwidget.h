@@ -30,6 +30,7 @@ class Editor;
 class BaseTool;
 class BucketOptionsWidget;
 class CameraOptionsWidget;
+class ColorizeOptionsWidget;
 class StrokeOptionsWidget;
 class TransformOptionsWidget;
 class OnionAlignOptionsWidget;
@@ -60,6 +61,7 @@ private:
 
     BucketOptionsWidget* mBucketOptionsWidget = nullptr;
     CameraOptionsWidget* mCameraOptionsWidget = nullptr;
+    ColorizeOptionsWidget* mColorizeOptionsWidget = nullptr;
     StrokeOptionsWidget* mStrokeOptionsWidget = nullptr;
     class BrushOptionsWidget* mBrushOptionsWidget = nullptr;
     TransformOptionsWidget* mTransformOptionsWidget = nullptr;

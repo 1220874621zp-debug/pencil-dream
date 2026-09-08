@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include <QDebug>
 
 #include "cameraoptionswidget.h"
+#include "colorizeoptionswidget.h"
 #include "brushoptionswidget.h"
 #include "bucketoptionswidget.h"
 #include "strokeoptionswidget.h"
@@ -58,7 +59,10 @@ void ToolOptionWidget::initUI()
 
     mBucketOptionsWidget->setHidden(true);
     mCameraOptionsWidget->setHidden(true);
-    
+
+    mColorizeOptionsWidget = new ColorizeOptionsWidget(editor(), this);
+    mColorizeOptionsWidget->setHidden(true);
+
     mBrushOptionsWidget = new BrushOptionsWidget(editor(), this);
     mBrushOptionsWidget->setHidden(true);
     mStrokeOptionsWidget = new StrokeOptionsWidget(editor(), this);
@@ -67,6 +71,7 @@ void ToolOptionWidget::initUI()
     mOnionAlignOptionsWidget->setHidden(true);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBucketOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mCameraOptionsWidget);
+    ui->scrollAreaWidgetContents->layout()->addWidget(mColorizeOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBrushOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mStrokeOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mTransformOptionsWidget);
@@ -105,6 +110,9 @@ void ToolOptionWidget::updateUIForTool(BaseTool* tool)
 {
     setWidgetVisibility(mBucketOptionsWidget, tool->type() == BUCKET);
     setWidgetVisibility(mCameraOptionsWidget, tool->type() == CAMERA);
+    Layer* currentLayer = editor()->layers()->currentLayer();
+    setWidgetVisibility(mColorizeOptionsWidget,
+                        currentLayer != nullptr && currentLayer->type() == Layer::COLORIZE);
     const bool isBrushLike = tool->type() == BRUSH || tool->type() == ERASER || tool->type() == SMUDGE;
     setWidgetVisibility(mBrushOptionsWidget, isBrushLike);
     setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool) && !isBrushLike);

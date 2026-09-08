@@ -18,6 +18,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameracontextmenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameraoptionswidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionalignoptionswidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorizeoptionswidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/camerapropertiesdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/brushpresetpanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/brushoptionswidget.h
@@ -80,6 +81,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameracontextmenu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/cameraoptionswidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionalignoptionswidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorizeoptionswidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/camerapropertiesdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/checkupdatesdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colorbox.cpp
