@@ -247,6 +247,9 @@ private:
     void tabletReleaseEventFired();
     bool mMouseInUse = false;
     bool mTabletInUse = false;
+    // 数位板悬停期间安装的应用级 override 光标是否在栈上
+    //（笔悬停不触发 WM_SETCURSOR，部件光标不会下发，必须 override 强制）
+    bool mPenHoverOverrideInstalled = false;
     qreal mDevicePixelRatio = 1.;
 
     // Double click handling for tablet input

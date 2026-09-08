@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #include "scribblearea.h"
 
 #include <cmath>
+#include <QApplication>
 #include <QGuiApplication>
 #include <QMessageBox>
 #include <QPainterPath>
@@ -161,6 +162,13 @@ void ScribbleArea::settingUpdated(SETTING setting)
 void ScribbleArea::updateToolCursor()
 {
     setCursor(currentTool()->cursor());
+    // 笔悬停 override 在场时同步替换，保证工具/临时工具切换后光标正确
+    //（Qt6 无 replaceOverrideCursor，用 restore+set 等效）
+    if (mPenHoverOverrideInstalled)
+    {
+        QApplication::restoreOverrideCursor();
+        QApplication::setOverrideCursor(currentTool()->cursor());
+    }
 }
 
 void ScribbleArea::setCurveSmoothing(int newSmoothingLevel)
@@ -389,6 +397,11 @@ bool ScribbleArea::event(QEvent *event)
     } else if (event->type() == QEvent::Leave)
     {
         qInfo() << "[cursor] canvas leave, tool" << int(currentTool()->type());
+        if (mPenHoverOverrideInstalled)
+        {
+            mPenHoverOverrideInstalled = false;
+            QApplication::restoreOverrideCursor();
+        }
         processed = currentTool()->leaveEvent(event) || processed;
     } else if (event->type() == QEvent::ShortcutOverride)
     {
@@ -652,6 +665,14 @@ void ScribbleArea::tabletEvent(QTabletEvent *e)
         {
             pointerMoveEvent(&event);
         }
+        // 数位板笔悬停不触发 WM_SETCURSOR：Windows 对笔悬停显示系统箭头，
+        // Qt 的部件光标不会应用到屏幕（鼠标移动则正常）。悬停期间用应用级
+        // override 光标强制下发工具光标；清理由离开画布/换回鼠标统一负责
+        if (event.buttons() == Qt::NoButton && !mTabletInUse && !mPenHoverOverrideInstalled)
+        {
+            mPenHoverOverrideInstalled = true;
+            QApplication::setOverrideCursor(currentTool()->cursor());
+        }
     }
     else if (event.eventType() == PointerEvent::Release)
     {
@@ -783,6 +804,12 @@ void ScribbleArea::mousePressEvent(QMouseEvent* e)
 
 void ScribbleArea::mouseMoveEvent(QMouseEvent* e)
 {
+    // 鼠标移动=用户从数位板切回鼠标，撤掉笔悬停装的 override 光标
+    if (mPenHoverOverrideInstalled)
+    {
+        mPenHoverOverrideInstalled = false;
+        QApplication::restoreOverrideCursor();
+    }
     if (mTabletInUse || (mMouseFilterTimer->isActive() && mTabletReleaseMillisAgo < MOUSE_FILTER_THRESHOLD)) { e->ignore(); return; }
 
     PointerEvent event(e, mEditor->view()->mapScreenToCanvas(e->localPos()));
