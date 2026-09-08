@@ -141,10 +141,11 @@ void OnionSkinWidget::buildParamRows()
 
 void OnionSkinWidget::makeConnections()
 {
-    connect(mPrevFramesSpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionPrevFramesNumChange);
-    connect(mNextFramesSpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionNextFramesNumChange);
-    connect(mMaxOpacitySpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionMaxOpacityChange);
-    connect(mMinOpacitySpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionMinOpacityChange);
+    // QDoubleSpinBox::valueChanged(double) 直连 int 槽会在运行时连接失败，必须 lambda 取整
+    connect(mPrevFramesSpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionPrevFramesNumChange(qRound(v)); });
+    connect(mNextFramesSpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionNextFramesNumChange(qRound(v)); });
+    connect(mMaxOpacitySpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionMaxOpacityChange(qRound(v)); });
+    connect(mMinOpacitySpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionMinOpacityChange(qRound(v)); });
 
     connect(mOnionToggleButton, &QToolButton::clicked, this, &OnionSkinWidget::onionToggleClicked);
     connect(mOnionBlueButton, &QToolButton::clicked, this, &OnionSkinWidget::onionBlueButtonClicked);
