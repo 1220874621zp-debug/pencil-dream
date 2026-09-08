@@ -322,7 +322,9 @@ int FlowLayout::applyLayout(const QRect &rect) const
 
     if (maxRowCount == itemList.length() - 1) {
         alignHCenterRow(itemList.length() - currentRowCount, currentRowCount, effectiveRect, spaceX);
-    } else if (currentRowCount > 0) {
+    } else if (currentRowCount > 0 && !rowAlignments.isEmpty()) {
+        // 无 HCenter/Justify 对齐（或本次无换行）时 rowAlignments 恒为空，
+        // 此时没有可参照的前行对齐信息；Release 下空的 last() 读越界内存即崩
         lastLineAlignment(itemList.length() - currentRowCount, currentRowCount, rowAlignments.last(), effectiveRect);
     }
 

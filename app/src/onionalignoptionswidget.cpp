@@ -39,6 +39,8 @@ void OnionAlignOptionsWidget::initUI()
 
     // 流式布局：面板宽度不够时按钮自动换行（与工具箱按钮同机制）
     auto* layout = new FlowLayout(this, 4, 4, 4);
+    // HCenter 保证换行时行对齐信息被记录（FlowLayout 无对齐+换行会触发其空表缺陷）
+    layout->setAlignment(Qt::AlignHCenter);
 
     auto addToolButton = [this, layout](const QString& text, const QString& tip, auto slot)
     {

@@ -27,6 +27,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_brushengine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_viewmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_util.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_flowlayout.cpp
 )
 
 set(TEST_RESOURCES
