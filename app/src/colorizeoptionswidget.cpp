@@ -34,6 +34,8 @@ GNU General Public License for more details.
 ColorizeOptionsWidget::ColorizeOptionsWidget(Editor* editor, QWidget* parent)
     : BaseWidget(parent), mEditor(editor)
 {
+    // 与兄弟选项部件一致：构造即建控件，updateUI 随时可能被图层切换触发
+    initUI();
 }
 
 void ColorizeOptionsWidget::initUI()
