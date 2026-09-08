@@ -123,7 +123,7 @@ void ColorizeUpdateManager::enqueueJob(LayerColorize* layer, int frameNumber)
     const int index = object->getIndex(layer);
     if (index < 0) { return; }
 
-    LayerBitmap* source = object->getBitmapLayerAbove(index);
+    LayerBitmap* source = object->getColorizeSourceLayer(index, editor()->currentFrame());
 
     ColorizeJobData data;
     if (!LayerColorize::buildColorizeJob(layer, frameNumber, source, data))

@@ -158,6 +158,30 @@ LayerBitmap* Object::getBitmapLayerAbove(int i) const
     return nullptr;
 }
 
+LayerBitmap* Object::getColorizeSourceLayer(int colorizeIndex, int frameNumber) const
+{
+    auto layerUsable = [frameNumber](Layer* layer) -> bool {
+        if (layer->type() != Layer::BITMAP)
+            return false;
+        auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+        BitmapImage* frame = bitmapLayer->getLastBitmapImageAtFrame(frameNumber);
+        return frame != nullptr && !frame->bounds().isEmpty();
+    };
+
+    // 先向上（栈顶方向），再向下
+    for (int index = colorizeIndex - 1; index >= 0; --index)
+    {
+        if (layerUsable(mLayers.at(index)))
+            return static_cast<LayerBitmap*>(mLayers.at(index));
+    }
+    for (int index = colorizeIndex + 1; index < mLayers.size(); ++index)
+    {
+        if (layerUsable(mLayers.at(index)))
+            return static_cast<LayerBitmap*>(mLayers.at(index));
+    }
+    return nullptr;
+}
+
 LayerSound* Object::addNewSoundLayer()
 {
     LayerSound* layerSound = new LayerSound(getUniqueLayerID());
@@ -845,7 +869,7 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                     if (frame->needsUpdate() ||
                         frame->computedStructureGeneration() != layerStructureGeneration())
                     {
-                        layerColorize->updateColoringAtFrame(frameNumber, getBitmapLayerAbove(layerIndex));
+                        layerColorize->updateColoringAtFrame(frameNumber, getColorizeSourceLayer(layerIndex, frameNumber));
                     }
                     if (layerColorize->showColoring() && !frame->coloringImage().isNull())
                     {

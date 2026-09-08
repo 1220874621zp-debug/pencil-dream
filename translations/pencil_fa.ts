@@ -2977,98 +2977,108 @@
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="54"/>
         <source>Colorize Mask</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="60"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="61"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
         <source>Update All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="64"/>
         <source>Regenerate coloring for the current frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
         <source>Regenerate coloring for every frame of this layer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="69"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="71"/>
         <source>Edit key strokes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="70"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="72"/>
         <source>Show output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="75"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="81"/>
         <source>Key Strokes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="90"/>
         <source>Transparent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="91"/>
         <source>Remove</source>
         <translation type="unfinished">زدایش</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="92"/>
         <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="87"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="93"/>
         <source>Erase all strokes of the selected color on this frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="100"/>
         <source>Edge detection (soft pencil lines)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="101"/>
         <location filename="../app/src/colorizeoptionswidget.cpp" line="107"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="113"/>
         <source> px</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="126"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="132"/>
         <source>Edge size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="127"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="133"/>
         <source>Gap closing radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="128"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="134"/>
         <source>Cleanup strength</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="131"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="137"/>
         <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="237"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="214"/>
+        <source>Line art source: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="219"/>
+        <source>No line art layer found! Add a bitmap layer with drawings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="262"/>
         <source>Transparent (stays unfilled)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4522,7 +4532,7 @@ Read the instructions and try again</source>
 <context>
     <name>LayerColorize</name>
     <message>
-        <location filename="../core_lib/src/structure/layercolorize.cpp" line="27"/>
+        <location filename="../core_lib/src/structure/layercolorize.cpp" line="28"/>
         <source>Colorize Layer</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5065,7 +5075,7 @@ Read the instructions and try again</source>
     </message>
     <message>
         <location filename="../app/ui/mainwindow2.ui" line="632"/>
-        <location filename="../app/src/mainwindow2.cpp" line="1853"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1856"/>
         <source>Play</source>
         <translation>پخش</translation>
     </message>
@@ -5569,57 +5579,57 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation type="vanished">گشودن پالت</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1848"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1851"/>
         <source>Stop</source>
         <translation>نگهداشتن</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1924"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1927"/>
         <source>Restore Project?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1925"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1928"/>
         <source>Pencil2D didn&apos;t close correctly. Would you like to restore the project?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1929"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1932"/>
         <source>Restore project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1962"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1965"/>
         <source>Recovery Failed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1963"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1966"/>
         <source>Sorry! Pencil2D is unable to restore your project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1973"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1976"/>
         <source>Recovery Succeeded!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1974"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1977"/>
         <source>Please save your work immediately to prevent loss of data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1982"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1985"/>
         <source>Main Toolbar</source>
         <translation>نوار ابزار اصلی</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1999"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2002"/>
         <source>View Toolbar</source>
         <translation>نوار ابزار نما</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="2006"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2009"/>
         <source>Overlay Toolbar</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5775,127 +5785,127 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 <context>
     <name>Object</name>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="500"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="524"/>
         <source>error</source>
         <translation>خطا</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="754"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="778"/>
         <source>Black</source>
         <translation>سیاه</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="755"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="779"/>
         <source>Red</source>
         <translation>قرمز</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="756"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="780"/>
         <source>Dark Red</source>
         <translation>قرمز تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="757"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="781"/>
         <source>Orange</source>
         <translation>نارنجی</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="758"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="782"/>
         <source>Dark Orange</source>
         <translation>نارنجی تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="759"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="783"/>
         <source>Yellow</source>
         <translation>زرد</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="760"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="784"/>
         <source>Dark Yellow</source>
         <translation>زرد تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="761"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="785"/>
         <source>Green</source>
         <translation>سبز</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="762"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="786"/>
         <source>Dark Green</source>
         <translation>سبز تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="763"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="787"/>
         <source>Cyan</source>
         <translation>فیروزه ای</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="764"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="788"/>
         <source>Dark Cyan</source>
         <translation>فیروزه ای تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="765"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="789"/>
         <source>Blue</source>
         <translation>آبی</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="766"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="790"/>
         <source>Dark Blue</source>
         <translation>آبی تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="767"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="791"/>
         <source>White</source>
         <translation>سفید</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="768"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="792"/>
         <source>Very Light Grey</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="769"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="793"/>
         <source>Light Grey</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="770"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="794"/>
         <source>Grey</source>
         <translation>خاکستری</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="771"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="795"/>
         <source>Dark Grey</source>
         <translation>خاکستری تیره</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="772"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="796"/>
         <source>Pale Orange Yellow</source>
         <translation>زرد نارنجی کم رنگ</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="773"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="797"/>
         <source>Pale Grayish Orange Yellow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="774"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="798"/>
         <source>Orange Yellow </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="775"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="799"/>
         <source>Grayish Orange Yellow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="776"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="800"/>
         <source>Light Orange Yellow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="777"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="801"/>
         <source>Light Grayish Orange Yellow</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6389,13 +6399,13 @@ or cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1569"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1572"/>
         <source>Delete Selection</source>
         <comment>Undo Step: clear the selection area.</comment>
         <translation>زدایش گزینش</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1585"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1588"/>
         <source>Clear Image</source>
         <comment>Undo step text</comment>
         <translation>پاک کردن نگاره</translation>

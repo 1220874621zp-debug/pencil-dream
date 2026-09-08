@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include "basewidget.h"
 
 class QCheckBox;
+class QLabel;
 class QDoubleSpinBox;
 class QHBoxLayout;
 class QPushButton;
@@ -53,6 +54,7 @@ private:
 
     Editor* mEditor = nullptr;
 
+    QLabel* mSourceLabel = nullptr;
     QPushButton* mRefreshButton = nullptr;
     QPushButton* mRefreshAllButton = nullptr;
     QCheckBox* mEditKeyStrokesCheck = nullptr;

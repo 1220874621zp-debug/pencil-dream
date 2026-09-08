@@ -272,6 +272,29 @@ bool LayerColorize::buildColorizeJob(LayerColorize* layer, int frameNumber,
     out.options.hasTransparentColor = layer->mHasTransparentColor;
     out.options.transparentColor = layer->mTransparentColor;
 
+    // 透明标记自愈：标记色已不在笔画中（被移除/误标）则本次忽略
+    if (out.options.hasTransparentColor)
+    {
+        const QImage& strokesImage = strokeImg;
+        bool found = false;
+        for (int y = 0; y < strokesImage.height() && !found; ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(strokesImage.constScanLine(y));
+            for (int x = 0; x < strokesImage.width(); ++x)
+            {
+                const QRgb px = line[x];
+                const int alpha = qAlpha(px);
+                if (alpha == 0) continue;
+                const int r = qBound(0, qRound(qRed(px) * 255.0 / alpha), 255);
+                const int g = qBound(0, qRound(qGreen(px) * 255.0 / alpha), 255);
+                const int b = qBound(0, qRound(qBlue(px) * 255.0 / alpha), 255);
+                if (qRgb(r, g, b) == out.options.transparentColor) { found = true; break; }
+            }
+        }
+        if (!found)
+            out.options.hasTransparentColor = false;
+    }
+
 #ifdef COLORIZE_JOB_DEBUG_DUMP
     {
         const QString dir = QDir::temp().absoluteFilePath("pencil-colorize-tests");

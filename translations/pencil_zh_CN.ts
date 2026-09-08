@@ -2964,98 +2964,108 @@
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="54"/>
         <source>Colorize Mask</source>
         <translation>智能填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="60"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="61"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
         <source>Update All</source>
         <translation>更新全部</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="64"/>
         <source>Regenerate coloring for the current frame</source>
         <translation>重新计算当前帧的填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
         <source>Regenerate coloring for every frame of this layer</source>
         <translation>重新计算本图层全部帧的填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="69"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="71"/>
         <source>Edit key strokes</source>
         <translation>编辑模式（显示并绘制笔画）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="70"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="72"/>
         <source>Show output</source>
         <translation>显示填色结果</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="75"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="81"/>
         <source>Key Strokes</source>
         <translation>笔画颜色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="90"/>
         <source>Transparent</source>
         <translation>透明</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="91"/>
         <source>Remove</source>
         <translation type="unfinished">删除</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="92"/>
         <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
         <translation>将选中的颜色标记为透明：该颜色的笔画区域保持不填色（用于背景）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="87"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="93"/>
         <source>Erase all strokes of the selected color on this frame</source>
         <translation>擦除当前帧上该颜色的全部笔画</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="100"/>
         <source>Edge detection (soft pencil lines)</source>
         <translation>边缘检测（软铅笔线稿增强）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="101"/>
         <location filename="../app/src/colorizeoptionswidget.cpp" line="107"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="113"/>
         <source> px</source>
         <translation> 像素</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="126"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="132"/>
         <source>Edge size</source>
         <translation>检测尺寸</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="127"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="133"/>
         <source>Gap closing radius</source>
         <translation>闭缝半径</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="128"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="134"/>
         <source>Cleanup strength</source>
         <translation>清理强度</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="131"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="137"/>
         <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
         <translation>用画笔画颜色笔画；把背景颜色标记为透明；点「刷新」计算填色。</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="237"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="214"/>
+        <source>Line art source: %1</source>
+        <translation>线稿源：%1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="219"/>
+        <source>No line art layer found! Add a bitmap layer with drawings.</source>
+        <translation>未找到线稿层！需要含有画作的位图图层。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="262"/>
         <source>Transparent (stays unfilled)</source>
         <translation>透明（保持不填色）</translation>
     </message>
@@ -4776,7 +4786,7 @@ Read the instructions and try again</source>
 <context>
     <name>LayerColorize</name>
     <message>
-        <location filename="../core_lib/src/structure/layercolorize.cpp" line="27"/>
+        <location filename="../core_lib/src/structure/layercolorize.cpp" line="28"/>
         <source>Colorize Layer</source>
         <translation>填色图层</translation>
     </message>
@@ -5301,7 +5311,7 @@ Read the instructions and try again</source>
     </message>
     <message>
         <location filename="../app/ui/mainwindow2.ui" line="632"/>
-        <location filename="../app/src/mainwindow2.cpp" line="1853"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1856"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
@@ -5819,57 +5829,57 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 如果你认为这是 Pencil2D 的问题，请到以下地址提交 issue：&lt;br&gt;&lt;a href=&apos;https://github.com/pencil2d/pencil/issues&apos;&gt;https://github.com/pencil2d/pencil/issues&lt;/a&gt;&lt;br&gt;请在 issue 中包含以下详细信息：</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1848"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1851"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1924"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1927"/>
         <source>Restore Project?</source>
         <translation>恢复项目？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1925"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1928"/>
         <source>Pencil2D didn&apos;t close correctly. Would you like to restore the project?</source>
         <translation>Pencil2D上次没有被正常关闭。您要恢复项目吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1929"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1932"/>
         <source>Restore project</source>
         <translation>恢复项目</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1962"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1965"/>
         <source>Recovery Failed.</source>
         <translation>项目恢复失败。</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1963"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1966"/>
         <source>Sorry! Pencil2D is unable to restore your project</source>
         <translation>抱歉！ Pencil2D 无法恢复您的项目</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1973"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1976"/>
         <source>Recovery Succeeded!</source>
         <translation>项目恢复成功！</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1974"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1977"/>
         <source>Please save your work immediately to prevent loss of data</source>
         <translation>请立即保存您的工作以防止数据丢失</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1982"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1985"/>
         <source>Main Toolbar</source>
         <translation>主工具栏</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1999"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2002"/>
         <source>View Toolbar</source>
         <translation>显示工具栏</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="2006"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2009"/>
         <source>Overlay Toolbar</source>
         <translation>叠加工具栏</translation>
     </message>
@@ -6025,127 +6035,127 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 <context>
     <name>Object</name>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="500"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="524"/>
         <source>error</source>
         <translation>错误</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="754"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="778"/>
         <source>Black</source>
         <translation>黑色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="755"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="779"/>
         <source>Red</source>
         <translation>红色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="756"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="780"/>
         <source>Dark Red</source>
         <translation>暗红色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="757"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="781"/>
         <source>Orange</source>
         <translation>橙色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="758"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="782"/>
         <source>Dark Orange</source>
         <translation>暗橙色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="759"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="783"/>
         <source>Yellow</source>
         <translation>黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="760"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="784"/>
         <source>Dark Yellow</source>
         <translation>暗黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="761"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="785"/>
         <source>Green</source>
         <translation>绿色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="762"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="786"/>
         <source>Dark Green</source>
         <translation>暗绿色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="763"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="787"/>
         <source>Cyan</source>
         <translation>青色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="764"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="788"/>
         <source>Dark Cyan</source>
         <translation>暗青色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="765"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="789"/>
         <source>Blue</source>
         <translation>蓝色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="766"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="790"/>
         <source>Dark Blue</source>
         <translation>暗蓝色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="767"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="791"/>
         <source>White</source>
         <translation>白色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="768"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="792"/>
         <source>Very Light Grey</source>
         <translation>极浅灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="769"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="793"/>
         <source>Light Grey</source>
         <translation>浅灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="770"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="794"/>
         <source>Grey</source>
         <translation>灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="771"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="795"/>
         <source>Dark Grey</source>
         <translation>暗灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="772"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="796"/>
         <source>Pale Orange Yellow</source>
         <translation>淡橙黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="773"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="797"/>
         <source>Pale Grayish Orange Yellow</source>
         <translation>淡灰橙黄</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="774"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="798"/>
         <source>Orange Yellow </source>
         <translation>橙黄色 </translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="775"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="799"/>
         <source>Grayish Orange Yellow</source>
         <translation>灰橙黄</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="776"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="800"/>
         <source>Light Orange Yellow</source>
         <translation>浅橙黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="777"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="801"/>
         <source>Light Grayish Orange Yellow</source>
         <translation>浅灰橙黄</translation>
     </message>
@@ -6652,13 +6662,13 @@ or cancel</source>
         <translation>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1569"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1572"/>
         <source>Delete Selection</source>
         <comment>Undo Step: clear the selection area.</comment>
         <translation>删除选择区域</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1585"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1588"/>
         <source>Clear Image</source>
         <comment>Undo step text</comment>
         <translation>清理图像</translation>

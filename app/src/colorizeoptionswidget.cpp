@@ -32,6 +32,7 @@ GNU General Public License for more details.
 #include "layercolorize.h"
 #include "colorizeimage.h"
 #include "layermanager.h"
+#include "object.h"
 #include "scribblearea.h"
 #include "colorizeupdatemanager.h"
 
@@ -73,6 +74,10 @@ void ColorizeOptionsWidget::initUI()
     rootLayout->addWidget(mShowColoringCheck);
 
     // --- 颜色列表（Krita: Key Strokes） ---
+    mSourceLabel = new QLabel(this);
+    mSourceLabel->setWordWrap(true);
+    rootLayout->addWidget(mSourceLabel);
+
     auto* colorsLabel = new QLabel(tr("Key Strokes"), this);
     rootLayout->addWidget(colorsLabel);
 
@@ -198,6 +203,23 @@ void ColorizeOptionsWidget::updateUI()
 
     if (layer == nullptr)
         return;
+
+    // 线稿源提示（双向就近解析）
+    {
+        Object* obj = mEditor->object();
+        const int index = obj->getIndex(layer);
+        LayerBitmap* source = obj->getColorizeSourceLayer(index, mEditor->currentFrame());
+        if (source != nullptr)
+        {
+            mSourceLabel->setText(tr("Line art source: %1").arg(source->name()));
+            mSourceLabel->setStyleSheet("color: gray;");
+        }
+        else
+        {
+            mSourceLabel->setText(tr("No line art layer found! Add a bitmap layer with drawings."));
+            mSourceLabel->setStyleSheet("color: #E85D5D;");
+        }
+    }
 
     mEditKeyStrokesCheck->setChecked(layer->editKeyStrokes());
     mShowColoringCheck->setChecked(layer->showColoring());

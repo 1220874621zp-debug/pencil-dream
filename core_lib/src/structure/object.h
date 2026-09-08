@@ -104,8 +104,12 @@ public:
     Layer* getLayer(int i) const;
     Layer* getLayerBelow(int i, Layer::LAYER_TYPE type) const;
 
-    /** 智能填色图层的线稿源：索引 i 上方（含更远）最近的位图图层 */
+    /** 智能填色图层的线稿源：上方（含更远）最近的位图图层 */
     LayerBitmap* getBitmapLayerAbove(int i) const;
+
+    /** 线稿源智能解析：优先上方最近「当前帧非空」位图层，其次下方最近非空；
+     *  都没有返回 nullptr（用于计算与面板提示） */
+    LayerBitmap* getColorizeSourceLayer(int colorizeIndex, int frameNumber) const;
     Layer* findLayerByName(const QString& strName, Layer::LAYER_TYPE type = Layer::UNDEFINED) const;
     Layer* findLayerById(int layerId) const;
 
