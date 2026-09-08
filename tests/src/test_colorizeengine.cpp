@@ -646,6 +646,24 @@ TEST_CASE("Colorize FullEditorIntegration")
         canvasPainter.setPaintSettings(object, object->getIndex(colorizeLayer), 1, nullptr);
         canvasPainter.paint(QRect(0, 0, 200, 200));
         REQUIRE(!frame->coloringImage().isNull());
+        // 验证画出来的像素：pixmap 中框内应存在不透明红色
+        QImage rendered = canvasPixmap.toImage();
+        int opaqueCount = 0;
+        for (int y = 0; y < rendered.height(); ++y)
+        {
+            for (int x = 0; x < rendered.width(); ++x)
+            {
+                if (qAlpha(rendered.pixel(x, y)) > 0) ++opaqueCount;
+            }
+        }
+        INFO("画布不透明像素数: " << opaqueCount);
+        {
+            const QString outDir = QDir::temp().absoluteFilePath("pencil-colorize-tests");
+            QDir().mkpath(outDir);
+            canvasPixmap.save(outDir + "/rendered.png");
+            qDebug() << "[填色] 渲染像素验证 不透明=" << opaqueCount;
+        }
+        REQUIRE(opaqueCount > 1500); // 框内着色约2100，仅笔画约200
     }
 
     SECTION("透明颜色经真实管理器生效")
