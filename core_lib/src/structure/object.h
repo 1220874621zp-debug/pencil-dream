@@ -87,6 +87,7 @@ public:
     void importPaletteGPL(QFile& file);
     void importPalettePencil(QFile& file);
     void openPalette(const QString& filePath);
+    bool loadProjectPalette(const QString& filePath); ///< 工程内 palette.xml：新多卡格式/旧扁平格式皆可
 
     bool exportPalette(const QString& filePath) const;
     void exportPaletteGPL(QFile& file) const;
@@ -94,6 +95,17 @@ public:
     QString savePalette(const QString& filePath) const;
 
     void loadDefaultPalette();
+
+    // ---- 多色卡：工程内可存多个命名色卡，当前编辑的始终映在 mPalette ----
+    int paletteCount() const { return mPaletteSlots.size(); }
+    QString paletteName(int index) const;
+    int currentPaletteIndex() const { return mCurrentPaletteIndex; }
+    void switchToPalette(int index);          ///< 换卡：当前卡写回槽位，载入目标卡
+    int addPalette(const QString& name);      ///< 新建空色卡并激活，返回其索引
+    void renamePalette(int index, const QString& name);
+    void removePalette(int index);            ///< 至少保留一张卡
+    void syncActivePaletteToSlot();           ///< 把当前 mPalette 写回槽位（保存/换卡前调用）
+    void ensurePaletteSlots();                ///< 旧工程无槽位时用当前 mPalette 补一张默认卡
 
     LayerBitmap* addNewBitmapLayer();
     LayerSound* addNewSoundLayer();
@@ -203,7 +215,15 @@ private:
     quint32 mLayerStructureGeneration = 0;
     bool modified = false;
 
-    QList<ColorRef> mPalette;
+    QList<ColorRef> mPalette; //< 当前激活色卡的实时缓冲（所有既有读写走这里）
+
+    struct PaletteSlot
+    {
+        QString name;
+        QList<ColorRef> colors;
+    };
+    QList<PaletteSlot> mPaletteSlots; //< 工程内存储的全部色卡
+    int mCurrentPaletteIndex = 0;
 
     ObjectData mData;
     mutable std::unique_ptr<ActiveFramePool> mActiveFramePool;

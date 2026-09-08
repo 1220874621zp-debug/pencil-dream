@@ -646,7 +646,7 @@ bool FileManager::loadPalette(Object* obj)
     FILEMANAGER_LOG("Load Palette..");
 
     QString paletteFilePath = validateDataPath(PFF_PALETTE_FILE, obj->dataDir());
-    if (paletteFilePath.isEmpty() || !obj->importPalette(paletteFilePath))
+    if (paletteFilePath.isEmpty() || !obj->loadProjectPalette(paletteFilePath))
     {
         obj->loadDefaultPalette();
     }

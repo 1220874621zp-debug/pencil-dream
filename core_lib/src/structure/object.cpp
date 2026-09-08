@@ -591,18 +591,37 @@ void Object::exportPalettePencil(QFile& file) const
 {
     QTextStream out(&file);
 
+    // 序列化视图：当前 mPalette 实时状态覆盖回激活槽位（const 方法不落地改动）
+    // 注意：局部变量不能叫 slots——那是 Qt 的关键字宏
+    QList<PaletteSlot> slotList = mPaletteSlots;
+    if (mCurrentPaletteIndex >= 0 && mCurrentPaletteIndex < slotList.size())
+    {
+        slotList[mCurrentPaletteIndex].colors = mPalette;
+    }
+    if (slotList.isEmpty())
+    {
+        slotList.append({ tr("默认色卡"), mPalette });
+    }
+
     QDomDocument doc("PencilPalette");
     QDomElement root = doc.createElement("palette");
+    root.setAttribute("active", mCurrentPaletteIndex);
     doc.appendChild(root);
-    for (const ColorRef& ref : mPalette)
+    for (const PaletteSlot& slot : slotList)
     {
-        QDomElement tag = doc.createElement("Color");
-        tag.setAttribute("name", ref.name);
-        tag.setAttribute("red", ref.color.red());
-        tag.setAttribute("green", ref.color.green());
-        tag.setAttribute("blue", ref.color.blue());
-        tag.setAttribute("alpha", ref.color.alpha());
-        root.appendChild(tag);
+        QDomElement entryTag = doc.createElement("paletteentry");
+        entryTag.setAttribute("name", slot.name);
+        root.appendChild(entryTag);
+        for (const ColorRef& ref : slot.colors)
+        {
+            QDomElement tag = doc.createElement("Color");
+            tag.setAttribute("name", ref.name);
+            tag.setAttribute("red", ref.color.red());
+            tag.setAttribute("green", ref.color.green());
+            tag.setAttribute("blue", ref.color.blue());
+            tag.setAttribute("alpha", ref.color.alpha());
+            entryTag.appendChild(tag);
+        }
     }
     int indentSize = 2;
     doc.save(out, indentSize);
@@ -726,7 +745,7 @@ void Object::importPalettePencil(QFile& file)
     while (!tag.isNull())
     {
         QDomElement e = tag.toElement(); // try to convert the node to an element.
-        if (!e.isNull())
+        if (!e.isNull() && e.tagName() == "Color")
         {
             QString name = e.attribute("name");
             int r = e.attribute("red").toInt();
@@ -799,6 +818,161 @@ void Object::loadDefaultPalette()
     addColor(ColorRef(QColor(207, 174, 127), tr("Grayish Orange Yellow")));
     addColor(ColorRef(QColor(255, 198, 116), tr("Light Orange Yellow")));
     addColor(ColorRef(QColor(227, 177, 105), tr("Light Grayish Orange Yellow")));
+
+    // 新文档：重置为单一默认色卡
+    mPaletteSlots.clear();
+    mPaletteSlots.append({ tr("默认色卡"), mPalette });
+    mCurrentPaletteIndex = 0;
+}
+
+QString Object::paletteName(int index) const
+{
+    if (index < 0 || index >= mPaletteSlots.size())
+    {
+        return QString();
+    }
+    return mPaletteSlots.at(index).name;
+}
+
+void Object::syncActivePaletteToSlot()
+{
+    if (mCurrentPaletteIndex >= 0 && mCurrentPaletteIndex < mPaletteSlots.size())
+    {
+        mPaletteSlots[mCurrentPaletteIndex].colors = mPalette;
+    }
+}
+
+void Object::switchToPalette(int index)
+{
+    if (index < 0 || index >= mPaletteSlots.size() || index == mCurrentPaletteIndex)
+    {
+        return;
+    }
+    syncActivePaletteToSlot();
+    mCurrentPaletteIndex = index;
+    mPalette = mPaletteSlots.at(index).colors;
+}
+
+int Object::addPalette(const QString& name)
+{
+    syncActivePaletteToSlot();
+    mPaletteSlots.append({ name, QList<ColorRef>() });
+    mCurrentPaletteIndex = mPaletteSlots.size() - 1;
+    mPalette.clear();
+    return mCurrentPaletteIndex;
+}
+
+void Object::renamePalette(int index, const QString& name)
+{
+    if (index < 0 || index >= mPaletteSlots.size() || name.isEmpty())
+    {
+        return;
+    }
+    mPaletteSlots[index].name = name;
+}
+
+void Object::removePalette(int index)
+{
+    if (mPaletteSlots.size() <= 1)
+    {
+        return; // 至少保留一张色卡
+    }
+    if (index < 0 || index >= mPaletteSlots.size())
+    {
+        return;
+    }
+    mPaletteSlots.removeAt(index);
+    if (mCurrentPaletteIndex == index)
+    {
+        mCurrentPaletteIndex = qMin(index, mPaletteSlots.size() - 1);
+        mPalette = mPaletteSlots.at(mCurrentPaletteIndex).colors;
+    }
+    else if (mCurrentPaletteIndex > index)
+    {
+        mCurrentPaletteIndex--;
+    }
+}
+
+void Object::ensurePaletteSlots()
+{
+    if (mPaletteSlots.isEmpty())
+    {
+        mPaletteSlots.append({ tr("默认色卡"), mPalette });
+        mCurrentPaletteIndex = 0;
+    }
+}
+
+bool Object::loadProjectPalette(const QString& filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly))
+    {
+        return false;
+    }
+
+    QDomDocument doc;
+    if (!doc.setContent(&file))
+    {
+        return false;
+    }
+
+    QDomElement root = doc.documentElement();
+    if (root.isNull() || root.tagName() != "palette")
+    {
+        return false;
+    }
+
+    // 检测新容器格式（paletteentry 子节点）；旧格式是扁平的 Color 列表
+    bool multiFormat = false;
+    for (QDomNode n = root.firstChild(); !n.isNull(); n = n.nextSibling())
+    {
+        if (n.toElement().tagName() == "paletteentry")
+        {
+            multiFormat = true;
+            break;
+        }
+    }
+
+    if (!multiFormat)
+    {
+        // 旧工程：颜色追加进当前缓冲，再补一张默认卡槽
+        for (QDomNode n = root.firstChild(); !n.isNull(); n = n.nextSibling())
+        {
+            QDomElement e = n.toElement();
+            if (e.tagName() != "Color") { continue; }
+            mPalette.append(ColorRef(QColor(e.attribute("red").toInt(),
+                                            e.attribute("green").toInt(),
+                                            e.attribute("blue").toInt(),
+                                            e.attribute("alpha", "255").toInt()),
+                                      e.attribute("name")));
+        }
+        ensurePaletteSlots();
+        return true;
+    }
+
+    mPaletteSlots.clear();
+    for (QDomNode entryNode = root.firstChild(); !entryNode.isNull(); entryNode = entryNode.nextSibling())
+    {
+        QDomElement entry = entryNode.toElement();
+        if (entry.tagName() != "paletteentry") { continue; }
+
+        PaletteSlot slot;
+        slot.name = entry.attribute("name", tr("色卡"));
+        for (QDomNode colorNode = entry.firstChild(); !colorNode.isNull(); colorNode = colorNode.nextSibling())
+        {
+            QDomElement e = colorNode.toElement();
+            if (e.tagName() != "Color") { continue; }
+            slot.colors.append(ColorRef(QColor(e.attribute("red").toInt(),
+                                               e.attribute("green").toInt(),
+                                               e.attribute("blue").toInt(),
+                                               e.attribute("alpha", "255").toInt()),
+                                         e.attribute("name")));
+        }
+        mPaletteSlots.append(slot);
+    }
+    mCurrentPaletteIndex = qBound(0, root.attribute("active", "0").toInt(), qMax(0, mPaletteSlots.size() - 1));
+    mPalette = mPaletteSlots.value(mCurrentPaletteIndex).colors;
+    return true;
 }
 
 void Object::paintImage(QPainter& painter,int frameNumber,

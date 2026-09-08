@@ -100,12 +100,111 @@ void ColorPaletteWidget::initUI()
     connect(ui->removeColorButton, &QPushButton::clicked, this, &ColorPaletteWidget::clickRemoveColorButton);
     connect(ui->colorListWidget, &QListWidget::customContextMenuRequested, this, &ColorPaletteWidget::showContextMenu);
 
+    // 多色卡：下拉切换 + 新建按钮 + 下拉框右键重命名/删除
+    connect(ui->paletteComboBox, QOverload<int>::of(&QComboBox::activated),
+            this, &ColorPaletteWidget::paletteActivated);
+    connect(ui->newPaletteButton, &QPushButton::clicked, this, &ColorPaletteWidget::clickNewPaletteButton);
+    ui->paletteComboBox->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->paletteComboBox, &QWidget::customContextMenuRequested,
+            this, &ColorPaletteWidget::showPaletteContextMenu);
+
     connect(editor(), &Editor::objectLoaded, this, &ColorPaletteWidget::updateUI);
+}
+
+void ColorPaletteWidget::refreshPaletteCombo()
+{
+    if (mObject == nullptr) { return; }
+    QSignalBlocker b(ui->paletteComboBox);
+    ui->paletteComboBox->clear();
+    for (int i = 0; i < mObject->paletteCount(); i++)
+    {
+        ui->paletteComboBox->addItem(mObject->paletteName(i));
+    }
+    ui->paletteComboBox->setCurrentIndex(mObject->currentPaletteIndex());
+}
+
+void ColorPaletteWidget::paletteActivated(int index)
+{
+    if (mObject == nullptr) { return; }
+    mObject->switchToPalette(index);
+    refreshPaletteCombo();
+
+    // 换卡后原选中号可能越界，回退到第一格（空卡跳过，setColorNumber 断言 n>=0）
+    if (mObject->getColorCount() > 0)
+    {
+        editor()->color()->setColorNumber(0);
+    }
+    refreshColorList();
+}
+
+void ColorPaletteWidget::clickNewPaletteButton()
+{
+    if (mObject == nullptr) { return; }
+
+    const QString defaultName = tr("色卡 %1").arg(mObject->paletteCount() + 1);
+    bool ok = false;
+    QString name = QInputDialog::getText(this, tr("新建色卡"), tr("色卡名称："),
+                                         QLineEdit::Normal, defaultName, &ok);
+    if (!ok) { return; }
+    if (name.isEmpty()) { name = defaultName; }
+
+    mObject->addPalette(name);
+    refreshPaletteCombo();
+
+    if (mObject->getColorCount() > 0)
+    {
+        editor()->color()->setColorNumber(0);
+    }
+    refreshColorList();
+}
+
+void ColorPaletteWidget::showPaletteContextMenu(const QPoint& pos)
+{
+    if (mObject == nullptr) { return; }
+    const int index = ui->paletteComboBox->currentIndex();
+    if (index < 0) { return; }
+
+    QMenu menu(this);
+    QAction* renameAction = menu.addAction(tr("重命名色卡"));
+    QAction* deleteAction = menu.addAction(tr("删除色卡"));
+    deleteAction->setEnabled(mObject->paletteCount() > 1);
+
+    QAction* chosen = menu.exec(ui->paletteComboBox->mapToGlobal(pos));
+    if (chosen == renameAction)
+    {
+        bool ok = false;
+        QString name = QInputDialog::getText(this, tr("重命名色卡"), tr("色卡名称："),
+                                             QLineEdit::Normal, mObject->paletteName(index), &ok);
+        if (ok && !name.isEmpty())
+        {
+            mObject->renamePalette(index, name);
+            refreshPaletteCombo();
+        }
+    }
+    else if (chosen == deleteAction)
+    {
+        const auto button = QMessageBox::question(this, tr("删除色卡"),
+                                                  tr("确定删除色卡“%1”吗？其中 %2 个颜色将一并移除。")
+                                                      .arg(mObject->paletteName(index))
+                                                      .arg(mObject->getColorCount()),
+                                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (button == QMessageBox::Yes)
+        {
+            mObject->removePalette(index);
+            refreshPaletteCombo();
+            if (mObject->getColorCount() > 0)
+            {
+                editor()->color()->setColorNumber(0);
+            }
+            refreshColorList();
+        }
+    }
 }
 
 void ColorPaletteWidget::updateUI()
 {
     mObject = mEditor->object();
+    refreshPaletteCombo();
     refreshColorList();
     updateGridUI();
 }

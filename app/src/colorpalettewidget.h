@@ -82,6 +82,10 @@ private slots:
     void replaceItem();
     void removeItem();
     void showPaletteReminder();
+    void refreshPaletteCombo();
+    void paletteActivated(int index);
+    void clickNewPaletteButton();
+    void showPaletteContextMenu(const QPoint& pos);
 
     bool showPaletteWarning();
 
