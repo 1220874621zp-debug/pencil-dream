@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QLabel>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QSlider>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -112,26 +113,48 @@ void ColorizeOptionsWidget::initUI()
     mFuzzyRadiusSpin->setDecimals(1);
     mFuzzyRadiusSpin->setSuffix(tr(" px"));
 
-    mCleanUpSpin = new QSpinBox(this);
-    mCleanUpSpin->setRange(0, 100);
+    mCleanUpSpin = new QDoubleSpinBox(this);
+    mCleanUpSpin->setRange(0.0, 100.0);
+    mCleanUpSpin->setDecimals(0);
     mCleanUpSpin->setSingleStep(5);
     mCleanUpSpin->setSuffix(" %");
 
+    // 参数行 = 标签 + 滑杆 + 输入框（输入框为数据源，滑杆双向同步）
     auto* form = new QVBoxLayout;
     form->setSpacing(4);
-    auto addRow = [this, &form](QWidget* field, const char* label, int indent = 0) {
+    auto addParamRow = [this, &form](const char* label, QSlider*& slider, QDoubleSpinBox* spin, int indent = 0) {
+        slider = new QSlider(Qt::Horizontal, this);
+        // 双精度参数以 0.1 步长映射到整型滑杆
+        slider->setRange(qRound(spin->minimum() * 10.0), qRound(spin->maximum() * 10.0));
+
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
         if (indent > 0)
             row->setContentsMargins(indent, 0, 0, 0);
         row->addWidget(new QLabel(tr(label), this));
-        row->addStretch();
-        row->addWidget(field);
+        row->addWidget(slider, 1);
+        row->addWidget(spin);
         form->addLayout(row);
+
+        // 滑杆 → 输入框（输入框 valueChanged 统一驱动参数应用）
+        connect(slider, &QSlider::valueChanged, this, [spin](int value) {
+            if (qAbs(spin->value() - value / 10.0) >= 0.05) {
+                QSignalBlocker blocker(spin);
+                spin->setValue(value / 10.0);
+            }
+        });
+        // 输入框 → 滑杆
+        connect(spin, &QDoubleSpinBox::valueChanged, this, [slider](double value) {
+            const int pos = qRound(value * 10.0);
+            if (slider->value() != pos) {
+                QSignalBlocker blocker(slider);
+                slider->setValue(pos);
+            }
+        });
     };
-    addRow(mEdgeSizeSpin, QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Edge size"), 16);
-    addRow(mFuzzyRadiusSpin, QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Gap closing radius"));
-    addRow(mCleanUpSpin, QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Cleanup strength"));
+    addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Edge size"), mEdgeSizeSlider, mEdgeSizeSpin, 16);
+    addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Gap closing radius"), mFuzzyRadiusSlider, mFuzzyRadiusSpin);
+    addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Cleanup strength"), mCleanupSlider, mCleanUpSpin);
     rootLayout->addLayout(form);
 
     auto* hintLabel = new QLabel(tr("Paint color strokes with the brush; mark background color as transparent; press Refresh to fill."), this);
@@ -179,7 +202,7 @@ void ColorizeOptionsWidget::initUI()
     connect(mEdgeDetectionCheck, &QCheckBox::toggled, this, &ColorizeOptionsWidget::applyParams);
     connect(mEdgeSizeSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
     connect(mFuzzyRadiusSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
-    connect(mCleanUpSpin, &QSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
+    connect(mCleanUpSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
 
     // 笔画编辑后刷新颜色列表
     connect(mEditor, &Editor::frameModified, this, [this](int) {
@@ -228,6 +251,11 @@ void ColorizeOptionsWidget::updateUI()
     mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
     mFuzzyRadiusSpin->setValue(layer->fuzzyRadius());
     mCleanUpSpin->setValue(qRound(layer->cleanUpAmount() * 100.0));
+
+    // 滑杆同步（updateUI 里 spin 被 blocker 屏蔽，信号链不触发，手动对齐）
+    if (mEdgeSizeSlider) mEdgeSizeSlider->setValue(qRound(layer->edgeDetectionSize() * 10.0));
+    if (mFuzzyRadiusSlider) mFuzzyRadiusSlider->setValue(qRound(layer->fuzzyRadius() * 10.0));
+    if (mCleanupSlider) mCleanupSlider->setValue(qRound(layer->cleanUpAmount() * 100.0));
 
     refreshColors();
 }
@@ -310,6 +338,7 @@ void ColorizeOptionsWidget::applyParams()
     layer->setCleanUpAmount(mCleanUpSpin->value() / 100.0);
 
     mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
+    mEdgeSizeSlider->setEnabled(layer->useEdgeDetection());
 
     // 参数影响全部帧：标记待更新（手动刷新，不自动计算）
     invalidateAllFrames(layer);

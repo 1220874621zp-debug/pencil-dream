@@ -25,6 +25,7 @@ class QDoubleSpinBox;
 class QHBoxLayout;
 class QPushButton;
 class QSpinBox;
+class QSlider;
 class QToolButton;
 class Editor;
 class LayerColorize;
@@ -66,9 +67,12 @@ private:
     QPushButton* mRemoveButton = nullptr;
 
     QCheckBox* mEdgeDetectionCheck = nullptr;
+    QSlider* mEdgeSizeSlider = nullptr;
     QDoubleSpinBox* mEdgeSizeSpin = nullptr;
+    QSlider* mFuzzyRadiusSlider = nullptr;
     QDoubleSpinBox* mFuzzyRadiusSpin = nullptr;
-    QSpinBox* mCleanUpSpin = nullptr;
+    QSlider* mCleanupSlider = nullptr;
+    QDoubleSpinBox* mCleanUpSpin = nullptr; // 0位小数，与双精度行同型
 };
 
 #endif // COLORIZEOPTIONSWIDGET_H
