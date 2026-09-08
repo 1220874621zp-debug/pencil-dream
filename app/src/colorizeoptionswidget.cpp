@@ -140,7 +140,7 @@ void ColorizeOptionsWidget::initUI()
         grid->addWidget(slider, 1, 0);
         grid->addWidget(spin, 0, 1, 2, 1);
         grid->setColumnStretch(0, 1);
-        spin->setFixedWidth(76);
+        spin->setFixedWidth(96); // 容纳「50.0 像素」+调节箭头
         spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
         form->addLayout(grid);
 
@@ -256,7 +256,6 @@ void ColorizeOptionsWidget::updateUI()
     mShowColoringCheck->setChecked(layer->showColoring());
     mEdgeDetectionCheck->setChecked(layer->useEdgeDetection());
     mEdgeSizeSpin->setValue(layer->edgeDetectionSize());
-    mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
     mFuzzyRadiusSpin->setValue(layer->fuzzyRadius());
     mCleanUpSpin->setValue(qRound(layer->cleanUpAmount() * 100.0));
 
@@ -345,8 +344,7 @@ void ColorizeOptionsWidget::applyParams()
     layer->setFuzzyRadius(mFuzzyRadiusSpin->value());
     layer->setCleanUpAmount(mCleanUpSpin->value() / 100.0);
 
-    mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
-    mEdgeSizeSlider->setEnabled(layer->useEdgeDetection());
+    // 检测尺寸保持常可用（参数无害，置灰曾被用户当作无法点击的故障）
 
     // 参数影响全部帧：标记待更新（手动刷新，不自动计算）
     invalidateAllFrames(layer);
