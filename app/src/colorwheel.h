@@ -51,6 +51,7 @@ private:
     
     void drawHueIndicator(const int& hue);
     void drawPicker(const QColor& color);
+    void drawColorSwatch();
 
     void drawWheelImage(const QSize& newSize);
     void drawSquareImage(const int& hue);

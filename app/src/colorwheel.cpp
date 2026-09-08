@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #include <QVBoxLayout>
 #include <QtMath>
 #include <QPainter>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QStyleOption>
 #include <QRect>
@@ -332,6 +333,28 @@ void ColorWheel::drawPicker(const QColor& color)
     painter.drawEllipse(static_cast<int>(S), static_cast<int>(V), ellipseSize, ellipseSize);
 }
 
+void ColorWheel::drawColorSwatch()
+{
+    QPainter painter(&mWheelPixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // 轮盘为内切圆，右下角是天然空白区；色块尺寸随部件缩放
+    const int side = qMax(18, qMin(width(), height()) / 6);
+    const int margin = qMax(4, side / 8);
+    QRectF swatchRect(width() - side - margin, height() - side - margin, side, side);
+
+    QPainterPath path;
+    path.addRoundedRect(swatchRect, 4, 4);
+    painter.fillPath(path, mCurrentColor);
+
+    // 双层描边（外白内黑），任意颜色/背景下都可见
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(255, 255, 255, 190), 1));
+    painter.drawPath(path);
+    painter.setPen(QPen(QColor(0, 0, 0, 160), 1));
+    painter.drawRoundedRect(swatchRect.adjusted(1, 1, -1, -1), 3, 3);
+}
+
 void ColorWheel::composeWheel(QPixmap& pixmap, QRect blitRect)
 {
     QPainter composePainter(&pixmap);
@@ -344,6 +367,7 @@ void ColorWheel::composeWheel(QPixmap& pixmap, QRect blitRect)
     composePainter.end();
     drawHueIndicator(mCurrentColor.hsvHue());
     drawPicker(mCurrentColor);
+    drawColorSwatch();
 }
 
 void ColorWheel::hueChanged(const int &hue)
