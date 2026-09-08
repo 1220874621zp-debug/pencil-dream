@@ -123,21 +123,24 @@ void ColorizeOptionsWidget::initUI()
     // 参数行 = 标签 + 滑杆 + 输入框（输入框为数据源，滑杆双向同步）
     auto* form = new QVBoxLayout;
     form->setSpacing(4);
-    auto addParamRow = [this, &form](const char* label, QSlider*& slider, QDoubleSpinBox* spin, int indent = 0) {
+    auto addParamRow = [this, &form](const char* label, QSlider*& slider, QDoubleSpinBox* spin) {
         slider = new QSlider(Qt::Horizontal, this);
         // 双精度参数以 0.1 步长映射到整型滑杆
         slider->setRange(qRound(spin->minimum() * 10.0), qRound(spin->maximum() * 10.0));
 
-        // 排版：标签独占一行；下一行滑杆+输入框；输入框跨两行高（右列）
+        // 排版：标签独占一行（左对齐带冒号）；下一行滑杆+输入框；
+        // 输入框跨两行高（右列定宽，三行统一）；滑杆列拉伸等宽
         auto* grid = new QGridLayout;
         grid->setHorizontalSpacing(8);
         grid->setVerticalSpacing(2);
-        if (indent > 0)
-            grid->setContentsMargins(indent, 0, 0, 0);
-        grid->addWidget(new QLabel(tr(label), this), 0, 0);
+        grid->setContentsMargins(0, 0, 0, 0);
+        auto* labelWidget = new QLabel(tr(label) + QStringLiteral("："), this);
+        labelWidget->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        grid->addWidget(labelWidget, 0, 0);
         grid->addWidget(slider, 1, 0);
         grid->addWidget(spin, 0, 1, 2, 1);
         grid->setColumnStretch(0, 1);
+        spin->setFixedWidth(76);
         spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
         form->addLayout(grid);
 
@@ -157,7 +160,7 @@ void ColorizeOptionsWidget::initUI()
             }
         });
     };
-    addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Edge size"), mEdgeSizeSlider, mEdgeSizeSpin, 16);
+    addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Edge size"), mEdgeSizeSlider, mEdgeSizeSpin);
     addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Gap closing radius"), mFuzzyRadiusSlider, mFuzzyRadiusSpin);
     addParamRow(QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Cleanup strength"), mCleanupSlider, mCleanUpSpin);
     rootLayout->addLayout(form);
