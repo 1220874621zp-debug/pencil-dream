@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #include "layercolorize.h"
 
 #include <QPainter>
+#include <QDir>
 
 #include "colorizeimage.h"
 #include "graphics/bitmap/colorizeengine.h"
@@ -270,6 +271,15 @@ bool LayerColorize::buildColorizeJob(LayerColorize* layer, int frameNumber,
     out.options.cleanUpAmount = layer->mCleanUpAmount;
     out.options.hasTransparentColor = layer->mHasTransparentColor;
     out.options.transparentColor = layer->mTransparentColor;
+
+#ifdef COLORIZE_JOB_DEBUG_DUMP
+    {
+        const QString dir = QDir::temp().absoluteFilePath("pencil-colorize-tests");
+        QDir().mkpath(dir);
+        lineImg.save(dir + "/job_line.png");
+        strokeImg.save(dir + "/job_stroke.png");
+    }
+#endif
 
     return true;
 }

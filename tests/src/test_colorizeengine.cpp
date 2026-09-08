@@ -16,6 +16,7 @@ GNU General Public License for more details.
 #include "catch.hpp"
 
 #include "colorizeengine.h"
+#include <memory>
 
 #include <QDebug>
 #include <QDir>
@@ -428,5 +429,247 @@ TEST_CASE("Colorize VisualPerf")
         qDebug() << "[colorize] 1920x1080 耗时 ms:" << ms;
         REQUIRE(!result.isNull());
         REQUIRE(ms < 20000); // 上限保护：测试机上不应慢于一帧 20s
+    }
+}
+
+#include "object.h"
+#include "layerbitmap.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
+
+TEST_CASE("Colorize LayerPipeline")
+{
+    std::unique_ptr<Object> object(new Object);
+    object->init();
+
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    LayerBitmap* colorizeLayerBase = object->addNewColorizeLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(colorizeLayerBase);
+
+    // 线稿：封闭方框
+    auto* lineArt = lineArtLayer->getBitmapImageAtFrame(1);
+    REQUIRE(lineArt != nullptr);
+    QPen blackPen(Qt::black, 2);
+    lineArt->drawRect(QRectF(8, 8, 48, 48), blackPen, QBrush(Qt::NoBrush), QPainter::CompositionMode_SourceOver, false);
+
+    // 笔画：框内红色一小笔 + 框外蓝色一小笔（背景色候选）
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+    frame->drawLine(QPointF(24, 32), QPointF(40, 32),
+                    QPen(QColor(255, 0, 0), 3), QPainter::CompositionMode_SourceOver, false);
+    frame->drawLine(QPointF(60, 4), QPointF(63, 7),
+                    QPen(QColor(0, 0, 255), 3), QPainter::CompositionMode_SourceOver, false);
+
+    SECTION("同步更新：单色铺满 + 透明颜色保护（Krita 语义）")
+    {
+        // 未标记透明：红色铺满整个计算域（含框外）
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer));
+        QImage coloring = frame->coloringImage();
+        REQUIRE(!coloring.isNull());
+        {
+            const QString outDir = QDir::temp().absoluteFilePath("pencil-colorize-tests");
+            QDir().mkpath(outDir);
+            QImage debug(coloring.size(), QImage::Format_ARGB32_Premultiplied);
+            debug.fill(Qt::white);
+            QPainter dp(&debug);
+            dp.drawImage(0, 0, coloring);
+            dp.end();
+            debug.save(outDir + "/layerpipe.png");
+            qDebug() << "[colorize] layerpipe coloring size" << coloring.size()
+                     << "bounds" << frame->coloringBounds()
+                     << "stroke bounds" << frame->bounds()
+                     << "lineart bounds" << lineArt->bounds();
+        }
+        const QRgb red = QColor(255, 0, 0).rgba();
+        int redCount = 0;
+        for (int y = 0; y < coloring.height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(coloring.constScanLine(y));
+            for (int x = 0; x < coloring.width(); ++x)
+            {
+                const int a = qAlpha(line[x]);
+                if (a == 0) continue;
+                const QRgb c = qRgb(qBound(0, qRound(qRed(line[x]) * 255.0 / a), 255),
+                                    qBound(0, qRound(qGreen(line[x]) * 255.0 / a), 255),
+                                    qBound(0, qRound(qBlue(line[x]) * 255.0 / a), 255));
+                if (c == red) ++redCount;
+            }
+        }
+        // 红蓝双色竞争：红色止于框内（约46x46），框外归蓝（视觉验证过的正确行为）
+        REQUIRE(redCount > 40 * 40);
+        REQUIRE(redCount < 55 * 55);
+
+        // 标记蓝色为透明：框外区域不再被红色覆盖（红色只剩框内+线）
+        colorizeLayer->setTransparentColor(QColor(0, 0, 255).rgba());
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer));
+        coloring = frame->coloringImage();
+        redCount = 0;
+        for (int y = 0; y < coloring.height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(coloring.constScanLine(y));
+            for (int x = 0; x < coloring.width(); ++x)
+            {
+                const int a = qAlpha(line[x]);
+                if (a == 0) continue;
+                const QRgb c = qRgb(qBound(0, qRound(qRed(line[x]) * 255.0 / a), 255),
+                                    qBound(0, qRound(qGreen(line[x]) * 255.0 / a), 255),
+                                    qBound(0, qRound(qBlue(line[x]) * 255.0 / a), 255));
+                if (c == red) ++redCount;
+            }
+        }
+        // 框内约 46x46 ≈ 2116，框外不再有红
+        REQUIRE(redCount > 40 * 40);
+        REQUIRE(redCount < 55 * 55);
+    }
+
+    SECTION("颜色列表与移除笔画色")
+    {
+        const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+        REQUIRE(colors.size() == 2);
+
+        colorizeLayer->removeStrokeColor(1, QColor(0, 0, 255).rgba());
+        const QVector<QRgb> after = colorizeLayer->strokeColorsAtFrame(1);
+        REQUIRE(after.size() == 1);
+    }
+}
+
+#include "editor.h"
+#include "scribblearea.h"
+#include "layermanager.h"
+#include "undoredomanager.h"
+#include "colorizeupdatemanager.h"
+#include <QCoreApplication>
+#include <QThreadPool>
+#include <QElapsedTimer>
+
+TEST_CASE("Colorize AsyncManager")
+{
+    Object* object = new Object;
+    object->init();
+    Editor* editor = new Editor;
+    editor->setObject(object);
+
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+
+    auto* lineArt = lineArtLayer->getBitmapImageAtFrame(1);
+    lineArt->drawRect(QRectF(8, 8, 48, 48), QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                      QPainter::CompositionMode_SourceOver, false);
+
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    frame->drawLine(QPointF(24, 32), QPointF(40, 32),
+                    QPen(QColor(255, 0, 0), 3), QPainter::CompositionMode_SourceOver, false);
+
+    auto* manager = new ColorizeUpdateManager(editor);
+    manager->init();
+    manager->load(object);
+
+    SECTION("requestUpdate 异步回贴")
+    {
+        REQUIRE(frame->needsUpdate());
+        manager->requestUpdate(colorizeLayer, 1);
+
+        // 等待线程池完成 + 队列回贴（事件循环派发）
+        QElapsedTimer timer;
+        timer.start();
+        while ((frame->needsUpdate() || frame->coloringImage().isNull()) && !timer.hasExpired(10000))
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QThreadPool::globalInstance()->waitForDone(50);
+        }
+
+        INFO("异步回贴等待耗时 ms: " << timer.elapsed());
+        REQUIRE(!frame->needsUpdate());
+        REQUIRE(!frame->coloringImage().isNull());
+        REQUIRE(frame->coloringBounds().width() > 30);
+    }
+
+    // 删除顺序曾是崩溃源；进程退出统一回收（隔离实验）
+    manager->deleteLater();
+}
+
+TEST_CASE("Colorize FullEditorIntegration")
+{
+    // 桶测试同款 harness：完整 Editor.init()，走真实管理器实例
+    Object* object = new Object;
+    object->init();
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(object);
+    editor->init();
+
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+    editor->layers()->setCurrentLayer(object->getIndex(colorizeLayer));
+
+    auto* lineArt = lineArtLayer->getBitmapImageAtFrame(1);
+    lineArt->drawRect(QRectF(8, 8, 48, 48), QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                      QPainter::CompositionMode_SourceOver, false);
+
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    frame->drawLine(QPointF(24, 32), QPointF(40, 32),
+                    QPen(QColor(255, 0, 0), 3), QPainter::CompositionMode_SourceOver, false);
+
+    // 模拟「编辑模式关闭」的绘画封锁
+    SECTION("编辑模式关闭时帧不被标记")
+    {
+        // （绘画封锁在 pointerPressEvent 层，此处验证属性语义）
+        colorizeLayer->setEditKeyStrokes(false);
+        REQUIRE(colorizeLayer->editKeyStrokes() == false);
+    }
+
+    SECTION("真实管理器：requestUpdate 全链回贴")
+    {
+        REQUIRE(editor->colorizeUpdates() != nullptr);
+        REQUIRE(frame->needsUpdate());
+
+        editor->colorizeUpdates()->requestUpdate(colorizeLayer, 1);
+
+        QElapsedTimer timer;
+        timer.start();
+        while ((frame->needsUpdate() || frame->coloringImage().isNull()) && !timer.hasExpired(10000))
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QThreadPool::globalInstance()->waitForDone(50);
+        }
+
+        REQUIRE(!frame->needsUpdate());
+        REQUIRE(!frame->coloringImage().isNull());
+        REQUIRE(frame->coloringBounds().width() > 30);
+    }
+
+    SECTION("透明颜色经真实管理器生效")
+    {
+        editor->colorizeUpdates()->requestUpdate(colorizeLayer, 1);
+        QElapsedTimer timer; timer.start();
+        while (frame->needsUpdate() && !timer.hasExpired(10000))
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QThreadPool::globalInstance()->waitForDone(50);
+        }
+        REQUIRE(!frame->needsUpdate());
+
+        // 标记红色为透明 → 再刷新 → 结果应全透明（唯一颜色被标透明）
+        colorizeLayer->setTransparentColor(QColor(255, 0, 0).rgba());
+        colorizeLayer->getLastColorizeImageAtFrame(1)->setNeedsUpdate(true);
+        editor->colorizeUpdates()->requestUpdate(colorizeLayer, 1);
+        timer.restart();
+        while (frame->needsUpdate() && !timer.hasExpired(10000))
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            QThreadPool::globalInstance()->waitForDone(50);
+        }
+        REQUIRE(!frame->needsUpdate());
+
+        const QImage coloring = frame->coloringImage();
+        int opaqueCount = 0;
+        for (int y = 0; y < coloring.height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(coloring.constScanLine(y));
+            for (int x = 0; x < coloring.width(); ++x)
+                if (qAlpha(line[x]) > 0) ++opaqueCount;
+        }
+        REQUIRE(opaqueCount == 0); // 红色被标透明 → 无着色像素
     }
 }

@@ -16,6 +16,7 @@ GNU General Public License for more details.
 */
 #include "colorizeupdatemanager.h"
 
+#include <QDebug>
 #include <QPointer>
 #include <QThreadPool>
 
@@ -133,6 +134,8 @@ void ColorizeUpdateManager::enqueueJob(LayerColorize* layer, int frameNumber)
         return;
     mInFlight.insert(record);
 
+    qDebug() << "[填色] 已入队 层" << layer->id() << "帧" << frameNumber << "计算域" << data.bounds.width() << "x" << data.bounds.height();
+
     QThreadPool::globalInstance()->start(new ColorizeUpdateRunnable(this, data));
 }
 
@@ -150,6 +153,7 @@ void ColorizeUpdateManager::applyResult(int layerId, int keyPos, const QImage& r
     if (frameImage == nullptr) { return; }
 
     frameImage->setColoringResult(result, bounds, object->layerStructureGeneration());
+    qDebug() << "[填色] 计算完成回贴 层" << layerId << "关键帧" << keyPos << "结果" << bounds.width() << "x" << bounds.height();
     Q_EMIT frameUpdated(layerId, keyPos);
 
     // 画布帧缓存整清后重绘（着色结果覆盖整块曝光，逐帧失效不可靠）
