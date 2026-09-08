@@ -132,7 +132,7 @@ TEST_CASE("DeformTool liquify drag moves pixels")
 
     DeformTool* tool = h.deformTool();
     REQUIRE(tool != nullptr);
-    tool->setDeformMode(0); // liquify
+    tool->setDeformMode(1); // liquify
 
     BitmapImage* img = static_cast<BitmapImage*>(h.layer->getKeyFrameAt(1));
     const QRgb before = img->image()->pixel(100, 100);
@@ -158,7 +158,7 @@ TEST_CASE("DeformTool no-op click keeps image")
     DeformHarness h;
 
     DeformTool* tool = h.deformTool();
-    tool->setDeformMode(0);
+    tool->setDeformMode(1); // liquify
 
     BitmapImage* img = static_cast<BitmapImage*>(h.layer->getKeyFrameAt(1));
     const QRgb before = img->image()->pixel(100, 100);
@@ -176,7 +176,7 @@ TEST_CASE("DeformTool liquify interactive preview updates on large regions")
     DeformHarness h;
 
     DeformTool* tool = h.deformTool();
-    tool->setDeformMode(0);
+    tool->setDeformMode(1); // liquify
 
     // a region big enough to engage the down-scaled interactive path
     // (>220k px): it used to build a lattice whose point count mismatched
@@ -215,4 +215,34 @@ TEST_CASE("DeformTool liquify interactive preview updates on large regions")
 
     h.release(QPointF(360, 300));
     tool->leavingThisTool();
+}
+
+TEST_CASE("DeformTool free mode scales the frame")
+{
+    DeformHarness h;
+
+    DeformTool* tool = h.deformTool();
+    tool->setDeformMode(0); // free (the default mode, Krita parity)
+
+    BitmapImage* img = static_cast<BitmapImage*>(h.layer->getKeyFrameAt(1));
+    // the harness content spans (0,0)-(200,200): red with a blue band at
+    // x 95..105; the free frame must hug those bounds exactly
+    const QRgb cornerBefore = img->image()->pixel(10, 10);
+    REQUIRE(qAlpha(cornerBefore) == 255);
+
+    // drag the top-left corner handle inward: the frame shrinks towards
+    // the anchored bottom-right corner
+    h.press(QPointF(5, 5));
+    REQUIRE(tool->isActive());
+    for (int i = 1; i <= 10; i++)
+    {
+        h.move(QPointF(5 + i * 5.5, 5 + i * 5.5));
+    }
+    h.release(QPointF(60, 60));
+    tool->leavingThisTool(); // commit
+
+    // the corner area fell outside the shrunken frame and was cleared
+    REQUIRE(qAlpha(img->image()->pixel(10, 10)) == 0);
+    // source (100,100) sits in the blue band and lands at 60+0.7*100=130
+    REQUIRE(qBlue(img->image()->pixel(130, 130)) > 200);
 }

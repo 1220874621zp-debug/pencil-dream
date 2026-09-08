@@ -64,6 +64,11 @@
         <widget class="QComboBox" name="deformModeComboBox">
          <item>
           <property name="text">
+           <string>Free</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>Liquify</string>
           </property>
          </item>
@@ -156,6 +161,20 @@
        <property name="currentIndex">
         <number>0</number>
        </property>
+       <widget class="QWidget" name="freePage">
+        <layout class="QVBoxLayout" name="verticalLayout_5">
+         <item>
+          <widget class="QLabel" name="freeHintLabel">
+           <property name="text">
+            <string>Drag corners/edges to scale, drag inside the frame to move, drag the rings outside the corners to rotate. Shift keeps the aspect ratio, Ctrl snaps rotation to 15°. Enter/double-click applies, Esc cancels.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
        <widget class="QWidget" name="liquifyPage">
         <layout class="QFormLayout" name="formLayout_2">
          <property name="fieldGrowthPolicy">

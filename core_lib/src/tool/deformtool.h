@@ -29,7 +29,10 @@ GNU General Public License for more details.
 
 class PointerEvent;
 
-/** Multi-mode deform tool, a port of Krita's transform-tool deformation modes:
+/** Multi-mode deform tool, a port of Krita's transform-tool modes:
+ *  - Free: bbox frame over the content bounds with 8 scale handles,
+ *    rotation handles outside the corners and inside-drag translate
+ *    (KisFreeTransformStrategy, the tool's default mode)
  *  - Liquify: brush dabs push/scale/rotate/offset/restore pixels
  *    (KisLiquifyTransformWorker semantics)
  *  - Warp: MLS control-point grid, rigid/similitude/affine + alpha
@@ -116,6 +119,9 @@ private:
     void finalizeCage(const QPointF& pos);
     void updateCagePreview();
     void updatePerspectivePreview();
+    void updateFreeDrag(const QPointF& pos, Qt::KeyboardModifiers modifiers);
+    void updateFreePreview(bool interactive);
+    int hitTestFree(const QPointF& pos, int& handleOut) const;
     int hitTestControlPoint(const QPointF& pos) const;
     int hitTestCageVertex(const QPointF& pos) const;
     int hitTestPerspectiveCorner(const QPointF& pos) const;
@@ -138,6 +144,16 @@ private:
     // interactive-warp downscale (warp mode, big regions)
     QImage mPreviewSource;
     qreal mPreviewScale = 1.0;
+
+    // free mode state (Krita FreeTransformMode). Corners are stored as
+    // QPolygonF TL/TR/BR/BL in canvas coordinates; the quad stays
+    // parallelogram-shaped (affine) at all times.
+    QPolygonF mFreeOrig;
+    QPolygonF mFreeMoved;
+    QPolygonF mFreePressCorners; // frame snapshot taken at drag start
+    QPointF mFreePressPos;
+    int mFreeDragKind = -1;   // -1 none / 0 translate / 1 scale / 2 rotate
+    int mFreeDragHandle = -1; // scale 0..7 (TL TR BR BL T R B L) / rotate corner 0..3
 
     // warp mode state
     QVector<QPointF> mOrigPoints;
@@ -169,7 +185,7 @@ private:
     bool mAnyPointMoved = false;
 
     // options (persisted via tool properties)
-    int mDeformMode = 0;      // 0 liquify / 1 warp / 2 cage / 3 perspective
+    int mDeformMode = 0;      // 0 free / 1 liquify / 2 warp / 3 cage / 4 perspective
     int mLiquifyOp = 0;       // 0 move / 1 scale / 2 rotate / 3 offset / 4 undo
     int mLiquifySize = 60;
     qreal mLiquifyAmount = 0.1;

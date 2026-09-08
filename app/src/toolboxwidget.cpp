@@ -78,7 +78,7 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_SELECT ) ) );
     ui->lassoButton->setToolTip( tr( "Lasso Tool (%1): Select a free-form area" )
         .arg( GetToolTips( CMD_TOOL_LASSO ) ) );
-    ui->deformButton->setToolTip( tr( "Deform Tool (%1): Liquify / warp / cage / perspective (see tool options)" )
+    ui->deformButton->setToolTip( tr( "Deform Tool (%1): Free / liquify / warp / cage / perspective (see tool options)" )
         .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setToolTip( tr( "Move Tool (%1): Move an object" )
         .arg( GetToolTips( CMD_TOOL_MOVE ) ) );

@@ -50,6 +50,53 @@ namespace
         return QPointF(v.y() / len, -v.x() / len);
     }
 
+    qreal crossProduct(const QPointF& a, const QPointF& b)
+    {
+        return a.x() * b.y() - a.y() * b.x();
+    }
+
+    // QPolygonF(QRectF) is a CLOSED polygon with 5 points, but the quad
+    // consumers here (perspectiveWarpImage, drag math) want exactly 4
+    // corners TL/TR/BR/BL
+    QPolygonF quadFromRect(const QRectF& r)
+    {
+        QPolygonF quad;
+        quad << r.topLeft() << QPointF(r.right(), r.top())
+             << QPointF(r.right(), r.bottom()) << QPointF(r.left(), r.bottom());
+        return quad;
+    }
+
+    // scale-handle local coordinates on the frame: (u,v) in [0,1]^2.
+    // Indices: 0 TL, 1 TR, 2 BR, 3 BL, 4 top, 5 right, 6 bottom, 7 left.
+    void freeHandleLocal(int handle, qreal& u, qreal& v)
+    {
+        static const qreal kLocal[8][2] = {
+            { 0.0, 0.0 }, { 1.0, 0.0 }, { 1.0, 1.0 }, { 0.0, 1.0 },
+            { 0.5, 0.0 }, { 1.0, 0.5 }, { 0.5, 1.0 }, { 0.0, 0.5 }
+        };
+        u = kLocal[handle][0];
+        v = kLocal[handle][1];
+    }
+
+    QPointF freeHandlePos(int handle, const QPolygonF& corners)
+    {
+        qreal u, v;
+        freeHandleLocal(handle, u, v);
+        return corners[0] + u * (corners[1] - corners[0]) + v * (corners[3] - corners[0]);
+    }
+
+    // rotation handle sits outside its corner along the diagonal from the
+    // frame center, at a roughly screen-constant distance
+    QPointF freeRotateHandlePos(int corner, const QPolygonF& corners, qreal viewScale)
+    {
+        const QPointF center = (corners[0] + corners[1] + corners[2] + corners[3]) / 4.0;
+        QPointF dir = corners[corner] - center;
+        const qreal len = std::hypot(dir.x(), dir.y());
+        if (len < 1e-9) { return corners[corner]; }
+        const qreal offset = 22.0 / qMax(viewScale, 0.01);
+        return corners[corner] + dir / len * offset;
+    }
+
     const qreal HandleTolerance = 10.0;
 }
 
@@ -74,7 +121,7 @@ void DeformTool::loadSettings()
     QHash<int, PropertyInfo> info;
     info[TransformToolProperties::ANTI_ALIASING_ENABLED] = true;
     info[TransformToolProperties::GRID_SIZE_VALUE] = { 2, 10, 4 };
-    info[TransformToolProperties::DEFORM_MODE_VALUE] = { 0, 3, 0 };
+    info[TransformToolProperties::DEFORM_MODE_VALUE] = { 0, 4, 0 };
     info[TransformToolProperties::LIQUIFY_OP_VALUE] = { 0, 4, 0 };
     info[TransformToolProperties::LIQUIFY_SIZE_VALUE] = { 5, 1000, 60 };
     info[TransformToolProperties::LIQUIFY_AMOUNT_VALUE] = { 0.01, 1.0, 0.1 };
@@ -97,14 +144,15 @@ void DeformTool::loadSettings()
 
 QCursor DeformTool::cursor()
 {
-    if (mDeformMode == 0)
+    if (mDeformMode == 1)
     {
         // liquify: the brush circle drawn in paint() is the cursor
         return QCursor(Qt::BlankCursor);
     }
-    if ((mDeformMode == 1 && mDragIndex >= 0) ||
-        (mDeformMode == 2 && mCageDragVertex >= 0) ||
-        (mDeformMode == 3 && mPerspDragCorner >= 0))
+    if ((mDeformMode == 0 && mFreeDragKind >= 0) ||
+        (mDeformMode == 2 && mDragIndex >= 0) ||
+        (mDeformMode == 3 && mCageDragVertex >= 0) ||
+        (mDeformMode == 4 && mPerspDragCorner >= 0))
     {
         return QCursor(Qt::ClosedHandCursor);
     }
@@ -164,7 +212,7 @@ void DeformTool::setGridSize(int size)
     toolProperties().setBaseValue(TransformToolProperties::GRID_SIZE_VALUE, size);
     emit gridSizeChanged(size);
 
-    if (mDeformActive && mDeformMode == 1)
+    if (mDeformActive && mDeformMode == 2)
     {
         rebuildLattice();
         mAnyPointMoved = false;
@@ -175,7 +223,7 @@ void DeformTool::setGridSize(int size)
 
 void DeformTool::setDeformMode(int mode)
 {
-    mode = qBound(0, mode, 3);
+    mode = qBound(0, mode, 4);
     if (mode == mDeformMode) { return; }
 
     // switching modes drops the running session losslessly
@@ -238,7 +286,7 @@ void DeformTool::setWarpAlpha(qreal alpha)
     toolProperties().setBaseValue(TransformToolProperties::WARP_ALPHA_VALUE, alpha);
     emit warpAlphaChanged(alpha);
 
-    if (mDeformActive && mDeformMode == 1 && mAnyPointMoved)
+    if (mDeformActive && mDeformMode == 2 && mAnyPointMoved)
     {
         updateWarpPreview(true);
     }
@@ -253,7 +301,7 @@ void DeformTool::setWarpType(int type)
     toolProperties().setBaseValue(TransformToolProperties::WARP_TYPE_VALUE, type);
     emit warpTypeChanged(type);
 
-    if (mDeformActive && mDeformMode == 1 && mAnyPointMoved)
+    if (mDeformActive && mDeformMode == 2 && mAnyPointMoved)
     {
         updateWarpPreview(true);
     }
@@ -270,7 +318,7 @@ void DeformTool::paint(QPainter& painter, const QRect& blitRect)
     const qreal viewScale = mEditor->view()->scaling();
     const qreal halfSize = qBound(2.5, HandleTolerance / 2 / viewScale, 8.0);
 
-    if (mDeformMode == 0)
+    if (mDeformMode == 1)
     {
         // liquify brush cursor: solid ring at sigma, faint ring at 3*sigma
         const qreal sigma = mLiquifySize;
@@ -286,7 +334,44 @@ void DeformTool::paint(QPainter& painter, const QRect& blitRect)
         painter.setPen(ring);
         painter.drawEllipse(mCursorPos, sigma, sigma);
     }
-    else if (mDeformActive && mDeformMode == 1)
+    else if (mDeformActive && mDeformMode == 0)
+    {
+        // free transform: original frame dashed, moved frame solid with
+        // scale handles on corners/edges and rotation rings outside
+        QPen origPen(QColor(255, 255, 255, 110), 1.0, Qt::DashLine);
+        origPen.setCosmetic(true);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(origPen);
+        painter.drawPolygon(mFreeOrig);
+
+        QPen movedPen(QColor(120, 170, 255, 220), 1.5);
+        movedPen.setCosmetic(true);
+        painter.setPen(movedPen);
+        painter.drawPolygon(mFreeMoved);
+
+        const bool anyMoved = mFreeMoved != mFreeOrig;
+        for (int i = 0; i < 8; ++i)
+        {
+            const QPointF hp = freeHandlePos(i, mFreeMoved);
+            const bool dragging = mFreeDragKind == 1 && mFreeDragHandle == i;
+            QRectF rect(hp.x() - halfSize, hp.y() - halfSize, halfSize * 2, halfSize * 2);
+            painter.setPen(dragging ? QPen(Qt::white, 1.5) : QPen(QColor(40, 40, 40), 1.0));
+            painter.setBrush(anyMoved ? QBrush(QColor(255, 170, 0)) : QBrush(QColor(120, 170, 255)));
+            painter.drawRect(rect);
+        }
+
+        painter.setBrush(Qt::NoBrush);
+        for (int i = 0; i < 4; ++i)
+        {
+            const QPointF rp = freeRotateHandlePos(i, mFreeMoved, viewScale);
+            const bool dragging = mFreeDragKind == 2 && mFreeDragHandle == i;
+            QPen ringPen(dragging ? Qt::white : QColor(120, 170, 255, 220), 1.2);
+            ringPen.setCosmetic(true);
+            painter.setPen(ringPen);
+            painter.drawEllipse(rp, halfSize, halfSize);
+        }
+    }
+    else if (mDeformActive && mDeformMode == 2)
     {
         // warp grid through the moved control points
         QPen linePen(QColor(120, 170, 255, 180), 1.0);
@@ -329,7 +414,7 @@ void DeformTool::paint(QPainter& painter, const QRect& blitRect)
             painter.drawRect(rect);
         }
     }
-    else if (mDeformMode == 2)
+    else if (mDeformMode == 3)
     {
         if (!mCageSet && mCageDrawPoints.size() >= 2)
         {
@@ -370,7 +455,7 @@ void DeformTool::paint(QPainter& painter, const QRect& blitRect)
             }
         }
     }
-    else if (mDeformActive && mDeformMode == 3)
+    else if (mDeformActive && mDeformMode == 4)
     {
         // perspective: original quad dashed, moved quad + corner handles
         QPen origPen(QColor(255, 255, 255, 110), 1.0, Qt::DashLine);
@@ -417,11 +502,27 @@ void DeformTool::pointerPressEvent(PointerEvent* event)
 
     switch (mDeformMode)
     {
-    case 0: // liquify
+    case 0: // free
+    {
+        int handle = -1;
+        const int kind = hitTestFree(pos, handle);
+        if (kind >= 0)
+        {
+            mFreeDragKind = kind;
+            mFreeDragHandle = handle;
+            mFreePressCorners = mFreeMoved;
+            mFreePressPos = pos;
+            mScribbleArea->updateToolCursor();
+        }
+        // clicks that miss everything keep the session running; use
+        // Enter / double-click to apply (Krita semantics)
+        break;
+    }
+    case 1: // liquify
         mLiquifyStrokeActive = true;
         mLiquifyLastPos = pos;
         break;
-    case 1: // warp
+    case 2: // warp
     {
         const int hit = hitTestControlPoint(pos);
         if (hit >= 0)
@@ -433,7 +534,7 @@ void DeformTool::pointerPressEvent(PointerEvent* event)
         // Enter / double-click to apply (Krita semantics)
         break;
     }
-    case 2: // cage
+    case 3: // cage
         if (!mCageSet)
         {
             mCageDrawPoints.clear();
@@ -449,7 +550,7 @@ void DeformTool::pointerPressEvent(PointerEvent* event)
             }
         }
         break;
-    case 3: // perspective
+    case 4: // perspective
     {
         const int hit = hitTestPerspectiveCorner(pos);
         if (hit >= 0)
@@ -475,7 +576,7 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
 
     if (!mScribbleArea->isPointerInUse())
     {
-        if (mDeformMode == 0)
+        if (mDeformMode == 1)
         {
             // hover only moves the brush ring: repaint just the union of its
             // old and new areas instead of the whole canvas
@@ -486,7 +587,7 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
                 .mapRect(newRing | oldRing).toAlignedRect().adjusted(-2, -2, 2, 2);
             mScribbleArea->update(widgetRect);
         }
-        // cage/warp/perspective hover visuals don't depend on the cursor
+        // other modes' hover visuals don't depend on the cursor
         mLastHoverPos = pos;
         return;
     }
@@ -495,12 +596,18 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
     switch (mDeformMode)
     {
     case 0:
+        if (mFreeDragKind >= 0)
+        {
+            updateFreeDrag(pos, event->modifiers());
+        }
+        break;
+    case 1:
         if (mLiquifyStrokeActive)
         {
             liquifyStrokeTo(pos);
         }
         break;
-    case 1:
+    case 2:
         if (mDragIndex >= 0)
         {
             mMovedPoints[mDragIndex] = pos;
@@ -511,7 +618,7 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
             updateWarpPreview(true);
         }
         break;
-    case 2:
+    case 3:
         if (!mCageSet)
         {
             if (mCageDrawPoints.size() > 0 && QLineF(mCageDrawPoints.last(), pos).length() >= 3.0)
@@ -527,7 +634,7 @@ void DeformTool::pointerMoveEvent(PointerEvent* event)
             updateCagePreview();
         }
         break;
-    case 3:
+    case 4:
         if (mPerspDragCorner >= 0)
         {
             mPerspMoved[mPerspDragCorner] = pos;
@@ -547,6 +654,19 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
     switch (mDeformMode)
     {
     case 0:
+        if (mFreeDragKind >= 0)
+        {
+            mFreeDragKind = -1;
+            mFreeDragHandle = -1;
+            if (mAnyPointMoved)
+            {
+                // the drag preview may be down-sampled: restore full resolution
+                updateFreePreview(false);
+            }
+            mScribbleArea->updateToolCursor();
+        }
+        break;
+    case 1:
         if (mLiquifyStrokeActive)
         {
             mLiquifyStrokeActive = false;
@@ -556,7 +676,7 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
             }
         }
         break;
-    case 1:
+    case 2:
         if (mDragIndex >= 0)
         {
             mDragIndex = -1;
@@ -568,7 +688,7 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
             mScribbleArea->updateToolCursor();
         }
         break;
-    case 2:
+    case 3:
         if (!mCageSet)
         {
             finalizeCage(event->canvasPos());
@@ -579,7 +699,7 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
             mScribbleArea->updateToolCursor();
         }
         break;
-    case 3:
+    case 4:
         if (mPerspDragCorner >= 0)
         {
             mPerspDragCorner = -1;
@@ -596,7 +716,7 @@ void DeformTool::pointerReleaseEvent(PointerEvent* event)
 void DeformTool::pointerDoubleClickEvent(PointerEvent* event)
 {
     if (event->button() != Qt::LeftButton) { return; }
-    if (mDeformMode == 2 && mCageSet == false && mCageDrawPoints.size() >= 3)
+    if (mDeformMode == 3 && mCageSet == false && mCageDrawPoints.size() >= 3)
     {
         finalizeCage(event->canvasPos());
         return;
@@ -631,19 +751,25 @@ bool DeformTool::keyPressEvent(QKeyEvent* event)
     case Qt::Key_Backspace:
         if (mDeformActive)
         {
-            if (mDeformMode == 1)
+            if (mDeformMode == 0)
+            {
+                mFreeMoved = mFreeOrig;
+                mAnyPointMoved = false;
+                updateFreePreview(true);
+            }
+            else if (mDeformMode == 2)
             {
                 mMovedPoints = mOrigPoints;
                 mAnyPointMoved = false;
                 updateWarpPreview(true);
             }
-            else if (mDeformMode == 2)
+            else if (mDeformMode == 3)
             {
                 mCageMovedVertices = mCageOrigVertices;
                 mAnyPointMoved = false;
                 updateCagePreview();
             }
-            else if (mDeformMode == 3)
+            else if (mDeformMode == 4)
             {
                 mPerspMoved = mPerspOrig;
                 mAnyPointMoved = false;
@@ -690,8 +816,10 @@ void DeformTool::beginSession()
         QRect contentBounds = bitmapImage->bounds();
         if (contentBounds.isEmpty()) { return; }
 
-        // margin so pushed pixels have somewhere to go
-        const int margin = qMax(64, mDeformMode == 0 ? mLiquifySize * 3 : 32);
+        // margin so pushed pixels have somewhere to go; the free mode hugs
+        // the content bounds exactly, like Krita's transform frame
+        const int margin = (mDeformMode == 1) ? qMax(64, mLiquifySize * 3)
+                                              : (mDeformMode == 0 ? 0 : 64);
         contentBounds.adjust(-margin, -margin, margin, margin);
         regionPolygon = QPolygonF(QRectF(contentBounds));
 
@@ -731,6 +859,14 @@ void DeformTool::beginSession()
     // per-mode state
     if (mDeformMode == 0)
     {
+        // free transform frame over the region (TL TR BR BL)
+        mFreeOrig = quadFromRect(QRectF(mRegion));
+        mFreeMoved = mFreeOrig;
+        mFreeDragKind = -1;
+        mFreeDragHandle = -1;
+    }
+    else if (mDeformMode == 1)
+    {
         // control-point grid over the region (local coords, row-major)
         mLiquifyGridCols = qMax(1, (mSourceImage.width() + mLiquifyGridCell - 1) / mLiquifyGridCell);
         mLiquifyGridRows = qMax(1, (mSourceImage.height() + mLiquifyGridCell - 1) / mLiquifyGridCell);
@@ -745,11 +881,11 @@ void DeformTool::beginSession()
         }
         mLiquifyMovedGrid = mLiquifyOrigGrid;
     }
-    if (mDeformMode == 1)
+    else if (mDeformMode == 2)
     {
         rebuildLattice();
     }
-    else if (mDeformMode == 2)
+    else if (mDeformMode == 3)
     {
         mCageSet = false;
         mCageDrawPoints.clear();
@@ -757,9 +893,9 @@ void DeformTool::beginSession()
         mCageMovedVertices.clear();
         mCageDragVertex = -1;
     }
-    else if (mDeformMode == 3)
+    else if (mDeformMode == 4)
     {
-        mPerspOrig = QPolygonF(QRectF(mRegion));
+        mPerspOrig = quadFromRect(QRectF(mRegion));
         mPerspMoved = mPerspOrig;
         mPerspDragCorner = -1;
     }
@@ -797,6 +933,8 @@ void DeformTool::teardown()
     mDragIndex = -1;
     mCageDragVertex = -1;
     mPerspDragCorner = -1;
+    mFreeDragKind = -1;
+    mFreeDragHandle = -1;
     mLiquifyStrokeActive = false;
     mAnyPointMoved = false;
     mSourceImage = QImage();
@@ -807,6 +945,9 @@ void DeformTool::teardown()
     mLiquifyGridRows = 0;
     mPreviewScale = 1.0;
     mWarpedResult = QImage();
+    mFreeOrig = QPolygonF();
+    mFreeMoved = QPolygonF();
+    mFreePressCorners = QPolygonF();
     mOrigPoints.clear();
     mMovedPoints.clear();
     mCageSet = false;
@@ -923,7 +1064,7 @@ void DeformTool::liquifyStrokeTo(const QPointF& pos)
 
 void DeformTool::updateLiquifyPreview(bool interactive)
 {
-    if (!mDeformActive || mDeformMode != 0 || mLiquifyMovedGrid.isEmpty()) { return; }
+    if (!mDeformActive || mDeformMode != 1 || mLiquifyMovedGrid.isEmpty()) { return; }
 
     // interactive frames render a down-scaled copy, release/commit full res
     const bool useScaled = interactive && mPreviewScale < 1.0 && !mPreviewSource.isNull();
@@ -971,7 +1112,7 @@ void DeformTool::updateLiquifyPreview(bool interactive)
 
 void DeformTool::updateWarpPreview(bool interactive)
 {
-    if (!mDeformActive || mDeformMode != 1) { return; }
+    if (!mDeformActive || mDeformMode != 2) { return; }
 
     // while dragging, large regions are warped at reduced resolution and
     // stretched back for display; pointer release / commit recompute full res
@@ -1042,7 +1183,7 @@ void DeformTool::finalizeCage(const QPointF& pos)
 
 void DeformTool::updateCagePreview()
 {
-    if (!mDeformActive || mDeformMode != 2 || !mCageSet) { return; }
+    if (!mDeformActive || mDeformMode != 3 || !mCageSet) { return; }
 
     const QPointF topLeft(mRegion.topLeft());
     QVector<QPointF> origLocal;
@@ -1065,7 +1206,7 @@ void DeformTool::updateCagePreview()
 
 void DeformTool::updatePerspectivePreview()
 {
-    if (!mDeformActive || mDeformMode != 3) { return; }
+    if (!mDeformActive || mDeformMode != 4) { return; }
 
     const QPointF topLeft(mRegion.topLeft());
     QPolygonF dstLocal;
@@ -1080,6 +1221,167 @@ void DeformTool::updatePerspectivePreview()
     mWarpedTopLeft = topLeft + offset;
 
     mScribbleArea->setDeformPreview(mWarpedResult, QRectF(mWarpedTopLeft, QSizeF(mWarpedResult.size())));
+}
+
+void DeformTool::updateFreeDrag(const QPointF& pos, Qt::KeyboardModifiers modifiers)
+{
+    if (!mDeformActive || mFreeDragKind < 0 || mFreeMoved.size() != 4
+        || mFreePressCorners.size() != 4)
+    {
+        return;
+    }
+
+    // frame-at-press basis: origin TL, u-axis along the top edge, v-axis
+    // along the left edge; everything is solved in its local (u,v) space
+    const QPolygonF& base = mFreePressCorners;
+    const QPointF origin = base[0];
+    const QPointF uAxis = base[1] - base[0];
+    const QPointF vAxis = base[3] - base[0];
+    const qreal det = crossProduct(uAxis, vAxis);
+    if (std::abs(det) < 1e-9) { return; }
+
+    const auto toLocal = [&](const QPointF& p)
+    {
+        const QPointF d = p - origin;
+        return QPointF(crossProduct(d, vAxis) / det, crossProduct(uAxis, d) / det);
+    };
+
+    QPolygonF result;
+    if (mFreeDragKind == 0)
+    {
+        // translate
+        const QPointF t = pos - mFreePressPos;
+        for (const QPointF& c : base) { result << c + t; }
+    }
+    else if (mFreeDragKind == 2)
+    {
+        // rotate around the frame center (Ctrl snaps to 15 degree steps)
+        const QPointF center = (base[0] + base[1] + base[2] + base[3]) / 4.0;
+        const qreal a0 = std::atan2(mFreePressPos.y() - center.y(), mFreePressPos.x() - center.x());
+        const qreal a1 = std::atan2(pos.y() - center.y(), pos.x() - center.x());
+        qreal angle = a1 - a0;
+        if (modifiers & Qt::ControlModifier)
+        {
+            const qreal step = M_PI / 12.0;
+            angle = qRound(angle / step) * step;
+        }
+        const qreal cs = std::cos(angle), sn = std::sin(angle);
+        for (const QPointF& c : base)
+        {
+            const QPointF d = c - center;
+            result << center + QPointF(cs * d.x() - sn * d.y(), sn * d.x() + cs * d.y());
+        }
+    }
+    else
+    {
+        // scale: the dragged handle must land under the cursor; the opposite
+        // side of the frame stays anchored. Corner handles scale both axes,
+        // edge handles only their own (Krita free-transform behavior).
+        const QPointF target = toLocal(pos);
+        qreal uh, vh;
+        freeHandleLocal(mFreeDragHandle, uh, vh);
+        const qreal au = 1.0 - uh;
+        const qreal av = 1.0 - vh;
+
+        qreal su = 1.0, sv = 1.0;
+        if (std::abs(uh - au) > 1e-6) { su = (target.x() - au) / (uh - au); }
+        if (std::abs(vh - av) > 1e-6) { sv = (target.y() - av) / (vh - av); }
+
+        // clamp near zero but keep the sign so flips still work
+        if (std::abs(su) < 0.02) { su = su < 0 ? -0.02 : 0.02; }
+        if (std::abs(sv) < 0.02) { sv = sv < 0 ? -0.02 : 0.02; }
+
+        if ((modifiers & Qt::ShiftModifier) && mFreeDragHandle < 4)
+        {
+            // Shift on a corner keeps the aspect ratio
+            const qreal s = (std::abs(su) + std::abs(sv)) / 2.0;
+            su = su < 0 ? -s : s;
+            sv = sv < 0 ? -s : s;
+        }
+
+        static const qreal kCornerU[4] = { 0.0, 1.0, 1.0, 0.0 };
+        static const qreal kCornerV[4] = { 0.0, 0.0, 1.0, 1.0 };
+        for (int i = 0; i < 4; ++i)
+        {
+            const qreal u = au + su * (kCornerU[i] - au);
+            const qreal v = av + sv * (kCornerV[i] - av);
+            result << origin + u * uAxis + v * vAxis;
+        }
+    }
+
+    mFreeMoved = result;
+    mAnyPointMoved = mFreeMoved != mFreeOrig;
+
+    updateFreePreview(true);
+}
+
+void DeformTool::updateFreePreview(bool interactive)
+{
+    if (!mDeformActive || mDeformMode != 0 || mFreeMoved.size() != 4) { return; }
+
+    // the quad stays affine, so the perspective quad mapper is an exact
+    // affine transform here; big regions warp a down-scaled copy while
+    // dragging (release/commit recompute full res)
+    const bool useScaled = interactive && mPreviewScale < 1.0 && !mPreviewSource.isNull();
+    const QImage& src = useScaled ? mPreviewSource : mSourceImage;
+    const qreal scale = useScaled ? mPreviewScale : 1.0;
+
+    const QPointF topLeft(mRegion.topLeft());
+    QPolygonF dstLocal;
+    for (const QPointF& pt : mFreeMoved)
+    {
+        dstLocal << (pt - topLeft) * scale;
+    }
+
+    const bool useAA = toolProperties().getInfo(TransformToolProperties::ANTI_ALIASING_ENABLED).boolValue();
+    QPointF offset;
+    const QImage warped = MlsWarp::perspectiveWarpImage(src, dstLocal, useAA, &offset);
+
+    if (useScaled)
+    {
+        mScribbleArea->setDeformPreview(warped,
+            QRectF(topLeft + offset / scale,
+                   QSizeF(warped.width() / scale, warped.height() / scale)));
+    }
+    else
+    {
+        mWarpedResult = warped;
+        mWarpedTopLeft = topLeft + offset;
+        mScribbleArea->setDeformPreview(mWarpedResult, QRectF(mWarpedTopLeft, QSizeF(mWarpedResult.size())));
+    }
+}
+
+int DeformTool::hitTestFree(const QPointF& pos, int& handleOut) const
+{
+    if (mFreeMoved.size() != 4) { return -1; }
+
+    const qreal viewScale = mEditor->view()->scaling();
+    const qreal tolerance = HandleTolerance / qMax<qreal>(viewScale, 0.01);
+
+    // rotation rings first: they sit outside the corners, so they never
+    // overlap the scale handles
+    for (int i = 0; i < 4; ++i)
+    {
+        if (QLineF(freeRotateHandlePos(i, mFreeMoved, viewScale), pos).length() <= tolerance)
+        {
+            handleOut = i;
+            return 2;
+        }
+    }
+    for (int i = 0; i < 8; ++i)
+    {
+        if (QLineF(freeHandlePos(i, mFreeMoved), pos).length() <= tolerance)
+        {
+            handleOut = i;
+            return 1;
+        }
+    }
+    if (mFreeMoved.containsPoint(pos, Qt::OddEvenFill))
+    {
+        handleOut = -1;
+        return 0;
+    }
+    return -1;
 }
 
 void DeformTool::commitDeform()
@@ -1101,6 +1403,10 @@ void DeformTool::commitDeform()
             if (mDeformMode == 0)
             {
                 // make sure the committed result is the full-resolution warp
+                updateFreePreview(false);
+            }
+            else if (mDeformMode == 1)
+            {
                 updateLiquifyPreview(false);
             }
 

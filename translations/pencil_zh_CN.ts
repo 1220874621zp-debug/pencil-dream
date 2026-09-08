@@ -7586,8 +7586,8 @@ or cancel</source>
     <name>ToolBoxWidget</name>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" />
-        <source>Deform Tool (%1): Liquify / warp / cage / perspective (see tool options)</source>
-        <translation>变形工具 (%1): 液化/弯曲/笼罩/透视（参数见工具选项）</translation>
+        <source>Deform Tool (%1): Free / liquify / warp / cage / perspective (see tool options)</source>
+        <translation>变形工具 (%1): 自由/液化/弯曲/笼罩/透视（参数见工具选项）</translation>
     </message>
 
     <message>
@@ -7843,6 +7843,12 @@ or cancel</source>
 
     <message>
         <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Drag corners/edges to scale, drag inside the frame to move, drag the rings outside the corners to rotate. Shift keeps the aspect ratio, Ctrl snaps rotation to 15°. Enter/double-click applies, Esc cancels.</source>
+        <translation>拖动角/边缩放，框内拖动平移，角外圆环旋转；Shift 锁定宽高比，Ctrl 旋转按 15° 吸附。回车/双击应用，Esc 取消。</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
         <source>Drag the four corners to adjust the perspective. Enter/double-click applies, Esc cancels.</source>
         <translation>拖动四角调整透视。回车/双击应用，Esc 取消。</translation>
     </message>
@@ -7953,6 +7959,12 @@ or cancel</source>
         <location filename="../app/ui/transformoptionswidget.ui" />
         <source>Warp</source>
         <translation>弯曲</translation>
+    </message>
+
+    <message>
+        <location filename="../app/ui/transformoptionswidget.ui" />
+        <source>Free</source>
+        <translation>自由</translation>
     </message>
 
     <message>
