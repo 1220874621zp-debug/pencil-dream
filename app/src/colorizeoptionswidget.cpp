@@ -144,18 +144,16 @@ void ColorizeOptionsWidget::initUI()
         spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
         form->addLayout(grid);
 
-        // 滑杆 → 输入框（输入框 valueChanged 统一驱动参数应用）
+        // 滑杆 → 输入框：不加 QSignalBlocker（会连参数应用处理器一起屏蔽）——守卫防环
         connect(slider, &QSlider::valueChanged, this, [spin](int value) {
             if (qAbs(spin->value() - value / 10.0) >= 0.05) {
-                QSignalBlocker blocker(spin);
                 spin->setValue(value / 10.0);
             }
         });
-        // 输入框 → 滑杆
+        // 输入框 → 滑杆（守卫防环）
         connect(spin, &QDoubleSpinBox::valueChanged, this, [slider](double value) {
             const int pos = qRound(value * 10.0);
             if (slider->value() != pos) {
-                QSignalBlocker blocker(slider);
                 slider->setValue(pos);
             }
         });

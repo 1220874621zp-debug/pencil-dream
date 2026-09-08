@@ -116,18 +116,17 @@ void OnionSkinWidget::buildParamRows()
         grid->setColumnStretch(0, 1);
         rows->addLayout(grid);
 
-        // 滑杆 → 输入框
+        // 滑杆 → 输入框：不加 QSignalBlocker！屏蔽会连输入框的参数应用处理器
+        // 一起堵死（拖滑杆无效的根因）——数值守卫已天然防环
         connect(slider, &QSlider::valueChanged, this, [spin](int value) {
             if (qAbs(spin->value() - value) >= 1) {
-                QSignalBlocker blocker(spin);
                 spin->setValue(value);
             }
         });
-        // 输入框 → 滑杆（整型参数直通）
+        // 输入框 → 滑杆（守卫防环）
         connect(spin, &QDoubleSpinBox::valueChanged, this, [slider](double value) {
             const int pos = qRound(value);
             if (slider->value() != pos) {
-                QSignalBlocker blocker(slider);
                 slider->setValue(pos);
             }
         });
