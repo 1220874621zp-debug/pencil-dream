@@ -43,13 +43,19 @@ QString GetToolTips(QString strCommandName)
     return QString("<b>%1</b>").arg(keySequence.toString()); // don't tr() this string.
 }
 
-// 选区工具组按钮图标：PS 式右下角小三角标记 = 长按有变体菜单。
+// 工具组按钮图标：PS 式右下角小三角标记 = 长按有变体菜单。
 // 2x 渲染 + DPR 标注，高分屏不发虚；SVG 必经 QIcon::pixmap 缩放（防 viewBox 整图加载）
-static QIcon selectionVariantIcon(ToolType toolType, bool withCornerBadge)
+static QIcon variantIcon(ToolType toolType, bool withCornerBadge)
 {
-    const QString svg = (toolType == LASSO)
-        ? ":/icons/themes/playful/tools/tool-lasso.svg"
-        : ":/icons/themes/playful/tools/tool-select.svg";
+    QString svg;
+    switch (toolType)
+    {
+    case LASSO:  svg = ":/icons/themes/playful/tools/tool-lasso.svg"; break;
+    case SELECT: svg = ":/icons/themes/playful/tools/tool-select.svg"; break;
+    case DEFORM: svg = ":/icons/themes/playful/tools/tool-deform.svg"; break;
+    case MOVE:   svg = ":/icons/themes/playful/tools/tool-move.svg"; break;
+    default:     return QIcon();
+    }
     QIcon icon(svg);
     if (!withCornerBadge) { return icon; }
 
@@ -88,7 +94,6 @@ void ToolBoxWidget::initUI()
     ui->pencilButton->setStyleSheet(sStyle);
     ui->lassoButton->setStyleSheet(sStyle);
     ui->deformButton->setStyleSheet(sStyle);
-    ui->moveButton->setStyleSheet(sStyle);
     ui->onionAlignButton->setStyleSheet(sStyle);
     ui->handButton->setStyleSheet(sStyle);
     ui->penButton->setStyleSheet(sStyle);
@@ -102,10 +107,6 @@ void ToolBoxWidget::initUI()
 
     ui->pencilButton->setToolTip( tr( "Pencil Tool (%1): Sketch with pencil" )
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
-    ui->deformButton->setToolTip( tr( "Deform Tool (%1): Free / liquify / warp / cage / perspective (see tool options)" )
-        .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
-    ui->moveButton->setToolTip( tr( "Move Tool (%1): Move an object" )
-        .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
     ui->onionAlignButton->setToolTip( tr( "洋葱皮对位工具 (%1)：拖动红/蓝幽灵像对位中割；双击=中心对齐；Alt+点击=归零" )
         .arg( GetToolTips( CMD_TOOL_ONION_ALIGN ) ) );
     ui->handButton->setToolTip( tr( "Hand Tool (%1): Move the canvas" )
@@ -130,10 +131,7 @@ void ToolBoxWidget::initUI()
     ui->pencilButton->setWhatsThis( tr( "Pencil Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
     ui->lassoButton->setWhatsThis( tr( "Select a free-form (lasso) or rectangular area; press and hold the button to switch variants" ) );
-    ui->deformButton->setWhatsThis( tr( "Deform Tool (%1)" )
-        .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
-    ui->moveButton->setWhatsThis( tr( "Move Tool (%1)" )
-        .arg( GetToolTips( CMD_TOOL_MOVE ) ) );
+    ui->deformButton->setWhatsThis( tr( "Deform or move; press and hold the button to switch variants" ) );
     ui->onionAlignButton->setWhatsThis( tr( "洋葱皮对位工具 (%1)" )
         .arg( GetToolTips( CMD_TOOL_ONION_ALIGN ) ) );
     ui->handButton->setWhatsThis( tr( "Hand Tool (%1)" )
@@ -155,10 +153,9 @@ void ToolBoxWidget::initUI()
 
     connect(ui->pencilButton, &QToolButton::clicked, this, &ToolBoxWidget::pencilOn);
     connect(ui->eraserButton, &QToolButton::clicked, this, &ToolBoxWidget::eraserOn);
-    // 套索按钮承载选区工具组：短按=激活当前变体；长按=弹变体菜单（eventFilter 计时）
-    connect(ui->lassoButton, &QToolButton::clicked, this, &ToolBoxWidget::selectionVariantOn);
-    connect(ui->deformButton, &QToolButton::clicked, this, &ToolBoxWidget::deformOn);
-    connect(ui->moveButton, &QToolButton::clicked, this, &ToolBoxWidget::moveOn);
+    // 工具组按钮：短按=激活当前变体；长按=弹变体菜单（eventFilter 计时）
+    connect(ui->lassoButton, &QToolButton::clicked, this, [this]() { variantOn(mSelectionGroup); });
+    connect(ui->deformButton, &QToolButton::clicked, this, [this]() { variantOn(mTransformGroup); });
     connect(ui->onionAlignButton, &QToolButton::clicked, this, &ToolBoxWidget::onionAlignOn);
     connect(ui->penButton, &QToolButton::clicked, this, &ToolBoxWidget::penOn);
     connect(ui->handButton, &QToolButton::clicked, this, &ToolBoxWidget::handOn);
@@ -174,7 +171,6 @@ void ToolBoxWidget::initUI()
     mFlowlayout->addWidget(ui->eraserButton);
     mFlowlayout->addWidget(ui->lassoButton);
     mFlowlayout->addWidget(ui->deformButton);
-    mFlowlayout->addWidget(ui->moveButton);
     mFlowlayout->addWidget(ui->onionAlignButton);
     mFlowlayout->addWidget(ui->penButton);
     mFlowlayout->addWidget(ui->handButton);
@@ -196,7 +192,6 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->eraserButton);
     buttonGroup->addButton(ui->lassoButton);
     buttonGroup->addButton(ui->deformButton);
-    buttonGroup->addButton(ui->moveButton);
     buttonGroup->addButton(ui->onionAlignButton);
     buttonGroup->addButton(ui->penButton);
     buttonGroup->addButton(ui->handButton);
@@ -206,24 +201,9 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->brushButton);
     buttonGroup->addButton(ui->smudgeButton);
 
-    // 选区工具组（PS 式）：长按套索按钮弹出「套索 / 矩形选择」变体菜单
-    mSelectionMenu = new QMenu(this);
-    QAction* lassoVariantAct = mSelectionMenu->addAction(
-        selectionVariantIcon(LASSO, false),
-        tr("套索工具（%1）：圈选任意形状区域").arg(GetToolTips(CMD_TOOL_LASSO)));
-    QAction* selectVariantAct = mSelectionMenu->addAction(
-        selectionVariantIcon(SELECT, false),
-        tr("矩形选择工具（%1）：拖拽框选区域").arg(GetToolTips(CMD_TOOL_SELECT)));
-    connect(lassoVariantAct, &QAction::triggered, this, &ToolBoxWidget::lassoOn);
-    connect(selectVariantAct, &QAction::triggered, this, &ToolBoxWidget::selectOn);
-
-    mMenuHoldTimer = new QTimer(this);
-    mMenuHoldTimer->setSingleShot(true);
-    mMenuHoldTimer->setInterval(QApplication::styleHints()->mousePressAndHoldInterval());
-    connect(mMenuHoldTimer, &QTimer::timeout, this, &ToolBoxWidget::showSelectionMenu);
-    ui->lassoButton->installEventFilter(this);
-
-    setSelectionVariant(LASSO);
+    // 工具组（PS 式）：套索按钮 = 套索/矩形选择；变形按钮 = 变形/移动
+    setupVariantGroup(mSelectionGroup, ui->lassoButton, LASSO, { LASSO, SELECT });
+    setupVariantGroup(mTransformGroup, ui->deformButton, DEFORM, { DEFORM, MOVE });
 }
 
 int ToolBoxWidget::getMinHeightForWidth(int width) const
@@ -328,27 +308,29 @@ void ToolBoxWidget::eraserOn()
 
 void ToolBoxWidget::selectOn()
 {
-    setSelectionVariant(SELECT);
+    setVariant(mSelectionGroup, SELECT);
     toolOn(SELECT, ui->lassoButton);
 }
 
 void ToolBoxWidget::lassoOn()
 {
-    setSelectionVariant(LASSO);
+    setVariant(mSelectionGroup, LASSO);
     toolOn(LASSO, ui->lassoButton);
 }
 
 void ToolBoxWidget::deformOn()
 {
+    setVariant(mTransformGroup, DEFORM);
     toolOn(DEFORM, ui->deformButton);
 }
 
 void ToolBoxWidget::moveOn()
 {
+    setVariant(mTransformGroup, MOVE);
     if (mEditor->layers()->currentLayer()->type() == Layer::CAMERA) {
-        toolOn(CAMERA, ui->moveButton);
+        toolOn(CAMERA, ui->deformButton);
     } else {
-        toolOn(MOVE, ui->moveButton);
+        toolOn(MOVE, ui->deformButton);
     }
 }
 
@@ -398,7 +380,6 @@ void ToolBoxWidget::deselectAllTools()
     ui->eraserButton->setChecked(false);
     ui->lassoButton->setChecked(false);
     ui->deformButton->setChecked(false);
-    ui->moveButton->setChecked(false);
     ui->onionAlignButton->setChecked(false);
     ui->handButton->setChecked(false);
     ui->penButton->setChecked(false);
@@ -424,51 +405,116 @@ void ToolBoxWidget::toolOn(ToolType toolType, QToolButton* toolButton)
     mEditor->tools()->setCurrentTool(toolType);
 }
 
-void ToolBoxWidget::setSelectionVariant(ToolType toolType)
+void ToolBoxWidget::setupVariantGroup(VariantGroup& group, QToolButton* button,
+                                      ToolType defaultVariant, const QList<ToolType>& variants)
 {
-    mSelectionVariant = toolType;
-    ui->lassoButton->setIcon(selectionVariantIcon(toolType, true));
+    group.button = button;
 
-    if (toolType == SELECT)
+    group.menu = new QMenu(this);
+    for (ToolType toolType : variants)
     {
-        ui->lassoButton->setToolTip(
-            tr("矩形选择工具（%1）：拖拽框选区域；长按此按钮可选择套索工具")
-                .arg(GetToolTips(CMD_TOOL_SELECT)));
+        QAction* action = group.menu->addAction(
+            variantIcon(toolType, false),
+            tr("%1（%2）：%3").arg(variantName(toolType), GetToolTips(variantCommand(toolType)), variantDesc(toolType)));
+        connect(action, &QAction::triggered, this, [this, &group, toolType]() {
+            setVariant(group, toolType);
+            variantOn(group);
+        });
+    }
+
+    group.holdTimer = new QTimer(this);
+    group.holdTimer->setSingleShot(true);
+    group.holdTimer->setInterval(QApplication::styleHints()->mousePressAndHoldInterval());
+    connect(group.holdTimer, &QTimer::timeout, this, [this, &group]() {
+        showVariantMenu(group);
+    });
+    button->installEventFilter(this);
+
+    setVariant(group, defaultVariant);
+}
+
+void ToolBoxWidget::setVariant(VariantGroup& group, ToolType toolType)
+{
+    group.current = toolType;
+    group.button->setIcon(variantIcon(toolType, true));
+    group.button->setToolTip(
+        tr("%1（%2）：%3；长按此按钮可切换同类工具")
+            .arg(variantName(toolType), GetToolTips(variantCommand(toolType)), variantDesc(toolType)));
+}
+
+void ToolBoxWidget::variantOn(VariantGroup& group)
+{
+    if (&group == &mTransformGroup && group.current == MOVE)
+    {
+        // 移动变体保留相机层特化：相机层上激活的是 CAMERA 工具
+        moveOn();
     }
     else
     {
-        ui->lassoButton->setToolTip(
-            tr("套索工具（%1）：圈选任意形状区域；长按此按钮可选择矩形选择工具")
-                .arg(GetToolTips(CMD_TOOL_LASSO)));
+        toolOn(group.current, group.button);
     }
 }
 
-void ToolBoxWidget::selectionVariantOn()
+void ToolBoxWidget::showVariantMenu(VariantGroup& group)
 {
-    toolOn(mSelectionVariant, ui->lassoButton);
+    // 菜单弹在按钮右侧，不遮挡工具栏
+    group.menu->exec(group.button->mapToGlobal(QPoint(group.button->width() + 4, 0)));
 }
 
-void ToolBoxWidget::showSelectionMenu()
+QString ToolBoxWidget::variantName(ToolType toolType)
 {
-    mSelectionMenu->exec(ui->lassoButton->mapToGlobal(QPoint(0, ui->lassoButton->height() + 2)));
+    switch (toolType)
+    {
+    case SELECT: return tr("矩形选择工具");
+    case LASSO:  return tr("套索工具");
+    case DEFORM: return tr("变形工具");
+    case MOVE:   return tr("移动工具");
+    default:     return tr("工具");
+    }
+}
+
+QString ToolBoxWidget::variantDesc(ToolType toolType)
+{
+    switch (toolType)
+    {
+    case SELECT: return tr("拖拽框选区域");
+    case LASSO:  return tr("圈选任意形状区域");
+    case DEFORM: return tr("自由/液化/弯曲/笼罩/透视（见工具选项）");
+    case MOVE:   return tr("移动对象，相机层上为移动相机");
+    default:     return QString();
+    }
+}
+
+QString ToolBoxWidget::variantCommand(ToolType toolType)
+{
+    switch (toolType)
+    {
+    case SELECT: return CMD_TOOL_SELECT;
+    case LASSO:  return CMD_TOOL_LASSO;
+    case DEFORM: return CMD_TOOL_DEFORM;
+    case MOVE:   return CMD_TOOL_MOVE;
+    default:     return QString();
+    }
 }
 
 bool ToolBoxWidget::eventFilter(QObject* watched, QEvent* event)
 {
-    if (watched == ui->lassoButton)
+    for (VariantGroup* group : { &mSelectionGroup, &mTransformGroup })
     {
+        if (watched != group->button) { continue; }
+
         if (event->type() == QEvent::MouseButtonPress)
         {
             auto* mouseEvent = static_cast<QMouseEvent*>(event);
             if (mouseEvent->button() == Qt::LeftButton)
             {
-                mMenuHoldTimer->start();
+                group->holdTimer->start();
             }
         }
         else if (event->type() == QEvent::MouseButtonRelease)
         {
             // 短按：停表，放行 clicked() 激活当前变体
-            mMenuHoldTimer->stop();
+            group->holdTimer->stop();
         }
     }
     return QWidget::eventFilter(watched, event);

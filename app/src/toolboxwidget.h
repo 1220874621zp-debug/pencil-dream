@@ -77,16 +77,29 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    // 套索按钮 = 选区工具组（PS 式）：短按激活当前变体，长按弹出变体菜单。
-    // 矩形选择（SELECT）与套索（LASSO）共用此按钮。
-    void setSelectionVariant(ToolType toolType);
-    void selectionVariantOn();
-    void showSelectionMenu();
+    // 工具组按钮（PS 式）：一个按钮承载多个同类工具变体。
+    // 短按=激活当前变体；长按=弹出变体菜单；图标右下角小三角标记。
+    struct VariantGroup
+    {
+        QToolButton* button = nullptr;
+        QMenu* menu = nullptr;
+        QTimer* holdTimer = nullptr;
+        ToolType current = INVALID_TOOL;
+    };
+
+    void setupVariantGroup(VariantGroup& group, QToolButton* button,
+                           ToolType defaultVariant, const QList<ToolType>& variants);
+    void setVariant(VariantGroup& group, ToolType toolType);
+    void variantOn(VariantGroup& group);
+    void showVariantMenu(VariantGroup& group);
+
+    static QString variantName(ToolType toolType);
+    static QString variantDesc(ToolType toolType);
+    static QString variantCommand(ToolType toolType);
 
     FlowLayout* mFlowlayout = nullptr;
-    QMenu* mSelectionMenu = nullptr;
-    QTimer* mMenuHoldTimer = nullptr;
-    ToolType mSelectionVariant = LASSO;
+    VariantGroup mSelectionGroup;   // 套索 + 矩形选择
+    VariantGroup mTransformGroup;   // 变形 + 移动
 
     Ui::ToolBoxWidget* ui = nullptr;
     Editor* mEditor = nullptr;
