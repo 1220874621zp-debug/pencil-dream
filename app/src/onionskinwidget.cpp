@@ -65,40 +65,55 @@ void OnionSkinWidget::buildParamRows()
     mOnionToggleButton->setAutoRaise(true);
     mOnionToggleButton->setToolTip(tr("Toggle onion skin (previous & next frames together)"));
 
+    // 红蓝着色按钮与灯泡开关同行
+    mOnionRedButton = new QToolButton(this);
+    mOnionRedButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-red.svg"));
+    mOnionRedButton->setIconSize(QSize(22, 22));
+    mOnionRedButton->setCheckable(true);
+    mOnionRedButton->setAutoRaise(true);
+    mOnionRedButton->setToolTip(tr("Onion skin color: red"));
+
+    mOnionBlueButton = new QToolButton(this);
+    mOnionBlueButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-blue.svg"));
+    mOnionBlueButton->setIconSize(QSize(22, 22));
+    mOnionBlueButton->setCheckable(true);
+    mOnionBlueButton->setAutoRaise(true);
+    mOnionBlueButton->setToolTip(tr("Onion skin color: blue"));
+
     auto* toggleRow = new QHBoxLayout;
     toggleRow->setSpacing(6);
     toggleRow->addWidget(mOnionToggleButton);
     auto* toggleLabel = new QLabel(tr("Onion Skin On/Off："), this);
     toggleRow->addWidget(toggleLabel, 1);
+    toggleRow->addWidget(mOnionRedButton);
+    toggleRow->addWidget(mOnionBlueButton);
     rows->addLayout(toggleRow);
 
     // --- 滑杆+输入框参数行（见知识库 slider-spinbox-param-row.md 规范） ---
     auto addParamRow = [this, rows](const char* label, QSlider*& slider, QDoubleSpinBox*& spin,
-                                    qreal min, qreal max, const QString& suffix,
-                                    QToolButton* extraButton = nullptr) {
+                                    qreal min, qreal max, const QString& suffix) {
         spin = new QDoubleSpinBox(this);
         spin->setRange(min, max);
         spin->setDecimals(0);
         spin->setSuffix(suffix);
-        spin->setFixedWidth(96);
+        spin->setFixedWidth(96);  // 四行统一宽
         spin->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
 
         slider = new QSlider(Qt::Horizontal, this);
         slider->setRange(qRound(min), qRound(max));
+        slider->setMaximumWidth(110); // 四行统一宽（窄面板下不过分拉伸）
 
+        // 标签独占一行；滑杆+输入框一行，输入框常规高度靠右
         auto* grid = new QGridLayout;
         grid->setHorizontalSpacing(8);
         grid->setVerticalSpacing(2);
         grid->setContentsMargins(0, 0, 0, 0);
         auto* labelWidget = new QLabel(tr(label) + QStringLiteral("："), this);
         labelWidget->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        grid->addWidget(labelWidget, 0, 0);
+        grid->addWidget(labelWidget, 0, 0, 1, 2);
         grid->addWidget(slider, 1, 0);
-        grid->addWidget(spin, 0, 1, 2, 1);
-        if (extraButton != nullptr)
-            grid->addWidget(extraButton, 1, 2, Qt::AlignVCenter);
+        grid->addWidget(spin, 1, 1, Qt::AlignRight);
         grid->setColumnStretch(0, 1);
-        spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
         rows->addLayout(grid);
 
         // 滑杆 → 输入框
@@ -118,23 +133,8 @@ void OnionSkinWidget::buildParamRows()
         });
     };
 
-    // 红蓝色化按钮保留在对应参数行的滑杆行尾
-    mOnionRedButton = new QToolButton(this);
-    mOnionRedButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-red.svg"));
-    mOnionRedButton->setIconSize(QSize(22, 22));
-    mOnionRedButton->setCheckable(true);
-    mOnionRedButton->setAutoRaise(true);
-    mOnionRedButton->setToolTip(tr("Onion skin color: red"));
-
-    mOnionBlueButton = new QToolButton(this);
-    mOnionBlueButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-blue.svg"));
-    mOnionBlueButton->setIconSize(QSize(22, 22));
-    mOnionBlueButton->setCheckable(true);
-    mOnionBlueButton->setAutoRaise(true);
-    mOnionBlueButton->setToolTip(tr("Onion skin color: blue"));
-
-    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Previous frames"), mPrevFramesSlider, mPrevFramesSpin, 1, 60, QString(), mOnionRedButton);
-    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 1, 60, QString(), mOnionBlueButton);
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Previous frames"), mPrevFramesSlider, mPrevFramesSpin, 1, 60, QString());
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 1, 60, QString());
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Max opacity"), mMaxOpacitySlider, mMaxOpacitySpin, 0, 100, tr(" %"));
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Min opacity"), mMinOpacitySlider, mMinOpacitySpin, 0, 100, tr(" %"));
 }

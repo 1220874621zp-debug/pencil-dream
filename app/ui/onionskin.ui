@@ -129,13 +129,6 @@
            </widget>
           </item>
           <item>
-           <widget class="Line" name="line">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QCheckBox" name="onionSkinMode">
             <property name="text">
              <string>Show Keyframes Only</string>
