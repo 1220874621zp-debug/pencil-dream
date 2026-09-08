@@ -52,9 +52,9 @@ void OnionAlignOptionsWidget::initUI()
     };
 
     addToolButton(tr("中心对齐"), tr("前后帧内容中心对齐到中点（等同双击画布）"), &OnionAlignTool::autoAlignCenters);
-    addToolButton(tr("复位前帧"), tr("归零红色（前帧）幽灵的偏移"), &OnionAlignTool::resetPrevGhostOffset);
-    addToolButton(tr("复位后帧"), tr("归零蓝色（后帧）幽灵的偏移"), &OnionAlignTool::resetNextGhostOffset);
-    addToolButton(tr("全部复位"), tr("清空当前图层全部幽灵偏移（等同 Alt+点空白）"), &OnionAlignTool::resetAllGhostOffsets);
+    addToolButton(tr("复位前帧"), tr("归零红色（前帧）幽灵的全部变换（位移/旋转/缩放）"), &OnionAlignTool::resetPrevGhostOffset);
+    addToolButton(tr("复位后帧"), tr("归零蓝色（后帧）幽灵的全部变换（位移/旋转/缩放）"), &OnionAlignTool::resetNextGhostOffset);
+    addToolButton(tr("全部复位"), tr("清空当前图层全部幽灵变换（等同 Alt+点空白）"), &OnionAlignTool::resetAllGhostOffsets);
 }
 
 void OnionAlignOptionsWidget::updateUI()

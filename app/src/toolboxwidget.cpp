@@ -130,7 +130,7 @@ void ToolBoxWidget::initUI()
 
     ui->pencilButton->setToolTip( tr( "Pencil Tool (%1): Sketch with pencil" )
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
-    ui->onionAlignButton->setToolTip( tr( "洋葱皮对位工具 (%1)：拖动红/蓝幽灵像对位中割；双击=中心对齐；Alt+点击=归零" )
+    ui->onionAlignButton->setToolTip( tr( "洋葱皮对位工具 (%1)：拖动移动红/蓝幽灵，Ctrl=旋转，Shift=缩放；双击=中心对齐；Alt+点击=归零" )
         .arg( GetToolTips( CMD_TOOL_ONION_ALIGN ) ) );
     ui->handButton->setToolTip( tr( "Hand Tool (%1): Move the canvas" )
         .arg( GetToolTips( CMD_TOOL_HAND ) ) );

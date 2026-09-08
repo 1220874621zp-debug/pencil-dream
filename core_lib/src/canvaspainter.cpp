@@ -308,25 +308,44 @@ void CanvasPainter::paintBitmapOnionSkinFrame(QPainter& painter, const QRect& bl
     QPainter onionSkinPainter;
     initializePainter(onionSkinPainter, mOnionSkinPixmap, blitRect);
 
-    onionSkinPainter.drawImage(bitmapImage->topLeft() + onionGhostOffset(layer, nFrame), *bitmapImage->image());
+    const OnionGhostTransform ghostT = onionGhostTransform(layer, nFrame);
+    if (ghostT.isPlainTranslation())
+    {
+        onionSkinPainter.drawImage(bitmapImage->topLeft() + ghostT.offset, *bitmapImage->image());
+    }
+    else
+    {
+        // 旋转/缩放：painter 操作叠加在既有 viewTransform 之上（勿用 setTransform 整体替换），
+        // 锚点 = 幽灵内容包围盒中心，与命中测试(alphaHit)用同一矩阵求逆
+        const QPointF c = bitmapImage->bounds().center();
+        onionSkinPainter.save();
+        onionSkinPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        onionSkinPainter.setRenderHint(QPainter::Antialiasing, true);
+        onionSkinPainter.translate(c + ghostT.offset);
+        onionSkinPainter.rotate(ghostT.rotation);
+        onionSkinPainter.scale(ghostT.scale, ghostT.scale);
+        onionSkinPainter.translate(-c);
+        onionSkinPainter.drawImage(bitmapImage->topLeft(), *bitmapImage->image());
+        onionSkinPainter.restore();
+    }
     paintOnionSkinFrame(painter, onionSkinPainter, nFrame, colorize, bitmapImage->getOpacity());
 }
 
-QPointF CanvasPainter::onionGhostOffset(const Layer* layer, int nFrame) const
+OnionGhostTransform CanvasPainter::onionGhostTransform(const Layer* layer, int nFrame) const
 {
-    if (mOnionGhostOffsets == nullptr || nFrame == mFrameNumber) { return QPointF(); }
+    if (mOnionGhostOffsets == nullptr || nFrame == mFrameNumber) { return OnionGhostTransform(); }
     auto it = mOnionGhostOffsets->constFind(layer->id());
-    if (it == mOnionGhostOffsets->constEnd()) { return QPointF(); }
+    if (it == mOnionGhostOffsets->constEnd()) { return OnionGhostTransform(); }
     const OnionGhostOffset& ghost = it.value();
     if (nFrame < mFrameNumber && nFrame == ghost.prevFrameNumber)
     {
-        return ghost.prevOffset;
+        return ghost.prev;
     }
     if (nFrame > mFrameNumber && nFrame == ghost.nextFrameNumber)
     {
-        return ghost.nextOffset;
+        return ghost.next;
     }
-    return QPointF();
+    return OnionGhostTransform();
 }
 
 void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity)

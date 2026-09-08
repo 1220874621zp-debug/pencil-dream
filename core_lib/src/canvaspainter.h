@@ -37,12 +37,23 @@ class Object;
 class BitmapImage;
 class ViewManager;
 
-/** 洋葱皮幽灵的运行时显示偏移（对位中割用，不落盘）。
- *  偏移绑定创建时的洋葱帧号：换帧后前后幽灵变了，旧偏移自动失效归零。 */
+/** 洋葱皮幽灵的单侧运行时变换（对位中割用，不落盘）。
+ *  平移 + 绕幽灵内容包围盒中心旋转 + 等比缩放；identity 时走纯平移快路径。 */
+struct OnionGhostTransform
+{
+    QPointF offset;
+    qreal rotation = 0.0;  ///< 度，正值顺时针（画布 y 向下坐标系）
+    qreal scale = 1.0;
+
+    bool isPlainTranslation() const { return qFuzzyIsNull(rotation) && qFuzzyCompare(scale, 1.0); }
+};
+
+/** 洋葱皮幽灵的运行时显示变换（对位中割用，不落盘）。
+ *  变换绑定创建时的洋葱帧号：换帧后前后幽灵变了，旧变换自动失效归零。 */
 struct OnionGhostOffset
 {
-    QPointF prevOffset;
-    QPointF nextOffset;
+    OnionGhostTransform prev;
+    OnionGhostTransform next;
     int prevFrameNumber = -1;
     int nextFrameNumber = -1;
 };
@@ -118,7 +129,7 @@ private:
 
     void paintBitmapOnionSkinFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int nFrame, bool colorize);
     void paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity);
-    QPointF onionGhostOffset(const Layer* layer, int nFrame) const;
+    OnionGhostTransform onionGhostTransform(const Layer* layer, int nFrame) const;
 
     void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
 
