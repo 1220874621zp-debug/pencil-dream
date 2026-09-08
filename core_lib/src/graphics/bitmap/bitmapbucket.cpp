@@ -27,6 +27,9 @@ GNU General Public License for more details.
 
 #include "layerbitmap.h"
 
+#include "scanlinefill.h"
+#include "fillfilters.h"
+
 BitmapBucket::BitmapBucket()
 {
 }
@@ -35,11 +38,12 @@ BitmapBucket::BitmapBucket(Editor* editor,
                            QColor color,
                            QRect maxFillRegion,
                            QPointF fillPoint,
-                           BucketToolProperties properties):
+                           BucketToolProperties properties,
+                           int regionModeOverride):
     mEditor(editor),
     mMaxFillRegion(maxFillRegion),
-    mProperties(properties)
-
+    mProperties(properties),
+    mRegionModeOverride(regionModeOverride)
 {
     Layer* initialLayer = editor->layers()->currentLayer();
     int initialLayerIndex = mEditor->currentLayerIndex();
@@ -63,7 +67,9 @@ BitmapBucket::BitmapBucket(Editor* editor,
         mReferenceImage = singleLayerImage;
     }
     mStartReferenceColor = mReferenceImage.constScanLine(point.x(), point.y());
-    mUseDragToFill = canUseDragToFill(point, color, singleLayerImage);
+
+    const bool dragEnabled = properties.dragFillMode() != static_cast<int>(DragFillMode::Disabled);
+    mUseDragToFill = dragEnabled && canUseDragToFill(point, color, singleLayerImage);
 
     mPixelCache = new QHash<QRgb, bool>();
 }
@@ -101,8 +107,6 @@ bool BitmapBucket::allowContinuousFill(const QPoint& checkPoint, const QRgb& che
         return false;
     }
 
-    const QRgb& colorOfReferenceImage = mReferenceImage.constScanLine(checkPoint.x(), checkPoint.y());
-
     if (checkColor == mBucketColor && (mProperties.fillMode() == 1 || qAlpha(checkColor) == 255))
     {
         // Avoid filling if target pixel color matches fill color
@@ -110,8 +114,31 @@ bool BitmapBucket::allowContinuousFill(const QPoint& checkPoint, const QRgb& che
         return false;
     }
 
+    if (mProperties.dragFillMode() == static_cast<int>(DragFillMode::AnyRegion)) {
+        // Fill regions of any color: no reference color gating.
+        return true;
+    }
+
+    const QRgb& colorOfReferenceImage = mReferenceImage.constScanLine(checkPoint.x(), checkPoint.y());
+
     return BitmapImage::compareColor(colorOfReferenceImage, mStartReferenceColor, mTolerance, mPixelCache) &&
            (checkColor == 0 || BitmapImage::compareColor(checkColor, mStartReferenceColor, mTolerance, mPixelCache));
+}
+
+QImage BitmapBucket::referenceRegionImage(const QRect& workRect)
+{
+    QImage region(workRect.size(), QImage::Format_ARGB32_Premultiplied);
+    region.fill(Qt::transparent);
+
+    BitmapImage& ref = mReferenceImage;
+    QRect srcRect = ref.bounds().intersected(workRect);
+    if (!srcRect.isEmpty()) {
+        QPainter p(&region);
+        p.drawImage(srcRect.topLeft() - workRect.topLeft(),
+                    *ref.image(), srcRect.translated(-ref.bounds().topLeft()));
+        p.end();
+    }
+    return region;
 }
 
 void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketState, int, int)> state)
@@ -129,8 +156,18 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     // the click, grow the scanned area to always cover the click and the
     // active selection (which bounds the visible result anyway).
     const QPainterPath selectionClip = mEditor->select()->selectionClipPath();
-    int expandValue = mProperties.fillExpandEnabled() ? mProperties.fillExpandAmount() : 0;
-    QRect fillRegion = mMaxFillRegion;
+    const int growValue = mProperties.fillExpandEnabled() ? mProperties.fillExpandAmount() : 0;
+    const int featherValue = qMax(0, mProperties.featherPx());
+    const int closeGapValue = qMax(0, mProperties.closeGapPx());
+    // The post filters can move the mask outward, so reserve a margin for
+    // them around the scanned fill region (Krita grows the selection rect the
+    // same way before filtering).
+    const int filterMargin = qMax(qMax(growValue, 0), featherValue);
+
+    // The fill region must also cover the reference content, so regions
+    // connected through transparent pixels beyond the camera view still fill
+    // (parity with the previous implementation).
+    QRect fillRegion = mMaxFillRegion.united(mReferenceImage.bounds().adjusted(-1, -1, 1, 1));
     QRect hardCap; // empty = the flood may sweep the whole camera region
     if (!selectionClip.isEmpty())
     {
@@ -138,7 +175,7 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         // scanned area to its rect - everything outside is masked away by
         // the caller anyway, and on an empty canvas this keeps the flood
         // from sweeping all ~2M pixels of the camera view
-        const int margin = expandValue + 4;
+        const int margin = qMax(growValue, 0) + 4;
         hardCap = selectionClip.boundingRect().toAlignedRect()
                       .adjusted(-margin, -margin, margin, margin);
         fillRegion = fillRegion.intersected(hardCap);
@@ -163,29 +200,154 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
 
     const QRgb& targetPixelColor = targetImage->constScanLine(point.x(), point.y());
 
-    qDebug() << "[bucket] paint pt=" << point << " refBounds=" << mReferenceImage.bounds()
-             << " selEmpty=" << selectionClip.isEmpty()
-             << " selBounds=" << selectionClip.boundingRect()
-             << " fillRegion=" << fillRegion
-             << " fillMode=" << mProperties.fillMode() << " tol=" << mTolerance
-             << " targetPx=" << targetPixelColor;
-
     if (!allowFill(point, targetPixelColor)) {
-        qDebug() << "[bucket] rejected by allowFill";
         return;
     }
 
     if (!selectionClip.isEmpty() && !selectionClip.contains(updatedPoint))
     {
         // a click outside the selection cannot produce a visible fill
-        qDebug() << "[bucket] click outside selection, dropped";
         return;
     }
+
+    // === Mask pipeline (Krita's fill architecture): generate a grayscale
+    // selection mask over the work region, post-process it, then paint the
+    // fill color through it. ===
+
+    const QRect workRect = fillRegion.adjusted(-filterMargin, -filterMargin,
+                                               filterMargin, filterMargin);
+    const int w = workRect.width();
+    const int h = workRect.height();
+    Q_ASSERT(w > 0 && h > 0);
+
+    const QImage refRegion = referenceRegionImage(workRect);
+
+    // 兜底：部分构造路径（如测试）插入的属性集不含新键，此时 PropertyInfo
+    // 为 INVALID，整值读出 -1，按默认的连续区域处理。
+    int regionMode = (mRegionModeOverride >= 0)
+            ? mRegionModeOverride : mProperties.regionFillMode();
+    if (regionMode < 0) {
+        regionMode = static_cast<int>(FillRegionMode::Contiguous);
+    }
+
+    QVector<quint8> mask(w * h, 0);
+    const QPoint seedLocal = point - workRect.topLeft();
+    // compareColor wants the squared tolerance
+    const int squaredTolerance = static_cast<int>(qPow(mTolerance, 2));
+
+    switch (regionMode)
+    {
+    case static_cast<int>(FillRegionMode::Contiguous):
+    case static_cast<int>(FillRegionMode::UntilColor):
+    {
+        ScanlineFill fill(refRegion, seedLocal, QRect(0, 0, w, h));
+        fill.setThreshold(squaredTolerance);
+        if (regionMode == static_cast<int>(FillRegionMode::UntilColor)) {
+            fill.setUntilColor(true, qPremultiply(static_cast<QRgb>(mProperties.boundaryColor())));
+        }
+        fill.setCloseGap(closeGapValue);
+        fill.fillSelection(mask);
+        break;
+    }
+    case static_cast<int>(FillRegionMode::Similar):
+    {
+        // Fill every region of a similar color, connected or not: a plain
+        // sweep of the color test over the whole region (Krita's
+        // createSimilarColorsSelection).
+        const QRgb seedColor = mStartReferenceColor;
+        for (int y = 0; y < h; ++y) {
+            const QRgb* row = reinterpret_cast<const QRgb*>(refRegion.constScanLine(y));
+            for (int x = 0; x < w; ++x) {
+                if (BitmapImage::compareColor(row[x], seedColor, squaredTolerance, mPixelCache)) {
+                    mask[y * w + x] = 255;
+                }
+            }
+        }
+        break;
+    }
+    case static_cast<int>(FillRegionMode::Selection):
+    {
+        // Fill the active selection (or, without one, the whole region).
+        // The selection clip below trims the mask either way.
+        mask.fill(255);
+        break;
+    }
+    default:
+        break;
+    }
+
+    // === Post filters, in Krita's order: grow/shrink, then feather or
+    // antialias (feathering already smooths, so antialias is skipped). ===
+
+    if (growValue > 0) {
+        if (mProperties.growStopDarkestEnabled()) {
+            FillFilters::growUntilDarkestPixel(mask, refRegion, w, h, growValue);
+        } else {
+            FillFilters::growSelection(mask, w, h, growValue);
+        }
+    } else if (growValue < 0) {
+        FillFilters::shrinkSelection(mask, w, h, -growValue);
+    }
+
+    if (featherValue > 0) {
+        FillFilters::featherSelection(mask, w, h, featherValue);
+    } else if (mProperties.antiAliasingEnabled()) {
+        FillFilters::antialiasSelection(mask, w, h);
+    }
+
+    // Constrain the fill to the active selection, the same way brush
+    // strokes are (Krita's fill tools are selection-aware too): multiply
+    // the mask by the rasterized selection alpha.
+    if (!selectionClip.isEmpty())
+    {
+        QImage selectionRaster(w, h, QImage::Format_ARGB32_Premultiplied);
+        selectionRaster.fill(Qt::transparent);
+        QPainter rasterPainter(&selectionRaster);
+        rasterPainter.translate(-workRect.topLeft());
+        rasterPainter.setRenderHint(QPainter::Antialiasing, true);
+        rasterPainter.fillPath(selectionClip, Qt::white);
+        rasterPainter.end();
+
+        for (int y = 0; y < h; ++y) {
+            const QRgb* selRow = reinterpret_cast<const QRgb*>(selectionRaster.constScanLine(y));
+            quint8* maskRow = mask.data() + y * w;
+            for (int x = 0; x < w; ++x) {
+                maskRow[x] = static_cast<quint8>((maskRow[x] * qAlpha(selRow[x])) / 255);
+            }
+        }
+    }
+
+    // Tight bounds of the filled area, so the pasted image (and the undo
+    // footprint) stay minimal.
+    int minX = w, minY = h, maxX = -1, maxY = -1;
+    for (int y = 0; y < h; ++y) {
+        const quint8* row = mask.constData() + y * w;
+        for (int x = 0; x < w; ++x) {
+            if (row[x]) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    if (maxX < 0) {
+        // nothing to fill (e.g. clicked on a boundary pixel with no tolerance)
+        return;
+    }
+    const QRect maskBounds(minX, minY, maxX - minX + 1, maxY - minY + 1);
+
+    qDebug() << "[bucket] mask bounds=" << maskBounds.translated(workRect.topLeft())
+             << " regionMode=" << regionMode << " tol=" << mTolerance
+             << " grow=" << growValue << " feather=" << featherValue
+             << " closeGap=" << closeGapValue << " took" << fillTimer.elapsed() << "ms";
+
+    // === Paint the fill color through the mask ===
 
     QRgb fillColor = mBucketColor;
     if (mProperties.fillMode() == 1)
     {
-        // Pass a fully opaque version of the new color to floodFill
+        // Pass a fully opaque version of the new color to the mask
         // This is required so we can fully mask out the existing data before
         // writing the new color.
         QColor tempColor;
@@ -194,53 +356,30 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         fillColor = tempColor.rgba();
     }
 
-    BitmapImage* replaceImage = nullptr;
-
-    bool didFloodFill = BitmapImage::floodFill(&replaceImage,
-                           &mReferenceImage,
-                           fillRegion,
-                           point,
-                           fillColor,
-                           mTolerance,
-                           expandValue,
-                           hardCap.isEmpty() ? nullptr : &hardCap);
-
-    if (!didFloodFill) {
-        qDebug() << "[bucket] floodFill returned false";
-        delete replaceImage;
-        return;
-    }
-    Q_ASSERT(replaceImage != nullptr);
-
-    // constrain the fill to the active selection, the same way brush
-    // strokes are (Krita's fill tools are selection-aware too)
-    if (!selectionClip.isEmpty())
+    BitmapImage* replaceImage = new BitmapImage(maskBounds.translated(workRect.topLeft()), Qt::transparent);
     {
-        if (!selectionClip.intersects(QRectF(replaceImage->bounds())))
-        {
-            qDebug() << "[bucket] fill" << replaceImage->bounds() << "does not intersect selection, dropped";
-            delete replaceImage;
-            return;
+        QImage* out = replaceImage->image();
+        const int colorAlpha = qAlpha(fillColor);
+        const int outR = qRed(fillColor), outG = qGreen(fillColor), outB = qBlue(fillColor);
+        for (int y = maskBounds.top(); y <= maskBounds.bottom(); ++y) {
+            const quint8* row = mask.constData() + y * w;
+            QRgb* outRow = reinterpret_cast<QRgb*>(out->scanLine(y - maskBounds.top()));
+            for (int x = maskBounds.left(); x <= maskBounds.right(); ++x) {
+                const quint8 m = row[x];
+                if (m == 0) continue;
+                if (m == 255) {
+                    outRow[x - maskBounds.left()] = fillColor;
+                } else {
+                    // scale the premultiplied fill color by the mask value
+                    const int a = (colorAlpha * m + 127) / 255;
+                    outRow[x - maskBounds.left()] = qRgba((outR * m + 127) / 255,
+                                                          (outG * m + 127) / 255,
+                                                          (outB * m + 127) / 255,
+                                                          a);
+                }
+            }
         }
-
-        // erase the fill outside the selection through an odd-even inverse
-        // fill; (DestinationIn + drawPath is a no-op on the raster engine,
-        // verified by isolation test)
-        QImage* fillData = replaceImage->image();
-        QPainter masker(fillData);
-        masker.translate(-replaceImage->topLeft());
-        QPainterPath erasePath;
-        erasePath.setFillRule(Qt::OddEvenFill);
-        erasePath.addRect(QRectF(replaceImage->bounds()).adjusted(-2.0, -2.0, 2.0, 2.0));
-        erasePath.addPath(selectionClip);
-        masker.setCompositionMode(QPainter::CompositionMode_Clear);
-        masker.fillPath(erasePath, Qt::white);
-        masker.end();
     }
-
-    qDebug() << "[bucket] filling bounds=" << replaceImage->bounds()
-             << " masked=" << !selectionClip.isEmpty() << " mode=" << mProperties.fillMode()
-             << " took" << fillTimer.elapsed() << "ms";
 
     state(BucketState::WillFillTarget, mTargetFillToLayerIndex, currentFrameIndex);
 

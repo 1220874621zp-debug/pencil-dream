@@ -51,6 +51,13 @@ public:
     void setFillExpandEnabled(bool enabled);
     void setFillReferenceMode(int referenceMode);
     void setFillMode(int mode);
+    void setCloseGap(int closeGap);
+    void setFeather(int feather);
+    void setAntiAliasingEnabled(bool enabled);
+    void setGrowStopDarkestEnabled(bool enabled);
+    void setRegionMode(int mode);
+    void setBoundaryColor(const QColor& color);
+    void setDragMode(int mode);
 
     QPointF getCurrentPoint() const;
     QPointF getCurrentPixel() const;
@@ -62,6 +69,13 @@ signals:
     void fillExpandChanged(int fillExpandValue);
     void toleranceEnabledChanged(bool isON);
     void toleranceChanged(int width);
+    void closeGapChanged(int closeGap);
+    void featherChanged(int feather);
+    void antiAliasingEnabledChanged(bool isON);
+    void growStopDarkestEnabledChanged(bool isON);
+    void regionModeChanged(int mode);
+    void boundaryColorChanged(const QColor& color);
+    void dragModeChanged(int mode);
 
 private:
 

@@ -58,6 +58,14 @@ void checkExistingShortcuts()
         }
     }
 
+    // 一次性迁移：油漆桶默认快捷键 K → F（Krita 同键位）。仅当用户仍在使用
+    // 旧默认值时改写，自定义过的快捷键不受影响。
+    const QString bucketKey = SHORTCUTS_GROUP "/CmdToolBucket";
+    if (curSetting.value(bucketKey).toString() == "K")
+    {
+        curSetting.setValue(bucketKey, "F");
+    }
+
     curSetting.beginGroup(SHORTCUTS_GROUP);
     defaultKey.beginGroup(SHORTCUTS_GROUP);
     foreach (QString pKey, curSetting.allKeys())

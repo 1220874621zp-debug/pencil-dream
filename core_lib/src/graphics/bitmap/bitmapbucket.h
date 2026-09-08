@@ -31,11 +31,29 @@ enum class BucketState
     DidFillTarget, // After calling floodfill and applied to target
 };
 
+/** Which pixels the bucket fills (Krita's fill tool "fill mode"). */
+enum class FillRegionMode
+{
+    Contiguous = 0, ///< flood fill a contiguous region (default)
+    Similar = 1,    ///< fill every region of a similar color, connected or not
+    UntilColor = 2, ///< contiguous fill that only stops at the boundary color
+    Selection = 3,  ///< fill the active selection (or the whole fill region)
+};
+
+/** Behavior while dragging the bucket (Krita's "continuous fill mode"). */
+enum class DragFillMode
+{
+    SimilarRegions = 0, ///< only fill regions similar in color to the initial one
+    AnyRegion = 1,      ///< fill regions of any color
+    Disabled = 2,       ///< dragging does not fill
+};
+
 class BitmapBucket
 {
 public:
     explicit BitmapBucket();
-    explicit BitmapBucket(Editor* editor, QColor color, QRect maxFillRegion, QPointF fillPoint, BucketToolProperties properties);
+    explicit BitmapBucket(Editor* editor, QColor color, QRect maxFillRegion, QPointF fillPoint,
+                          BucketToolProperties properties, int regionModeOverride = -1);
 
     /** Will paint at the given point, given that it makes sense.. canUse is always called prior to painting
      *
@@ -65,6 +83,11 @@ private:
 
     BitmapImage flattenBitmapLayersToImage();
 
+    /** Renders the reference image over the work region into a transparent
+     *  ARGB32 premultiplied buffer (pixels outside the reference bounds read
+     *  as transparent). */
+    QImage referenceRegionImage(const QRect& workRect);
+
     Editor* mEditor = nullptr;
     Layer* mTargetFillToLayer = nullptr;
 
@@ -81,6 +104,8 @@ private:
     int mTargetFillToLayerIndex = -1;
     bool mFilledOnce = false;
     bool mUseDragToFill = false;
+
+    int mRegionModeOverride = -1;
 
     BucketToolProperties mProperties;
 };

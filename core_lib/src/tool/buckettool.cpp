@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include <QPixmap>
 #include <QPainter>
 #include <QSettings>
+#include <climits>
 #include "pointerevent.h"
 
 #include "layer.h"
@@ -44,6 +45,13 @@ void BucketTool::loadSettings()
     mPropertyUsed[BucketToolProperties::FILLEXPAND_ENABLED] = { Layer::BITMAP };
     mPropertyUsed[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = { Layer::BITMAP };
     mPropertyUsed[BucketToolProperties::FILLMODE_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::CLOSEGAP_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::FEATHER_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::ANTIALIASING_ENABLED] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::GROWSTOPDARKEST_ENABLED] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::REGIONMODE_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::BOUNDARYCOLOR_VALUE] = { Layer::BITMAP };
+    mPropertyUsed[BucketToolProperties::DRAGMODE_VALUE] = { Layer::BITMAP };
 
     QSettings pencilSettings(PENCIL2D, PENCIL2D);
 
@@ -51,10 +59,19 @@ void BucketTool::loadSettings()
 
     info[BucketToolProperties::COLORTOLERANCE_VALUE] = { 1, 100, 32 };
     info[BucketToolProperties::COLORTOLERANCE_ENABLED] = false;
-    info[BucketToolProperties::FILLEXPAND_VALUE] = { 1, 25, 2 };
+    // The expand value is now a signed grow/shrink amount (Krita parity)
+    info[BucketToolProperties::FILLEXPAND_VALUE] = { -40, 40, 2 };
     info[BucketToolProperties::FILLEXPAND_ENABLED] = true;
     info[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = { 0, 1, 0 };
     info[BucketToolProperties::FILLMODE_VALUE] = { 0, 2, 0 };
+    info[BucketToolProperties::CLOSEGAP_VALUE] = { 0, 32, 0 };
+    info[BucketToolProperties::FEATHER_VALUE] = { 0, 40, 0 };
+    info[BucketToolProperties::ANTIALIASING_ENABLED] = false;
+    info[BucketToolProperties::GROWSTOPDARKEST_ENABLED] = false;
+    info[BucketToolProperties::REGIONMODE_VALUE] = { 0, 3, 0 };
+    // A QRgb does not always fit a positive int, hence the full int range
+    info[BucketToolProperties::BOUNDARYCOLOR_VALUE] = { INT_MIN, INT_MAX, static_cast<int>(QColor(Qt::black).rgba()) };
+    info[BucketToolProperties::DRAGMODE_VALUE] = { 0, 2, 0 };
 
     toolProperties().insertProperties(info);
     toolProperties().loadFrom(typeName(), pencilSettings);
@@ -99,11 +116,23 @@ void BucketTool::pointerPressEvent(PointerEvent* event)
     LayerCamera* layerCam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
 
     mUndoSaveState = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+
+    // Krita parity: holding Shift for this click fills similar regions
+    // everywhere, holding Alt fills the active selection; the configured
+    // option stays untouched.
+    int regionModeOverride = -1;
+    if (event->modifiers() & Qt::ShiftModifier) {
+        regionModeOverride = static_cast<int>(FillRegionMode::Similar);
+    } else if (event->modifiers() & Qt::AltModifier) {
+        regionModeOverride = static_cast<int>(FillRegionMode::Selection);
+    }
+
     mBitmapBucket = BitmapBucket(mEditor,
                                  mEditor->color()->frontColor(),
                                  layerCam ? layerCam->getViewAtFrame(mEditor->currentFrame()).inverted().mapRect(layerCam->getViewRect()) : QRect(),
                                  getCurrentPoint(),
-                                 mSettings);
+                                 mSettings,
+                                 regionModeOverride);
 
     // Because we can change layer to on the fly, but we do not act reactively
     // on it, it's necessary to invalidate layer cache on press event.
@@ -199,6 +228,49 @@ void BucketTool::setFillMode(int mode)
 {
     toolProperties().setBaseValue(BucketToolProperties::FILLMODE_VALUE, mode);
     emit fillModeChanged(mode);
+}
+
+void BucketTool::setCloseGap(int closeGap)
+{
+    toolProperties().setBaseValue(BucketToolProperties::CLOSEGAP_VALUE, closeGap);
+    emit closeGapChanged(closeGap);
+}
+
+void BucketTool::setFeather(int feather)
+{
+    toolProperties().setBaseValue(BucketToolProperties::FEATHER_VALUE, feather);
+    emit featherChanged(feather);
+}
+
+void BucketTool::setAntiAliasingEnabled(bool enabled)
+{
+    toolProperties().setBaseValue(BucketToolProperties::ANTIALIASING_ENABLED, enabled);
+    emit antiAliasingEnabledChanged(enabled);
+}
+
+void BucketTool::setGrowStopDarkestEnabled(bool enabled)
+{
+    toolProperties().setBaseValue(BucketToolProperties::GROWSTOPDARKEST_ENABLED, enabled);
+    emit growStopDarkestEnabledChanged(enabled);
+}
+
+void BucketTool::setRegionMode(int mode)
+{
+    toolProperties().setBaseValue(BucketToolProperties::REGIONMODE_VALUE, mode);
+    emit regionModeChanged(mode);
+}
+
+void BucketTool::setBoundaryColor(const QColor& color)
+{
+    toolProperties().setBaseValue(BucketToolProperties::BOUNDARYCOLOR_VALUE,
+                                  PropertyInfo(static_cast<int>(color.rgba())));
+    emit boundaryColorChanged(color);
+}
+
+void BucketTool::setDragMode(int mode)
+{
+    toolProperties().setBaseValue(BucketToolProperties::DRAGMODE_VALUE, mode);
+    emit dragModeChanged(mode);
 }
 
 QPointF BucketTool::getCurrentPoint() const

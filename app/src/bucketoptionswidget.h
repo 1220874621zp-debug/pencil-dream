@@ -21,6 +21,8 @@ GNU General Public License for more details.
 #include "basewidget.h"
 #include "pencildef.h"
 
+#include <QColor>
+
 class Editor;
 class Layer;
 class BucketTool;
@@ -48,12 +50,20 @@ public:
     void setColorTolerance(int tolerance);
     void setFillReferenceMode(int referenceMode);
     void setFillMode(int mode);
+    void setCloseGap(int closeGap);
+    void setFeather(int feather);
+    void setAntiAliasingEnabled(bool enabled);
+    void setGrowStopDarkestEnabled(bool enabled);
+    void setRegionMode(int mode);
+    void setBoundaryColor(const QColor& color);
+    void setDragMode(int mode);
     void onLayerChanged(int);
 
 private:
     void makeConnectionsFromUIToModel();
     void makeConnectionsFromModelToUI();
     void updatePropertyVisibility();
+    void updateBoundaryColorEnabled();
 
     BucketTool* mBucketTool = nullptr;
     Ui::BucketOptionsWidget *ui;

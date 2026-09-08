@@ -491,6 +491,13 @@ struct BucketToolProperties: public ToolPropertiesBase
         FILLMODE_VALUE                  = 304,
         COLORTOLERANCE_ENABLED          = 305,
         FILLEXPAND_ENABLED              = 306,
+        CLOSEGAP_VALUE                  = 307,
+        FEATHER_VALUE                   = 308,
+        ANTIALIASING_ENABLED            = 309,
+        GROWSTOPDARKEST_ENABLED         = 310,
+        REGIONMODE_VALUE                = 311,
+        BOUNDARYCOLOR_VALUE             = 312,
+        DRAGMODE_VALUE                  = 313,
 
         END                             = 399,
     };
@@ -505,7 +512,14 @@ struct BucketToolProperties: public ToolPropertiesBase
             { FILLEXPAND_ENABLED,           "FillExpandEnabled"},
             { COLORTOLERANCE_ENABLED,       "ColorToleranceEnabled"},
             { FILLLAYERREFERENCEMODE_VALUE, "FillReferenceMode"},
-            { FILLMODE_VALUE,               "FillMode"}
+            { FILLMODE_VALUE,               "FillMode"},
+            { CLOSEGAP_VALUE,               "CloseGap"},
+            { FEATHER_VALUE,                "Feather"},
+            { ANTIALIASING_ENABLED,         "AntiAliasingEnabled"},
+            { GROWSTOPDARKEST_ENABLED,      "GrowStopDarkestEnabled"},
+            { REGIONMODE_VALUE,             "RegionMode"},
+            { BOUNDARYCOLOR_VALUE,          "BoundaryColor"},
+            { DRAGMODE_VALUE,               "DragMode"}
         });
     }
 
@@ -521,6 +535,13 @@ struct BucketToolProperties: public ToolPropertiesBase
     int fillMode() const { return getInfo(FILLMODE_VALUE).intValue(); }
     bool colorToleranceEnabled() const { return getInfo(COLORTOLERANCE_ENABLED).boolValue(); }
     bool fillExpandEnabled() const { return getInfo(FILLEXPAND_ENABLED).boolValue(); }
+    int closeGapPx() const { return getInfo(CLOSEGAP_VALUE).intValue(); }
+    int featherPx() const { return getInfo(FEATHER_VALUE).intValue(); }
+    bool antiAliasingEnabled() const { return getInfo(ANTIALIASING_ENABLED).boolValue(); }
+    bool growStopDarkestEnabled() const { return getInfo(GROWSTOPDARKEST_ENABLED).boolValue(); }
+    int regionFillMode() const { return getInfo(REGIONMODE_VALUE).intValue(); }
+    int boundaryColor() const { return getInfo(BOUNDARYCOLOR_VALUE).intValue(); }
+    int dragFillMode() const { return getInfo(DRAGMODE_VALUE).intValue(); }
 
 private:
     ToolProperties mToolProperties;

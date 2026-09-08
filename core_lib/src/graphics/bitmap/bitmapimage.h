@@ -97,14 +97,6 @@ public:
     void clear(QRectF rectangle) { clear(rectangle.toRect()); }
     void clear(QPolygonF polygon);
 
-    static bool floodFill(BitmapImage** replaceImage, const BitmapImage* targetImage, const QRect& cameraRect, const QPoint& point, const QRgb& fillColor, int tolerance, const int expandValue, const QRect* hardCap = nullptr);
-    static bool* floodFillPoints(const BitmapImage* targetImage,
-                                const QRect& searchBounds,
-                                QPoint point,
-                                const int tolerance,
-                                QRect& newBounds);
-    static void expandFill(bool* fillPixels, const QRect& searchBounds, const QRect& maxBounds, int expand);
-
     void drawLine(QPointF P1, QPointF P2, QPen pen, QPainter::CompositionMode cm, bool antialiasing);
     void drawRect(QRectF rectangle, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);
     void drawEllipse(QRectF rectangle, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);

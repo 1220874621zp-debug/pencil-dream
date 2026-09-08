@@ -301,6 +301,190 @@ namespace
     };
 }
 
+namespace
+{
+
+    // 每个用例独立搭台：120x120 透明画布上的指定线稿
+    struct FillBench
+    {
+        Editor* editor = nullptr;
+        ScribbleArea* scribbleArea = nullptr;
+        LayerBitmap* layer = nullptr;
+
+        ~FillBench()
+        {
+            delete scribbleArea;
+            delete editor;
+        }
+    };
+
+    FillBench makeBench(std::function<void(QPainter&)> drawLineArt)
+    {
+        FillBench bench;
+        Object* object = new Object;
+        object->init();
+        bench.editor = new Editor;
+        bench.scribbleArea = new ScribbleArea(nullptr);
+        bench.editor->setScribbleArea(bench.scribbleArea);
+        bench.editor->setObject(object);
+        bench.scribbleArea->setEditor(bench.editor);
+        bench.editor->init();
+        bench.scribbleArea->init();
+
+        bench.layer = bench.editor->layers()->createBitmapLayer("fill");
+        bench.editor->layers()->setCurrentLayer(0);
+        bench.editor->scrubTo(1);
+
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getKeyFrameAt(1));
+        REQUIRE(img != nullptr);
+
+        BitmapImage content(QRect(0, 0, 120, 120), Qt::transparent);
+        QPainter painter(content.image());
+        painter.setPen(QPen(QColor(0, 0, 0, 255), 1));
+        drawLineArt(painter);
+        painter.end();
+        img->paste(&content);
+        return bench;
+    }
+
+    // 全属性集（Krita 移植新增键缺省时 PropertyInfo 为 INVALID，读出 -1，
+    // 这里显式给定避免依赖兜底）
+    BucketToolProperties benchProperties(int regionMode, int closeGap, int grow)
+    {
+        BucketToolProperties properties;
+        QHash<int, PropertyInfo> info;
+        info[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = 0;
+        info[BucketToolProperties::FILLEXPAND_ENABLED] = false;
+        info[BucketToolProperties::FILLMODE_VALUE] = 0;
+        info[BucketToolProperties::COLORTOLERANCE_VALUE] = 0;
+        info[BucketToolProperties::COLORTOLERANCE_ENABLED] = false;
+        info[BucketToolProperties::CLOSEGAP_VALUE] = PropertyInfo(0, 32, 0);
+        info[BucketToolProperties::FILLEXPAND_VALUE] = PropertyInfo(-40, 40, 0);
+        info[BucketToolProperties::FEATHER_VALUE] = PropertyInfo(0, 40, 0);
+        info[BucketToolProperties::ANTIALIASING_ENABLED] = false;
+        info[BucketToolProperties::GROWSTOPDARKEST_ENABLED] = false;
+        info[BucketToolProperties::REGIONMODE_VALUE] = regionMode;
+        info[BucketToolProperties::BOUNDARYCOLOR_VALUE] = static_cast<int>(QColor(Qt::black).rgba());
+        info[BucketToolProperties::DRAGMODE_VALUE] = 2;
+        properties.toolProperties().insertProperties(info);
+        properties.toolProperties().setBaseValue(BucketToolProperties::CLOSEGAP_VALUE, PropertyInfo(closeGap));
+        if (grow != 0) {
+            properties.toolProperties().setBaseValue(BucketToolProperties::FILLEXPAND_ENABLED, PropertyInfo(true));
+            properties.toolProperties().setBaseValue(BucketToolProperties::FILLEXPAND_VALUE, PropertyInfo(grow));
+        }
+        return properties;
+    }
+
+    // 画一个带 4px 底边缺口的黑框（框内/框外仅通过缺口连通）
+    void drawGappedBox(QPainter& painter)
+    {
+        painter.drawLine(20, 20, 100, 20);    // top
+        painter.drawLine(20, 20, 20, 100);    // left
+        painter.drawLine(100, 20, 100, 100);  // right
+        painter.drawLine(20, 100, 58, 100);   // bottom left  → 缺口 x=59..62
+        painter.drawLine(63, 100, 100, 100);  // bottom right
+    }
+
+    QRgb fillOnce(const FillBench& bench, const BucketToolProperties& properties, QPoint click)
+    {
+        const QColor fillColor(255, 0, 0, 255);
+        BitmapBucket bucket(bench.editor, fillColor, QRect(0, 0, 120, 120), click, properties);
+        bool didFill = false;
+        bucket.paint(click, [&didFill](BucketState state, int, int) {
+            if (state == BucketState::DidFillTarget) didFill = true;
+        });
+        REQUIRE(didFill);
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        return img->constScanLine(click.x(), click.y());
+    }
+}
+
+TEST_CASE("BitmapBucket - Krita gap closing")
+{
+    SECTION("gap open: the fill spills through the 4px gap")
+    {
+        FillBench bench = makeBench(drawGappedBox);
+        const QRgb red = qPremultiply(QColor(255, 0, 0, 255).rgba());
+        const QRgb at = fillOnce(bench, benchProperties(0, 0, 0), QPoint(60, 60));
+        REQUIRE(at == red);                       // 框内已填
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img->constScanLine(5, 5) == red); // 漏到框外
+        REQUIRE(img->constScanLine(110, 110) == red);
+    }
+
+    SECTION("close gap 8px: the spill is contained")
+    {
+        FillBench bench = makeBench(drawGappedBox);
+        const QRgb red = qPremultiply(QColor(255, 0, 0, 255).rgba());
+        const QRgb at = fillOnce(bench, benchProperties(0, 8, 0), QPoint(60, 60));
+        REQUIRE(at == red);                        // 框内仍完整填充
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img->constScanLine(5, 5) == 0);    // 框外被封闭间隙挡住
+        REQUIRE(img->constScanLine(110, 110) == 0);
+        REQUIRE(img->constScanLine(60, 95) == red); // 缺口内侧贴线处也填满
+    }
+}
+
+TEST_CASE("BitmapBucket - Krita fill modes")
+{
+    SECTION("similar regions fill disconnected areas")
+    {
+        FillBench bench = makeBench([](QPainter& painter) {
+            painter.drawRect(20, 20, 30, 30);  // box A
+            painter.drawRect(70, 70, 30, 30);  // box B（完全封闭、不连通）
+        });
+        const QRgb red = qPremultiply(QColor(255, 0, 0, 255).rgba());
+        const QRgb at = fillOnce(bench, benchProperties(1, 0, 0), QPoint(35, 35));
+        REQUIRE(at == red);
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img->constScanLine(85, 85) == red); // 不连通的 box B 也被填
+        REQUIRE(img->constScanLine(5, 5) == red);   // 背景透明处全填
+        REQUIRE(img->constScanLine(20, 35) == qPremultiply(QColor(0, 0, 0, 255).rgba())); // 线稿不动
+    }
+
+    SECTION("until boundary color crosses non-boundary strokes")
+    {
+        FillBench bench = makeBench([](QPainter& painter) {
+            painter.drawRect(20, 20, 60, 60);                  // 黑框
+            painter.setPen(QPen(QColor(255, 0, 0, 255), 1));
+            painter.drawLine(21, 50, 79, 50);                  // 框内一条红线
+        });
+        const QRgb red = qPremultiply(QColor(255, 0, 0, 255).rgba());
+        // 到边界色模式：只有黑色算边界，红线拦不住
+        const QRgb at = fillOnce(bench, benchProperties(2, 0, 0), QPoint(50, 30));
+        REQUIRE(at == red);
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img->constScanLine(50, 60) == red);  // 红线之下的下半框被填
+        REQUIRE(img->constScanLine(5, 5) == 0);      // 框外不填（黑框是边界）
+
+        // 对照：连续区域模式容差 0 时红线会拦住填充
+        FillBench bench2 = makeBench([](QPainter& painter) {
+            painter.drawRect(20, 20, 60, 60);
+            painter.setPen(QPen(QColor(255, 0, 0, 255), 1));
+            painter.drawLine(21, 50, 79, 50);
+        });
+        fillOnce(bench2, benchProperties(0, 0, 0), QPoint(50, 30));
+        BitmapImage* img2 = static_cast<BitmapImage*>(bench2.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img2->constScanLine(50, 60) == 0);   // 下半框保持透明
+    }
+
+    SECTION("negative grow shrinks the fill")
+    {
+        FillBench bench = makeBench([](QPainter& painter) {
+            painter.drawRect(20, 20, 80, 80);
+        });
+        const QRgb red = qPremultiply(QColor(255, 0, 0, 255).rgba());
+        const QRgb at = fillOnce(bench, benchProperties(0, 0, -3), QPoint(60, 60));
+        REQUIRE(at == red);
+        BitmapImage* img = static_cast<BitmapImage*>(bench.layer->getLastBitmapImageAtFrame(1));
+        REQUIRE(img->constScanLine(60, 60) == red);   // 中心填充
+        REQUIRE(img->constScanLine(30, 30) == red);   // 距墙 10px
+        REQUIRE(img->constScanLine(22, 60) == 0);     // 距左墙 2px 被腐蚀
+        REQUIRE(img->constScanLine(60, 98) == 0);     // 距底墙 2px 被腐蚀
+    }
+}
+
+
 TEST_CASE("BucketTool - lasso over a never-drawn keyframe")
 {
     // regression: a keyframe nobody has drawn into keeps a null image, and
