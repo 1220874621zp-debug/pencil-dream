@@ -156,7 +156,7 @@ void SmudgeTool::pointerPressEvent(PointerEvent* event)
     if (event->button() == Qt::LeftButton)
     {
         startStroke(event->inputType());
-        if (layer->type() == Layer::BITMAP)
+        if (layer->isBitmapKind())
         {
             if (toolMode == 0) {
                 syncEngineSettings();
@@ -192,7 +192,7 @@ void SmudgeTool::pointerMoveEvent(PointerEvent* event)
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer == nullptr) { return; }
 
-    if (layer->type() != Layer::BITMAP)
+    if (!layer->isBitmapKind())
     {
         return;
     }
@@ -228,7 +228,7 @@ void SmudgeTool::pointerReleaseEvent(PointerEvent* event)
     {
         mEditor->backup(typeName());
 
-        if (layer->type() == Layer::BITMAP)
+        if (layer->isBitmapKind())
         {
             if (toolMode == 0 && QLineF(getCurrentPoint(), mMouseDownPoint).length() < 1) {
                 // 混合笔刷单击不产生效果（Krita 同语义）
@@ -265,7 +265,7 @@ void SmudgeTool::drawStroke()
     }
 
     StrokeTool::drawStroke();
-    if (layer->type() == Layer::BITMAP && !mSampleImage.isNull())
+    if (layer->isBitmapKind() && !mSampleImage.isNull())
     {
         syncEngineSettings();
         mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);

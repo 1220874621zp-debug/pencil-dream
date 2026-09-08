@@ -77,7 +77,7 @@ void EyedropperTool::pointerMoveEvent(PointerEvent* event)
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer == nullptr) { return; }
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         QColor pickedColor = getBitmapColor(static_cast<LayerBitmap*>(layer), event->canvasPos());
         if (pickedColor.isValid())
@@ -107,7 +107,7 @@ void EyedropperTool::updateFrontColor(const QPointF& pos)
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer == nullptr) { return; }
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         QColor pickedColor = getBitmapColor(static_cast<LayerBitmap*>(layer), pos);
         if (pickedColor.isValid())

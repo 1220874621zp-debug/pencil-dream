@@ -195,7 +195,7 @@ void PolylineTool::pointerPressEvent(PointerEvent* event)
 
     if (event->button() == Qt::LeftButton)
     {
-        if (layer->type() == Layer::BITMAP)
+        if (layer->isBitmapKind())
         {
             mScribbleArea->handleDrawingOnEmptyFrame();
 
@@ -215,7 +215,7 @@ void PolylineTool::pointerMoveEvent(PointerEvent* event)
     }
 
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         drawPolyline(mPoints, getCurrentPoint());
     }
@@ -364,7 +364,7 @@ void PolylineTool::endPolyline(QList<QPointF> points)
 {
     Layer* layer = mEditor->layers()->currentLayer();
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         drawPolyline(points, points.last());
     }

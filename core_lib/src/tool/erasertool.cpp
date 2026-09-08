@@ -127,7 +127,7 @@ void EraserTool::pointerPressEvent(PointerEvent *event)
     startStroke(event->inputType());
 
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         syncEngineSettings();
         // 镜像绘画对称中心 = 视口中心（画布坐标）
@@ -198,7 +198,7 @@ void EraserTool::pointerReleaseEvent(PointerEvent *event)
 void EraserTool::paintAt(QPointF point)
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         syncEngineSettings();
         mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
@@ -212,7 +212,7 @@ void EraserTool::drawStroke()
 
     Layer* layer = mEditor->layers()->currentLayer();
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         syncEngineSettings();
         mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);

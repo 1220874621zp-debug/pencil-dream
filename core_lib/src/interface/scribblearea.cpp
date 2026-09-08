@@ -1273,7 +1273,7 @@ void ScribbleArea::drawPolyline(QPainterPath path, QPen pen, bool useAA)
 
 void ScribbleArea::endStroke()
 {
-    if (mEditor->layers()->currentLayer()->type() == Layer::BITMAP) {
+    if (mEditor->layers()->currentLayer()->isBitmapKind()) {
         paintBitmapBuffer();
     }
 

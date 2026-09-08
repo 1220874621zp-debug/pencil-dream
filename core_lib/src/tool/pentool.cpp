@@ -142,7 +142,7 @@ void PenTool::pointerReleaseEvent(PointerEvent *event)
 void PenTool::paintAt(QPointF point)
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
         qreal brushWidth = mSettings.width() * pressure;
@@ -161,7 +161,7 @@ void PenTool::drawStroke()
 
     Layer* layer = mEditor->layers()->currentLayer();
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
         qreal brushWidth = mSettings.width() * pressure;

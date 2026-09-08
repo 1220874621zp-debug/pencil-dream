@@ -148,7 +148,7 @@ void PencilTool::paintAt(QPointF point)
 {
     //qDebug() << "Made a single dab at " << point;
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
         qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
@@ -171,7 +171,7 @@ void PencilTool::drawStroke()
 
     Layer* layer = mEditor->layers()->currentLayer();
 
-    if (layer->type() == Layer::BITMAP)
+    if (layer->isBitmapKind())
     {
         qreal pressure = (mSettings.pressureEnabled()) ? mCurrentPressure : 1.0;
         qreal opacity = (mSettings.pressureEnabled()) ? (mCurrentPressure * 0.5) : 1.0;
