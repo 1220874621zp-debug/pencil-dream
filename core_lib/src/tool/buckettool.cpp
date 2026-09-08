@@ -109,6 +109,12 @@ void BucketTool::pointerPressEvent(PointerEvent* event)
     // on it, it's necessary to invalidate layer cache on press event.
     // Otherwise, the cache will be drawn until a move event has been initiated.
     mScribbleArea->invalidatePainterCaches();
+
+    qDebug() << "[bucket] press layer=" << targetLayer->name()
+             << "frame" << mEditor->currentFrame()
+             << "pt=" << getCurrentPoint()
+             << "cam=" << (layerCam ? layerCam->getViewAtFrame(mEditor->currentFrame()).inverted().mapRect(layerCam->getViewRect()) : QRect())
+             << "color=" << mEditor->color()->frontColor();
 }
 
 void BucketTool::pointerMoveEvent(PointerEvent* event)

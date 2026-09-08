@@ -140,7 +140,15 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
 
     const QRgb& targetPixelColor = targetImage->constScanLine(point.x(), point.y());
 
+    qDebug() << "[bucket] paint pt=" << point << " refBounds=" << mReferenceImage.bounds()
+             << " selEmpty=" << selectionClip.isEmpty()
+             << " selBounds=" << selectionClip.boundingRect()
+             << " fillRegion=" << fillRegion
+             << " fillMode=" << mProperties.fillMode() << " tol=" << mTolerance
+             << " targetPx=" << targetPixelColor;
+
     if (!allowFill(point, targetPixelColor)) {
+        qDebug() << "[bucket] rejected by allowFill";
         return;
     }
 
@@ -168,6 +176,7 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
                            expandValue);
 
     if (!didFloodFill) {
+        qDebug() << "[bucket] floodFill returned false";
         delete replaceImage;
         return;
     }
@@ -179,6 +188,7 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     {
         if (!selectionClip.intersects(QRectF(replaceImage->bounds())))
         {
+            qDebug() << "[bucket] fill" << replaceImage->bounds() << "does not intersect selection, dropped";
             delete replaceImage;
             return;
         }
@@ -197,6 +207,9 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         masker.fillPath(erasePath, Qt::white);
         masker.end();
     }
+
+    qDebug() << "[bucket] filling bounds=" << replaceImage->bounds()
+             << " masked=" << !selectionClip.isEmpty() << " mode=" << mProperties.fillMode();
 
     state(BucketState::WillFillTarget, mTargetFillToLayerIndex, currentFrameIndex);
 

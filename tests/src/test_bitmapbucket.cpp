@@ -18,6 +18,7 @@
 #include "bitmapimage.h"
 
 #include "basetool.h"
+#include "buckettool.h"
 
 void dragAndFill(QPointF movePoint, Editor* editor, QColor color, QRect bounds, BucketToolProperties properties, int fillCountThreshold) {
     int moveX = 0;
@@ -354,8 +355,19 @@ TEST_CASE("BucketTool - lasso over empty canvas via the real event path")
 
     REQUIRE(!editor->select()->selectionClipPath().isEmpty());
 
-    // bucket click through real events
+    // bucket click through real events, with the user's REAL persisted
+    // settings (registry key 颜料桶): reference = all layers, tolerance
+    // disabled, expand 2 enabled, overlay mode. The zh_CN translation makes
+    // the app read a different settings key than an untranslated test run,
+    // which is why earlier benches silently used different values.
     editor->color()->setFrontColor(QColor(0, 0, 255));
+    BucketTool* bucketTool = dynamic_cast<BucketTool*>(editor->tools()->getTool(BUCKET));
+    REQUIRE(bucketTool != nullptr);
+    bucketTool->setFillReferenceMode(1);
+    bucketTool->setColorToleranceEnabled(false);
+    bucketTool->setFillExpandEnabled(true);
+    bucketTool->setFillExpand(2);
+    bucketTool->setFillMode(0);
     editor->tools()->setCurrentTool(BUCKET);
     scribbleArea->testMousePress(QPointF(clickPoint));
     scribbleArea->testMouseRelease(QPointF(clickPoint));

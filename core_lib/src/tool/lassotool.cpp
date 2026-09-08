@@ -272,6 +272,10 @@ void LassoTool::endLasso(const QPointF& pos)
     }
     mLassoPoints.clear();
 
+    qDebug() << "[lasso] end pts=" << simplified.size()
+             << " bounds=" << simplified.boundingRect()
+             << " action=" << mActiveAction;
+
     QPainterPath newPath = polygonToPath(simplified);
 
     // combine with the existing selection according to the action
