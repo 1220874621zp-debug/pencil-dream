@@ -108,6 +108,10 @@ private:
 
     Status convertSoundToWav(const QString& filePath);
 
+    // 导出/导入需要 ffmpeg 时先确保其可用；缺失则弹窗引导下载并选择。
+    // 返回 true = ffmpeg 可用（可能刚由用户设置），false = 用户取消。
+    bool ensureFFmpegAvailable();
+
     Editor* mEditor = nullptr;
     QWidget* mParent = nullptr;
 

@@ -91,11 +91,8 @@ Status MovieExporter::run(const Object* obj,
     qDebug() << ffmpegPath;
     if (!QFile::exists(ffmpegPath))
     {
-#ifdef _WIN32
-        qCritical() << "Please place ffmpeg.exe in " << ffmpegPath << " directory";
-#else
-        qCritical() << "Please place ffmpeg in " << ffmpegPath << " directory";
-#endif
+        qCritical() << "FFmpeg not found at" << ffmpegPath
+                    << "- 请在 首选项 → 文件 设置 FFmpeg 路径，或将其放入程序目录的 plugins 文件夹";
         return Status::ERROR_FFMPEG_NOT_FOUND;
     }
 

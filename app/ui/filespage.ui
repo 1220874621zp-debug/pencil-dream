@@ -184,6 +184,46 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="ffmpegBox">
+     <property name="title">
+      <string>FFmpeg（视频导出）</string>
+     </property>
+     <layout class="QVBoxLayout" name="ffmpegLayout">
+      <item>
+       <widget class="QLabel" name="ffmpegHintLabel">
+        <property name="text">
+         <string>导出视频/GIF、导入视频或音频需要 FFmpeg 程序。留空则使用程序目录 plugins 文件夹中的 ffmpeg。</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="ffmpegPathRow">
+        <item>
+         <widget class="QLineEdit" name="ffmpegPathEdit">
+          <property name="placeholderText">
+           <string>未设置 — 使用程序 plugins 目录</string>
+          </property>
+          <property name="clearButtonEnabled">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="ffmpegBrowseBtn">
+          <property name="text">
+           <string>浏览...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>

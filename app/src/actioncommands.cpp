@@ -19,8 +19,10 @@ GNU General Public License for more details.
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QApplication>
 #include <QDesktopServices>
+#include <QFile>
 #include <QStandardPaths>
 #include <QFileDialog>
 
@@ -35,6 +37,7 @@ GNU General Public License for more details.
 #include "playbackmanager.h"
 #include "colormanager.h"
 #include "selectionmanager.h"
+#include "preferencemanager.h"
 #include "util.h"
 #include "app_util.h"
 
@@ -64,6 +67,42 @@ ActionCommands::ActionCommands(QWidget* parent) : QObject(parent)
 }
 
 ActionCommands::~ActionCommands() {}
+
+bool ActionCommands::ensureFFmpegAvailable()
+{
+    if (QFile::exists(ffmpegLocation()))
+    {
+        return true;
+    }
+
+    QMessageBox box(mParent);
+    box.setIcon(QMessageBox::Warning);
+    box.setWindowTitle(tr("未找到 FFmpeg"));
+    box.setText(tr("导出视频/GIF、导入视频或音频需要 FFmpeg 程序，但未能找到可用的 FFmpeg。"));
+    box.setInformativeText(tr("请先下载 FFmpeg（https://www.gyan.dev/ffmpeg/builds/ ），然后点击“浏览”选择 ffmpeg 程序。\n"
+                              "也可以稍后在 首选项 → 文件 页设置路径，或把 ffmpeg 放进程序目录的 plugins 文件夹。"));
+    QPushButton* browseButton = box.addButton(tr("浏览..."), QMessageBox::AcceptRole);
+    box.addButton(tr("取消"), QMessageBox::RejectRole);
+    box.exec();
+    if (box.clickedButton() != browseButton)
+    {
+        return false;
+    }
+
+#ifdef _WIN32
+    const QString filter = tr("可执行程序 (*.exe);;所有文件 (*)");
+#else
+    const QString filter = tr("所有文件 (*)");
+#endif
+    const QString selected = QFileDialog::getOpenFileName(mParent, tr("选择 FFmpeg 程序"), QString(), filter);
+    if (selected.isEmpty())
+    {
+        return false;
+    }
+
+    mEditor->preference()->set(SETTING::FFMPEG_PATH, selected);
+    return true;
+}
 
 Status ActionCommands::importAnimatedImage()
 {
@@ -111,6 +150,11 @@ Status ActionCommands::importAnimatedImage()
 
 Status ActionCommands::importMovieVideo()
 {
+    if (!ensureFFmpegAvailable())
+    {
+        return Status::SAFE;
+    }
+
     QString filePath = FileDialog::getOpenFileName(mParent, FileType::MOVIE);
     if (filePath.isEmpty())
     {
@@ -241,6 +285,11 @@ Status ActionCommands::importSound(FileType type)
 
 Status ActionCommands::convertSoundToWav(const QString& filePath)
 {
+    if (!ensureFFmpegAvailable())
+    {
+        return Status::ERROR_FFMPEG_NOT_FOUND;
+    }
+
     QProgressDialog progressDialog(tr("Importing sound..."), tr("Abort"), 0, 100, mParent);
     hideQuestionMark(progressDialog);
     progressDialog.setWindowModality(Qt::WindowModal);
@@ -277,6 +326,11 @@ Status ActionCommands::exportGif()
 
 Status ActionCommands::exportMovie(bool isGif)
 {
+    if (!ensureFFmpegAvailable())
+    {
+        return Status::SAFE;
+    }
+
     FileType fileType = (isGif) ? FileType::GIF : FileType::MOVIE;
 
     int clipCount = mEditor->sound()->soundClipCount();

@@ -370,8 +370,8 @@ Status MovieImporter::verifyFFmpegExists()
     if (!QFile::exists(ffmpegPath))
     {
         Status status = Status::ERROR_FFMPEG_NOT_FOUND;
-        status.setTitle(tr("FFmpeg Not Found"));
-        status.setDescription(tr("Please place the ffmpeg binary in plugins directory and try again"));
+        status.setTitle(tr("未找到 FFmpeg"));
+        status.setDescription(tr("请在 首选项 → 文件 页设置 FFmpeg 路径（可从 https://www.gyan.dev/ffmpeg/builds/ 下载），或把 ffmpeg 放进程序目录的 plugins 文件夹后重试。"));
         return status;
     }
     return Status::OK;

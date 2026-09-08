@@ -17,6 +17,7 @@ GNU General Public License for more details.
 
 #include "filespage.h"
 
+#include <QFileDialog>
 #include <QSettings>
 #include <QStandardPaths>
 
@@ -47,6 +48,8 @@ FilesPage::FilesPage()
     connect(ui->autosaveNumberBox, spinBoxValueChange, this, &FilesPage::autoSaveNumberChange);
     connect(ui->autosaveByTimeCheckBox, &QCheckBox::stateChanged, this, &FilesPage::autoSaveByTimeChange);
     connect(ui->autosaveByTimeNumberBox, spinBoxValueChange, this, &FilesPage::autoSaveByTimeTimerChange);
+    connect(ui->ffmpegBrowseBtn, &QPushButton::clicked, this, &FilesPage::ffmpegBrowse);
+    connect(ui->ffmpegPathEdit, &QLineEdit::textChanged, this, &FilesPage::ffmpegPathChanged);
 }
 
 FilesPage::~FilesPage()
@@ -216,6 +219,7 @@ void FilesPage::updateValues()
     ui->askPresetRbtn->setChecked(mManager->isOn(SETTING::ASK_FOR_PRESET));
     ui->loadDefaultPresetRbtn->setChecked(mManager->isOn(SETTING::LOAD_DEFAULT_PRESET));
     ui->loadLastActiveRbtn->setChecked(mManager->isOn(SETTING::LOAD_MOST_RECENT));
+    ui->ffmpegPathEdit->setText(mManager->getString(SETTING::FFMPEG_PATH));
 }
 
 void FilesPage::askForPresetChange(int b)
@@ -251,4 +255,26 @@ void FilesPage::autoSaveByTimeChange(int b)
 void FilesPage::autoSaveByTimeTimerChange(int number)
 {
     mManager->set(SETTING::AUTO_SAVE_BY_TIME_TIMER, number);
+}
+
+void FilesPage::ffmpegBrowse()
+{
+#ifdef _WIN32
+    const QString filter = tr("可执行程序 (*.exe);;所有文件 (*)");
+#else
+    const QString filter = tr("所有文件 (*)");
+#endif
+    QString path = QFileDialog::getOpenFileName(this, tr("选择 FFmpeg 程序"), QString(), filter);
+    if (!path.isEmpty())
+    {
+        ui->ffmpegPathEdit->setText(path);
+    }
+}
+
+void FilesPage::ffmpegPathChanged(const QString& path)
+{
+    if (mManager)
+    {
+        mManager->set(SETTING::FFMPEG_PATH, path);
+    }
 }

@@ -19,8 +19,12 @@ GNU General Public License for more details.
 #include <QDebug>
 #include <QApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QSettings>
 #include <QStandardPaths>
+
+#include "pencildef.h"
 
 static inline bool clipLineToEdge(qreal& t0, qreal& t1, qreal p, qreal q)
 {
@@ -63,8 +67,36 @@ void clearFocusOnFinished(QAbstractSpinBox *spinBox)
     QObject::connect(spinBox, &QAbstractSpinBox::editingFinished, spinBox, &QAbstractSpinBox::clearFocus);
 }
 
+// 用户在首选项里配置的 ffmpeg 路径（存在且文件有效时优先于内置 plugins 目录）。
+// 直接读 QSettings 而非 PreferenceManager：util 是自由函数层，且 set() 写透
+// QSettings，两者始终同步。
+static QString customFFmpegPath()
+{
+    QSettings settings(PENCIL2D, PENCIL2D);
+    const QString path = settings.value(SETTING_FFMPEG_PATH).toString();
+    if (!path.isEmpty() && QFile::exists(path))
+    {
+        return path;
+    }
+    return QString();
+}
+
 QString ffprobeLocation()
 {
+    // 自定义 ffmpeg 所在目录里的 ffprobe 优先（官方发行包两者同目录）
+    const QString customFfmpeg = customFFmpegPath();
+    if (!customFfmpeg.isEmpty())
+    {
+#ifdef _WIN32
+        const QString beside = QFileInfo(customFfmpeg).absoluteDir().filePath("ffprobe.exe");
+#else
+        const QString beside = QFileInfo(customFfmpeg).absoluteDir().filePath("ffprobe");
+#endif
+        if (QFile::exists(beside))
+        {
+            return beside;
+        }
+    }
 #ifdef _WIN32
     return QApplication::applicationDirPath() + "/plugins/ffprobe.exe";
 #elif __APPLE__
@@ -86,6 +118,11 @@ QString ffprobeLocation()
 
 QString ffmpegLocation()
 {
+    const QString custom = customFFmpegPath();
+    if (!custom.isEmpty())
+    {
+        return custom;
+    }
 #ifdef _WIN32
     return QApplication::applicationDirPath() + "/plugins/ffmpeg.exe";
 #elif __APPLE__

@@ -92,6 +92,7 @@ enum class SETTING
     LOAD_MOST_RECENT,
     LOAD_DEFAULT_PRESET,
     DEFAULT_PRESET,
+    FFMPEG_PATH,
     COUNT, // COUNT must always be the last one.
 };
 

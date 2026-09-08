@@ -52,6 +52,8 @@ public slots:
     void autoSaveNumberChange(int number);
     void autoSaveByTimeChange(int b);
     void autoSaveByTimeTimerChange(int number);
+    void ffmpegBrowse();
+    void ffmpegPathChanged(const QString& path);
 
 signals:
     void clearRecentList();

@@ -142,6 +142,7 @@ void PreferenceManager::loadPrefs()
     set(SETTING::LOAD_MOST_RECENT,         settings.value(SETTING_LOAD_MOST_RECENT,       true).toBool());
     set(SETTING::LOAD_DEFAULT_PRESET,      settings.value(SETTING_LOAD_DEFAULT_PRESET,    true).toBool());
     set(SETTING::DEFAULT_PRESET,           settings.value(SETTING_DEFAULT_PRESET,         0).toInt());
+    set(SETTING::FFMPEG_PATH,              settings.value(SETTING_FFMPEG_PATH,            "").toString());
 
     // Timeline
     set(SETTING::SHORT_SCRUB,              settings.value(SETTING_SHORT_SCRUB,            false ).toBool());
@@ -257,6 +258,9 @@ void PreferenceManager::set(SETTING option, QString value)
         break;
     case SETTING::LANGUAGE:
         settings.setValue(SETTING_LANGUAGE, value);
+        break;
+    case SETTING::FFMPEG_PATH:
+        settings.setValue(SETTING_FFMPEG_PATH, value);
         break;
     default:
         break;
