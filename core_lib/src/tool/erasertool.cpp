@@ -106,7 +106,12 @@ void EraserTool::loadSettings()
 
 QCursor EraserTool::cursor()
 {
-    return QCursor(QPixmap(":icons/general/cross.png"), 10, 10);
+    if (!mCursorBuilt)
+    {
+        mCursorBuilt = true;
+        mCursorCross = QCursor(QPixmap(":icons/general/cross.png"), 10, 10);
+    }
+    return mCursorCross;
 }
 
 void EraserTool::pointerPressEvent(PointerEvent *event)

@@ -102,11 +102,17 @@ void BrushTool::loadSettings()
 
 QCursor BrushTool::cursor()
 {
+    if (!mCursorBuilt)
+    {
+        mCursorBuilt = true;
+        mCursorSvg = QCursor(QPixmap(":icons/general/cursor-brush.svg"), 4, 14);
+        mCursorCross = QCursor(QPixmap(":icons/general/cross.png"), 10, 10);
+    }
     if (mEditor->preference()->isOn(SETTING::TOOL_CURSOR))
     {
-        return QCursor(QPixmap(":icons/general/cursor-brush.svg"), 4, 14);
+        return mCursorSvg;
     }
-    return QCursor(QPixmap(":icons/general/cross.png"), 10, 10);
+    return mCursorCross;
 }
 
 void BrushTool::pointerPressEvent(PointerEvent *event)

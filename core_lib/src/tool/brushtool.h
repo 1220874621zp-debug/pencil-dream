@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "stroketool.h"
 #include "brush/brushengine.h"
 #include <QColor>
+#include <QCursor>
 #include <QTimer>
 
 class Layer;
@@ -77,6 +78,12 @@ private:
     BrushEngine mEngine;
     QTimer mAirbrushTimer;
     bool mUserOptionsRestored = false;
+
+    // 位图光标一次构造终身复用：每次新建 QCursor 都会重建 Windows
+    // 原生 HCURSOR，间歇性创建失败会静默回退成系统箭头
+    bool mCursorBuilt = false;
+    QCursor mCursorSvg;
+    QCursor mCursorCross;
 };
 
 #endif // BRUSHTOOL_H

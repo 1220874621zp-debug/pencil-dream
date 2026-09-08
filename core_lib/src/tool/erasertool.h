@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "stroketool.h"
 
 #include "brush/brushengine.h"
+#include <QCursor>
 #include <QTimer>
 
 class EraserTool : public StrokeTool
@@ -67,6 +68,10 @@ private:
     BrushSettings mPresetExtras;
     QTimer mAirbrushTimer;
     bool mUserOptionsRestored = false;
+
+    // 同 BrushTool：位图光标一次构造终身复用
+    bool mCursorBuilt = false;
+    QCursor mCursorCross;
 };
 
 #endif // ERASERTOOL_H

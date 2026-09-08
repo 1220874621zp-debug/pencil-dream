@@ -683,6 +683,12 @@ void ScribbleArea::tabletEvent(QTabletEvent *e)
 
 void ScribbleArea::pointerPressEvent(PointerEvent* event)
 {
+    // 数位板笔从空中直接落点会瞬移进画布（无 Enter 事件，Enter 自愈
+    // 覆盖不到）；每次按下都重设一次工具光标（同 Enter 分支的 Windows
+    // 光标缓存击穿机理）
+    unsetCursor();
+    updateToolCursor();
+
     {
         Layer* l = mEditor->layers()->currentLayer();
         qDebug() << "[ui] canvas press:" << (l ? l->name() : QString("?"))
