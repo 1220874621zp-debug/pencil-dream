@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPolygonF>
+#include <QSet>
 #include <QStyleHints>
 #include <QTimer>
 
@@ -182,6 +183,18 @@ void ToolBoxWidget::initUI()
 
     delete ui->scrollAreaWidgetContents_2->layout();
     ui->scrollAreaWidgetContents_2->setLayout(mFlowlayout);
+
+    // 防御：未被流式布局接管的按钮会以任意几何叠画在工具栏上（.ui 与接线
+    // 漂移、或并行编译竞态残留旧生成头时发生过）——把流浪按钮隐藏掉
+    QSet<QWidget*> managed;
+    for (int i = 0; i < mFlowlayout->count(); ++i)
+    {
+        managed.insert(mFlowlayout->itemAt(i)->widget());
+    }
+    for (QToolButton* stray : ui->scrollAreaWidgetContents_2->findChildren<QToolButton*>())
+    {
+        if (!managed.contains(stray)) { stray->hide(); }
+    }
 
     // Important to set the proper minimumSize;
     ui->scrollArea->setMinimumSize(QSize(1,1));
