@@ -207,3 +207,60 @@ TEST_CASE("BitmapBucket - fill respects the active selection")
     delete scribbleArea;
     delete editor;
 }
+
+TEST_CASE("BitmapBucket - fill a lasso over empty canvas")
+{
+    FileManager fm;
+    Object* obj = fm.load(":/fill-drag-test/fill-drag-test.pcl");
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(obj);
+    editor->init();
+
+    BucketToolProperties properties;
+    QSettings settings;
+
+    QHash<int, PropertyInfo> info;
+    info[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = 0;
+    info[BucketToolProperties::FILLEXPAND_ENABLED] = false;
+    info[BucketToolProperties::FILLMODE_VALUE] = 0;
+    info[BucketToolProperties::COLORTOLERANCE_VALUE] = 25;
+    info[BucketToolProperties::COLORTOLERANCE_ENABLED] = true;
+    properties.toolProperties().insertProperties(info);
+    properties.toolProperties().loadFrom("BucketTest", settings);
+
+    const QColor fillColor = QColor(0, 0, 255, 255);
+
+    BitmapImage beforeFill = *static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getBitmapImageAtFrame(1);
+    const QRect content = beforeFill.bounds();
+
+    // click in empty canvas far away from any content, inside a lasso box:
+    // this used to be clamped to the content corner and filled nothing
+    // visible (or the wrong place entirely)
+    QPoint clickPoint = content.topLeft() + QPoint(45, 45);
+    REQUIRE(!beforeFill.contains(clickPoint));
+
+    QPolygonF selection;
+    selection << QPointF(clickPoint.x() - 4, clickPoint.y() - 4)
+              << QPointF(clickPoint.x() + 4, clickPoint.y() - 4)
+              << QPointF(clickPoint.x() + 4, clickPoint.y() + 4)
+              << QPointF(clickPoint.x() - 4, clickPoint.y() + 4);
+    editor->select()->setSelection(selection, true);
+
+    // a camera-like max fill region generously covering the empty canvas
+    BitmapBucket bucket = BitmapBucket(editor, fillColor, content.adjusted(-500, -500, 500, 500), clickPoint, properties);
+    bucket.paint(clickPoint, [](BucketState, int, int) {});
+
+    BitmapImage* image = static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getLastBitmapImageAtFrame(1);
+
+    // the lassoed empty area got filled at the click position
+    REQUIRE(image->constScanLine(clickPoint.x(), clickPoint.y()) == qPremultiply(fillColor.rgba()));
+    // just outside the lasso the canvas stays empty
+    REQUIRE(image->constScanLine(clickPoint.x(), clickPoint.y() - 8) == 0);
+    // the drawn content is untouched (the top row of the test image is a stroke)
+    REQUIRE(image->constScanLine(content.left(), content.top()) == beforeFill.constScanLine(content.left(), content.top()));
+
+    delete scribbleArea;
+    delete editor;
+}

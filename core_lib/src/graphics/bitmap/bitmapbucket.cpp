@@ -123,8 +123,15 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     QPoint point = QPoint(qFloor(updatedPoint.x()), qFloor(updatedPoint.y()));
     if (!mReferenceImage.contains(point))
     {
-        // If point is outside the our max known fill area, move the fill point anywhere within the bounds
-        point = mReferenceImage.topLeft();
+        // Clicking outside the drawn content (e.g. inside a lasso over empty
+        // canvas) must still fill AT the click position: the flood treats
+        // pixels beyond the content bounds as transparent. Only bail out
+        // when the click is outside the camera view as well, otherwise the
+        // fill point would leave the flood's scanned area.
+        if (!mMaxFillRegion.contains(point))
+        {
+            return;
+        }
     }
 
     const QRgb& targetPixelColor = targetImage->constScanLine(point.x(), point.y());
