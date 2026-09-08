@@ -321,6 +321,9 @@ struct FillGroup
     FillGroup() {}
     explicit FillGroup(int _colorIndex) : colorIndex(_colorIndex) {}
 
+    /** 计算域边缘的自动背景组：清理pass将其视为合法邻居，不作为移除候选 */
+    bool isBackground = false;
+
     int colorIndex = -1;
 
     struct LevelData
@@ -361,6 +364,7 @@ public:
     {
         mKeyStrokeColors << color;
         mKeyStrokeTransparent << isTransparent;
+        mKeyStrokeIsBorder << false;
         // 本地副本：笔画在解析时会被消费
         mKeyStrokes << strokeMask.convertToFormat(QImage::Format_Grayscale8);
 
@@ -393,6 +397,13 @@ public:
 
         for (int i = 0; i < mKeyStrokes.size(); ++i)
             parseColorIntoGroups(mKeyStrokes[i], i);
+
+        // 自动背景组：计算域边缘一圈作为「透明笔画」参与竞争（与普通笔画
+        // 同优先级——种子合并高度后同为 level>=1，靠距离公平竞争）。
+        // Krita 原版靠用户手画透明笔画保护背景，这里默认提供：
+        // 无竞争的单一颜色止于线稿范围，线稿外保持透明；
+        // 封闭且无笔画的区域仍归就近颜色（Krita 行为）。
+        addBorderBackgroundStroke();
 
         const QRect initRect = mGroupMapArea & mBoundingRect;
         initializeQueueFromGroupMap(initRect);
@@ -465,7 +476,9 @@ private:
             {
                 if (line[x] > 0)
                 {
-                    mGroups << FillGroup(colorIndex);
+                    FillGroup group(colorIndex);
+                    group.isBackground = mKeyStrokeIsBorder[colorIndex];
+                    mGroups << group;
                     fillContiguousGroup(stroke, QPoint(x, y), mGroups.size() - 1);
                 }
             }
@@ -496,11 +509,39 @@ private:
         }
     }
 
+    // 计算域四边一圈合成「透明笔画」：与用户笔画同路径解析（合并高度、
+    // 等值成组），保证优先级对等；不与用户笔画抢像素（addKeyStroke 后加优先）
+    void addBorderBackgroundStroke()
+    {
+        QImage ring(mHeightMap.size(), QImage::Format_Grayscale8);
+        ring.fill(0);
+        const QRect& rc = mBoundingRect;
+        for (int x = rc.left(); x <= rc.right(); ++x)
+        {
+            ring.scanLine(rc.top())[x] = 255;
+            ring.scanLine(rc.bottom())[x] = 255;
+        }
+        for (int y = rc.top(); y <= rc.bottom(); ++y)
+        {
+            ring.scanLine(y)[rc.left()] = 255;
+            ring.scanLine(y)[rc.right()] = 255;
+        }
+
+        addKeyStroke(ring, 0, true);
+        mKeyStrokeIsBorder.back() = true;
+        parseColorIntoGroups(mKeyStrokes.back(), mKeyStrokeColors.size() - 1);
+    }
+
     void addForeignAlly(qint32 currGroupId, qint32 prevGroupId,
                         FillGroup& currGroup, FillGroup& prevGroup,
                         FillGroup::LevelData& currLevelData, FillGroup::LevelData& prevLevelData,
                         const QPoint& currPt, const QPoint& prevPt, bool sameLevel)
     {
+        // 背景组与颜色的邻接是合法邻居关系：不记 foreign/ally/冲突点，
+        // 否则清理pass的污染度量会把贴边的颜色组整体误删
+        if (currGroup.isBackground || prevGroup.isBackground)
+            return;
+
         if (currGroup.colorIndex != prevGroup.colorIndex || !sameLevel)
         {
             prevLevelData.foreignEdgeSize++;
@@ -524,6 +565,9 @@ private:
                            FillGroup::LevelData& currLevelData, FillGroup::LevelData& prevLevelData,
                            const QPoint& currPt, const QPoint& prevPt, bool sameLevel)
     {
+        if (currGroup.isBackground || prevGroup.isBackground)
+            return; // 与 addForeignAlly 对称：背景对从未记账
+
         if (currGroup.colorIndex != prevGroup.colorIndex || !sameLevel)
         {
             prevLevelData.foreignEdgeSize--;
@@ -838,13 +882,16 @@ private:
         for (qint32 i = 0; i < mGroups.size(); ++i)
         {
             FillGroup& group = mGroups[i];
+            if (group.isBackground)
+                continue; // 背景组不作为移除候选
             for (auto levelIt = group.levels.begin(); levelIt != group.levels.end(); ++levelIt)
             {
                 FillGroup::LevelData& l = levelIt.value();
                 for (auto conflictIt = l.conflictWithGroup.begin(); conflictIt != l.conflictWithGroup.end(); ++conflictIt)
                 {
-                    if (!conflictIt->empty())
+                    if (!conflictIt->empty() && !mGroups[conflictIt.key()].isBackground)
                     {
+                        // 与背景组的边界是合法邻居关系，不算漏色污染
                         result.append(GroupLevelPair(i, levelIt.key()));
                         break;
                     }
@@ -922,6 +969,7 @@ private:
     QVector<QImage> mKeyStrokes;
     QVector<QRgb> mKeyStrokeColors;
     QVector<bool> mKeyStrokeTransparent;
+    QVector<bool> mKeyStrokeIsBorder;
 
     QVector<FillGroup> mGroups;
     QVector<qint32> mGroupMap;
