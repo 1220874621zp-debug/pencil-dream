@@ -284,12 +284,12 @@ void TimeLine::initUI()
     QSplitter* splitter = new QSplitter(this);
     splitter->addWidget(leftWidget);
     splitter->addWidget(rightWidget);
-    // the layer column rests at the layer toolbar's natural width (the
-    // divider sits right beside the tools dropdown) and all extra width
-    // goes to the tracks; the request of 0 clamps to the minimum
+    // the layer column rests at the layer toolbar's natural width plus a
+    // small margin — the divider sits a bit right of the tools dropdown —
+    // and all extra width goes to the tracks
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
-    splitter->setSizes(QList<int>() << 0 << 1);
+    splitter->setSizes(QList<int>() << leftToolBar->sizeHint().width() + 12 << 1);
 
 
     QGridLayout* lay = new QGridLayout();
