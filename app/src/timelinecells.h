@@ -201,6 +201,7 @@ private:
 
     // Dreams-style trim (drag block right edge)
     bool mTrimming = false;
+    Layer* mTrimLayer = nullptr; // trim 预览只作用于被拖拽的层，防止跨层泄漏
     int mTrimKeyPos = -1;
     int mTrimOriginalLength = 1;
     int mTrimPreviewLength = 1;

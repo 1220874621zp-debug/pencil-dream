@@ -552,7 +552,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
 
 int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
 {
-    if (mTrimming && key->pos() == mTrimKeyPos)
+    if (mTrimming && layer == mTrimLayer && key->pos() == mTrimKeyPos)
     {
         return mTrimPreviewLength;
     }
@@ -748,7 +748,7 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         int framePos = key->pos();
         int recLeft = getFrameX(framePos) - standardWidth;
         // live ripple: while trimming, later blocks follow the drag in real time
-        if (mTrimming && framePos > mTrimKeyPos)
+        if (mTrimming && layer == mTrimLayer && framePos > mTrimKeyPos)
             recLeft += mTrimRippleOffset * mFrameSize;
 
         // Selected frames are normally drawn as regular cards with a
@@ -840,10 +840,10 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     layer->foreachKeyFrame([&](KeyFrame* key)
     {
         // the block being trimmed is painted last so its growth stays visible
-        if (mTrimming && key->pos() == mTrimKeyPos) { return; }
+        if (mTrimming && layer == mTrimLayer && key->pos() == mTrimKeyPos) { return; }
         paintOneBlock(key);
     });
-    if (mTrimming)
+    if (mTrimming && layer == mTrimLayer)
     {
         KeyFrame* trimKey = layer->getKeyFrameAt(mTrimKeyPos);
         if (trimKey != nullptr) { paintOneBlock(trimKey); }
@@ -1479,6 +1479,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     mDropTargetLayer = -1;
     mDropShiftFrames = 0;
     mTrimming = false;
+    mTrimLayer = nullptr;
     mTrimKeyPos = -1;
     mTrimRippleOffset = 0;
     mPlusCreating = false;
@@ -1614,6 +1615,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             emit mEditor->selectedFramesChanged();
                         }
                         mTrimming = true;
+                        mTrimLayer = trimLayer;
                         mTrimKeyPos = trimPos;
                         int trimEnd = trimLayer->getBlockEnd(trimKey);
                         mTrimOriginalLength = (trimEnd > 0) ? (trimEnd - trimPos) : 1;
@@ -1998,24 +2000,16 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
 
                 if (isTrailingBlock && delta > 0)
                 {
-                    // Trailing block: the extension becomes real blank
-                    // keyframes (one per frame, per user preference); the
-                    // drawing keeps its original span
-                    for (int f = mTrimKeyPos + mTrimOriginalLength;
-                         f < mTrimKeyPos + mTrimPreviewLength; ++f)
-                    {
-                        if (!currentLayer->keyExists(f))
-                        {
-                            QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
-                            blank.fill(Qt::transparent);
-                            currentLayer->addKeyFrame(f, new BitmapImage(QPoint(0, 0), blank));
-                        }
-                    }
+                    // Trailing block: extend the exposure (explicit block
+                    // length) — one wide block, no materialized keyframes
+                    trimKey->setLength(mTrimPreviewLength);
+                    trimKey->setLengthExplicit(true);
                 }
                 else if (isTrailingBlock && delta < 0)
                 {
                     // Shrinking the trailing block removes the materialized
-                    // frames inside the vacated span (undo restores them)
+                    // frames inside the vacated span (undo restores them);
+                    // legacy projects may still carry materialized blanks
                     const int prevEnd = mTrimKeyPos + mTrimOriginalLength;
                     const int newEnd = mTrimKeyPos + mTrimPreviewLength;
                     for (int f = newEnd; f < prevEnd; ++f)
@@ -2049,6 +2043,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 mEditor->endLayerLayoutEdit(tr("拉伸帧块"));
             }
             mTrimKeyPos = -1;
+            mTrimLayer = nullptr;
             mEditor->layers()->notifyAnimationLengthChanged();
             emit mEditor->framesModified();
             updateContent();
