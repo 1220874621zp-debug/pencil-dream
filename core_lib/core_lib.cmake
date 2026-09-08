@@ -12,6 +12,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/external/platformhandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapbucket.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/colorizeengine.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/mlswarp.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
@@ -112,6 +113,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/canvaspainter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapbucket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/bitmapimage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/colorizeengine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/mlswarp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
