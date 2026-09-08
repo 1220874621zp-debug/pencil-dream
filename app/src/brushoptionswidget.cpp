@@ -20,7 +20,6 @@ GNU General Public License for more details.
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QScrollArea>
 #include <QVBoxLayout>
 
 #include "brushtool.h"
@@ -149,13 +148,13 @@ void BrushOptionsWidget::initUI()
     layout->addWidget(advGroup);
 
     layout->addStretch();
-    QScrollArea* scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setWidget(content);
+    // 无内层滚动区：宿主 ToolOptionWidget 的外层滚动区（widgetResizable）
+    // 已负责滚动。内层 QScrollArea 的 sizeHint 是有界的（702px 内容只报
+    // 288），外层布局按 288 结算后把面板剩余高度留给尾部弹簧，形成
+    // "内层出滚动条 + 下方死空间"的假被限制状态
     QVBoxLayout* top = new QVBoxLayout(this);
     top->setContentsMargins(0, 0, 0, 0);
-    top->addWidget(scroll);
+    top->addWidget(content);
 
     // ---- 信号：任何改动 → 整套参数回写工具 ----
     const auto sliders = { mSizeSlider, mOpacitySlider, mFlowSlider, mHardnessSlider,
