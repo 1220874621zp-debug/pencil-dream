@@ -74,7 +74,17 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     mbShortScrub = mPrefs->isOn(SETTING::SHORT_SCRUB);
     mDrawFrameNumber = mPrefs->isOn(SETTING::DRAW_LABEL);
 
-    setMinimumSize(500, 4 * mLayerHeight);
+    // tracks need horizontal room; the layer column must not force the
+    // splitter open — 500px here kept the divider far right of the layer
+    // toolbar (it has to sit right beside the tools dropdown instead)
+    if (type == TIMELINE_CELL_TYPE::Tracks)
+    {
+        setMinimumSize(500, 4 * mLayerHeight);
+    }
+    else
+    {
+        setMinimumSize(120, 4 * mLayerHeight);
+    }
     setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
     setAttribute(Qt::WA_OpaquePaintEvent, false);
     setMouseTracking(true);

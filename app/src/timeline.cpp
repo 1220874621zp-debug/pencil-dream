@@ -123,12 +123,11 @@ void TimeLine::initUI()
     // TVP satellite tools dropdown: right beside the lock toggle
     QToolButton* toolsButton = new QToolButton(this);
     toolsButton->setText(tr("工具"));
-    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 对位中割 / 视频抽帧"));
+    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 视频抽帧"));
     toolsButton->setMinimumSize(QSize(38, 34));
     QMenu* toolsMenu = new QMenu(this);
     QAction* lipsyncAct = toolsMenu->addAction(tr("口型同步切换器"));
     QAction* paletteAct = toolsMenu->addAction(tr("调色板提取"));
-    QAction* inbetweenAct = toolsMenu->addAction(tr("对位中割参考"));
     QAction* videoAct = toolsMenu->addAction(tr("视频抽帧中割"));
     toolsButton->setMenu(toolsMenu);
     toolsButton->setPopupMode(QToolButton::InstantPopup);
@@ -285,7 +284,12 @@ void TimeLine::initUI()
     QSplitter* splitter = new QSplitter(this);
     splitter->addWidget(leftWidget);
     splitter->addWidget(rightWidget);
-    splitter->setSizes(QList<int>() << 100 << 600);
+    // the layer column rests at the layer toolbar's natural width (the
+    // divider sits right beside the tools dropdown) and all extra width
+    // goes to the tracks; the request of 0 clamps to the minimum
+    splitter->setStretchFactor(0, 0);
+    splitter->setStretchFactor(1, 1);
+    splitter->setSizes(QList<int>() << 0 << 1);
 
 
     QGridLayout* lay = new QGridLayout();
@@ -323,7 +327,6 @@ void TimeLine::initUI()
     connect(copyClearButton, &QToolButton::clicked, this, &TimeLine::duplicateLayerCleared);
     connect(lipsyncAct, &QAction::triggered, this, &TimeLine::showLipsyncDialog);
     connect(paletteAct, &QAction::triggered, this, &TimeLine::showPaletteExtractDialog);
-    connect(inbetweenAct, &QAction::triggered, this, &TimeLine::showInbetweenRefsDialog);
     connect(videoAct, &QAction::triggered, this, &TimeLine::showVideoExtractDialog);
 
     // TVP global toggles: unanimous state flips, mixed state resolves to "all on"
@@ -413,14 +416,6 @@ void TimeLine::showPaletteExtractDialog()
     mPaletteDialog->show();
     mPaletteDialog->raise();
     mPaletteDialog->activateWindow();
-}
-
-void TimeLine::showInbetweenRefsDialog()
-{
-    if (mInbetweenDialog == nullptr) { mInbetweenDialog = new InbetweenRefsDialog(editor(), this); }
-    mInbetweenDialog->show();
-    mInbetweenDialog->raise();
-    mInbetweenDialog->activateWindow();
 }
 
 void TimeLine::showVideoExtractDialog()

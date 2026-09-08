@@ -29,7 +29,6 @@ class QWheelEvent;
 class QSpinBox;
 class LipsyncDialog;
 class PaletteExtractDialog;
-class InbetweenRefsDialog;
 class VideoExtractDialog;
 
 
@@ -90,7 +89,6 @@ public slots:
     // TVP satellite tools (lazy, non-modal)
     void showLipsyncDialog();
     void showPaletteExtractDialog();
-    void showInbetweenRefsDialog();
     void showVideoExtractDialog();
 
 public:
@@ -122,7 +120,6 @@ private:
     // TVP satellite tools (lazily created, non-modal)
     LipsyncDialog* mLipsyncDialog = nullptr;
     PaletteExtractDialog* mPaletteDialog = nullptr;
-    InbetweenRefsDialog* mInbetweenDialog = nullptr;
     VideoExtractDialog* mVideoDialog = nullptr;
     int mNumLayers = 0;
     int mLastUpdatedFrame = 0;

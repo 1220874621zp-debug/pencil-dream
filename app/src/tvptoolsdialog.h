@@ -68,26 +68,6 @@ private:
     QList<QRgb> mLastColors;
 };
 
-/** 洋葱皮对位中割：把前后源帧作为红/绿着色参考层，内容中心对齐到中点 */
-class InbetweenRefsDialog : public QDialog
-{
-    Q_OBJECT
-public:
-    explicit InbetweenRefsDialog(Editor* editor, QWidget* parent = nullptr);
-
-private slots:
-    void createOrUpdateRefs();
-    void toggleRefsVisibility();
-    void resetRefsPosition();
-    void deleteRefs();
-
-private:
-    Editor* mEditor = nullptr;
-    QPoint mPrevOriginalTopLeft;
-    QPoint mNextOriginalTopLeft;
-    bool mHasRefs = false;
-};
-
 /** 视频抽帧中割：ffmpeg 从视频抽帧预览并导入为时间轴图层 */
 class VideoExtractDialog : public QDialog
 {
