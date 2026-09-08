@@ -121,17 +121,21 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     if (targetImage == nullptr || !targetImage->isLoaded()) { return; } // Can happen if the first frame is deleted while drawing
 
     QPoint point = QPoint(qFloor(updatedPoint.x()), qFloor(updatedPoint.y()));
-    if (!mReferenceImage.contains(point))
+
+    // The flood treats pixels beyond the content bounds as transparent, so a
+    // click on empty canvas (e.g. inside a lasso) fills AT the click position.
+    // The camera-derived region can be degenerate, so instead of rejecting
+    // the click, grow the scanned area to always cover the click and the
+    // active selection (which bounds the visible result anyway).
+    const QPainterPath selectionClip = mEditor->select()->selectionClipPath();
+    QRect fillRegion = mMaxFillRegion;
+    if (!selectionClip.isEmpty())
     {
-        // Clicking outside the drawn content (e.g. inside a lasso over empty
-        // canvas) must still fill AT the click position: the flood treats
-        // pixels beyond the content bounds as transparent. Only bail out
-        // when the click is outside the camera view as well, otherwise the
-        // fill point would leave the flood's scanned area.
-        if (!mMaxFillRegion.contains(point))
-        {
-            return;
-        }
+        fillRegion = fillRegion.united(selectionClip.boundingRect().toAlignedRect());
+    }
+    if (!fillRegion.contains(point))
+    {
+        fillRegion = fillRegion.united(QRect(point, QSize(1, 1)));
     }
 
     const QRgb& targetPixelColor = targetImage->constScanLine(point.x(), point.y());
@@ -157,7 +161,7 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     int expandValue = mProperties.fillExpandEnabled() ? mProperties.fillExpandAmount() : 0;
     bool didFloodFill = BitmapImage::floodFill(&replaceImage,
                            &mReferenceImage,
-                           mMaxFillRegion,
+                           fillRegion,
                            point,
                            fillColor,
                            mTolerance,
@@ -171,7 +175,6 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
 
     // constrain the fill to the active selection, the same way brush
     // strokes are (Krita's fill tools are selection-aware too)
-    const QPainterPath selectionClip = mEditor->select()->selectionClipPath();
     if (!selectionClip.isEmpty())
     {
         if (!selectionClip.intersects(QRectF(replaceImage->bounds())))

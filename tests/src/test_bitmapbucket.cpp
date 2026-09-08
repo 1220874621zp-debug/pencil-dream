@@ -4,6 +4,11 @@
 #include "filemanager.h"
 #include "scribblearea.h"
 #include "selectionmanager.h"
+#include "toolmanager.h"
+#include "layercamera.h"
+#include "colormanager.h"
+
+#include <QMouseEvent>
 
 #include "layerbitmap.h"
 
@@ -21,7 +26,10 @@ void dragAndFill(QPointF movePoint, Editor* editor, QColor color, QRect bounds, 
     QPointF movingPoint = movePoint;
 
     int fillCount = 0;
-    while (moveX < bounds.width()) {
+    // stay inside the content: dragging beyond the bounds now also fills the
+    // transparent canvas outside (Krita semantics), which would add an extra
+    // fill event to the count
+    while (moveX < bounds.width() - 5) {
         moveX++;
         movingPoint.setX(movingPoint.x()+1);
 
@@ -260,6 +268,101 @@ TEST_CASE("BitmapBucket - fill a lasso over empty canvas")
     REQUIRE(image->constScanLine(clickPoint.x(), clickPoint.y() - 8) == 0);
     // the drawn content is untouched (the top row of the test image is a stroke)
     REQUIRE(image->constScanLine(content.left(), content.top()) == beforeFill.constScanLine(content.left(), content.top()));
+
+    delete scribbleArea;
+    delete editor;
+}
+
+namespace
+{
+    // exposes the protected widget handlers so the test drives the real
+    // event path (mMouseInUse tracking included)
+    class BucketTestScribbleArea : public ScribbleArea
+    {
+    public:
+        using ScribbleArea::ScribbleArea;
+
+        void testMousePress(const QPointF& pos)
+        {
+            QMouseEvent e(QEvent::MouseButtonPress, pos, pos, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            mousePressEvent(&e);
+        }
+        void testMouseMove(const QPointF& pos)
+        {
+            QMouseEvent e(QEvent::MouseMove, pos, pos, Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+            mouseMoveEvent(&e);
+        }
+        void testMouseRelease(const QPointF& pos)
+        {
+            QMouseEvent e(QEvent::MouseButtonRelease, pos, pos, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            mouseReleaseEvent(&e);
+        }
+    };
+}
+
+TEST_CASE("BucketTool - lasso over empty canvas via the real event path")
+{
+    FileManager fm;
+    Object* obj = fm.load(":/fill-drag-test/fill-drag-test.pcl");
+    Editor* editor = new Editor;
+    BucketTestScribbleArea* scribbleArea = new BucketTestScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(obj);
+    scribbleArea->setEditor(editor);
+    editor->init();
+    scribbleArea->init();
+
+    BitmapImage beforeFill = *static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getBitmapImageAtFrame(1);
+    const QRect content = beforeFill.bounds();
+    const QPoint clickPoint = content.topLeft() + QPoint(45, 45);
+    REQUIRE(!beforeFill.contains(clickPoint));
+
+    // the app derives the bucket's max fill region from the camera layer;
+    // the test project's camera viewRect is degenerate (29x11), which is
+    // exactly the setup that used to kill the fill
+    LayerCamera* layerCam = editor->layers()->getCameraLayerBelow(editor->currentLayerIndex());
+    REQUIRE(layerCam != nullptr);
+    REQUIRE(!layerCam->getViewAtFrame(editor->currentFrame())
+                 .inverted().mapRect(layerCam->getViewRect()).contains(clickPoint));
+
+    // lasso a box around the click point through real events
+    editor->tools()->setCurrentTool(LASSO);
+    const qreal x0 = clickPoint.x() - 4, y0 = clickPoint.y() - 4;
+    const qreal x1 = clickPoint.x() + 4, y1 = clickPoint.y() + 4;
+    scribbleArea->testMousePress(QPointF(x0, y0));
+    for (int i = 0; i <= 8; ++i)
+    {
+        const qreal t = qreal(i) / 8.0;
+        scribbleArea->testMouseMove(QPointF(x0 + t * (x1 - x0), y0));
+    }
+    for (int i = 0; i <= 8; ++i)
+    {
+        const qreal t = qreal(i) / 8.0;
+        scribbleArea->testMouseMove(QPointF(x1, y0 + t * (y1 - y0)));
+    }
+    for (int i = 0; i <= 8; ++i)
+    {
+        const qreal t = qreal(i) / 8.0;
+        scribbleArea->testMouseMove(QPointF(x1 - t * (x1 - x0), y1));
+    }
+    for (int i = 0; i <= 8; ++i)
+    {
+        const qreal t = qreal(i) / 8.0;
+        scribbleArea->testMouseMove(QPointF(x0, y1 - t * (y1 - y0)));
+    }
+    scribbleArea->testMouseRelease(QPointF(x0, y0));
+
+    REQUIRE(!editor->select()->selectionClipPath().isEmpty());
+
+    // bucket click through real events
+    editor->color()->setFrontColor(QColor(0, 0, 255));
+    editor->tools()->setCurrentTool(BUCKET);
+    scribbleArea->testMousePress(QPointF(clickPoint));
+    scribbleArea->testMouseRelease(QPointF(clickPoint));
+
+    BitmapImage* image = static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getLastBitmapImageAtFrame(1);
+    const QRgb got = image->constScanLine(clickPoint.x(), clickPoint.y());
+    REQUIRE(got != 0);
 
     delete scribbleArea;
     delete editor;
