@@ -4,13 +4,15 @@
 <context>
     <name>AboutDialog</name>
     <message>
+        <location filename="../app/ui/aboutdialog.ui" line="26"/>
         <source>About</source>
         <comment>About Dialog Window Title</comment>
-        <translation type="vanished">关于</translation>
+        <translation>关于</translation>
     </message>
     <message>
+        <location filename="../app/ui/aboutdialog.ui" line="52"/>
         <source>Developed by: &lt;b&gt;Pascal Naidon, Patrick Corrieri, Matt Chang&lt;/b&gt;&lt;br&gt;Thanks to Qt Framework&lt;br&gt;Distributed under the GNU General Public License, version 2</source>
-        <translation type="vanished">开发者：&lt;b&gt;Pascal Naidon、Patrick Corrieri、Matt Chang&lt;/b&gt;&lt;br&gt;感谢 Qt 框架&lt;br&gt;基于 GNU 通用公共许可证第 2 版分发</translation>
+        <translation>开发者：&lt;b&gt;Pascal Naidon、Patrick Corrieri、Matt Chang&lt;/b&gt;&lt;br&gt;感谢 Qt 框架&lt;br&gt;基于 GNU 通用公共许可证第 2 版分发</translation>
     </message>
     <message>
         <location filename="../app/src/aboutdialog.cpp" line="53"/>
@@ -256,48 +258,59 @@
 <context>
     <name>AddTransparencyToPaperDialog</name>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="14"/>
         <source>Replace Paper with Transparency</source>
-        <translation type="vanished">把纸张替换为透明</translation>
+        <translation>把纸张替换为透明</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="24"/>
         <source>Threshold</source>
-        <translation type="vanished">阈值</translation>
+        <translation>阈值</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="61"/>
         <source>Color values above this threshold will be made transparent</source>
-        <translation type="vanished">高于此阈值的颜色值将变为透明</translation>
+        <translation>高于此阈值的颜色值将变为透明</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="81"/>
         <source>Trace Red</source>
-        <translation type="vanished">提取红色</translation>
+        <translation>提取红色</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="109"/>
         <source>Trace Green</source>
-        <translation type="vanished">提取绿色</translation>
+        <translation>提取绿色</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="137"/>
         <source>Trace Blue</source>
-        <translation type="vanished">提取蓝色</translation>
+        <translation>提取蓝色</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="170"/>
         <source>Apply to:</source>
-        <translation type="vanished">应用到：</translation>
+        <translation>应用到：</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="176"/>
         <source>Current Keyframe</source>
-        <translation type="vanished">当前关键帧</translation>
+        <translation>当前关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="183"/>
         <source>All Keyframes on Layer</source>
-        <translation type="vanished">图层上的所有关键帧</translation>
+        <translation>图层上的所有关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="245"/>
         <source>Zoom</source>
-        <translation type="vanished">缩放</translation>
+        <translation>缩放</translation>
     </message>
     <message>
+        <location filename="../app/ui/addtransparencytopaperdialog.ui" line="265"/>
         <source>Test Transparency</source>
-        <translation type="vanished">测试透明效果</translation>
+        <translation>测试透明效果</translation>
     </message>
     <message>
         <location filename="../app/src/addtransparencytopaperdialog.cpp" line="153"/>
@@ -690,16 +703,79 @@
 <context>
     <name>BucketOptionsWidget</name>
     <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="20"/>
         <source>Form</source>
-        <translation type="vanished">表格</translation>
+        <translation>表格</translation>
     </message>
     <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="54"/>
         <source>Reference</source>
-        <translation type="vanished">参考</translation>
+        <translation>参考</translation>
     </message>
     <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="78"/>
         <source>Blend mode</source>
-        <translation type="vanished">混合模式</translation>
+        <translation>混合模式</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="102"/>
+        <source>模式</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="115"/>
+        <source>连续区域：填充点击处的封闭区域；相似颜色：填充全图中颜色相近的所有区域（Shift+点击临时使用）；到边界色：填充直到指定颜色为止；选区填充：填充活动选区（Alt+点击临时使用）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="129"/>
+        <source>边界色</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="142"/>
+        <source>到边界色模式停止填充的颜色，通常为线稿颜色</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="156"/>
+        <source>拖拽填充</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="169"/>
+        <source>按住拖动时的填充行为：仅相似区域只填充与起笔处颜色相近的区域（适合线稿上色）；任意区域填充拖过的一切；不用则仅单击填充</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="254"/>
+        <source>封闭线稿中不超过该像素数的缺口，防止填充物涌出（Krita 同款算法）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="274"/>
+        <source>用高斯模糊羽化填充边缘</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="288"/>
+        <source>边缘抗锯齿</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="291"/>
+        <source>平滑填充边缘的锯齿（与羽化互斥，羽化优先）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="298"/>
+        <source>扩展止于最深色</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/bucketoptionswidget.ui" line="301"/>
+        <source>扩展填充时遇到更深或更不透明的线稿像素即停止，避免越过线条</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="60"/>
@@ -1145,83 +1221,103 @@
 <context>
     <name>CameraOptionsWidget</name>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="35"/>
         <source>Transform</source>
-        <translation type="vanished">变换</translation>
+        <translation>变换</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="56"/>
         <source>Reset scaling</source>
-        <translation type="vanished">重置缩放</translation>
+        <translation>重置缩放</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="73"/>
         <source>Reset rotation</source>
-        <translation type="vanished">重置旋转</translation>
+        <translation>重置旋转</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="90"/>
         <source>Reset</source>
-        <translation type="vanished">重置</translation>
+        <translation>重置</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="97"/>
         <source>Reset translation</source>
-        <translation type="vanished">重置位移</translation>
+        <translation>重置位移</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="114"/>
         <source>Reset all transforms</source>
-        <translation type="vanished">重置全部变换</translation>
+        <translation>重置全部变换</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="117"/>
         <source>Reset all</source>
-        <translation type="vanished">全部重置</translation>
+        <translation>全部重置</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="127"/>
         <source>Camera path</source>
-        <translation type="vanished">相机路径</translation>
+        <translation>相机路径</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="150"/>
         <source>Show interpolation path</source>
-        <translation type="vanished">显示插值路径</translation>
+        <translation>显示插值路径</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="153"/>
         <source>Show path</source>
-        <translation type="vanished">显示路径</translation>
+        <translation>显示路径</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="161"/>
         <source>Red</source>
-        <translation type="vanished">红色</translation>
+        <translation>红色</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="166"/>
         <source>Blue</source>
-        <translation type="vanished">蓝色</translation>
+        <translation>蓝色</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="171"/>
         <source>Green</source>
-        <translation type="vanished">绿色</translation>
+        <translation>绿色</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="176"/>
         <source>Black</source>
-        <translation type="vanished">黑色</translation>
+        <translation>黑色</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="181"/>
         <source>White</source>
-        <translation type="vanished">白色</translation>
+        <translation>白色</translation>
     </message>
     <message>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="206"/>
+        <location filename="../app/ui/cameraoptionswidget.ui" line="209"/>
         <source>Reset path</source>
-        <translation type="vanished">重置路径</translation>
+        <translation>重置路径</translation>
     </message>
 </context>
 <context>
     <name>CameraPropertiesDialog</name>
     <message>
+        <location filename="../app/ui/camerapropertiesdialog.ui" line="14"/>
         <source>Camera Properties</source>
-        <translation type="vanished">相机属性</translation>
+        <translation>相机属性</translation>
     </message>
     <message>
+        <location filename="../app/ui/camerapropertiesdialog.ui" line="22"/>
         <source>Camera name:</source>
-        <translation type="vanished">相机名:</translation>
+        <translation>相机名:</translation>
     </message>
     <message>
+        <location filename="../app/ui/camerapropertiesdialog.ui" line="36"/>
         <source>Camera size:</source>
-        <translation type="vanished">相机尺寸:</translation>
+        <translation>相机尺寸:</translation>
     </message>
 </context>
 <context>
@@ -1311,48 +1407,62 @@
 <context>
     <name>ColorInspector</name>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="52"/>
         <source>HSV</source>
-        <translation type="vanished">HSV</translation>
+        <translation>HSV</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="70"/>
         <source>H</source>
-        <translation type="vanished">色调</translation>
+        <translation>色调</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="77"/>
         <source>S</source>
-        <translation type="vanished">饱和度</translation>
+        <translation>饱和度</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="84"/>
         <source>V</source>
-        <translation type="vanished">明度</translation>
+        <translation>明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="91"/>
+        <location filename="../app/ui/colorinspector.ui" line="197"/>
         <source>A</source>
-        <translation type="vanished">A</translation>
+        <translation>A</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="138"/>
         <source>°</source>
-        <translation type="vanished">°</translation>
+        <translation>°</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="148"/>
+        <location filename="../app/ui/colorinspector.ui" line="158"/>
+        <location filename="../app/ui/colorinspector.ui" line="168"/>
         <source>%</source>
-        <translation type="vanished">%</translation>
+        <translation>%</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="179"/>
         <source>RGB</source>
-        <translation type="vanished">RGB</translation>
+        <translation>RGB</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="204"/>
         <source>G</source>
-        <translation type="vanished">G</translation>
+        <translation>G</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="231"/>
         <source>B</source>
-        <translation type="vanished">B</translation>
+        <translation>B</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorinspector.ui" line="258"/>
         <source>R</source>
-        <translation type="vanished">R</translation>
+        <translation>R</translation>
     </message>
     <message>
         <location filename="../app/src/colorinspector.cpp" line="33"/>
@@ -1364,73 +1474,90 @@
 <context>
     <name>ColorPalette</name>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="20"/>
         <source>Color Palette</source>
         <comment>Window title of color palette.</comment>
-        <translation type="vanished">调色板</translation>
+        <translation>调色板</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="53"/>
         <source>Add Color</source>
-        <translation type="vanished">增加颜色</translation>
+        <translation>增加颜色</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="88"/>
         <source>Remove Color</source>
-        <translation type="vanished">删除颜色</translation>
+        <translation>删除颜色</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="148"/>
         <source>Native color dialog window</source>
-        <translation type="vanished">操作系统原生颜色对话窗口</translation>
+        <translation>操作系统原生颜色对话窗口</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="279"/>
         <source>List Mode</source>
-        <translation type="vanished">列表模式</translation>
+        <translation>列表模式</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="282"/>
         <source>Show palette as a list</source>
-        <translation type="vanished">列表显示调色板</translation>
+        <translation>列表显示调色板</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="290"/>
         <source>Grid Mode</source>
-        <translation type="vanished">栅格模式</translation>
+        <translation>栅格模式</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="293"/>
         <source>Show palette as icons</source>
-        <translation type="vanished">图标显示调色板</translation>
+        <translation>图标显示调色板</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="303"/>
         <source>Small swatch</source>
-        <translation type="vanished">小色块</translation>
+        <translation>小色块</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="306"/>
         <source>Sets swatch size to: 16x16px</source>
-        <translation type="vanished">设置色块尺寸为: 16x16px</translation>
+        <translation>设置色块尺寸为: 16x16px</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="314"/>
         <source>Medium Swatch</source>
-        <translation type="vanished">中色块</translation>
+        <translation>中色块</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="317"/>
         <source>Sets swatch size to: 26x26px</source>
-        <translation type="vanished">设置色块尺寸为: 26x26px</translation>
+        <translation>设置色块尺寸为: 26x26px</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="328"/>
         <source>Large Swatch</source>
-        <translation type="vanished">大色块</translation>
+        <translation>大色块</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="331"/>
         <source>Sets swatch size to: 36x36px</source>
-        <translation type="vanished">设置色块尺寸为: 36x36px</translation>
+        <translation>设置色块尺寸为: 36x36px</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="339"/>
         <source>Fit Swatch</source>
-        <translation type="vanished">适配色块</translation>
+        <translation>适配色块</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="342"/>
         <source>Fit swatch to window (19-36 px)</source>
-        <translation type="vanished">色块适配窗口（19-36 像素）</translation>
+        <translation>色块适配窗口（19-36 像素）</translation>
     </message>
     <message>
+        <location filename="../app/ui/colorpalette.ui" line="345"/>
         <source>Swatch fits window</source>
-        <translation type="vanished">色块适配窗口</translation>
+        <translation>色块适配窗口</translation>
     </message>
 </context>
 <context>
@@ -2983,12 +3110,14 @@
 <context>
     <name>DoubleProgressDialog</name>
     <message>
+        <location filename="../app/ui/doubleprogressdialog.ui" line="27"/>
         <source>Loading...</source>
-        <translation type="vanished">加载中...</translation>
+        <translation>加载中...</translation>
     </message>
     <message>
+        <location filename="../app/ui/doubleprogressdialog.ui" line="56"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
 </context>
 <context>
@@ -3117,20 +3246,24 @@
 <context>
     <name>ErrorDialog</name>
     <message>
+        <location filename="../app/ui/errordialog.ui" line="20"/>
         <source>Dialog</source>
-        <translation type="vanished">对话框</translation>
+        <translation>对话框</translation>
     </message>
     <message>
+        <location filename="../app/ui/errordialog.ui" line="55"/>
         <source>&lt;h3&gt;Title&lt;/h3&gt;</source>
-        <translation type="vanished">&lt;h3&gt;标题&lt;/h3&gt;</translation>
+        <translation>&lt;h3&gt;标题&lt;/h3&gt;</translation>
     </message>
     <message>
+        <location filename="../app/ui/errordialog.ui" line="68"/>
         <source>Description</source>
-        <translation type="vanished">描述</translation>
+        <translation>描述</translation>
     </message>
     <message>
+        <location filename="../app/ui/errordialog.ui" line="88"/>
         <source>This report contains vital information. Copy all of it when submitting a bug.</source>
-        <translation type="vanished">此报告包含关键信息，提交错误时请全部复制。</translation>
+        <translation>此报告包含关键信息，提交错误时请全部复制。</translation>
     </message>
     <message>
         <location filename="../app/src/errordialog.cpp" line="41"/>
@@ -3154,72 +3287,89 @@
 <context>
     <name>ExportImageOptions</name>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="23"/>
         <source>Camera</source>
-        <translation type="vanished">相机</translation>
+        <translation>相机</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="35"/>
         <source>Resolution</source>
-        <translation type="vanished">分辨率</translation>
+        <translation>分辨率</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="76"/>
         <source>Format</source>
-        <translation type="vanished">格式</translation>
+        <translation>格式</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="83"/>
         <source>PNG</source>
-        <translation type="vanished">PNG</translation>
+        <translation>PNG</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="88"/>
         <source>JPG</source>
-        <translation type="vanished">JPG</translation>
+        <translation>JPG</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="93"/>
         <source>BMP</source>
-        <translation type="vanished">BMP</translation>
+        <translation>BMP</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="98"/>
         <source>TIFF</source>
-        <translation type="vanished">TIFF</translation>
+        <translation>TIFF</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="103"/>
         <source>WEBP</source>
-        <translation type="vanished">WEBP</translation>
+        <translation>WEBP</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="111"/>
         <source>Transparency</source>
-        <translation type="vanished">透明</translation>
+        <translation>透明</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="121"/>
         <source>Range</source>
-        <translation type="vanished">范围</translation>
+        <translation>范围</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="154"/>
         <source>The last frame you want to include in the exported movie</source>
-        <translation type="vanished">要包含在导出电影里的最后一帧</translation>
+        <translation>要包含在导出电影里的最后一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="157"/>
         <source>End Frame</source>
-        <translation type="vanished">结束帧</translation>
+        <translation>结束帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="182"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;End frame is set to last paintable keyframe (Useful when you only want to export to the last animated frame)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;结束帧设置成最后一个可以绘制的关键帧(用于想导出最后一个动画帧时)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;结束帧设置成最后一个可以绘制的关键帧(用于想导出最后一个动画帧时)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="188"/>
         <source>To the end of sound clips</source>
-        <translation type="vanished">到声音剪辑的结尾处</translation>
+        <translation>到声音剪辑的结尾处</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="220"/>
         <source>The first frame you want to include in the exported movie</source>
-        <translation type="vanished">要包含在导出电影里的第一帧</translation>
+        <translation>要包含在导出电影里的第一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="223"/>
         <source>Start Frame</source>
-        <translation type="vanished">起始帧</translation>
+        <translation>起始帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportimageoptions.ui" line="243"/>
         <source>Export keyframes only</source>
-        <translation type="vanished">仅导出关键帧</translation>
+        <translation>仅导出关键帧</translation>
     </message>
 </context>
 <context>
@@ -3238,76 +3388,94 @@
 <context>
     <name>ExportMovieOptions</name>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="29"/>
         <source>Camera</source>
-        <translation type="vanished">相机</translation>
+        <translation>相机</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="41"/>
         <source>Resolution</source>
-        <translation type="vanished">分辨率</translation>
+        <translation>分辨率</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="59"/>
         <source>Width</source>
-        <translation type="vanished">宽度</translation>
+        <translation>宽度</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="66"/>
         <source>The MP4 format does not support odd width. Please specify an even width or use a different file format.</source>
-        <translation type="vanished">MP4 格式不支持奇数宽度。请指定偶数宽度或改用其他文件格式。</translation>
+        <translation>MP4 格式不支持奇数宽度。请指定偶数宽度或改用其他文件格式。</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="98"/>
         <source>Height</source>
-        <translation type="vanished">高度</translation>
+        <translation>高度</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="105"/>
         <source>The MP4 format does not support odd height. Please specify an even height or use a different file format.</source>
-        <translation type="vanished">MP4 格式不支持奇数高度。请指定偶数高度或改用其他文件格式。</translation>
+        <translation>MP4 格式不支持奇数高度。请指定偶数高度或改用其他文件格式。</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="128"/>
         <source>Range</source>
-        <translation type="vanished">范围</translation>
+        <translation>范围</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="174"/>
         <source>The last frame you want to include in the exported movie</source>
-        <translation type="vanished">要导出在电影中的最后一帧</translation>
+        <translation>要导出在电影中的最后一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="177"/>
         <source>End Frame</source>
-        <translation type="vanished">结束帧</translation>
+        <translation>结束帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="196"/>
         <source>The first frame you want to include in the exported movie</source>
-        <translation type="vanished">要 包含在导出电影里的第一帧</translation>
+        <translation>要 包含在导出电影里的第一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="199"/>
         <source>Start Frame</source>
-        <translation type="vanished">起始帧</translation>
+        <translation>起始帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="224"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;End frame is set to last paintable keyframe (Useful when you only want to export to the last animated frame)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;结束帧设置成最后一个可以绘制的关键帧(用于想导出最后一个动画帧时)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;结束帧设置成最后一个可以绘制的关键帧(用于想导出最后一个动画帧时)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="230"/>
         <source>To the end of sound clips</source>
-        <translation type="vanished">到声音剪辑的结尾处</translation>
+        <translation>到声音剪辑的结尾处</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="253"/>
         <source>GIF and APNG only</source>
-        <translation type="vanished">仅 GIF 和 APNG</translation>
+        <translation>仅 GIF 和 APNG</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="256"/>
         <source>Loop</source>
-        <translation type="vanished">循环</translation>
+        <translation>循环</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="269"/>
         <source>Exporter Settings</source>
-        <translation type="vanished">导出器设置</translation>
+        <translation>导出器设置</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="287"/>
         <source>WebM and APNG only</source>
-        <translation type="vanished">仅 WebM 和 APNG</translation>
+        <translation>仅 WebM 和 APNG</translation>
     </message>
     <message>
+        <location filename="../app/ui/exportmovieoptions.ui" line="290"/>
         <source>Transparency</source>
-        <translation type="vanished">透明</translation>
+        <translation>透明</translation>
     </message>
 </context>
 <context>
@@ -3566,59 +3734,73 @@
 <context>
     <name>FilesPage</name>
     <message>
+        <location filename="../app/ui/filespage.ui" line="17"/>
         <source>Startup Settings</source>
-        <translation type="vanished">启动设定</translation>
+        <translation>启动设定</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="25"/>
+        <location filename="../app/ui/filespage.ui" line="28"/>
         <source>Saving the current project as a preset</source>
-        <translation type="vanished">保存当前项目为范本</translation>
+        <translation>保存当前项目为范本</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="31"/>
         <source>+</source>
-        <translation type="vanished">+</translation>
+        <translation>+</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="38"/>
         <source>-</source>
-        <translation type="vanished">-</translation>
+        <translation>-</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="45"/>
         <source>Make Default</source>
-        <translation type="vanished">设定为默认范本</translation>
+        <translation>设定为默认范本</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="61"/>
         <source>Ask on startup</source>
-        <translation type="vanished">在启动时询问</translation>
+        <translation>在启动时询问</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="74"/>
         <source>Load default preset</source>
-        <translation type="vanished">加载默认预设</translation>
+        <translation>加载默认预设</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="87"/>
         <source>Load last active file</source>
-        <translation type="vanished">載入最近一個檔案</translation>
+        <translation>載入最近一個檔案</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="100"/>
         <source>Autosave documents</source>
         <comment>Preference</comment>
-        <translation type="vanished">自动保存文档</translation>
+        <translation>自动保存文档</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="106"/>
         <source>Enable autosave by number of modifications</source>
         <comment>Preference</comment>
-        <translation type="vanished">按修改次数自动保存</translation>
+        <translation>按修改次数自动保存</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="152"/>
         <source>Enable autosave by time</source>
-        <translation type="vanished">按时间自动保存</translation>
+        <translation>按时间自动保存</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="177"/>
         <source>Autosave period (minutes)</source>
-        <translation type="vanished">自动保存间隔（分钟）</translation>
+        <translation>自动保存间隔（分钟）</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="113"/>
         <source>Number of modifications before autosaving:</source>
         <comment>Preference</comment>
-        <translation type="vanished">自动保存前的修改数:</translation>
+        <translation>自动保存前的修改数:</translation>
     </message>
     <message>
         <location filename="../app/src/filespage.cpp" line="98"/>
@@ -3844,145 +4026,179 @@
 <context>
     <name>GeneralPage</name>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="38"/>
         <source>Language</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">语言</translation>
+        <translation>语言</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="44"/>
+        <location filename="../app/ui/generalpage.ui" line="48"/>
         <source>[System-Language]</source>
         <comment>First item of the language list</comment>
-        <translation type="vanished">[系统语言]</translation>
+        <translation>[系统语言]</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="59"/>
         <source>Window opacity</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">窗口不透明度</translation>
+        <translation>窗口不透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="65"/>
         <source>Opacity</source>
-        <translation type="vanished">不透明度</translation>
+        <translation>不透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="88"/>
         <source>Appearance</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">外观</translation>
+        <translation>外观</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="94"/>
         <source>Shadows</source>
-        <translation type="vanished">阴影</translation>
+        <translation>阴影</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="101"/>
         <source>Tool Cursors</source>
-        <translation type="vanished">工具光标</translation>
+        <translation>工具光标</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="108"/>
         <source>Canvas Cursor</source>
-        <translation type="vanished">画布光标</translation>
+        <translation>画布光标</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="118"/>
         <source>Background</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">背景</translation>
+        <translation>背景</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="162"/>
         <source>Canvas</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">画布</translation>
+        <translation>画布</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="168"/>
         <source>Antialiasing</source>
-        <translation type="vanished">抗锯齿</translation>
+        <translation>抗锯齿</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="191"/>
         <source>Editing</source>
         <comment>GroupBox title in Preference</comment>
-        <translation type="vanished">编辑</translation>
+        <translation>编辑</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="197"/>
         <source>Vector curve smoothing</source>
-        <translation type="vanished">矢量曲线平滑</translation>
+        <translation>矢量曲线平滑</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="217"/>
         <source>Tablet high-resolution position</source>
-        <translation type="vanished">绘图板高分辨率位置</translation>
+        <translation>绘图板高分辨率位置</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="227"/>
         <source>Grid</source>
         <comment>groupBox title in Preference</comment>
-        <translation type="vanished">栅格</translation>
+        <translation>栅格</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="233"/>
         <source>Grid Height</source>
-        <translation type="vanished">栅格高度</translation>
+        <translation>栅格高度</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="240"/>
         <source>Enable Grid</source>
-        <translation type="vanished">启用栅格</translation>
+        <translation>启用栅格</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="285"/>
         <source>Grid Width</source>
-        <translation type="vanished">栅格宽度</translation>
+        <translation>栅格宽度</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="295"/>
         <source>Overlays</source>
-        <translation type="vanished">叠加</translation>
+        <translation>叠加</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="311"/>
         <source>Enable Action Safe area (%)</source>
-        <translation type="vanished">启用操作安全区域 (%)</translation>
+        <translation>启用操作安全区域 (%)</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="354"/>
         <source>Enable Title Safe area (%)</source>
-        <translation type="vanished">启用标题安全区域 (%)</translation>
+        <translation>启用标题安全区域 (%)</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="394"/>
         <source>Show Safe area labels</source>
-        <translation type="vanished">显示安全区域标签</translation>
+        <translation>显示安全区域标签</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="404"/>
         <source>Scroll Wheel Zoom</source>
-        <translation type="vanished">滚轮缩放</translation>
+        <translation>滚轮缩放</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="422"/>
         <source>Invert Scroll Direction</source>
-        <translation type="vanished">反转滚动方向</translation>
+        <translation>反转滚动方向</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="432"/>
         <source>Advanced</source>
         <comment>groupBox title in Preference</comment>
-        <translation type="vanished">高级</translation>
+        <translation>高级</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="449"/>
         <source>Memory Cache Budget</source>
-        <translation type="vanished">高速缓存大小</translation>
+        <translation>高速缓存大小</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="480"/>
         <source>MB</source>
-        <translation type="vanished">MB</translation>
+        <translation>MB</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="501"/>
         <source>Undo/Redo</source>
-        <translation type="vanished">撤销/重做</translation>
+        <translation>撤销/重做</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="507"/>
         <source>Enable New System (Experimental)</source>
-        <translation type="vanished">启用新系统（实验性）</translation>
+        <translation>启用新系统（实验性）</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="519"/>
         <source>How many steps you&apos;re allowed to undo/redo</source>
-        <translation type="vanished">可撤销/重做的步数</translation>
+        <translation>可撤销/重做的步数</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="522"/>
         <source>Maximum Number of Undo/Redo Steps</source>
-        <translation type="vanished">撤销/重做最大步数</translation>
+        <translation>撤销/重做最大步数</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="555"/>
         <source>Apply</source>
-        <translation type="vanished">应用</translation>
+        <translation>应用</translation>
     </message>
     <message>
+        <location filename="../app/ui/generalpage.ui" line="562"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
     <message>
         <location filename="../app/src/generalpage.cpp" line="43"/>
@@ -4191,24 +4407,29 @@ Do you still want to try?</source>
 <context>
     <name>ImportExportDialog</name>
     <message>
+        <location filename="../app/ui/importexportdialog.ui" line="38"/>
         <source>Instructions</source>
-        <translation type="vanished">使用说明</translation>
+        <translation>使用说明</translation>
     </message>
     <message>
+        <location filename="../app/ui/importexportdialog.ui" line="48"/>
         <source>File</source>
-        <translation type="vanished">文件</translation>
+        <translation>文件</translation>
     </message>
     <message>
+        <location filename="../app/ui/importexportdialog.ui" line="79"/>
         <source>Browse...</source>
-        <translation type="vanished">浏览...</translation>
+        <translation>浏览...</translation>
     </message>
     <message>
+        <location filename="../app/ui/importexportdialog.ui" line="89"/>
         <source>Options</source>
-        <translation type="vanished">选项</translation>
+        <translation>选项</translation>
     </message>
     <message>
+        <location filename="../app/ui/importexportdialog.ui" line="96"/>
         <source>Imports</source>
-        <translation type="vanished">导入</translation>
+        <translation>导入</translation>
     </message>
 </context>
 <context>
@@ -4284,42 +4505,50 @@ Read the instructions and try again</source>
 <context>
     <name>ImportImageSeqOptions</name>
     <message>
+        <location filename="../app/ui/importimageseqoptions.ui" line="38"/>
         <source>Import an image every # frame</source>
-        <translation type="vanished">每 # 帧导入一幅图像</translation>
+        <translation>每 # 帧导入一幅图像</translation>
     </message>
 </context>
 <context>
     <name>ImportImageSeqPreviewGroupBox</name>
     <message>
+        <location filename="../app/ui/importimageseqpreview.ui" line="14"/>
         <source>GroupBox</source>
-        <translation type="vanished">分组框</translation>
+        <translation>分组框</translation>
     </message>
 </context>
 <context>
     <name>ImportLayersDialog</name>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="14"/>
         <source>Import Layers from other *.pclx files</source>
-        <translation type="vanished">从其他 pclx 文件导入图层</translation>
+        <translation>从其他 pclx 文件导入图层</translation>
     </message>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="22"/>
         <source>1. Select Project file:</source>
-        <translation type="vanished">1. 选择项目文件：</translation>
+        <translation>1. 选择项目文件：</translation>
     </message>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="42"/>
         <source>Select File</source>
-        <translation type="vanished">选择文件</translation>
+        <translation>选择文件</translation>
     </message>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="51"/>
         <source>2. Select layers from file:</source>
-        <translation type="vanished">2. 从文件中选择图层：</translation>
+        <translation>2. 从文件中选择图层：</translation>
     </message>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="76"/>
         <source>Close</source>
-        <translation type="vanished">关闭</translation>
+        <translation>关闭</translation>
     </message>
     <message>
+        <location filename="../app/ui/importlayersdialog.ui" line="83"/>
         <source>Import layers</source>
-        <translation type="vanished">导入图层</translation>
+        <translation>导入图层</translation>
     </message>
     <message>
         <location filename="../app/src/importlayersdialog.cpp" line="62"/>
@@ -4340,12 +4569,14 @@ Read the instructions and try again</source>
 <context>
     <name>ImportPositionDialog</name>
     <message>
+        <location filename="../app/ui/importpositiondialog.ui" line="14"/>
         <source>Import position</source>
-        <translation type="vanished">导入位置</translation>
+        <translation>导入位置</translation>
     </message>
     <message>
+        <location filename="../app/ui/importpositiondialog.ui" line="22"/>
         <source>Import image/s relative to:</source>
-        <translation type="vanished">导入图片的相对参照：</translation>
+        <translation>导入图片的相对参照：</translation>
     </message>
     <message>
         <location filename="../app/src/importpositiondialog.cpp" line="31"/>
@@ -4450,64 +4681,80 @@ Read the instructions and try again</source>
 <context>
     <name>LayerOpacityDialog</name>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="14"/>
         <source>Layer / Keyframe Opacity</source>
-        <translation type="vanished">图层/关键帧透明度</translation>
+        <translation>图层/关键帧透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="22"/>
         <source>Layer: </source>
-        <translation type="vanished">图层：</translation>
+        <translation>图层：</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="46"/>
+        <location filename="../app/ui/layeropacitydialog.ui" line="65"/>
         <source>% transparency</source>
-        <translation type="vanished">% 透明度</translation>
+        <translation>% 透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="68"/>
         <source> %</source>
-        <translation type="vanished">%</translation>
+        <translation>%</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="83"/>
         <source>Set opacity for:</source>
-        <translation type="vanished">设置不透明度：</translation>
+        <translation>设置不透明度：</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="89"/>
         <source>Active keyframe</source>
-        <translation type="vanished">当前关键帧</translation>
+        <translation>当前关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="99"/>
         <source>Selected keyframe(s)</source>
-        <translation type="vanished">选定的关键帧</translation>
+        <translation>选定的关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="106"/>
         <source>Layer</source>
-        <translation type="vanished">图层</translation>
+        <translation>图层</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="116"/>
         <source>Fade in / Fade out</source>
-        <translation type="vanished">淡入/淡出</translation>
+        <translation>淡入/淡出</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="122"/>
         <source>Fade in over selcted keyframes</source>
-        <translation type="vanished">在选定的多个关键帧上淡入</translation>
+        <translation>在选定的多个关键帧上淡入</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="125"/>
         <source>Fade in</source>
-        <translation type="vanished">淡入</translation>
+        <translation>淡入</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="135"/>
         <source>Fade out over selected keyframes</source>
-        <translation type="vanished">在选定的多个关键帧上淡出</translation>
+        <translation>在选定的多个关键帧上淡出</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="138"/>
         <source>Fade out</source>
-        <translation type="vanished">淡出</translation>
+        <translation>淡出</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="166"/>
         <source>Close</source>
-        <translation type="vanished">关闭</translation>
+        <translation>关闭</translation>
     </message>
     <message>
+        <location filename="../app/ui/layeropacitydialog.ui" line="178"/>
         <source>Be aware that opacity changes are made in the rendering, and will not change your artwork.</source>
-        <translation type="vanished">请注意，不透明度的改变是在渲染中进行的，并不会改变你的图稿。</translation>
+        <translation>请注意，不透明度的改变是在渲染中进行的，并不会改变你的图稿。</translation>
     </message>
     <message>
         <location filename="../app/src/layeropacitydialog.cpp" line="59"/>
@@ -4575,587 +4822,743 @@ Read the instructions and try again</source>
 <context>
     <name>MainWindow2</name>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="14"/>
         <source>MainWindow</source>
-        <translation type="vanished">主窗口</translation>
+        <translation>主窗口</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="75"/>
         <source>File</source>
-        <translation type="vanished">文件</translation>
+        <translation>文件</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="79"/>
         <source>Import</source>
-        <translation type="vanished">导入</translation>
+        <translation>导入</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="97"/>
         <source>Export</source>
-        <translation type="vanished">导出</translation>
+        <translation>导出</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="119"/>
         <source>Edit</source>
-        <translation type="vanished">编辑</translation>
+        <translation>编辑</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="123"/>
         <source>Selection</source>
-        <translation type="vanished">选择</translation>
+        <translation>选择</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="155"/>
         <source>View</source>
-        <translation type="vanished">查看</translation>
+        <translation>查看</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="159"/>
         <source>Onion Skin</source>
-        <translation type="vanished">洋葱皮</translation>
+        <translation>洋葱皮</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="166"/>
         <source>Zoom</source>
-        <translation type="vanished">缩放</translation>
+        <translation>缩放</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="182"/>
         <source>Layer Visibility</source>
-        <translation type="vanished">图层可见性</translation>
+        <translation>图层可见性</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="190"/>
         <source>Overlays</source>
-        <translation type="vanished">叠加</translation>
+        <translation>叠加</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="194"/>
         <source>Perspective Lines Angle</source>
-        <translation type="vanished">透视线角度</translation>
+        <translation>透视线角度</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="240"/>
         <source>Animation</source>
-        <translation type="vanished">动画</translation>
+        <translation>动画</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="244"/>
         <source>Timeline Selection</source>
-        <translation type="vanished">时间轴选区</translation>
+        <translation>时间轴选区</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="276"/>
         <source>Tools</source>
-        <translation type="vanished">工具</translation>
+        <translation>工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="297"/>
         <source>Layer</source>
-        <translation type="vanished">层</translation>
+        <translation>层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="301"/>
         <source>Change line color</source>
-        <translation type="vanished">更改线条颜色</translation>
+        <translation>更改线条颜色</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="318"/>
+        <location filename="../app/ui/mainwindow2.ui" line="848"/>
         <source>Help</source>
-        <translation type="vanished">帮助</translation>
+        <translation>帮助</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="326"/>
         <source>Windows</source>
-        <translation type="vanished">窗口</translation>
+        <translation>窗口</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="330"/>
         <source>Toolbars</source>
-        <translation type="vanished">工具栏</translation>
+        <translation>工具栏</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="354"/>
         <source>New</source>
-        <translation type="vanished">新建</translation>
+        <translation>新建</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="363"/>
         <source>Open</source>
-        <translation type="vanished">打开</translation>
+        <translation>打开</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="372"/>
         <source>Save</source>
-        <translation type="vanished">保存</translation>
+        <translation>保存</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="381"/>
         <source>Save As...</source>
-        <translation type="vanished">另存为...</translation>
+        <translation>另存为...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="386"/>
         <source>Exit</source>
-        <translation type="vanished">退出</translation>
+        <translation>退出</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="391"/>
+        <location filename="../app/ui/mainwindow2.ui" line="419"/>
         <source>Image Sequence...</source>
-        <translation type="vanished">图像序列...</translation>
+        <translation>图像序列...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="396"/>
+        <location filename="../app/ui/mainwindow2.ui" line="414"/>
         <source>Image...</source>
-        <translation type="vanished">图像...</translation>
+        <translation>图像...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="401"/>
         <source>Movie...</source>
-        <translation type="vanished">电影...</translation>
+        <translation>电影...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="409"/>
         <source>Palette</source>
-        <translation type="vanished">调色板</translation>
+        <translation>调色板</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="424"/>
         <source>Movie Video...</source>
-        <translation type="vanished">电影视频...</translation>
+        <translation>电影视频...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="429"/>
         <source>Sound...</source>
-        <translation type="vanished">声音...</translation>
+        <translation>声音...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="434"/>
         <source>Image Predefined set...</source>
-        <translation type="vanished">图像预设集...</translation>
+        <translation>图像预设集...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="443"/>
         <source>Undo</source>
-        <translation type="vanished">撤销</translation>
+        <translation>撤销</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="452"/>
         <source>Redo</source>
-        <translation type="vanished">重做</translation>
+        <translation>重做</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="464"/>
         <source>Cut</source>
-        <translation type="vanished">剪切</translation>
+        <translation>剪切</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="476"/>
         <source>Copy</source>
-        <translation type="vanished">复制</translation>
+        <translation>复制</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="488"/>
         <source>Paste</source>
-        <translation type="vanished">粘贴</translation>
+        <translation>粘贴</translation>
     </message>
     <message>
         <source>间隙填充…</source>
         <translation type="vanished">间隙填充…</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1093"/>
         <source>Center</source>
         <comment>To move sth. to the center</comment>
-        <translation type="vanished">中心</translation>
+        <translation>中心</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1103"/>
         <source>Replace Paper with Transparency</source>
-        <translation type="vanished">把纸张替换为透明</translation>
+        <translation>把纸张替换为透明</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1139"/>
+        <location filename="../app/ui/mainwindow2.ui" line="1142"/>
         <source>Paste from Previous Keyframe</source>
-        <translation type="vanished">从上一关键帧粘贴</translation>
+        <translation>从上一关键帧粘贴</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1154"/>
         <source>Center</source>
         <comment>The middle point of an area</comment>
-        <translation type="vanished">中心</translation>
+        <translation>中心</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1166"/>
         <source>Thirds</source>
-        <translation type="vanished">三分法</translation>
+        <translation>三分法</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1178"/>
         <source>Golden Ratio</source>
-        <translation type="vanished">黄金比例</translation>
+        <translation>黄金比例</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1190"/>
         <source>Safe Areas</source>
-        <translation type="vanished">安全框</translation>
+        <translation>安全框</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1202"/>
         <source>One Point Perspective</source>
-        <translation type="vanished">一点透视</translation>
+        <translation>一点透视</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1214"/>
         <source>Two Point Perspective</source>
-        <translation type="vanished">两点透视</translation>
+        <translation>两点透视</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1226"/>
         <source>Three Point Perspective</source>
-        <translation type="vanished">三点透视</translation>
+        <translation>三点透视</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1234"/>
         <source>2°</source>
-        <translation type="vanished">2°</translation>
+        <translation>2°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1242"/>
         <source>3°</source>
-        <translation type="vanished">3°</translation>
+        <translation>3°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1250"/>
         <source>5°</source>
-        <translation type="vanished">5°</translation>
+        <translation>5°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1258"/>
         <source>7.5°</source>
-        <translation type="vanished">7.5°</translation>
+        <translation>7.5°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1266"/>
         <source>10°</source>
-        <translation type="vanished">10°</translation>
+        <translation>10°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1274"/>
         <source>15°</source>
-        <translation type="vanished">15°</translation>
+        <translation>15°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1282"/>
         <source>20°</source>
-        <translation type="vanished">20°</translation>
+        <translation>20°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1290"/>
         <source>30°</source>
-        <translation type="vanished">30°</translation>
+        <translation>30°</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="493"/>
         <source>Select All</source>
-        <translation type="vanished">选择全部</translation>
+        <translation>选择全部</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="130"/>
         <source>Prepare Scanned Drawings</source>
-        <translation type="vanished">扫描稿准备</translation>
+        <translation>扫描稿准备</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="498"/>
         <source>Deselect All</source>
-        <translation type="vanished">取消选择全部</translation>
+        <translation>取消选择全部</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="507"/>
         <source>Clear Frame</source>
-        <translation type="vanished">清除帧</translation>
+        <translation>清除帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="512"/>
         <source>Preferences</source>
-        <translation type="vanished">首选项</translation>
+        <translation>首选项</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="520"/>
         <source>Reset Windows</source>
-        <translation type="vanished">重置窗口</translation>
+        <translation>重置窗口</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="529"/>
         <source>Zoom In</source>
-        <translation type="vanished">放大</translation>
+        <translation>放大</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="538"/>
         <source>Zoom Out</source>
-        <translation type="vanished">缩小</translation>
+        <translation>缩小</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="543"/>
         <source>Rotate Clockwise</source>
-        <translation type="vanished">顺时针旋转</translation>
+        <translation>顺时针旋转</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="548"/>
         <source>Rotate Anticlockwise</source>
-        <translation type="vanished">逆时针旋转</translation>
+        <translation>逆时针旋转</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="557"/>
         <source>Reset</source>
-        <translation type="vanished">重置</translation>
+        <translation>重置</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="569"/>
         <source>Horizontal Flip</source>
-        <translation type="vanished">水平反转</translation>
+        <translation>水平反转</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="581"/>
         <source>Vertical Flip</source>
-        <translation type="vanished">垂直反转</translation>
+        <translation>垂直反转</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="593"/>
         <source>Grid</source>
-        <translation type="vanished">栅格</translation>
+        <translation>栅格</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="605"/>
         <source>Previous</source>
-        <translation type="vanished">前一帧</translation>
+        <translation>前一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="608"/>
         <source>Show previous onion skin</source>
-        <translation type="vanished">显示前一帧洋葱皮</translation>
+        <translation>显示前一帧洋葱皮</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="620"/>
         <source>Next</source>
-        <translation type="vanished">后一帧</translation>
+        <translation>后一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="623"/>
         <source>Show next onion skin</source>
-        <translation type="vanished">显示后一帧洋葱皮</translation>
+        <translation>显示后一帧洋葱皮</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="632"/>
         <location filename="../app/src/mainwindow2.cpp" line="1853"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="644"/>
         <source>Loop</source>
-        <translation type="vanished">循环</translation>
+        <translation>循环</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="649"/>
         <source>Next Frame</source>
-        <translation type="vanished">后一帧</translation>
+        <translation>后一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="654"/>
         <source>Previous Frame</source>
-        <translation type="vanished">前一帧</translation>
+        <translation>前一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="663"/>
         <source>Add Frame</source>
-        <translation type="vanished">添加帧</translation>
+        <translation>添加帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="672"/>
         <source>Duplicate Frame</source>
-        <translation type="vanished">复制帧</translation>
+        <translation>复制帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="681"/>
         <source>Remove Frame</source>
-        <translation type="vanished">删除帧</translation>
+        <translation>删除帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="690"/>
         <source>Move</source>
-        <translation type="vanished">移动</translation>
+        <translation>移动</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="699"/>
+        <source>Onion Align</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mainwindow2.ui" line="708"/>
         <source>Select</source>
-        <translation type="vanished">选择</translation>
+        <translation>选择</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="717"/>
         <source>Lasso</source>
-        <translation type="vanished">套索</translation>
+        <translation>套索</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="726"/>
         <source>Deform</source>
-        <translation type="vanished">变形</translation>
+        <translation>变形</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="735"/>
         <source>Brush</source>
-        <translation type="vanished">画笔</translation>
+        <translation>画笔</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="744"/>
         <source>Polyline</source>
-        <translation type="vanished">折线</translation>
+        <translation>折线</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="753"/>
         <source>Smudge</source>
-        <translation type="vanished">涂抹</translation>
+        <translation>涂抹</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="762"/>
         <source>Pen</source>
-        <translation type="vanished">钢笔</translation>
+        <translation>钢笔</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="771"/>
         <source>Hand</source>
-        <translation type="vanished">抓手</translation>
+        <translation>抓手</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="780"/>
         <source>Pencil</source>
-        <translation type="vanished">铅笔</translation>
+        <translation>铅笔</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="789"/>
         <source>Bucket</source>
-        <translation type="vanished">颜料桶</translation>
+        <translation>颜料桶</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="798"/>
         <source>Eyedropper</source>
-        <translation type="vanished">吸管</translation>
+        <translation>吸管</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="807"/>
         <source>Eraser</source>
-        <translation type="vanished">橡皮擦</translation>
+        <translation>橡皮擦</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="816"/>
         <source>New Bitmap Layer</source>
-        <translation type="vanished">新建位图层</translation>
+        <translation>新建位图层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="825"/>
         <source>New Sound Layer</source>
-        <translation type="vanished">新建声音层</translation>
+        <translation>新建声音层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="834"/>
         <source>New Camera Layer</source>
-        <translation type="vanished">新建相机层</translation>
+        <translation>新建相机层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="843"/>
         <source>Delete Current Layer</source>
-        <translation type="vanished">删除当前层</translation>
+        <translation>删除当前层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="853"/>
         <source>About</source>
-        <translation type="vanished">关于</translation>
+        <translation>关于</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="858"/>
+        <location filename="../app/ui/mainwindow2.ui" line="861"/>
         <source>Reset to default</source>
-        <translation type="vanished">重置为默认</translation>
+        <translation>重置为默认</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="871"/>
+        <location filename="../app/ui/mainwindow2.ui" line="874"/>
         <source>Next Keyframe</source>
-        <translation type="vanished">后一关键帧</translation>
+        <translation>后一关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="884"/>
+        <location filename="../app/ui/mainwindow2.ui" line="887"/>
         <source>Previous KeyFrame</source>
-        <translation type="vanished">前一关键帧</translation>
+        <translation>前一关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="898"/>
         <source>Range</source>
-        <translation type="vanished">范围</translation>
+        <translation>范围</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="903"/>
         <source>Flip X</source>
-        <translation type="vanished">反转 X</translation>
+        <translation>反转 X</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="908"/>
         <source>Flip Y</source>
-        <translation type="vanished">反转 Y</translation>
+        <translation>反转 Y</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="913"/>
         <source>Move Frame Forward</source>
-        <translation type="vanished">向前移动帧</translation>
+        <translation>向前移动帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="918"/>
         <source>Move Frame Backward</source>
-        <translation type="vanished">向后移动帧</translation>
+        <translation>向后移动帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="923"/>
         <source>Pencil2D Website</source>
-        <translation type="vanished">Pencil2D 网站</translation>
+        <translation>Pencil2D 网站</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="928"/>
         <source>Report a Bug</source>
-        <translation type="vanished">报告问题</translation>
+        <translation>报告问题</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="933"/>
         <source>Quick Reference Guide</source>
-        <translation type="vanished">快速参考指南</translation>
+        <translation>快速参考指南</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="936"/>
         <source>F1</source>
-        <translation type="vanished">F1</translation>
+        <translation>F1</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="941"/>
         <source>Animated Image...</source>
-        <translation type="vanished">动图...</translation>
+        <translation>动图...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="946"/>
         <source>Animated GIF...</source>
-        <translation type="vanished">动画 GIF...</translation>
+        <translation>动画 GIF...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="951"/>
         <source>Check for Updates</source>
-        <translation type="vanished">检查更新</translation>
+        <translation>检查更新</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="956"/>
         <source>Pencil2D Forum</source>
-        <translation type="vanished">Pencil2D 论坛</translation>
+        <translation>Pencil2D 论坛</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="961"/>
         <source>Pencil2D Discord</source>
-        <translation type="vanished">Pencil2D Discord论坛</translation>
+        <translation>Pencil2D Discord论坛</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="966"/>
         <source>200%</source>
-        <translation type="vanished">200%</translation>
+        <translation>200%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="971"/>
         <source>300%</source>
-        <translation type="vanished">300%</translation>
+        <translation>300%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="976"/>
         <source>400%</source>
-        <translation type="vanished">400%</translation>
+        <translation>400%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="981"/>
         <source>50%</source>
-        <translation type="vanished">50%</translation>
+        <translation>50%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="986"/>
         <source>33%</source>
-        <translation type="vanished">33%</translation>
+        <translation>33%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="991"/>
         <source>25%</source>
-        <translation type="vanished">25%</translation>
+        <translation>25%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="996"/>
         <source>100%</source>
-        <translation type="vanished">100%</translation>
+        <translation>100%</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1001"/>
         <source>Flip In-Between</source>
-        <translation type="vanished">预览中间帧</translation>
+        <translation>预览中间帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1006"/>
         <source>Flip Rolling</source>
-        <translation type="vanished">预览动态</translation>
+        <translation>预览动态</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1011"/>
         <source>Peg Bar Alignment</source>
-        <translation type="vanished">定位销对齐</translation>
+        <translation>定位销对齐</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1049"/>
         <source>Current layer only</source>
-        <translation type="vanished">仅当前图层</translation>
+        <translation>仅当前图层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1057"/>
         <source>Relative</source>
-        <translation type="vanished">相对的</translation>
+        <translation>相对的</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1016"/>
         <source>Movie Audio...</source>
-        <translation type="vanished">电影音频...</translation>
+        <translation>电影音频...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1021"/>
         <source>Append to Palette...</source>
-        <translation type="vanished">附加到调色板...</translation>
+        <translation>附加到调色板...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1026"/>
         <source>Replace Palette...</source>
-        <translation type="vanished">更换调色板...</translation>
+        <translation>更换调色板...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1031"/>
         <source>Current keyframe</source>
-        <translation type="vanished">当前关键帧</translation>
+        <translation>当前关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1036"/>
         <source>All keyframes on layer</source>
-        <translation type="vanished">图层上的所有关键帧</translation>
+        <translation>图层上的所有关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1041"/>
         <source>Layers from Project file...</source>
-        <translation type="vanished">项目文件中的图层...</translation>
+        <translation>项目文件中的图层...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1065"/>
         <source>All layers</source>
-        <translation type="vanished">所有层</translation>
+        <translation>所有层</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1070"/>
         <source>Reposition Selected Frames</source>
-        <translation type="vanished">重排选中帧位置</translation>
+        <translation>重排选中帧位置</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1075"/>
         <source>Layer / Keyframe opacity</source>
-        <translation type="vanished">图层/关键帧透明度</translation>
+        <translation>图层/关键帧透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1080"/>
         <source>Open Temporary Directory</source>
-        <translation type="vanished">打开临时目录</translation>
+        <translation>打开临时目录</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1088"/>
         <source>Lock Windows</source>
-        <translation type="vanished">锁定窗口</translation>
+        <translation>锁定窗口</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1098"/>
         <source>Reset Rotation</source>
-        <translation type="vanished">重置旋转</translation>
+        <translation>重置旋转</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1108"/>
         <source>Add Exposure</source>
-        <translation type="vanished">增加曝光度</translation>
+        <translation>增加曝光度</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1113"/>
         <source>Subtract Exposure</source>
-        <translation type="vanished">减少曝光度</translation>
+        <translation>减少曝光度</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1118"/>
         <source>Reverse Frames Order</source>
-        <translation type="vanished">翻转帧顺序</translation>
+        <translation>翻转帧顺序</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1123"/>
         <source>Remove Frames</source>
-        <translation type="vanished">删除帧</translation>
+        <translation>删除帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="1134"/>
         <source>Status Bar</source>
-        <translation type="vanished">状态栏</translation>
+        <translation>状态栏</translation>
     </message>
     <message>
         <location filename="../app/src/mainwindow2.cpp" line="192"/>
@@ -5690,57 +6093,72 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 <context>
     <name>OnionSkin</name>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="23"/>
         <source>Onion Skins</source>
         <comment>Window title of display options like .</comment>
-        <translation type="vanished">洋葱皮</translation>
+        <translation>洋葱皮</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="111"/>
         <source>Previous Frames</source>
-        <translation type="vanished">前一帧</translation>
+        <translation>前一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="166"/>
+        <location filename="../app/ui/onionskin.ui" line="259"/>
         <source>...</source>
-        <translation type="vanished">...</translation>
+        <translation>...</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="163"/>
         <source>Onion skin color: red</source>
-        <translation type="vanished">洋葱皮颜色: 红</translation>
+        <translation>洋葱皮颜色: 红</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="192"/>
         <source>Next Frames</source>
-        <translation type="vanished">后一帧</translation>
+        <translation>后一帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="253"/>
         <source>Onion skin color: blue</source>
-        <translation type="vanished">洋葱皮颜色: 蓝</translation>
+        <translation>洋葱皮颜色: 蓝</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="285"/>
         <source>Distributed Opacity</source>
-        <translation type="vanished">分布不透明度</translation>
+        <translation>分布不透明度</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="395"/>
         <source>Min</source>
-        <translation type="vanished">最小值</translation>
+        <translation>最小值</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="355"/>
+        <location filename="../app/ui/onionskin.ui" line="420"/>
         <source> %</source>
-        <translation type="vanished">%</translation>
+        <translation>%</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="330"/>
         <source>Max</source>
-        <translation type="vanished">最大值</translation>
+        <translation>最大值</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="444"/>
         <source>Show On All Layers</source>
-        <translation type="vanished">在所有图层上显示</translation>
+        <translation>在所有图层上显示</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="458"/>
         <source>Show Keyframes Only</source>
-        <translation type="vanished">仅显示关键帧</translation>
+        <translation>仅显示关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/onionskin.ui" line="465"/>
         <source>Show During Playback</source>
-        <translation type="vanished">在播放时显示</translation>
+        <translation>在播放时显示</translation>
     </message>
 </context>
 <context>
@@ -5819,44 +6237,54 @@ Check selection, and please try again.</source>
 <context>
     <name>PegBarAlignmentDialog</name>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="14"/>
         <source>Peg bar Alignment</source>
-        <translation type="vanished">定位销对齐</translation>
+        <translation>定位销对齐</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="36"/>
         <source>Prerequisites</source>
-        <translation type="vanished">先决条件</translation>
+        <translation>先决条件</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="43"/>
         <source>1) A selection should exist</source>
-        <translation type="vanished">1) 需要先有一个选区</translation>
+        <translation>1) 需要先有一个选区</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="59"/>
         <source>2) The selection be large enough to contain the center pegs of all frames</source>
-        <translation type="vanished">2) 选区要足够大，能容纳所有帧的中心定位销</translation>
+        <translation>2) 选区要足够大，能容纳所有帧的中心定位销</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="75"/>
         <source>3) At least one layer should be selected (Bitmaps only!)</source>
-        <translation type="vanished">3) 至少选中一个图层（仅限位图！）</translation>
+        <translation>3) 至少选中一个图层（仅限位图！）</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="87"/>
         <source>Layer selection</source>
-        <translation type="vanished">图层选择</translation>
+        <translation>图层选择</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="123"/>
         <source>Reference key:</source>
-        <translation type="vanished">参考键：</translation>
+        <translation>参考键：</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="130"/>
         <source>TextLabel</source>
-        <translation type="vanished">文本标签</translation>
+        <translation>文本标签</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="170"/>
         <source>Close</source>
-        <translation type="vanished">关闭</translation>
+        <translation>关闭</translation>
     </message>
     <message>
+        <location filename="../app/ui/pegbaralignmentdialog.ui" line="180"/>
         <source>Align</source>
-        <translation type="vanished">对齐</translation>
+        <translation>对齐</translation>
     </message>
     <message>
         <location filename="../app/src/pegbaralignmentdialog.cpp" line="163"/>
@@ -5881,14 +6309,12 @@ Check selection, and please try again.</source>
 <context>
     <name>PopupColorPaletteWidget</name>
     <message>
-        <location filename="../app/src/popupcolorpalettewidget.cpp" line="49"/>
         <source>Color palette</source>
-        <translation>调色板</translation>
+        <translation type="vanished">调色板</translation>
     </message>
     <message>
-        <location filename="../app/src/popupcolorpalettewidget.cpp" line="59"/>
         <source>close/toggle</source>
-        <translation>关闭/切换</translation>
+        <translation type="vanished">关闭/切换</translation>
     </message>
 </context>
 <context>
@@ -5907,47 +6333,57 @@ Check selection, and please try again.</source>
 <context>
     <name>PreferencesDialog</name>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="14"/>
         <source>Preferences</source>
-        <translation type="vanished">首选项</translation>
+        <translation>首选项</translation>
     </message>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="74"/>
         <source>General</source>
-        <translation type="vanished">通用</translation>
+        <translation>通用</translation>
     </message>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="89"/>
         <source>Files</source>
-        <translation type="vanished">文件</translation>
+        <translation>文件</translation>
     </message>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="104"/>
         <source>Timeline</source>
-        <translation type="vanished">时间轴</translation>
+        <translation>时间轴</translation>
     </message>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="119"/>
         <source>Tools</source>
-        <translation type="vanished">工具</translation>
+        <translation>工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="134"/>
         <source>Shortcuts</source>
-        <translation type="vanished">快捷键</translation>
+        <translation>快捷键</translation>
     </message>
 </context>
 <context>
     <name>PresetDialog</name>
     <message>
+        <location filename="../app/ui/presetdialog.ui" line="14"/>
         <source>Choose a Preset for your Project</source>
-        <translation type="vanished">为您的项目选择一个预设范本</translation>
+        <translation>为您的项目选择一个预设范本</translation>
     </message>
     <message>
+        <location filename="../app/ui/presetdialog.ui" line="20"/>
         <source>&lt;h1&gt;Welcome to Pencil2D!&lt;/h1&gt;</source>
-        <translation type="vanished">&lt;h1&gt;欢迎使用Pencil2D!&lt;/h1&gt;</translation>
+        <translation>&lt;h1&gt;欢迎使用Pencil2D!&lt;/h1&gt;</translation>
     </message>
     <message>
+        <location filename="../app/ui/presetdialog.ui" line="27"/>
         <source>Choose a preset to get started:</source>
-        <translation type="vanished">选择一个预设范本开始：</translation>
+        <translation>选择一个预设范本开始：</translation>
     </message>
     <message>
+        <location filename="../app/ui/presetdialog.ui" line="37"/>
         <source>Always use this preset</source>
-        <translation type="vanished">始终使用此预设范本</translation>
+        <translation>始终使用此预设范本</translation>
     </message>
 </context>
 <context>
@@ -6033,36 +6469,44 @@ Check selection, and please try again.</source>
 <context>
     <name>RepositionFramesDialog</name>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="14"/>
         <source>Reposition Frames</source>
-        <translation type="vanished">重排帧位置</translation>
+        <translation>重排帧位置</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="30"/>
         <source>(Please move selection to desired destination.)</source>
-        <translation type="vanished">（请把选区移动到目标位置。）</translation>
+        <translation>（请把选区移动到目标位置。）</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="43"/>
         <source>Reposition (x,y): </source>
-        <translation type="vanished">重排位置 (x,y)：</translation>
+        <translation>重排位置 (x,y)：</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="50"/>
         <source>Reposition on other layers?</source>
-        <translation type="vanished">也在其他图层上重排？</translation>
+        <translation>也在其他图层上重排？</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="57"/>
         <source>Same keyframes as selected</source>
-        <translation type="vanished">与所选相同的关键帧</translation>
+        <translation>与所选相同的关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="64"/>
         <source>All keyframes on layer</source>
-        <translation type="vanished">图层上的所有关键帧</translation>
+        <translation>图层上的所有关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="93"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
     <message>
+        <location filename="../app/ui/repositionframesdialog.ui" line="100"/>
         <source>Reposition</source>
-        <translation type="vanished">重排</translation>
+        <translation>重排</translation>
     </message>
     <message>
         <location filename="../app/src/repositionframesdialog.cpp" line="72"/>
@@ -6120,36 +6564,44 @@ or cancel</source>
 <context>
     <name>ShortcutsPage</name>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="14"/>
         <source>Form</source>
-        <translation type="vanished">表单</translation>
+        <translation>表单</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="47"/>
         <source>Action:</source>
-        <translation type="vanished">动作:</translation>
+        <translation>动作:</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="54"/>
         <source>None</source>
-        <translation type="vanished">无</translation>
+        <translation>无</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="61"/>
         <source>Shortcuts:</source>
-        <translation type="vanished">快捷键:</translation>
+        <translation>快捷键:</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="73"/>
         <source>Clear</source>
-        <translation type="vanished">清除</translation>
+        <translation>清除</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="87"/>
         <source>Save</source>
-        <translation type="vanished">保存</translation>
+        <translation>保存</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="94"/>
         <source>Load</source>
-        <translation type="vanished">加载</translation>
+        <translation>加载</translation>
     </message>
     <message>
+        <location filename="../app/ui/shortcutspage.ui" line="114"/>
         <source>Restore Default Shortcuts</source>
-        <translation type="vanished">重置默认快捷键</translation>
+        <translation>重置默认快捷键</translation>
     </message>
     <message>
         <location filename="../app/src/shortcutspage.cpp" line="43"/>
@@ -7033,87 +7485,106 @@ or cancel</source>
 <context>
     <name>StrokeOptionsWidget</name>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="14"/>
         <source>Form</source>
-        <translation type="vanished">窗体</translation>
+        <translation>窗体</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="37"/>
         <source>Set Stroke Width &lt;br&gt;&lt;b&gt;[SHIFT]+drag&lt;/b&gt;&lt;br&gt;for quick adjustment</source>
-        <translation type="vanished">设置笔触宽度&lt;br&gt;&lt;b&gt;[SHIFT]+拖动&lt;/b&gt;&lt;br&gt;快速调整</translation>
+        <translation>设置笔触宽度&lt;br&gt;&lt;b&gt;[SHIFT]+拖动&lt;/b&gt;&lt;br&gt;快速调整</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="73"/>
         <source>Set Stroke Feather &lt;br&gt;&lt;b&gt;[CTRL]+drag&lt;/b&gt;&lt;br&gt;for quick adjustment</source>
-        <translation type="vanished">设置笔触羽化&lt;br&gt;&lt;b&gt;[CTRL]+拖动&lt;/b&gt;&lt;br&gt;快速调整</translation>
+        <translation>设置笔触羽化&lt;br&gt;&lt;b&gt;[CTRL]+拖动&lt;/b&gt;&lt;br&gt;快速调整</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="115"/>
         <source>Stabilizer</source>
-        <translation type="vanished">防抖</translation>
+        <translation>防抖</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="122"/>
         <source>Use stabilizer to interpolate strokes</source>
-        <translation type="vanished">使用防抖来平滑笔触</translation>
+        <translation>使用防抖来平滑笔触</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="125"/>
         <source>None</source>
         <comment>Stablizer level</comment>
-        <translation type="vanished">无</translation>
+        <translation>无</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="129"/>
         <source>None</source>
         <comment>Stabilizer option</comment>
-        <translation type="vanished">无</translation>
+        <translation>无</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="134"/>
         <source>Simple</source>
         <comment>Stabilizer option</comment>
-        <translation type="vanished">简单</translation>
+        <translation>简单</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="139"/>
         <source>Strong</source>
         <comment>Stabilizer option</comment>
-        <translation type="vanished">强</translation>
+        <translation>强</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="154"/>
         <source>Enable or disable feathering</source>
-        <translation type="vanished">启用或禁用羽化</translation>
+        <translation>启用或禁用羽化</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="157"/>
         <source>Use Feather</source>
-        <translation type="vanished">使用羽化</translation>
+        <translation>使用羽化</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="164"/>
         <source>Close Polyline path (hold Ctrl to temporarily invert)</source>
-        <translation type="vanished">闭合折线路径（按住 Ctrl 临时反转）</translation>
+        <translation>闭合折线路径（按住 Ctrl 临时反转）</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="167"/>
         <source>Closed Path</source>
-        <translation type="vanished">闭合路径</translation>
+        <translation>闭合路径</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="174"/>
         <source>Use Bézier curves to create curved lines</source>
-        <translation type="vanished">使用贝塞尔曲线绘制曲线</translation>
+        <translation>使用贝塞尔曲线绘制曲线</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="177"/>
         <source>Bézier</source>
         <comment>Tool options</comment>
-        <translation type="vanished">贝塞尔</translation>
+        <translation>贝塞尔</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="184"/>
         <source>Vary strokes based on pressure when drawing on a tablet</source>
-        <translation type="vanished">在数位板上根据压感变化笔触</translation>
+        <translation>在数位板上根据压感变化笔触</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="187"/>
         <source>Pressure</source>
         <comment>Tool options</comment>
-        <translation type="vanished">压感</translation>
+        <translation>压感</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="194"/>
         <source>Use anti-aliasing to create smooth edges</source>
-        <translation type="vanished">使用抗锯齿产生平滑边缘</translation>
+        <translation>使用抗锯齿产生平滑边缘</translation>
     </message>
     <message>
+        <location filename="../app/ui/strokeoptionswidget.ui" line="197"/>
         <source>Anti-Aliasing</source>
         <comment>Brush AA</comment>
-        <translation type="vanished">抗锯齿</translation>
+        <translation>抗锯齿</translation>
     </message>
     <message>
         <location filename="../app/src/strokeoptionswidget.cpp" line="40"/>
@@ -7470,97 +7941,120 @@ or cancel</source>
 <context>
     <name>TimelinePage</name>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="38"/>
         <source>Timeline</source>
-        <translation type="vanished">时间轴</translation>
+        <translation>时间轴</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="58"/>
         <source>Timeline length:</source>
         <comment>Preferences</comment>
-        <translation type="vanished">时间轴长度:</translation>
+        <translation>时间轴长度:</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="77"/>
         <source>Short scrub</source>
-        <translation type="vanished">短指示器</translation>
+        <translation>短指示器</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="87"/>
         <source>Drawing</source>
-        <translation type="vanished">绘画</translation>
+        <translation>绘画</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="93"/>
         <source>When drawing on an empty frame:</source>
-        <translation type="vanished">在空帧上绘画时:</translation>
+        <translation>在空帧上绘画时:</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="100"/>
         <source>Create a new (blank) key-frame and start drawing on it.</source>
-        <translation type="vanished">创建新(空白)关键帧并在其上绘制。</translation>
+        <translation>创建新(空白)关键帧并在其上绘制。</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="103"/>
         <source>Create a new (blank) key-frame</source>
-        <translation type="vanished">创建新(空白)关键帧</translation>
+        <translation>创建新(空白)关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="113"/>
         <source>Duplicate the previous key-frame and start drawing on the duplicate.</source>
-        <translation type="vanished">复制前一关键帧并在该复制品上开始绘制。</translation>
+        <translation>复制前一关键帧并在该复制品上开始绘制。</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="116"/>
         <source>Duplicate the previous key-frame</source>
-        <translation type="vanished">复制前一关键帧</translation>
+        <translation>复制前一关键帧</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="123"/>
         <source>Keep drawing on the previous key-frame</source>
-        <translation type="vanished">进行在前一关键帧上绘制</translation>
+        <translation>进行在前一关键帧上绘制</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="130"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;(Applies to Pencil, Eraser, Pen, Polyline, Bucket and Brush tools)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;（适用于铅笔，橡皮擦，钢笔，折线，颜料桶，笔刷）&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;（适用于铅笔，橡皮擦，钢笔，折线，颜料桶，笔刷）&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="143"/>
         <source>Flip and Roll</source>
-        <translation type="vanished">快速动态预览</translation>
+        <translation>快速动态预览</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="151"/>
         <source>Maximum numbers of drawings in roll</source>
-        <translation type="vanished">预览动态帧数</translation>
+        <translation>预览动态帧数</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="203"/>
         <source>Msecs per drawing in flip inbetween</source>
-        <translation type="vanished">预览中间帧速度 每帧毫秒</translation>
+        <translation>预览中间帧速度 每帧毫秒</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="252"/>
         <source>Msecs per drawing in flip roll</source>
-        <translation type="vanished">预览动态速度 每帧毫秒</translation>
+        <translation>预览动态速度 每帧毫秒</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="264"/>
         <source>Sound scrub</source>
-        <translation type="vanished">声音指示器</translation>
+        <translation>声音指示器</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="297"/>
         <source> ms</source>
-        <translation type="vanished">毫秒</translation>
+        <translation>毫秒</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="321"/>
         <source>Layer Visibility</source>
-        <translation type="vanished">图层可见性</translation>
+        <translation>图层可见性</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="327"/>
         <source>Startup option</source>
-        <translation type="vanished">启动选项</translation>
+        <translation>启动选项</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="335"/>
         <source>Current layer only</source>
-        <translation type="vanished">仅当前图层</translation>
+        <translation>仅当前图层</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="340"/>
         <source>Relative</source>
-        <translation type="vanished">相对的</translation>
+        <translation>相对的</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="345"/>
         <source>All Layers</source>
-        <translation type="vanished">所有层</translation>
+        <translation>所有层</translation>
     </message>
     <message>
+        <location filename="../app/ui/timelinepage.ui" line="353"/>
         <source>When layer visibility is relative (gray dot)</source>
-        <translation type="vanished">当图层可见性为相对模式时（灰点）</translation>
+        <translation>当图层可见性为相对模式时（灰点）</translation>
     </message>
 </context>
 <context>
@@ -7579,13 +8073,20 @@ or cancel</source>
         <translation type="vanished">变形工具 (%1): 自由/液化/弯曲/笼罩/透视（参数见工具选项）</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolboxwidget.ui" line="20"/>
         <source>Tools</source>
         <comment>Window title of tool box</comment>
-        <translation type="vanished">工具</translation>
+        <translation>工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolboxwidget.ui" line="223"/>
+        <source>洋葱皮对位工具</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/ui/toolboxwidget.ui" line="450"/>
         <source>Smudge</source>
-        <translation type="vanished">涂抹</translation>
+        <translation>涂抹</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="131"/>
@@ -7797,43 +8298,52 @@ or cancel</source>
 <context>
     <name>ToolOptions</name>
     <message>
+        <location filename="../app/ui/tooloptions.ui" line="20"/>
         <source>Form</source>
-        <translation type="vanished">表单</translation>
+        <translation>表单</translation>
     </message>
 </context>
 <context>
     <name>ToolsPage</name>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="44"/>
         <source>Brush Tools</source>
-        <translation type="vanished">笔刷工具</translation>
+        <translation>笔刷工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="50"/>
         <source>Use Quick Sizing</source>
-        <translation type="vanished">使用快速尺寸</translation>
+        <translation>使用快速尺寸</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="60"/>
         <source>Move Tool</source>
-        <translation type="vanished">移动工具</translation>
+        <translation>移动工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="66"/>
         <source>Rotation snap increment</source>
-        <translation type="vanished">旋转吸附步进</translation>
+        <translation>旋转吸附步进</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="89"/>
         <source>15 degrees</source>
-        <translation type="vanished">15度</translation>
+        <translation>15度</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="99"/>
         <source>Hand Tool</source>
-        <translation type="vanished">抓手工具</translation>
+        <translation>抓手工具</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="117"/>
         <source>Zoom in by dragging the cursor up instead of down</source>
-        <translation type="vanished">向上拖动光标为放大（默认向下）</translation>
+        <translation>向上拖动光标为放大（默认向下）</translation>
     </message>
     <message>
+        <location filename="../app/ui/toolspage.ui" line="120"/>
         <source>Invert Zoom Direction</source>
-        <translation type="vanished">反转缩放方向</translation>
+        <translation>反转缩放方向</translation>
     </message>
     <message>
         <location filename="../app/src/toolspage.cpp" line="71"/>
@@ -7844,140 +8354,175 @@ or cancel</source>
 <context>
     <name>TransformOptionsWidget</name>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="139"/>
         <source>Grow / Shrink</source>
-        <translation type="vanished">扩展 / 收缩</translation>
+        <translation>扩展 / 收缩</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="131"/>
         <source>Symmetric Difference</source>
-        <translation type="vanished">对称差</translation>
+        <translation>对称差</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="126"/>
         <source>Intersect</source>
-        <translation type="vanished">相交</translation>
+        <translation>相交</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="121"/>
         <source>Subtract</source>
-        <translation type="vanished">减去</translation>
+        <translation>减去</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="116"/>
         <source>Add</source>
-        <translation type="vanished">添加</translation>
+        <translation>添加</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="111"/>
         <source>Replace</source>
-        <translation type="vanished">替换</translation>
+        <translation>替换</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="103"/>
         <source>Action</source>
-        <translation type="vanished">动作</translation>
+        <translation>动作</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="169"/>
         <source>Drag corners/edges to scale, drag inside the frame to move, drag the rings outside the corners to rotate. Shift keeps the aspect ratio, Ctrl snaps rotation to 15°. Enter/double-click applies, Esc cancels.</source>
-        <translation type="vanished">拖动角/边缩放，框内拖动平移，角外圆环旋转；Shift 锁定宽高比，Ctrl 旋转按 15° 吸附。回车/双击应用，Esc 取消。</translation>
+        <translation>拖动角/边缩放，框内拖动平移，角外圆环旋转；Shift 锁定宽高比，Ctrl 旋转按 15° 吸附。回车/双击应用，Esc 取消。</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="354"/>
         <source>Drag the four corners to adjust the perspective. Enter/double-click applies, Esc cancels.</source>
-        <translation type="vanished">拖动四角调整透视。回车/双击应用，Esc 取消。</translation>
+        <translation>拖动四角调整透视。回车/双击应用，Esc 取消。</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="340"/>
         <source>Drag to draw a cage around the area, then drag its vertices to deform. Enter/double-click applies, Esc cancels.</source>
-        <translation type="vanished">拖动画出笼罩轮廓，再拖动顶点变形。回车/双击应用，Esc 取消。</translation>
+        <translation>拖动画出笼罩轮廓，再拖动顶点变形。回车/双击应用，Esc 取消。</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="328"/>
         <source>Rigid</source>
-        <translation type="vanished">刚体</translation>
+        <translation>刚体</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="323"/>
         <source>Similitude</source>
-        <translation type="vanished">相似</translation>
+        <translation>相似</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="318"/>
         <source>Affine</source>
-        <translation type="vanished">仿射</translation>
+        <translation>仿射</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="310"/>
         <source>Warp Mode</source>
-        <translation type="vanished">弯曲方式</translation>
+        <translation>弯曲方式</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="293"/>
         <source>Flexibility (Alpha)</source>
-        <translation type="vanished">弹性（Alpha）</translation>
+        <translation>弹性（Alpha）</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="273"/>
         <source>Grid Density</source>
-        <translation type="vanished">网格密度</translation>
+        <translation>网格密度</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="259"/>
         <source>Reverse Direction</source>
-        <translation type="vanished">反向</translation>
+        <translation>反向</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="242"/>
         <source>Amount</source>
-        <translation type="vanished">强度</translation>
+        <translation>强度</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="222"/>
         <source>Brush Size</source>
-        <translation type="vanished">笔刷大小</translation>
+        <translation>笔刷大小</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="214"/>
         <source>Undo (restore)</source>
-        <translation type="vanished">撤销（恢复）</translation>
+        <translation>撤销（恢复）</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="209"/>
         <source>Offset</source>
-        <translation type="vanished">偏移</translation>
+        <translation>偏移</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="204"/>
         <source>Rotate</source>
-        <translation type="vanished">旋转</translation>
+        <translation>旋转</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="199"/>
         <source>Scale</source>
-        <translation type="vanished">缩放</translation>
+        <translation>缩放</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="194"/>
         <source>Move</source>
-        <translation type="vanished">移动</translation>
+        <translation>移动</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="87"/>
         <source>Perspective</source>
-        <translation type="vanished">透视</translation>
+        <translation>透视</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="82"/>
         <source>Cage</source>
-        <translation type="vanished">笼罩</translation>
+        <translation>笼罩</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="77"/>
         <source>Warp</source>
-        <translation type="vanished">弯曲</translation>
+        <translation>弯曲</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="67"/>
         <source>Free</source>
-        <translation type="vanished">自由</translation>
+        <translation>自由</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="72"/>
         <source>Liquify</source>
-        <translation type="vanished">液化</translation>
+        <translation>液化</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="59"/>
+        <location filename="../app/ui/transformoptionswidget.ui" line="186"/>
         <source>Mode</source>
-        <translation type="vanished">模式</translation>
+        <translation>模式</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="14"/>
         <source>Form</source>
-        <translation type="vanished">窗体</translation>
+        <translation>窗体</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="37"/>
         <source>Enable or disable feathering</source>
-        <translation type="vanished">启用或禁用羽化</translation>
+        <translation>启用或禁用羽化</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="40"/>
         <source>Show Size and Diff.</source>
-        <translation type="vanished">显示尺寸与差值</translation>
+        <translation>显示尺寸与差值</translation>
     </message>
     <message>
+        <location filename="../app/ui/transformoptionswidget.ui" line="47"/>
         <source>Anti-Aliasing</source>
-        <translation type="vanished">抗锯齿</translation>
+        <translation>抗锯齿</translation>
     </message>
 </context>
 <context>
