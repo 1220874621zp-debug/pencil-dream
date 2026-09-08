@@ -459,7 +459,9 @@ void ToolBoxWidget::setupVariantGroup(VariantGroup& group, QToolButton* button,
 
     group.holdTimer = new QTimer(this);
     group.holdTimer->setSingleShot(true);
-    group.holdTimer->setInterval(QApplication::styleHints()->mousePressAndHoldInterval());
+    // 系统默认 mousePressAndHoldInterval（Windows≈500ms）偏钝，缩短到 250ms：
+    // 仍显著长于普通点击（<150ms），不会误触弹菜单
+    group.holdTimer->setInterval(250);
     connect(group.holdTimer, &QTimer::timeout, this, [this, &group]() {
         showVariantMenu(group);
     });
