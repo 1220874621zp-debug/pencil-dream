@@ -78,6 +78,16 @@ public:
     QString nameSuggestLayer(const QString& name);
     int getLastLayerIndex() { return count() - 1; }
 
+    // ---- 图层多选（Shift 范围选择；仅 UI 状态，不进撤销） ----
+    QList<int> selectedLayerIds() const { return mSelectedLayerIds; }
+    bool isLayerSelected(const Layer* layer) const;
+    /** Shift 范围选择：锚点层到点击层的连续区间 */
+    void selectLayerRange(int clickedIndex);
+    /** 单选（普通点击/程序切换） */
+    void selectSingleLayer(int index);
+    /** 把当前选中的多个图层收拢成组（非连续自动聚到锚点位置），返回组 id */
+    int groupSelectedLayers();
+
     // ---- 图层分组操作（每步一条撤销；入口保证声音/相机层不进组） ----
     /** 右键入口：把 layerIndex 处的图层收进一个新建组，返回组 id（失败 -1） */
     int createGroupWithLayer(int layerIndex);
@@ -95,6 +105,7 @@ public:
     bool moveLayerGroup(int groupId, int toIndex);
 
 signals:
+    void layerSelectionChanged();
     void currentLayerWillChange(int index);
     void currentLayerChanged(int index);
     void layerCountChanged(int count);
@@ -105,6 +116,8 @@ private:
     int getIndex(Layer*) const;
 
     int mLastCameraLayerIdx = 0;
+    QList<int> mSelectedLayerIds; // 按 id 存（重排后仍有效）
+    int mSelectionAnchorId = -1;
 };
 
 #endif

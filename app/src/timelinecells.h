@@ -125,6 +125,8 @@ private:
     int headerGroupIdAt(const QPoint& pos) const;
     /** 该层的行是否因组收起而不可见 */
     bool layerRowHidden(const Layer* layer) const;
+    /** 拖拽成组悬停判定：单层拖动落在目标行（层/组头）中心区时为真，rowOut=目标行 */
+    bool groupDropHoverRow(int& rowOut) const;
     void paintGroupHeader(QPainter& painter, int groupId, int x, int y, int width, int height) const;
     void paintGroupTrack(QPainter& painter, int groupId, int y, int height) const;
     void showGroupHeaderMenu(QPoint pos, int groupId);

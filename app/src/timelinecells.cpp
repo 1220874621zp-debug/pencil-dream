@@ -64,6 +64,11 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
         mThumbQueue.clear();
         mThumbQueued.clear();
     });
+    // 图层多选变化 -> 整列重绘
+    connect(mEditor->layers(), &LayerManager::layerSelectionChanged, this, [this]()
+    {
+        updateContent();
+    });
     // async thumbnail batches (TVP-style: paint reads the cache only)
     mThumbTimer = new QTimer(this);
     mThumbTimer->setSingleShot(true);
@@ -425,20 +430,44 @@ void TimeLineCells::drawContent()
 
         if (rowRef.layer != nullptr)
         {
+            const bool rowSelected = mEditor->layers()->isLayerSelected(rowRef.layer);
             switch (mType)
             {
             case TIMELINE_CELL_TYPE::Tracks:
                 paintTrack(painter, rowRef.layer, mOffsetX,
                            rowY, widgetWidth - mOffsetX,
-                           rowHeightAt(r), false, mFrameSize);
+                           rowHeightAt(r), rowSelected, mFrameSize);
                 break;
 
             case TIMELINE_CELL_TYPE::Layers:
                 paintLabel(painter, rowRef.layer, 0,
                            rowY, widgetWidth - 1,
-                           rowHeightAt(r), false, mEditor->layerVisibility());
+                           rowHeightAt(r), rowSelected, mEditor->layerVisibility());
                 break;
             }
+        }
+    }
+
+    // 拖拽成组落点高亮：悬停在目标行中心区时画强调框（替代插入线的反馈）
+    if (mType == TIMELINE_CELL_TYPE::Layers && didDetachLayer() && mGroupDragId < 0)
+    {
+        int hoverRow = -1;
+        if (groupDropHoverRow(hoverRow))
+        {
+            const int hy = rowYAt(hoverRow);
+            const int hh = rowHeightAt(hoverRow);
+            const bool isHeaderRow = mRows.at(hoverRow).isHeader;
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            QColor fill = Theme::Accent;
+            fill.setAlpha(36);
+            painter.setBrush(fill);
+            painter.setPen(QPen(Theme::Accent, 2));
+            painter.drawRoundedRect(QRectF(3, hy + 1.0, widgetWidth - 6, hh - 2.0), 5.0, 5.0);
+            painter.setRenderHint(QPainter::Antialiasing, false);
+            // 落点含义提示角标
+            painter.setPen(Theme::AccentHover);
+            painter.drawText(QRect(6, hy - 1, widgetWidth - 12, 14), Qt::AlignRight,
+                             isHeaderRow ? tr("加入此组") : tr("成组"));
         }
     }
 
@@ -468,7 +497,11 @@ void TimeLineCells::drawContent()
                        rowHeightOf(mEditor->layers()->currentLayerIndex()),
                        true, mEditor->layerVisibility());
 
-            paintLayerGutter(painter);
+            int gutterRow = -1;
+            if (!groupDropHoverRow(gutterRow))
+            {
+                paintLayerGutter(painter); // 中心区悬停时不画插入线，改画落点高亮
+            }
         }
     }
     else if (didDetachLayer() && mGroupDragId >= 0)
@@ -1348,6 +1381,43 @@ void TimeLineCells::paintSelection(QPainter& painter, int x, int y, int width, i
     painter.restore();
 }
 
+bool TimeLineCells::groupDropHoverRow(int& rowOut) const
+{
+    // 拖拽单层悬停在另一层/组头行的中心 40% 区 = 成组/入组落点（与释放判定同公式）
+    if (mType != TIMELINE_CELL_TYPE::Layers || !didDetachLayer() || mGroupDragId >= 0)
+    {
+        return false;
+    }
+    Layer* fromObj = mEditor->object()->getLayer(mFromLayer);
+    if (fromObj == nullptr || !fromObj->isGroupable())
+    {
+        return false;
+    }
+    const int row = rowIndexAtY(mEndY);
+    if (row < 0 || row >= mRows.size())
+    {
+        return false;
+    }
+    const int y = rowYAt(row);
+    const int h = rowHeightAt(row);
+    if (mEndY < y + h * 0.3 || mEndY > y + h * 0.7)
+    {
+        return false;
+    }
+    if (mRows.at(row).isHeader)
+    {
+        rowOut = row;
+        return true; // 组头中心区 = 加入该组
+    }
+    Layer* target = mRows.at(row).layer;
+    if (target == fromObj || !target->isGroupable())
+    {
+        return false;
+    }
+    rowOut = row;
+    return true;
+}
+
 int TimeLineCells::headerGroupIdAt(const QPoint& pos) const
 {
     const int row = rowIndexAtY(pos.y());
@@ -1809,6 +1879,14 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 {
                     mEditor->layers()->setCurrentLayer(members.last());
                     mEditor->layers()->currentLayer()->deselectAll();
+                    if (event->modifiers() & Qt::ShiftModifier)
+                    {
+                        mEditor->layers()->selectLayerRange(members.last());
+                    }
+                    else
+                    {
+                        mEditor->layers()->selectSingleLayer(members.last());
+                    }
                     mGroupDragId = hgid;
                     mFromLayer = members.last();
                 }
@@ -1889,10 +1967,21 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 qDebug() << "[ui] layer" << layerNumber << "toggle visible";
                 mEditor->switchVisibilityOfLayer(layerNumber);
             }
-            else if (mEditor->currentLayerIndex() != layerNumber)
+            else
             {
-                mEditor->layers()->setCurrentLayer(layerNumber);
-                mEditor->layers()->currentLayer()->deselectAll();
+                if (mEditor->currentLayerIndex() != layerNumber)
+                {
+                    mEditor->layers()->setCurrentLayer(layerNumber);
+                    mEditor->layers()->currentLayer()->deselectAll();
+                }
+                if (event->modifiers() & Qt::ShiftModifier)
+                {
+                    mEditor->layers()->selectLayerRange(layerNumber);
+                }
+                else
+                {
+                    mEditor->layers()->selectSingleLayer(layerNumber);
+                }
             }
         }
         if (layerNumber == -1)
@@ -2467,7 +2556,32 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                                         && event->pos().y() >= rowY2 + rowH2 * 0.3
                                         && event->pos().y() <= rowY2 + rowH2 * 0.7;
 
-                if (ontoCenter && fromLayerObj != nullptr && fromLayerObj->isGroupable()
+                // 组头中心区 = 加入该组（插到组块上方紧邻位 b+1）
+                if (!ontoCenter && dropRow >= 0 && dropRow < mRows.size() && mRows.at(dropRow).isHeader
+                    && fromLayerObj != nullptr && fromLayerObj->isGroupable()
+                    && event->pos().y() >= rowY2 + rowH2 * 0.3
+                    && event->pos().y() <= rowY2 + rowH2 * 0.7)
+                {
+                    const auto groupsBefore2 = LayerOrderCommand::captureGroups(mEditor->object());
+                    const QList<int> orderBefore2 = mEditor->object()->layerIdOrder();
+
+                    const int joinGid = mRows.at(dropRow).groupId;
+                    const QList<int> joinMembers = mEditor->object()->layerGroupMemberIndices(joinGid);
+                    if (!joinMembers.isEmpty() && fromLayerObj->groupId() != joinGid)
+                    {
+                        const int insertPos = joinMembers.last() + 1; // 紧贴组块上沿
+                        mEditor->object()->moveLayer(mFromLayer, insertPos);
+                        fromLayerObj->setGroupId(joinGid);
+                        mEditor->object()->repairLayerGroupContiguity();
+                        mEditor->undoRedo()->pushUndoCommand(new LayerOrderCommand(
+                            mEditor, orderBefore2, mEditor->object()->layerIdOrder(), tr("加入图层组"),
+                            nullptr, groupsBefore2, LayerOrderCommand::captureGroups(mEditor->object())));
+                        mEditor->layers()->setCurrentLayer(mEditor->object()->getIndex(fromLayerObj));
+                        emit mEditor->updateTimeLine();
+                        mEditor->getScribbleArea()->onLayerChanged();
+                    }
+                }
+                else if (ontoCenter && fromLayerObj != nullptr && fromLayerObj->isGroupable()
                     && dropTarget->isGroupable())
                 {
                     // ---- 拖到层上（中心）= 成组/入组，单步撤销 ----
@@ -2708,8 +2822,26 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
 
     QMenu menu(this);
     QAction* createAction = nullptr;
+    QAction* groupSelectedAction = nullptr;
     QAction* leaveAction = nullptr;
     QAction* dissolveAction = nullptr;
+
+    // 多选（含本层且全可入组）时提供批量成组
+    const QList<int> selection = mEditor->layers()->selectedLayerIds();
+    bool allGroupable = selection.contains(layer->id());
+    for (int i = 0; i < mEditor->object()->getLayerCount() && allGroupable; ++i)
+    {
+        Layer* l = mEditor->object()->getLayer(i);
+        if (selection.contains(l->id()) && !l->isGroupable())
+        {
+            allGroupable = false;
+        }
+    }
+    if (selection.size() >= 2 && allGroupable)
+    {
+        groupSelectedAction = menu.addAction(tr("将选中 %1 个图层成组").arg(selection.size()));
+        menu.addSeparator();
+    }
 
     if (layer->groupId() < 0)
     {
@@ -2722,7 +2854,11 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
     }
 
     QAction* chosen = menu.exec(mapToGlobal(pos));
-    if (chosen == createAction)
+    if (chosen == groupSelectedAction)
+    {
+        mEditor->layers()->groupSelectedLayers();
+    }
+    else if (chosen == createAction)
     {
         mEditor->layers()->createGroupWithLayer(layerIndex);
     }

@@ -426,6 +426,101 @@ int LayerManager::getIndex(Layer* layer) const
     return -1;
 }
 
+// ---- 图层多选 ----
+
+bool LayerManager::isLayerSelected(const Layer* layer) const
+{
+    return layer != nullptr && mSelectedLayerIds.contains(layer->id());
+}
+
+void LayerManager::selectSingleLayer(int index)
+{
+    Layer* layer = object()->getLayer(index);
+    if (layer == nullptr) { return; }
+    mSelectedLayerIds = QList<int>{ layer->id() };
+    mSelectionAnchorId = layer->id();
+    emit layerSelectionChanged();
+}
+
+void LayerManager::selectLayerRange(int clickedIndex)
+{
+    Layer* clicked = object()->getLayer(clickedIndex);
+    if (clicked == nullptr) { return; }
+    if (mSelectionAnchorId < 0 || mSelectedLayerIds.isEmpty())
+    {
+        mSelectionAnchorId = clicked->id();
+    }
+    Layer* anchor = findLayerById(mSelectionAnchorId);
+    if (anchor == nullptr)
+    {
+        mSelectionAnchorId = clicked->id();
+        selectSingleLayer(clickedIndex);
+        return;
+    }
+    const int a = getIndex(anchor);
+    const int b = clickedIndex;
+    mSelectedLayerIds.clear();
+    for (int i = qMin(a, b); i <= qMax(a, b); ++i)
+    {
+        mSelectedLayerIds.append(object()->getLayer(i)->id());
+    }
+    emit layerSelectionChanged();
+}
+
+int LayerManager::groupSelectedLayers()
+{
+    if (mSelectedLayerIds.size() < 2) { return -1; }
+
+    // 栈序收集选中层（保持相对顺序），并要求全部可入组
+    QList<Layer*> picked;
+    for (int i = 0; i < object()->getLayerCount(); ++i)
+    {
+        Layer* layer = object()->getLayer(i);
+        if (mSelectedLayerIds.contains(layer->id()))
+        {
+            if (!layer->isGroupable()) { return -1; }
+            picked.append(layer);
+        }
+    }
+    if (picked.size() < 2) { return -1; }
+
+    const auto before = LayerOrderCommand::captureGroups(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    const int gid = object()->createLayerGroup(tr("组 %1").arg(object()->layerGroups().size() + 1));
+
+    // 非连续：整批收拢到首个（最上）选中层的位置，保持相对顺序
+    const int targetIdx = object()->getIndex(picked.first());
+    int insertAt = targetIdx;
+    for (Layer* layer : picked)
+    {
+        const int cur = object()->getIndex(layer);
+        if (cur < insertAt)
+        {
+            object()->moveLayer(cur, insertAt); // 后移插入，目标自增补偿
+        }
+        else
+        {
+            object()->moveLayer(cur, insertAt);
+        }
+        layer->setGroupId(gid);
+        ++insertAt;
+    }
+    object()->repairLayerGroupContiguity();
+
+    editor()->undoRedo()->pushUndoCommand(new LayerOrderCommand(
+        editor(), orderBefore, object()->layerIdOrder(), tr("选中图层成组"),
+        nullptr, before, LayerOrderCommand::captureGroups(object())));
+
+    // 成组后收敛选择为该组
+    mSelectedLayerIds.clear();
+    for (Layer* layer : picked) { mSelectedLayerIds.append(layer->id()); }
+    emit layerSelectionChanged();
+    emit editor()->updateTimeLine();
+    editor()->getScribbleArea()->onLayerChanged();
+    return gid;
+}
+
 // ---- 图层分组操作 ----
 
 namespace
