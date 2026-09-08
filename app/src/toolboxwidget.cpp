@@ -35,6 +35,7 @@ GNU General Public License for more details.
 #include "toolmanager.h"
 #include "editor.h"
 #include "pencilsettings.h"
+#include "theme.h"
 
 // ----------------------------------------------------------------------------------
 QString GetToolTips(QString strCommandName)
@@ -87,7 +88,8 @@ protected:
         painter.setBrush(QColor(0, 0, 0, 130));
         painter.drawPolygon(shadow);
 
-        painter.setBrush(parentWidget()->palette().color(QPalette::WindowText));
+        // 红粉角标：与主题强调色一致（选中/播放头同款）
+        painter.setBrush(Theme::Accent);
         painter.drawPolygon(triangle);
     }
 };
