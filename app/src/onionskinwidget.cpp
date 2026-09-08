@@ -133,8 +133,8 @@ void OnionSkinWidget::buildParamRows()
         });
     };
 
-    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Previous frames"), mPrevFramesSlider, mPrevFramesSpin, 1, 60, QString());
-    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 1, 60, QString());
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Previous frames"), mPrevFramesSlider, mPrevFramesSpin, 0, 60, QString()); // 0=关闭该方向
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 0, 60, QString()); // 0=关闭该方向
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Max opacity"), mMaxOpacitySlider, mMaxOpacitySpin, 0, 100, tr(" %"));
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Min opacity"), mMinOpacitySlider, mMinOpacitySpin, 0, 100, tr(" %"));
 }
