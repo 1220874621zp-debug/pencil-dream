@@ -184,6 +184,11 @@ private:
     bool mDeformActive = false;
     bool mAnyPointMoved = false;
 
+    // true while the session created the selection itself (content-bounds
+    // fallback); such a selection is dropped on teardown so the next
+    // session re-measures the content instead of reusing a stale rect
+    bool mSessionOwnsSelection = false;
+
     // options (persisted via tool properties)
     int mDeformMode = 0;      // 0 free / 1 liquify / 2 warp / 3 cage / 4 perspective
     int mLiquifyOp = 0;       // 0 move / 1 scale / 2 rotate / 3 offset / 4 undo

@@ -797,9 +797,10 @@ void DeformTool::beginSession()
 
     auto selectMan = mEditor->select();
 
+    const bool hadSelection = selectMan->somethingSelected() && !selectMan->mySelectionRect().isEmpty();
     QPolygonF regionPolygon;
     bool isPolygon = false;
-    if (selectMan->somethingSelected() && !selectMan->mySelectionRect().isEmpty())
+    if (hadSelection)
     {
         if (selectMan->isPolygonSelection())
         {
@@ -822,9 +823,6 @@ void DeformTool::beginSession()
                                               : (mDeformMode == 0 ? 0 : 64);
         contentBounds.adjust(-margin, -margin, margin, margin);
         regionPolygon = QPolygonF(QRectF(contentBounds));
-
-        // make the implicit region visible through the marquee
-        selectMan->setSelection(QRectF(bitmapImage->bounds()), true);
     }
 
     Q_ASSERT(regionPolygon.size() >= 4);
@@ -837,6 +835,16 @@ void DeformTool::beginSession()
 
     BitmapImage sourcePart = bitmapImage->copy(mRegionPolygon);
     if (sourcePart.width() <= 0 || sourcePart.height() <= 0) { return; }
+
+    // the implicit selection drives the preview pipeline (the clear-region
+    // + draw-warp pass only runs while something is selected), so it is
+    // created here, once the session is certain to start; its marquee
+    // visual is suppressed by ScribbleArea while the session runs
+    mSessionOwnsSelection = !hadSelection;
+    if (mSessionOwnsSelection)
+    {
+        selectMan->setSelection(QRectF(bitmapImage->bounds()), true);
+    }
 
     mSourceImage = *sourcePart.image();
 
@@ -929,6 +937,13 @@ void DeformTool::rebuildLattice()
 
 void DeformTool::teardown()
 {
+    if (mSessionOwnsSelection)
+    {
+        mSessionOwnsSelection = false;
+        // drop the tool-made selection: leaving it behind would pin every
+        // later session to this stale rect instead of the content bounds
+        mEditor->deselectAll();
+    }
     mDeformActive = false;
     mDragIndex = -1;
     mCageDragVertex = -1;

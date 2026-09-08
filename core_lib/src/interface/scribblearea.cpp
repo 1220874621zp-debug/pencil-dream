@@ -954,8 +954,13 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
     {
         mOverlayPainter.paint(painter, rect());
 
-        // paints the selection outline
-        if (mEditor->select()->somethingSelected())
+        // paints the selection outline, except while a deform session runs:
+        // the deform tool draws its own frame over the same region and the
+        // marquee + corner squares would double it (the preview pipeline
+        // still rides on the selection itself, only the visual is skipped)
+        const BaseTool* tool = currentTool();
+        const bool deformSession = tool->type() == ToolType::DEFORM && tool->isActive();
+        if (mEditor->select()->somethingSelected() && !deformSession)
         {
             paintSelectionVisuals(painter);
         }
