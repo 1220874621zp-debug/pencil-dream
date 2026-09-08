@@ -1400,7 +1400,7 @@ bool TimeLineCells::groupDropHoverRow(int& rowOut) const
     }
     const int y = rowYAt(row);
     const int h = rowHeightAt(row);
-    if (mEndY < y + h * 0.3 || mEndY > y + h * 0.7)
+    if (mEndY < y + h * 0.225 || mEndY > y + h * 0.775)
     {
         return false;
     }
@@ -2525,8 +2525,13 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             updateContent();
         }
     }
-    if (mType == TIMELINE_CELL_TYPE::Layers && !mScrollingVertically && mStartLayerNumber != -1)
+    if (mType == TIMELINE_CELL_TYPE::Layers && mStartLayerNumber != -1)
     {
+        qDebug() << "[ui] layer-release: start=" << mStartLayerNumber << "at=" << layerNumber
+                 << "scroll=" << mScrollingVertically << "moveY=" << mMouseMoveY
+                 << "groupDrag=" << mGroupDragId;
+        if (!mScrollingVertically)
+        {
         if (mGroupDragId >= 0 && didDetachLayer())
         {
             // ---- 整组拖动提交：块移动（moveLayerGroup 自带单步撤销） ----
@@ -2540,6 +2545,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         else if (layerNumber != -1 && layerNumber != mStartLayerNumber)
         {
             mToLayer = getInbetweenLayerNumber(event->pos().y());
+            qDebug() << "[ui] layer-release: to=" << mToLayer << "from=" << mFromLayer;
             if (mToLayer != mFromLayer && mToLayer > -1 && mToLayer < mEditor->layers()->count())
             {
                 Layer* fromLayerObj = mEditor->object()->getLayer(mFromLayer);
@@ -2553,14 +2559,18 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 const int rowY2 = (dropRow >= 0) ? rowYAt(dropRow) : 0;
                 const int rowH2 = (dropRow >= 0) ? rowHeightAt(dropRow) : 0;
                 const bool ontoCenter = dropTarget != nullptr && dropTarget != fromLayerObj
-                                        && event->pos().y() >= rowY2 + rowH2 * 0.3
-                                        && event->pos().y() <= rowY2 + rowH2 * 0.7;
+                                        && event->pos().y() >= rowY2 + rowH2 * 0.225
+                                        && event->pos().y() <= rowY2 + rowH2 * 0.775;
 
                 // 组头中心区 = 加入该组（插到组块上方紧邻位 b+1）
+                qDebug() << "[ui] layer-release: dropRow=" << dropRow
+                         << "target=" << (dropTarget ? dropTarget->name() : QString("null"))
+                         << "ontoCenter=" << ontoCenter
+                         << "y=" << event->pos().y() << "rowY=" << rowY2 << "rowH=" << rowH2;
                 if (!ontoCenter && dropRow >= 0 && dropRow < mRows.size() && mRows.at(dropRow).isHeader
                     && fromLayerObj != nullptr && fromLayerObj->isGroupable()
-                    && event->pos().y() >= rowY2 + rowH2 * 0.3
-                    && event->pos().y() <= rowY2 + rowH2 * 0.7)
+                    && event->pos().y() >= rowY2 + rowH2 * 0.225
+                    && event->pos().y() <= rowY2 + rowH2 * 0.775)
                 {
                     const auto groupsBefore2 = LayerOrderCommand::captureGroups(mEditor->object());
                     const QList<int> orderBefore2 = mEditor->object()->layerIdOrder();
@@ -2585,6 +2595,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     && dropTarget->isGroupable())
                 {
                     // ---- 拖到层上（中心）= 成组/入组，单步撤销 ----
+                    qDebug() << "[ui] group-drop: 成组/入组" << fromLayerObj->name() << "->" << dropTarget->name();
                     const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
                     const QList<int> orderBefore = mEditor->object()->layerIdOrder();
 
@@ -2652,6 +2663,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             }
         }
         mGroupDragId = -1;
+        }
     }
 
     if (mType == TIMELINE_CELL_TYPE::Layers && event->button() == Qt::LeftButton)
