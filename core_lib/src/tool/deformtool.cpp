@@ -724,7 +724,6 @@ void DeformTool::pointerDoubleClickEvent(PointerEvent* event)
     if (mDeformActive && mAnyPointMoved)
     {
         commitDeform();
-        beginSession();
     }
 }
 
@@ -736,8 +735,9 @@ bool DeformTool::keyPressEvent(QKeyEvent* event)
     case Qt::Key_Enter:
         if (mDeformActive && mAnyPointMoved)
         {
+            // commit ends the session: the frame disappears, the next
+            // press starts fresh over the current content bounds
             commitDeform();
-            beginSession();
             return true;
         }
         break;
@@ -1440,6 +1440,11 @@ void DeformTool::commitDeform()
                 mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
                 mEditor->undoRedo()->record(saveStateId, typeName());
             }
+
+            // a committed move invalidates the region: keep the selection
+            // and the next session would deform whatever fell back into the
+            // old lasso/rect, splitting the drawing into leftover copies
+            mEditor->deselectAll();
         }
     }
 
