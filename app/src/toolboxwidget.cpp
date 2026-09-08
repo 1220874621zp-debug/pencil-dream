@@ -22,6 +22,13 @@ GNU General Public License for more details.
 #include <QResizeEvent>
 #include <QDebug>
 #include <QButtonGroup>
+#include <QApplication>
+#include <QMenu>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QPolygonF>
+#include <QStyleHints>
+#include <QTimer>
 
 #include "layermanager.h"
 #include "toolmanager.h"
@@ -34,6 +41,28 @@ QString GetToolTips(QString strCommandName)
     strCommandName = QString("shortcuts/") + strCommandName;
     QKeySequence keySequence(pencilSettings().value(strCommandName).toString());
     return QString("<b>%1</b>").arg(keySequence.toString()); // don't tr() this string.
+}
+
+// 选区工具组按钮图标：PS 式右下角小三角标记 = 长按有变体菜单。
+// 2x 渲染 + DPR 标注，高分屏不发虚；SVG 必经 QIcon::pixmap 缩放（防 viewBox 整图加载）
+static QIcon selectionVariantIcon(ToolType toolType, bool withCornerBadge)
+{
+    const QString svg = (toolType == LASSO)
+        ? ":/icons/themes/playful/tools/tool-lasso.svg"
+        : ":/icons/themes/playful/tools/tool-select.svg";
+    QIcon icon(svg);
+    if (!withCornerBadge) { return icon; }
+
+    QPixmap pixmap = icon.pixmap(QSize(22, 22) * 2);
+    pixmap.setDevicePixelRatio(2.0);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QPolygonF badge { QPointF(16, 22), QPointF(22, 22), QPointF(22, 16) };
+    painter.setPen(QPen(QColor(30, 30, 30), 1.0));
+    painter.setBrush(QColor(225, 225, 225));
+    painter.drawPolygon(badge);
+    painter.end();
+    return QIcon(pixmap);
 }
 
 ToolBoxWidget::ToolBoxWidget(QWidget* parent)
@@ -57,7 +86,6 @@ void ToolBoxWidget::initUI()
         "QToolButton:pressed { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }"
         "QToolButton:checked { border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }";
     ui->pencilButton->setStyleSheet(sStyle);
-    ui->selectButton->setStyleSheet(sStyle);
     ui->lassoButton->setStyleSheet(sStyle);
     ui->deformButton->setStyleSheet(sStyle);
     ui->moveButton->setStyleSheet(sStyle);
@@ -74,10 +102,6 @@ void ToolBoxWidget::initUI()
 
     ui->pencilButton->setToolTip( tr( "Pencil Tool (%1): Sketch with pencil" )
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
-    ui->selectButton->setToolTip( tr( "Select Tool (%1): Select an object" )
-        .arg( GetToolTips( CMD_TOOL_SELECT ) ) );
-    ui->lassoButton->setToolTip( tr( "Lasso Tool (%1): Select a free-form area" )
-        .arg( GetToolTips( CMD_TOOL_LASSO ) ) );
     ui->deformButton->setToolTip( tr( "Deform Tool (%1): Free / liquify / warp / cage / perspective (see tool options)" )
         .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setToolTip( tr( "Move Tool (%1): Move an object" )
@@ -105,10 +129,7 @@ void ToolBoxWidget::initUI()
 
     ui->pencilButton->setWhatsThis( tr( "Pencil Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_PENCIL ) ) );
-    ui->selectButton->setWhatsThis( tr( "Select Tool (%1)" )
-        .arg( GetToolTips( CMD_TOOL_SELECT ) ) );
-    ui->lassoButton->setWhatsThis( tr( "Lasso Tool (%1)" )
-        .arg( GetToolTips( CMD_TOOL_LASSO ) ) );
+    ui->lassoButton->setWhatsThis( tr( "Select a free-form (lasso) or rectangular area; press and hold the button to switch variants" ) );
     ui->deformButton->setWhatsThis( tr( "Deform Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_DEFORM ) ) );
     ui->moveButton->setWhatsThis( tr( "Move Tool (%1)" )
@@ -134,8 +155,8 @@ void ToolBoxWidget::initUI()
 
     connect(ui->pencilButton, &QToolButton::clicked, this, &ToolBoxWidget::pencilOn);
     connect(ui->eraserButton, &QToolButton::clicked, this, &ToolBoxWidget::eraserOn);
-    connect(ui->selectButton, &QToolButton::clicked, this, &ToolBoxWidget::selectOn);
-    connect(ui->lassoButton, &QToolButton::clicked, this, &ToolBoxWidget::lassoOn);
+    // 套索按钮承载选区工具组：短按=激活当前变体；长按=弹变体菜单（eventFilter 计时）
+    connect(ui->lassoButton, &QToolButton::clicked, this, &ToolBoxWidget::selectionVariantOn);
     connect(ui->deformButton, &QToolButton::clicked, this, &ToolBoxWidget::deformOn);
     connect(ui->moveButton, &QToolButton::clicked, this, &ToolBoxWidget::moveOn);
     connect(ui->onionAlignButton, &QToolButton::clicked, this, &ToolBoxWidget::onionAlignOn);
@@ -151,7 +172,6 @@ void ToolBoxWidget::initUI()
 
     mFlowlayout->addWidget(ui->pencilButton);
     mFlowlayout->addWidget(ui->eraserButton);
-    mFlowlayout->addWidget(ui->selectButton);
     mFlowlayout->addWidget(ui->lassoButton);
     mFlowlayout->addWidget(ui->deformButton);
     mFlowlayout->addWidget(ui->moveButton);
@@ -174,7 +194,6 @@ void ToolBoxWidget::initUI()
     QButtonGroup* buttonGroup = new QButtonGroup(this);
     buttonGroup->addButton(ui->pencilButton);
     buttonGroup->addButton(ui->eraserButton);
-    buttonGroup->addButton(ui->selectButton);
     buttonGroup->addButton(ui->lassoButton);
     buttonGroup->addButton(ui->deformButton);
     buttonGroup->addButton(ui->moveButton);
@@ -186,6 +205,25 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->eyedropperButton);
     buttonGroup->addButton(ui->brushButton);
     buttonGroup->addButton(ui->smudgeButton);
+
+    // 选区工具组（PS 式）：长按套索按钮弹出「套索 / 矩形选择」变体菜单
+    mSelectionMenu = new QMenu(this);
+    QAction* lassoVariantAct = mSelectionMenu->addAction(
+        selectionVariantIcon(LASSO, false),
+        tr("套索工具（%1）：圈选任意形状区域").arg(GetToolTips(CMD_TOOL_LASSO)));
+    QAction* selectVariantAct = mSelectionMenu->addAction(
+        selectionVariantIcon(SELECT, false),
+        tr("矩形选择工具（%1）：拖拽框选区域").arg(GetToolTips(CMD_TOOL_SELECT)));
+    connect(lassoVariantAct, &QAction::triggered, this, &ToolBoxWidget::lassoOn);
+    connect(selectVariantAct, &QAction::triggered, this, &ToolBoxWidget::selectOn);
+
+    mMenuHoldTimer = new QTimer(this);
+    mMenuHoldTimer->setSingleShot(true);
+    mMenuHoldTimer->setInterval(QApplication::styleHints()->mousePressAndHoldInterval());
+    connect(mMenuHoldTimer, &QTimer::timeout, this, &ToolBoxWidget::showSelectionMenu);
+    ui->lassoButton->installEventFilter(this);
+
+    setSelectionVariant(LASSO);
 }
 
 int ToolBoxWidget::getMinHeightForWidth(int width) const
@@ -290,11 +328,13 @@ void ToolBoxWidget::eraserOn()
 
 void ToolBoxWidget::selectOn()
 {
-    toolOn(SELECT, ui->selectButton);
+    setSelectionVariant(SELECT);
+    toolOn(SELECT, ui->lassoButton);
 }
 
 void ToolBoxWidget::lassoOn()
 {
+    setSelectionVariant(LASSO);
     toolOn(LASSO, ui->lassoButton);
 }
 
@@ -356,7 +396,6 @@ void ToolBoxWidget::deselectAllTools()
 {
     ui->pencilButton->setChecked(false);
     ui->eraserButton->setChecked(false);
-    ui->selectButton->setChecked(false);
     ui->lassoButton->setChecked(false);
     ui->deformButton->setChecked(false);
     ui->moveButton->setChecked(false);
@@ -383,4 +422,54 @@ void ToolBoxWidget::toolOn(ToolType toolType, QToolButton* toolButton)
         return;
     }
     mEditor->tools()->setCurrentTool(toolType);
+}
+
+void ToolBoxWidget::setSelectionVariant(ToolType toolType)
+{
+    mSelectionVariant = toolType;
+    ui->lassoButton->setIcon(selectionVariantIcon(toolType, true));
+
+    if (toolType == SELECT)
+    {
+        ui->lassoButton->setToolTip(
+            tr("矩形选择工具（%1）：拖拽框选区域；长按此按钮可选择套索工具")
+                .arg(GetToolTips(CMD_TOOL_SELECT)));
+    }
+    else
+    {
+        ui->lassoButton->setToolTip(
+            tr("套索工具（%1）：圈选任意形状区域；长按此按钮可选择矩形选择工具")
+                .arg(GetToolTips(CMD_TOOL_LASSO)));
+    }
+}
+
+void ToolBoxWidget::selectionVariantOn()
+{
+    toolOn(mSelectionVariant, ui->lassoButton);
+}
+
+void ToolBoxWidget::showSelectionMenu()
+{
+    mSelectionMenu->exec(ui->lassoButton->mapToGlobal(QPoint(0, ui->lassoButton->height() + 2)));
+}
+
+bool ToolBoxWidget::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == ui->lassoButton)
+    {
+        if (event->type() == QEvent::MouseButtonPress)
+        {
+            auto* mouseEvent = static_cast<QMouseEvent*>(event);
+            if (mouseEvent->button() == Qt::LeftButton)
+            {
+                mMenuHoldTimer->start();
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease)
+        {
+            // 短按：停表，放行 clicked() 激活当前变体
+            mMenuHoldTimer->stop();
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }

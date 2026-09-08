@@ -27,6 +27,8 @@ GNU General Public License for more details.
 #include "toolboxlayout.h"
 
 class Editor;
+class QMenu;
+class QTimer;
 
 namespace Ui {
 class ToolBoxWidget;
@@ -72,9 +74,19 @@ protected:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
     void resizeEvent(QResizeEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+    // 套索按钮 = 选区工具组（PS 式）：短按激活当前变体，长按弹出变体菜单。
+    // 矩形选择（SELECT）与套索（LASSO）共用此按钮。
+    void setSelectionVariant(ToolType toolType);
+    void selectionVariantOn();
+    void showSelectionMenu();
+
     FlowLayout* mFlowlayout = nullptr;
+    QMenu* mSelectionMenu = nullptr;
+    QTimer* mMenuHoldTimer = nullptr;
+    ToolType mSelectionVariant = LASSO;
 
     Ui::ToolBoxWidget* ui = nullptr;
     Editor* mEditor = nullptr;
