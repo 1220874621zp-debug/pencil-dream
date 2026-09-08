@@ -152,8 +152,10 @@ private:
     // and the saved panel sizes are lost
     void armPendingStateRestore();
     void applyPendingStateRestore();
+    void revealStartupWindow();
     QByteArray mPendingStateRestore;
     QTimer* mStateRestoreTimer = nullptr;
+    bool mStartupHiddenForRestore = false;
 
     // named panel-layout workspaces (friction-style):
     // snapshots of saveState() stored per name in QSettings,

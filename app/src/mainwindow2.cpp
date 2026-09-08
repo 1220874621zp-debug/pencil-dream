@@ -1401,6 +1401,25 @@ void MainWindow2::readSettings()
 
     bool isWindowsLocked = mEditor->preference()->isOn(SETTING::LAYOUT_LOCK);
     lockWidgets(isWindowsLocked);
+
+    // must come after setOpacity() above, which would otherwise undo it:
+    // keep the window fully transparent until the layout has settled.
+    // The native window is created at the saved normal size and the
+    // maximize lands a frame or two later, so brief intermediate states
+    // (normal-size frame, phase-2 size corrections) are unavoidable but
+    // can be kept invisible. applyPendingStateRestore() reveals it; the
+    // guard timer covers the case where the resize debounce never
+    // settles (window stuck transparent otherwise).
+    if (!mPendingStateRestore.isEmpty())
+    {
+        mStartupHiddenForRestore = true;
+        setWindowOpacity(0.0);
+        QTimer::singleShot(500, this, [this]
+        {
+            applyPendingStateRestore();
+            revealStartupWindow();
+        });
+    }
 }
 
 void MainWindow2::writeSettings()
@@ -1446,14 +1465,31 @@ void MainWindow2::armPendingStateRestore()
 
 void MainWindow2::applyPendingStateRestore()
 {
-    if (mPendingStateRestore.isEmpty()) { return; }
+    if (mPendingStateRestore.isEmpty())
+    {
+        revealStartupWindow();
+        return;
+    }
     const QByteArray state = mPendingStateRestore;
     mPendingStateRestore.clear();
-    // phase 2 (settle): restoreState is idempotent; the first pass in
-    // showEvent may run before the maximize resize, so re-apply here —
-    // the window geometry is stable now, and the saved dock and
-    // toolbar sizes apply at full value instead of being clamped
+    // phase 2 (settle): the first pass ran at the saved normal size,
+    // so if the window is maximized the saved dock sizes may have been
+    // clamped there — re-apply now that the geometry is stable.
+    // restoreState is idempotent; this is also the moment the startup
+    // transition ends and the window is revealed.
     restoreState(state);
+    revealStartupWindow();
+}
+
+void MainWindow2::revealStartupWindow()
+{
+    if (!mStartupHiddenForRestore) { return; }
+    mStartupHiddenForRestore = false;
+    // back to the user's window-opacity preference (readSettings()
+    // forced 0 for the startup transition); setWindowOpacity directly —
+    // MainWindow2::setOpacity() also writes the preference back
+    const int pref = mEditor->preference()->getInt(SETTING::WINDOW_OPACITY);
+    setWindowOpacity((100 - pref) / 100.0);
 }
 
 void MainWindow2::setupKeyboardShortcuts()
