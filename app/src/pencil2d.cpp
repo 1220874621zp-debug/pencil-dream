@@ -175,7 +175,18 @@ void Pencil2D::prepareGuiStartup(const QString& inputPath)
 
     mainWindow.reset(new MainWindow2);
     connect(this, &Pencil2D::openFileRequested, mainWindow.get(), &MainWindow2::openFile);
-    mainWindow->show();
+    // if the saved session was maximized, show maximized from the first
+    // frame: restoreGeometry() only sets the maximize flag on a hidden
+    // window, and plain show() paints one normal-size frame before the
+    // maximize is applied asynchronously (a visible small-then-full flash)
+    if (mainWindow->isMaximized())
+    {
+        mainWindow->showMaximized();
+    }
+    else
+    {
+        mainWindow->show();
+    }
 
     mainWindow->openStartupFile(inputPath);
 }

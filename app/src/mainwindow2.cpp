@@ -1381,14 +1381,20 @@ void MainWindow2::readSettings()
             winState = workspaceState;
         }
     }
-    // Do NOT call restoreState() here: the window is not shown yet and
-    // its final size arrives asynchronously (maximize), so the dock
-    // layout would be clamped to the dock minimums and the saved panel
-    // sizes lost. The state is applied in two phases: once in showEvent
-    // (before the first paint, so no default-layout flash) and again by
-    // applyPendingStateRestore() once the window geometry is stable
-    // (debounced in show/resize) so sizes apply at full value.
+    // phase 1: apply the state here, before the window is ever shown, so
+    // the first paint already shows the saved panel set instead of the
+    // code-built default layout (which would flash for a frame). The
+    // final window size is not known yet (maximize arrives with show()),
+    // so dock sizes from this pass are provisional —
+    // applyPendingStateRestore() (phase 2, debounced in show/resize)
+    // re-applies the same state once the geometry has settled, so sizes
+    // apply at full value instead of being clamped to dock minimums.
+    // restoreState is idempotent; the second pass is intentional.
     mPendingStateRestore = winState.toByteArray();
+    if (!mPendingStateRestore.isEmpty())
+    {
+        restoreState(mPendingStateRestore);
+    }
 
     int opacity = mEditor->preference()->getInt(SETTING::WINDOW_OPACITY);
     setOpacity(100 - opacity);
@@ -1407,14 +1413,10 @@ void MainWindow2::writeSettings()
 void MainWindow2::showEvent(QShowEvent* event)
 {
     QMainWindow::showEvent(event);
-    // phase 1 (anti-flash): the show event runs before the first paint,
-    // so applying the state here makes the first frame show the saved
-    // layout instead of the code-built default (panels the user closed
-    // would flash for a frame otherwise)
-    if (!mPendingStateRestore.isEmpty())
-    {
-        restoreState(mPendingStateRestore);
-    }
+    // the state itself was already restored in readSettings() (phase 1,
+    // before any paint); do not touch the layout from inside the show
+    // sequence — dirtying it here makes Windows paint one normal-size
+    // frame before the saved maximized state takes effect
     armPendingStateRestore();
 }
 
