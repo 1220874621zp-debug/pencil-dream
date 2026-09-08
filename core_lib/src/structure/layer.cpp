@@ -679,7 +679,7 @@ bool Layer::moveSelectedFrames(int offset)
 
 bool Layer::isPaintable() const
 {
-    return (type() == BITMAP || type() == VECTOR);
+    return (type() == BITMAP || type() == VECTOR || type() == COLORIZE);
 }
 
 bool Layer::keyExistsWhichCovers(int frameNumber)

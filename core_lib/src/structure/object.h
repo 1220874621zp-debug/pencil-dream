@@ -98,10 +98,14 @@ public:
     LayerBitmap* addNewBitmapLayer();
     LayerSound* addNewSoundLayer();
     LayerCamera* addNewCameraLayer();
+    LayerBitmap* addNewColorizeLayer();
 
     int  getLayerCount() const;
     Layer* getLayer(int i) const;
     Layer* getLayerBelow(int i, Layer::LAYER_TYPE type) const;
+
+    /** 智能填色图层的线稿源：索引 i 上方（含更远）最近的位图图层 */
+    LayerBitmap* getBitmapLayerAbove(int i) const;
     Layer* findLayerByName(const QString& strName, Layer::LAYER_TYPE type = Layer::UNDEFINED) const;
     Layer* findLayerById(int layerId) const;
     Layer* takeLayer(int layerId); // Note: transfer ownership of the layer

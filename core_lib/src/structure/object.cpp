@@ -31,6 +31,8 @@ GNU General Public License for more details.
 
 #include "layer.h"
 #include "layerbitmap.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
 #include "layersound.h"
 #include "layercamera.h"
 
@@ -108,6 +110,9 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
         case Layer::CAMERA:
             newLayer = new LayerCamera(getUniqueLayerID());
             break;
+        case Layer::COLORIZE:
+            newLayer = new LayerColorize(getUniqueLayerID());
+            break;
         default:
             Q_UNREACHABLE();
         }
@@ -125,6 +130,28 @@ LayerBitmap* Object::addNewBitmapLayer()
     layerBitmap->addNewKeyFrameAt(1);
 
     return layerBitmap;
+}
+
+LayerBitmap* Object::addNewColorizeLayer()
+{
+    auto layerColorize = new LayerColorize(getUniqueLayerID());
+    mLayers.append(layerColorize);
+
+    layerColorize->addNewKeyFrameAt(1);
+
+    return layerColorize;
+}
+
+LayerBitmap* Object::getBitmapLayerAbove(int i) const
+{
+    // 图层索引 0 = 栈顶；向上 = 索引递减
+    for (int index = i - 1; index >= 0; --index)
+    {
+        Layer* layer = mLayers.at(index);
+        if (layer->type() == Layer::BITMAP)
+            return static_cast<LayerBitmap*>(layer);
+    }
+    return nullptr;
 }
 
 LayerSound* Object::addNewSoundLayer()
@@ -758,6 +785,26 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                     bitmap->paintImage(painter);
                 }
 
+            }
+            else if (layer->type() == Layer::COLORIZE)
+            {
+                // 与 CanvasPainter::paintCurrentColorizeFrame 同式：着色垫底、笔画提示
+                auto layerColorize = static_cast<LayerColorize*>(layer);
+                ColorizeImage* frame = static_cast<ColorizeImage*>(layerColorize->getKeyFrameWhichCovers(frameNumber));
+                if (frame)
+                {
+                    frame->loadFile();
+                    if (!frame->coloringImage().isNull())
+                    {
+                        painter.setOpacity(frame->getOpacity() - (1.0 - layer->opacity()));
+                        painter.drawImage(frame->coloringBounds().topLeft(), frame->coloringImage());
+                    }
+                    if (frame->image() != nullptr && !frame->image()->isNull())
+                    {
+                        painter.setOpacity(qBound(0.0, 0.5 * layer->opacity(), 1.0));
+                        painter.drawImage(frame->topLeft(), *frame->image());
+                    }
+                }
             }
         }
         return;

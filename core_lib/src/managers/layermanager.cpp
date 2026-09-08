@@ -190,6 +190,9 @@ Layer* LayerManager::createLayer(Layer::LAYER_TYPE type, const QString& strLayer
     case Layer::BITMAP:
         layer = object()->addNewBitmapLayer();
         break;
+    case Layer::COLORIZE:
+        layer = object()->addNewColorizeLayer();
+        break;
     case Layer::SOUND:
         layer = object()->addNewSoundLayer();
         break;
@@ -215,6 +218,24 @@ LayerBitmap* LayerManager::createBitmapLayer(const QString& strLayerName)
 
     emit layerCountChanged(count());
     setCurrentLayer(getLastLayerIndex());
+
+    return layer;
+}
+
+LayerBitmap* LayerManager::createColorizeLayer(const QString& strLayerName)
+{
+    LayerBitmap* layer = object()->addNewColorizeLayer();
+    layer->setName(strLayerName);
+
+    // 插到当前层正下方：若当前层是位图图层，新填色层立即获得线稿源
+    const int currentIndex = currentLayerIndex();
+    if (currentIndex >= 0 && currentIndex < count() - 1)
+    {
+        object()->moveLayer(count() - 1, currentIndex + 1);
+    }
+
+    emit layerCountChanged(count());
+    setCurrentLayer(currentIndex + 1);
 
     return layer;
 }

@@ -21,6 +21,8 @@ GNU General Public License for more details.
 
 #include "object.h"
 #include "layerbitmap.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
 #include "bitmapimage.h"
 #include "tile.h"
 #include "tiledbuffer.h"
@@ -589,7 +591,69 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
             }
             break;
         }
+        case Layer::COLORIZE: {
+            paintCurrentColorizeFrame(painter, blitRect, layer, i, isCurrentLayer);
+            break;
+        }
         default: break;
         }
     }
+}
+
+void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer)
+{
+    auto colorizeLayer = static_cast<LayerColorize*>(layer);
+    ColorizeImage* frame = colorizeLayer->getLastColorizeImageAtFrame(mFrameNumber);
+
+    if (frame == nullptr) { return; }
+    frame->loadFile();
+
+    const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
+
+    // 着色缓存过期且当前无实时笔画时同步重算（阶段3改为后台线程+信号失效）
+    if (frame->needsUpdate() && !isDrawing)
+    {
+        LayerBitmap* source = mObject->getBitmapLayerAbove(layerIndex);
+        colorizeLayer->updateColoringAtFrame(mFrameNumber, source);
+    }
+
+    QPainter currentColorizePainter;
+    initializePainter(currentColorizePainter, mCurrentLayerPixmap, blitRect);
+
+    painter.setWorldMatrixEnabled(false);
+
+    // 1) 着色结果垫底
+    if (!frame->coloringImage().isNull())
+    {
+        currentColorizePainter.setOpacity(frame->getOpacity() - (1.0 - painter.opacity()));
+        currentColorizePainter.drawImage(frame->coloringBounds().topLeft(), frame->coloringImage());
+    }
+
+    // 2) 笔画显示在上（未算出结果时以全不透明显示，否则半透明提示）
+    if (!frame->image()->isNull())
+    {
+        if (!frame->coloringImage().isNull())
+            currentColorizePainter.setOpacity(qBound(0.0, 0.5 * painter.opacity(), 1.0));
+        else
+            currentColorizePainter.setOpacity(qBound(0.0, painter.opacity(), 1.0));
+        currentColorizePainter.drawImage(frame->topLeft(), *frame->image());
+    }
+
+    // 3) 当前层实时笔画缓冲（正在画）
+    if (isCurrentLayer && isDrawing)
+    {
+        currentColorizePainter.setOpacity(frame->getOpacity() - (1.0 - painter.opacity()));
+        currentColorizePainter.setCompositionMode(mOptions.cmBufferBlendMode);
+        if (!mSelectionClipPath.isEmpty()) {
+            currentColorizePainter.setClipPath(mSelectionClipPath);
+        }
+        const auto tiles = mTiledBuffer->tiles();
+        for (const Tile* tile : tiles) {
+            currentColorizePainter.drawPixmap(tile->posF(), tile->pixmap());
+        }
+    }
+
+    currentColorizePainter.end();
+
+    painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
 }

@@ -48,7 +48,7 @@ public:
     void setLengthExplicit(bool b) { mLengthExplicit = b; }
 
     void modification() { mIsModified = true; }
-    void setModified(bool b) { mIsModified = b; }
+    virtual void setModified(bool b) { mIsModified = b; }
     bool isModified() const { return mIsModified; }
 
     QString fileName() const { return mAttachedFileName; }

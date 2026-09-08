@@ -23,7 +23,7 @@ GNU General Public License for more details.
 #include "bitmapimage.h"
 #include "util/util.h"
 
-LayerBitmap::LayerBitmap(int id) : Layer(id, Layer::BITMAP)
+LayerBitmap::LayerBitmap(int id, LAYER_TYPE type) : Layer(id, type)
 {
     setName(tr("Bitmap Layer"));
 }

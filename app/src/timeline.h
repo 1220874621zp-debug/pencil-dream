@@ -76,6 +76,7 @@ signals:
     void duplicateKeyClick();
 
     void newBitmapLayer();
+    void newColorizeLayer();
     void newSoundLayer();
     void newCameraLayer();
 

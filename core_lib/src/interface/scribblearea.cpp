@@ -32,6 +32,8 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "undoredomanager.h"
 #include "layerbitmap.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
 #include "layercamera.h"
 #include "bitmapimage.h"
 #include "blitrect.h"
@@ -875,7 +877,7 @@ void ScribbleArea::paintBitmapBuffer()
 {
     LayerBitmap* layer = static_cast<LayerBitmap*>(mEditor->layers()->currentLayer());
     Q_ASSERT(layer);
-    Q_ASSERT(layer->type() == Layer::BITMAP);
+    Q_ASSERT(layer->isBitmapKind());
 
     int frameNumber = mEditor->currentFrame();
 
@@ -911,6 +913,18 @@ void ScribbleArea::paintBitmapBuffer()
     update(rect);
 
     layer->setModified(frameNumber, true);
+
+    // 智能填色层：笔画落帧即失效着色缓存（覆盖在延续帧上作画的情形——
+    // Layer::setModified 只查精确关键帧位置，会漏掉这种情况）
+    if (layer->type() == Layer::COLORIZE)
+    {
+        if (auto* colorizeLayer = static_cast<LayerColorize*>(layer);
+            colorizeLayer->getLastColorizeImageAtFrame(frameNumber) != nullptr)
+        {
+            colorizeLayer->getLastColorizeImageAtFrame(frameNumber)->setNeedsUpdate(true);
+        }
+    }
+
     mTiledBuffer.clear();
 }
 

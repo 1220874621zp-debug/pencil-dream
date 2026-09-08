@@ -27,7 +27,7 @@ class LayerBitmap : public Layer
     Q_DECLARE_TR_FUNCTIONS(LayerBitmap)
 
 public:
-    explicit LayerBitmap(int id);
+    explicit LayerBitmap(int id, LAYER_TYPE type = Layer::BITMAP);
     ~LayerBitmap() override;
 
     QDomElement createDomElement(QDomDocument& doc) const override;
@@ -45,8 +45,10 @@ protected:
     Status saveKeyFrameFile(KeyFrame*, QString strPath) override;
     KeyFrame* createKeyFrame(int position) override;
 
+    /** 子类可换成自己的关键帧类型（如 LayerColorize→ColorizeImage） */
+    virtual void loadImageAtFrame(QString strFilePath, QPoint topLeft, int frameNumber, qreal opacity);
+
 private:
-    void loadImageAtFrame(QString strFilePath, QPoint topLeft, int frameNumber, qreal opacity);
     QString filePath(KeyFrame* key, const QDir& dataFolder) const;
     QString fileName(KeyFrame* key) const;
     bool needSaveFrame(KeyFrame* key, const QString& strSavePath);

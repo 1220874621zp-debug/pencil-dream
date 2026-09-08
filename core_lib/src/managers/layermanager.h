@@ -61,6 +61,7 @@ public:
     /** Returns a new Layer with the given LAYER_TYPE */
     Layer* createLayer(Layer::LAYER_TYPE type, const QString& strLayerName);
     LayerBitmap* createBitmapLayer(const QString& strLayerName);
+    LayerBitmap* createColorizeLayer(const QString& strLayerName);
     LayerCamera* createCameraLayer(const QString& strLayerName);
     LayerSound*  createSoundLayer(const QString& strLayerName);
 

@@ -934,6 +934,19 @@ Status ActionCommands::addNewBitmapLayer()
     return Status::OK;
 }
 
+Status ActionCommands::addNewColorizeLayer()
+{
+    bool ok;
+    QString text = QInputDialog::getText(nullptr, tr("Layer Properties"),
+                                         tr("Layer name:"), QLineEdit::Normal,
+                                         mEditor->layers()->nameSuggestLayer(tr("Colorize Layer")), &ok);
+    if (ok && !text.isEmpty())
+    {
+        mEditor->layers()->createColorizeLayer(text);
+    }
+    return Status::OK;
+}
+
 Status ActionCommands::addNewCameraLayer()
 {
     bool ok;

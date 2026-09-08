@@ -479,6 +479,7 @@ void TimeLineCells::paintCollapsedTrack(QPainter& painter, const Layer* layer, i
 {
     QColor col;
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
     if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
     painter.setPen(Qt::NoPen);
@@ -500,6 +501,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     // the layer type color only feeds the block cards / accents, the track
     // itself stays dark (TVP) so the label color reads clearly
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
     if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
 
@@ -566,7 +568,7 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     const int layerIndex = getLayerNumber(pos.y());
     if (layerIndex < 0 || layerIndex >= mEditor->object()->getLayerCount()) return -1;
     Layer* layer = mEditor->object()->getLayer(layerIndex);
-    if (layer->type() != Layer::BITMAP || layer->locked()) return -1;
+    if (!layer->isBitmapKind() || layer->locked()) return -1;
 
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -660,7 +662,7 @@ void TimeLineCells::paintPlusPreview(QPainter& painter) const
 {
     if (!mPlusCreating || mPlusPreviewCount <= 0) return;
     Layer* layer = mEditor->object()->getLayer(mCurrentLayerNumber);
-    if (layer == nullptr || layer->type() != Layer::BITMAP) return;
+    if (layer == nullptr || !layer->isBitmapKind()) return;
 
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -1094,6 +1096,7 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     painter.drawEllipse(QRectF(x + 10, nameCenterY - 4.5, 9.0, 9.0));
 
     if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    if (layer->type() == Layer::COLORIZE) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
     if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-sound.svg").scaledToHeight(18, Qt::SmoothTransformation));
     if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-camera.svg").scaledToHeight(18, Qt::SmoothTransformation));
 
@@ -1738,7 +1741,7 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
     if (mPlusCreating && mType == TIMELINE_CELL_TYPE::Tracks)
     {
         Layer* layer = mEditor->object()->getLayer(mCurrentLayerNumber);
-        if (layer != nullptr && layer->type() == Layer::BITMAP)
+        if (layer != nullptr && layer->isBitmapKind())
         {
             int lastPos = -1;
             layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -1938,7 +1941,7 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             if (n > 0)
             {
                 Layer* layer = mEditor->layers()->getLayer(mCurrentLayerNumber);
-                if (layer != nullptr && layer->type() == Layer::BITMAP)
+                if (layer != nullptr && layer->isBitmapKind())
                 {
                     int lastPos = -1;
                     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -2218,7 +2221,7 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     if (layerNumber < 0 || layerNumber >= mEditor->object()->getLayerCount()) { return -1; }
 
     Layer* layer = mEditor->object()->getLayer(layerNumber);
-    if (layer == nullptr || layer->type() != Layer::BITMAP || layer->locked()) { return -1; }
+    if (layer == nullptr || !layer->isBitmapKind() || layer->locked()) { return -1; }
 
     const int frameNumber = getFrameNumber(pos.x());
     KeyFrame* key = layer->getKeyFrameWhichCovers(frameNumber);
