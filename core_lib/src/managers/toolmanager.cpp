@@ -268,6 +268,7 @@ bool ToolManager::tryClearTemporaryTool(Qt::MouseButton button)
 void ToolManager::setTemporaryTool(ToolType eToolType)
 {
     mTemporaryTool = getTool(eToolType);
+    qInfo() << "[cursor] tempSet" << int(eToolType);
     emit toolChanged(eToolType);
 }
 
@@ -280,5 +281,6 @@ void ToolManager::clearTemporaryTool()
     mTemporaryTriggerKeys = {};
     mTemporaryTriggerModifiers = Qt::NoModifier;
     mTemporaryTriggerMouseButtons = Qt::NoButton;
+    qInfo() << "[cursor] tempClear ->" << int(currentTool()->type());
     emit toolChanged(currentTool()->type());
 }

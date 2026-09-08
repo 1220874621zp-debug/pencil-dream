@@ -160,6 +160,14 @@ MainWindow2::MainWindow2(QWidget* parent) :
     mEditor->tools()->setDefaultTool();
     ui->background->init(mEditor->preference());
 
+    // TEMP PROBE: 焦点迁移追踪（光标诊断）
+    connect(qApp, &QApplication::focusChanged, this, [](QWidget* oldW, QWidget* newW)
+    {
+        qInfo() << "[cursor] focus"
+                << (oldW ? oldW->metaObject()->className() : "null")
+                << "->" << (newW ? newW->metaObject()->className() : "null");
+    });
+
     setWindowTitle(getWindowTitle());
 }
 
