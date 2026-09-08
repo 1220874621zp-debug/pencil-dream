@@ -3,6 +3,7 @@
 #include "layermanager.h"
 #include "filemanager.h"
 #include "scribblearea.h"
+#include "selectionmanager.h"
 
 #include "layerbitmap.h"
 
@@ -148,6 +149,60 @@ TEST_CASE("BitmapBucket - Fill drag behaviour across four segments")
             verifyOnlyPixelsInsideSegmentsAreFilled(pressPoint, image, fillColor.rgba());
         }
     }
+
+    delete scribbleArea;
+    delete editor;
+}
+
+TEST_CASE("BitmapBucket - fill respects the active selection")
+{
+    FileManager fm;
+    Object* obj = fm.load(":/fill-drag-test/fill-drag-test.pcl");
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(obj);
+    editor->init();
+
+    BucketToolProperties properties;
+    QSettings settings;
+
+    QHash<int, PropertyInfo> info;
+    info[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = 0;
+    info[BucketToolProperties::FILLEXPAND_ENABLED] = false;
+    info[BucketToolProperties::FILLMODE_VALUE] = 0;
+    info[BucketToolProperties::COLORTOLERANCE_VALUE] = 25;
+    info[BucketToolProperties::COLORTOLERANCE_ENABLED] = true;
+    properties.toolProperties().insertProperties(info);
+    properties.toolProperties().loadFrom("BucketTest", settings);
+
+    const QColor fillColor = QColor(0, 255, 0, 255);
+
+    BitmapImage beforeFill = *static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getBitmapImageAtFrame(1);
+    QPoint pressPoint = beforeFill.bounds().topLeft();
+    pressPoint.setX(pressPoint.x() + 3);
+    pressPoint.setY(pressPoint.y() + 7);
+    REQUIRE(beforeFill.constScanLine(pressPoint.x(), pressPoint.y()) == 0);
+
+    // lasso-style polygon selection: a small box around the press point
+    // only - the rest of the fillable segment must stay untouched
+    QPolygonF selection;
+    selection << QPointF(pressPoint.x() - 2, pressPoint.y() - 3)
+              << QPointF(pressPoint.x() + 2, pressPoint.y() - 3)
+              << QPointF(pressPoint.x() + 2, pressPoint.y() + 3)
+              << QPointF(pressPoint.x() - 2, pressPoint.y() + 3);
+    editor->select()->setSelection(selection, true);
+
+    BitmapBucket bucket = BitmapBucket(editor, fillColor, beforeFill.bounds(), pressPoint, properties);
+    bucket.paint(pressPoint, [](BucketState, int, int) {});
+
+    BitmapImage* image = static_cast<LayerBitmap*>(editor->layers()->currentLayer())->getLastBitmapImageAtFrame(1);
+
+    // inside the selection: filled
+    REQUIRE(image->constScanLine(pressPoint.x(), pressPoint.y()) == qPremultiply(fillColor.rgba()));
+    // same fillable segment but outside the selection: untouched
+    REQUIRE(image->constScanLine(pressPoint.x(), pressPoint.y() - 6) != qPremultiply(fillColor.rgba()));
+    REQUIRE(image->constScanLine(pressPoint.x(), pressPoint.y() + 6) != qPremultiply(fillColor.rgba()));
 
     delete scribbleArea;
     delete editor;

@@ -18,9 +18,11 @@ GNU General Public License for more details.
 
 #include <QtMath>
 #include <QDebug>
+#include <QPainter>
 
 #include "editor.h"
 #include "layermanager.h"
+#include "selectionmanager.h"
 
 #include "layerbitmap.h"
 
@@ -159,6 +161,32 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         return;
     }
     Q_ASSERT(replaceImage != nullptr);
+
+    // constrain the fill to the active selection, the same way brush
+    // strokes are (Krita's fill tools are selection-aware too)
+    const QPainterPath selectionClip = mEditor->select()->selectionClipPath();
+    if (!selectionClip.isEmpty())
+    {
+        if (!selectionClip.intersects(QRectF(replaceImage->bounds())))
+        {
+            delete replaceImage;
+            return;
+        }
+
+        // erase the fill outside the selection through an odd-even inverse
+        // fill; (DestinationIn + drawPath is a no-op on the raster engine,
+        // verified by isolation test)
+        QImage* fillData = replaceImage->image();
+        QPainter masker(fillData);
+        masker.translate(-replaceImage->topLeft());
+        QPainterPath erasePath;
+        erasePath.setFillRule(Qt::OddEvenFill);
+        erasePath.addRect(QRectF(replaceImage->bounds()).adjusted(-2.0, -2.0, 2.0, 2.0));
+        erasePath.addPath(selectionClip);
+        masker.setCompositionMode(QPainter::CompositionMode_Clear);
+        masker.fillPath(erasePath, Qt::white);
+        masker.end();
+    }
 
     state(BucketState::WillFillTarget, mTargetFillToLayerIndex, currentFrameIndex);
 
