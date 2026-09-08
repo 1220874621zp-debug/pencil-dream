@@ -20,8 +20,10 @@ GNU General Public License for more details.
 #include <QDoubleSpinBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include "editor.h"
@@ -30,6 +32,7 @@ GNU General Public License for more details.
 #include "colorizeimage.h"
 #include "layermanager.h"
 #include "scribblearea.h"
+#include "colorizeupdatemanager.h"
 
 ColorizeOptionsWidget::ColorizeOptionsWidget(Editor* editor, QWidget* parent)
     : BaseWidget(parent), mEditor(editor)
@@ -44,13 +47,50 @@ void ColorizeOptionsWidget::initUI()
     rootLayout->setContentsMargins(8, 8, 8, 8);
     rootLayout->setSpacing(6);
 
+    // --- 标题 + 更新（Krita: Update，纯手动刷新） ---
+    auto* titleRow = new QHBoxLayout;
     auto* titleLabel = new QLabel(tr("Colorize Mask"), this);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() + 0.5);
     titleLabel->setFont(titleFont);
-    rootLayout->addWidget(titleLabel);
+    titleRow->addWidget(titleLabel);
+    titleRow->addStretch();
 
+    mRefreshButton = new QPushButton(tr("Refresh"), this);
+    mRefreshAllButton = new QPushButton(tr("Update All"), this);
+    mRefreshButton->setToolTip(tr("Regenerate coloring for the current frame"));
+    mRefreshAllButton->setToolTip(tr("Regenerate coloring for every frame of this layer"));
+    titleRow->addWidget(mRefreshButton);
+    titleRow->addWidget(mRefreshAllButton);
+    rootLayout->addLayout(titleRow);
+
+    // --- 显示/编辑模式（Krita: Edit key strokes / Show output） ---
+    mEditKeyStrokesCheck = new QCheckBox(tr("Edit key strokes"), this);
+    mShowColoringCheck = new QCheckBox(tr("Show output"), this);
+    rootLayout->addWidget(mEditKeyStrokesCheck);
+    rootLayout->addWidget(mShowColoringCheck);
+
+    // --- 颜色列表（Krita: Key Strokes） ---
+    auto* colorsLabel = new QLabel(tr("Key Strokes"), this);
+    rootLayout->addWidget(colorsLabel);
+
+    mColorsRow = new QHBoxLayout;
+    mColorsRow->setSpacing(4);
+    mColorsRow->addStretch();
+    rootLayout->addLayout(mColorsRow);
+
+    auto* colorButtonsRow = new QHBoxLayout;
+    mTransparentButton = new QPushButton(tr("Transparent"), this);
+    mRemoveButton = new QPushButton(tr("Remove"), this);
+    mTransparentButton->setToolTip(tr("Mark the selected color as transparent: its stroke areas stay unfilled (use for background)"));
+    mRemoveButton->setToolTip(tr("Erase all strokes of the selected color on this frame"));
+    colorButtonsRow->addWidget(mTransparentButton);
+    colorButtonsRow->addWidget(mRemoveButton);
+    colorButtonsRow->addStretch();
+    rootLayout->addLayout(colorButtonsRow);
+
+    // --- 滤波参数（Krita 四参数） ---
     mEdgeDetectionCheck = new QCheckBox(tr("Edge detection (soft pencil lines)"), this);
     rootLayout->addWidget(mEdgeDetectionCheck);
 
@@ -88,15 +128,57 @@ void ColorizeOptionsWidget::initUI()
     addRow(mCleanUpSpin, QT_TRANSLATE_NOOP("ColorizeOptionsWidget", "Cleanup strength"));
     rootLayout->addLayout(form);
 
-    auto* hintLabel = new QLabel(tr("Paint color strokes with the brush; erase strokes to keep areas empty."), this);
+    auto* hintLabel = new QLabel(tr("Paint color strokes with the brush; mark background color as transparent; press Refresh to fill."), this);
     hintLabel->setWordWrap(true);
     hintLabel->setStyleSheet("color: gray;");
     rootLayout->addWidget(hintLabel);
 
-    connect(mEdgeDetectionCheck, &QCheckBox::toggled, this, &ColorizeOptionsWidget::applyAndRefresh);
-    connect(mEdgeSizeSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyAndRefresh);
-    connect(mFuzzyRadiusSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyAndRefresh);
-    connect(mCleanUpSpin, &QSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyAndRefresh);
+    // --- 连接 ---
+    connect(mRefreshButton, &QPushButton::clicked, this, &ColorizeOptionsWidget::refreshCurrentFrame);
+    connect(mRefreshAllButton, &QPushButton::clicked, this, &ColorizeOptionsWidget::refreshAllFrames);
+
+    connect(mEditKeyStrokesCheck, &QCheckBox::toggled, this, [this](bool value) {
+        LayerColorize* layer = currentColorizeLayer();
+        if (layer == nullptr) { return; }
+        layer->setEditKeyStrokes(value);
+        repaintCanvas();
+    });
+    connect(mShowColoringCheck, &QCheckBox::toggled, this, [this](bool value) {
+        LayerColorize* layer = currentColorizeLayer();
+        if (layer == nullptr) { return; }
+        layer->setShowColoring(value);
+        repaintCanvas();
+    });
+
+    connect(mTransparentButton, &QPushButton::clicked, this, [this]() {
+        LayerColorize* layer = currentColorizeLayer();
+        if (layer == nullptr || mSelectedColor < 0) { return; }
+        if (layer->hasTransparentColor() && layer->transparentColor() == static_cast<QRgb>(mSelectedColor))
+            layer->clearTransparentColor();
+        else
+            layer->setTransparentColor(static_cast<QRgb>(mSelectedColor));
+        invalidateAllFrames(layer);
+        refreshColors();
+    });
+    connect(mRemoveButton, &QPushButton::clicked, this, [this]() {
+        LayerColorize* layer = currentColorizeLayer();
+        if (layer == nullptr || mSelectedColor < 0) { return; }
+        layer->removeStrokeColor(mEditor->currentFrame(), static_cast<QRgb>(mSelectedColor));
+        mSelectedColor = -1;
+        repaintCanvas();
+        refreshColors();
+    });
+
+    connect(mEdgeDetectionCheck, &QCheckBox::toggled, this, &ColorizeOptionsWidget::applyParams);
+    connect(mEdgeSizeSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
+    connect(mFuzzyRadiusSpin, &QDoubleSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
+    connect(mCleanUpSpin, &QSpinBox::valueChanged, this, &ColorizeOptionsWidget::applyParams);
+
+    // 笔画编辑后刷新颜色列表
+    connect(mEditor, &Editor::frameModified, this, [this](int) {
+        if (currentColorizeLayer() != nullptr)
+            refreshColors();
+    });
 
     updateUI();
 }
@@ -105,30 +187,92 @@ void ColorizeOptionsWidget::updateUI()
 {
     LayerColorize* layer = currentColorizeLayer();
 
-    const QSignalBlocker b1(mEdgeDetectionCheck);
-    const QSignalBlocker b2(mEdgeSizeSpin);
-    const QSignalBlocker b3(mFuzzyRadiusSpin);
-    const QSignalBlocker b4(mCleanUpSpin);
+    const QSignalBlocker b1(mEditKeyStrokesCheck);
+    const QSignalBlocker b2(mShowColoringCheck);
+    const QSignalBlocker b3(mEdgeDetectionCheck);
+    const QSignalBlocker b4(mEdgeSizeSpin);
+    const QSignalBlocker b5(mFuzzyRadiusSpin);
+    const QSignalBlocker b6(mCleanUpSpin);
 
     if (layer == nullptr)
         return;
 
+    mEditKeyStrokesCheck->setChecked(layer->editKeyStrokes());
+    mShowColoringCheck->setChecked(layer->showColoring());
     mEdgeDetectionCheck->setChecked(layer->useEdgeDetection());
     mEdgeSizeSpin->setValue(layer->edgeDetectionSize());
     mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
     mFuzzyRadiusSpin->setValue(layer->fuzzyRadius());
     mCleanUpSpin->setValue(qRound(layer->cleanUpAmount() * 100.0));
+
+    refreshColors();
 }
 
-LayerColorize* ColorizeOptionsWidget::currentColorizeLayer() const
+void ColorizeOptionsWidget::refreshColors()
 {
-    Layer* layer = mEditor->layers()->currentLayer();
-    if (layer == nullptr || layer->type() != Layer::COLORIZE)
-        return nullptr;
-    return static_cast<LayerColorize*>(layer);
+    LayerColorize* layer = currentColorizeLayer();
+
+    // 清空旧色块
+    while (!mColorButtons.isEmpty())
+    {
+        QToolButton* button = mColorButtons.takeLast();
+        mColorsRow->removeWidget(button);
+        delete button;
+    }
+
+    if (layer == nullptr)
+    {
+        mSelectedColor = -1;
+        return;
+    }
+
+    const QVector<QRgb> colors = layer->strokeColorsAtFrame(mEditor->currentFrame());
+    for (int i = 0; i < colors.size() && i < 16; ++i)
+    {
+        const QRgb color = colors[i];
+        auto* button = new QToolButton(this);
+        button->setFixedSize(QSize(22, 22));
+        button->setAutoRaise(true);
+        const bool isTransparent = layer->hasTransparentColor() && layer->transparentColor() == color;
+        button->setToolTip(isTransparent ? tr("Transparent (stays unfilled)") : QColor(color).name());
+        QString style = QString("QToolButton { background: %1; border: 1px solid #666; }").arg(QColor(color).name());
+        if (isTransparent)
+            style += "QToolButton { border: 2px dashed #F5A623; }";
+        if (mSelectedColor < 0)
+            mSelectedColor = color; // 默认选中第一个
+        if (static_cast<QRgb>(mSelectedColor) == color)
+            style += "QToolButton { border: 2px solid #fff; }";
+        button->setStyleSheet(style);
+        connect(button, &QToolButton::clicked, this, [this, color]() {
+            mSelectedColor = color;
+            refreshColors();
+        });
+        mColorsRow->insertWidget(mColorsRow->count() - 1, button); // 弹簧前插入
+        mColorButtons.append(button);
+    }
 }
 
-void ColorizeOptionsWidget::applyAndRefresh()
+void ColorizeOptionsWidget::refreshCurrentFrame()
+{
+    LayerColorize* layer = currentColorizeLayer();
+    if (layer == nullptr) { return; }
+
+    if (mEditor->colorizeUpdates() != nullptr)
+        mEditor->colorizeUpdates()->requestUpdate(layer, mEditor->currentFrame());
+    repaintCanvas();
+}
+
+void ColorizeOptionsWidget::refreshAllFrames()
+{
+    LayerColorize* layer = currentColorizeLayer();
+    if (layer == nullptr || mEditor->colorizeUpdates() == nullptr) { return; }
+
+    layer->foreachKeyFrame([this, layer](KeyFrame* key) {
+        mEditor->colorizeUpdates()->requestUpdate(layer, key->pos());
+    });
+}
+
+void ColorizeOptionsWidget::applyParams()
 {
     LayerColorize* layer = currentColorizeLayer();
     if (layer == nullptr)
@@ -141,15 +285,32 @@ void ColorizeOptionsWidget::applyAndRefresh()
 
     mEdgeSizeSpin->setEnabled(layer->useEdgeDetection());
 
-    // 参数影响全部帧：整层失效，渲染懒触发会重算当前帧
-    layer->foreachKeyFrame([](KeyFrame* key)
-    {
+    // 参数影响全部帧：标记待更新（手动刷新，不自动计算）
+    invalidateAllFrames(layer);
+}
+
+void ColorizeOptionsWidget::invalidateAllFrames(LayerColorize* layer)
+{
+    if (layer == nullptr) { return; }
+    layer->foreachKeyFrame([](KeyFrame* key) {
         if (auto* frame = static_cast<ColorizeImage*>(key))
             frame->setNeedsUpdate(true);
     });
+    repaintCanvas();
+}
 
+void ColorizeOptionsWidget::repaintCanvas()
+{
     if (mEditor->getScribbleArea() != nullptr)
     {
-        mEditor->getScribbleArea()->updateFrame();
+        mEditor->getScribbleArea()->invalidateCanvasCache();
     }
+}
+
+LayerColorize* ColorizeOptionsWidget::currentColorizeLayer() const
+{
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr || layer->type() != Layer::COLORIZE)
+        return nullptr;
+    return static_cast<LayerColorize*>(layer);
 }

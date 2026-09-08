@@ -611,7 +611,7 @@ void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& bl
     const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
     Q_UNUSED(isDrawing);
 
-    // 着色的过期重算由 ColorizeUpdateManager 后台执行（ScribbleArea::paintEvent 懒触发），
+    // 着色计算完全由用户手动触发（选项面板「刷新」→ ColorizeUpdateManager），
     // 渲染路径只负责显示现有缓存 + 笔画
 
     QPainter currentColorizePainter;
@@ -619,20 +619,17 @@ void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& bl
 
     painter.setWorldMatrixEnabled(false);
 
-    // 1) 着色结果垫底
-    if (!frame->coloringImage().isNull())
+    // 1) 着色结果垫底（Krita: Show output）
+    if (colorizeLayer->showColoring() && !frame->coloringImage().isNull())
     {
         currentColorizePainter.setOpacity(frame->getOpacity() - (1.0 - painter.opacity()));
         currentColorizePainter.drawImage(frame->coloringBounds().topLeft(), frame->coloringImage());
     }
 
-    // 2) 笔画显示在上（未算出结果时以全不透明显示，否则半透明提示）
-    if (!frame->image()->isNull())
+    // 2) 笔画全不透明显示（Krita: Edit key strokes 开时可见）
+    if (colorizeLayer->editKeyStrokes() && frame->image() != nullptr && !frame->image()->isNull())
     {
-        if (!frame->coloringImage().isNull())
-            currentColorizePainter.setOpacity(qBound(0.0, 0.5 * painter.opacity(), 1.0));
-        else
-            currentColorizePainter.setOpacity(qBound(0.0, painter.opacity(), 1.0));
+        currentColorizePainter.setOpacity(qBound(0.0, painter.opacity(), 1.0));
         currentColorizePainter.drawImage(frame->topLeft(), *frame->image());
     }
 

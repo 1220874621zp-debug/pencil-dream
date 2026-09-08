@@ -132,15 +132,16 @@ TEST_CASE("Colorize buildHeightMap")
 
 TEST_CASE("Colorize WatershedFill")
 {
-    SECTION("single color stays inside closed line art")
+    SECTION("single color fills everything (Krita semantics)")
     {
-        // 封闭方框 + 框内一笔红：框内全红，框外保持透明（自动背景组）
+        // Krita 语义：无竞争的单一颜色铺满整个计算域——
+        // 背景保护靠用户画「透明笔画」（见 transparent stroke 用例）
         QImage lineArt = makeLineArt(QSize(64, 64), [](QPainter& p) {
-            p.drawRect(8, 8, 48, 48);
+            p.fillRect(30, 4, 4, 56, Qt::black);
         });
         QImage strokes = makeStrokes(QSize(64, 64), [](QPainter& p) {
             p.setPen(QPen(Qt::red, 3));
-            p.drawLine(24, 32, 40, 32);
+            p.drawLine(6, 32, 12, 32);
         });
 
         Colorize::FilteringOptions opt;
@@ -148,38 +149,7 @@ TEST_CASE("Colorize WatershedFill")
 
         REQUIRE(!result.isNull());
         REQUIRE(result.size() == lineArt.size());
-
-        const QRgb red = QColor(Qt::red).rgba();
-        // 框内（远离边线）全部为红
-        for (int y = 12; y < 52; ++y)
-            for (int x = 12; x < 52; ++x)
-                REQUIRE(nonPremul(result, x, y) == red);
-        // 框外四角保持透明
-        REQUIRE(result.pixel(2, 2) == 0);
-        REQUIRE(result.pixel(61, 2) == 0);
-        REQUIRE(result.pixel(2, 61) == 0);
-        REQUIRE(result.pixel(61, 61) == 0);
-        // 红色总量 = 框内区域（约 47x47），远小于全图
-        REQUIRE(countColor(result, red) > 40 * 40);
-        REQUIRE(countColor(result, red) < 60 * 60);
-    }
-
-    SECTION("unsealed single stroke does not blanket the canvas")
-    {
-        // 非封闭线稿（孤立短墙）+ 单笔：结果不得是整幅单色矩形
-        QImage lineArt = makeLineArt(QSize(64, 64), [](QPainter& p) {
-            p.fillRect(30, 24, 4, 16, Qt::black); // 孤立短墙
-        });
-        QImage strokes = makeStrokes(QSize(64, 64), [](QPainter& p) {
-            p.setPen(QPen(Qt::red, 3));
-            p.drawLine(6, 32, 12, 32);
-        });
-
-        QImage result = Colorize::colorize(lineArt, strokes, lineArt.rect(), Colorize::FilteringOptions());
-        const QRgb red = QColor(Qt::red).rgba();
-
-        REQUIRE(nonPremul(result, 9, 32) == red);       // 笔画处着色
-        REQUIRE(countColor(result, red) < 64 * 64);     // 不再铺满全图
+        REQUIRE(countColor(result, QColor(Qt::red).rgba()) == 64 * 64);
     }
 
     SECTION("two colors respect the wall")

@@ -76,6 +76,27 @@ public:
     qreal cleanUpAmount() const { return mCleanUpAmount; }
     void setCleanUpAmount(qreal v) { mCleanUpAmount = v; }
 
+    // --- 显示/编辑模式（对齐 Krita colorizeEditKeyStrokes / colorizeShowColoring） ---
+    /** 编辑模式：显示并可绘制笔画；关闭=只看着色结果（Krita: Edit key strokes） */
+    bool editKeyStrokes() const { return mEditKeyStrokes; }
+    void setEditKeyStrokes(bool v) { mEditKeyStrokes = v; }
+
+    /** 显示填色结果（Krita: Show output） */
+    bool showColoring() const { return mShowColoring; }
+    void setShowColoring(bool v) { mShowColoring = v; }
+
+    // --- 透明颜色（Krita transparentIndex：该颜色的笔画区域保持不填） ---
+    bool hasTransparentColor() const { return mHasTransparentColor; }
+    QRgb transparentColor() const { return mTransparentColor; }
+    void setTransparentColor(QRgb color);
+    void clearTransparentColor() { mHasTransparentColor = false; }
+
+    /** 从指定帧的笔画图里删除某颜色的全部笔画（Krita: Remove） */
+    void removeStrokeColor(int frameNumber, QRgb color);
+
+    /** 当前帧使用的笔画颜色列表（非预乘，按面积降序） */
+    QVector<QRgb> strokeColorsAtFrame(int frameNumber);
+
 protected:
     KeyFrame* createKeyFrame(int position) override;
     void loadImageAtFrame(QString strFilePath, QPoint topLeft, int frameNumber, qreal opacity) override;
@@ -85,6 +106,10 @@ private:
     qreal mEdgeDetectionSize = 4.0;
     qreal mFuzzyRadius = 0.0;
     qreal mCleanUpAmount = 0.7;
+    bool mEditKeyStrokes = true;
+    bool mShowColoring = true;
+    bool mHasTransparentColor = false;
+    QRgb mTransparentColor = 0;
 };
 
 #endif // LAYERCOLORIZE_H

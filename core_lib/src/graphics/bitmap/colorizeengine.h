@@ -46,6 +46,10 @@ struct FilteringOptions
     qreal edgeDetectionSize = 4.0;
     qreal fuzzyRadius = 0.0;        // 高斯闭缝半径（跨越线稿小缺口）
     qreal cleanUpAmount = 0.7;      // 污染区清理强度 [0..1]
+
+    // 透明颜色（Krita transparentIndex 语义）：该颜色的笔画区域保持不填
+    bool hasTransparentColor = false;
+    QRgb transparentColor = 0;
 };
 
 struct KeyStroke

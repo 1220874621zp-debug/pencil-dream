@@ -835,8 +835,8 @@ void Object::paintImage(QPainter& painter,int frameNumber,
             }
             else if (layer->type() == Layer::COLORIZE)
             {
-                // 与 CanvasPainter::paintCurrentColorizeFrame 同式：着色垫底、笔画提示；
-                // 导出/渲染是离线路径，过期帧在此同步兜底重算
+                // 导出/渲染为最终观感：只画着色结果（受 Show output 控制），
+                // 笔画不进导出；离线路径上过期帧同步兜底重算
                 auto layerColorize = static_cast<LayerColorize*>(layer);
                 ColorizeImage* frame = static_cast<ColorizeImage*>(layerColorize->getKeyFrameWhichCovers(frameNumber));
                 if (frame)
@@ -847,15 +847,10 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                     {
                         layerColorize->updateColoringAtFrame(frameNumber, getBitmapLayerAbove(layerIndex));
                     }
-                    if (!frame->coloringImage().isNull())
+                    if (layerColorize->showColoring() && !frame->coloringImage().isNull())
                     {
                         painter.setOpacity(frame->getOpacity() - (1.0 - layer->opacity()));
                         painter.drawImage(frame->coloringBounds().topLeft(), frame->coloringImage());
-                    }
-                    if (frame->image() != nullptr && !frame->image()->isNull())
-                    {
-                        painter.setOpacity(qBound(0.0, 0.5 * layer->opacity(), 1.0));
-                        painter.drawImage(frame->topLeft(), *frame->image());
                     }
                 }
             }

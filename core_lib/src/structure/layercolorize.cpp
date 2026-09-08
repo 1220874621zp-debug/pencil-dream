@@ -80,6 +80,12 @@ QDomElement LayerColorize::createDomElement(QDomDocument& doc) const
         layerElem.setAttribute("colorizeFuzzyRadius", QString::number(mFuzzyRadius, 'f', 1));
     if (mCleanUpAmount != 0.7)
         layerElem.setAttribute("colorizeCleanUp", QString::number(mCleanUpAmount, 'f', 2));
+    if (!mEditKeyStrokes)
+        layerElem.setAttribute("colorizeEditKeyStrokes", 0);
+    if (!mShowColoring)
+        layerElem.setAttribute("colorizeShowColoring", 0);
+    if (mHasTransparentColor)
+        layerElem.setAttribute("colorizeTransparentColor", static_cast<int>(mTransparentColor));
 
     return layerElem;
 }
@@ -94,8 +100,102 @@ void LayerColorize::loadDomElement(const QDomElement& element, QString dataDirPa
         mFuzzyRadius = element.attribute("colorizeFuzzyRadius").toDouble();
     if (!element.attribute("colorizeCleanUp").isEmpty())
         mCleanUpAmount = element.attribute("colorizeCleanUp").toDouble();
+    if (element.hasAttribute("colorizeEditKeyStrokes"))
+        mEditKeyStrokes = element.attribute("colorizeEditKeyStrokes").toInt() != 0;
+    if (element.hasAttribute("colorizeShowColoring"))
+        mShowColoring = element.attribute("colorizeShowColoring").toInt() != 0;
+    if (element.hasAttribute("colorizeTransparentColor"))
+    {
+        mTransparentColor = static_cast<QRgb>(element.attribute("colorizeTransparentColor").toInt());
+        mHasTransparentColor = true;
+    }
 
     LayerBitmap::loadDomElement(element, dataDirPath, progressStep);
+}
+
+void LayerColorize::setTransparentColor(QRgb color)
+{
+    mTransparentColor = color;
+    mHasTransparentColor = true;
+}
+
+void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
+{
+    ColorizeImage* frame = getLastColorizeImageAtFrame(frameNumber);
+    if (frame == nullptr)
+        return;
+    frame->loadFile();
+
+    QImage* image = frame->image();
+    if (image == nullptr || image->isNull())
+        return;
+
+    bool changed = false;
+    for (int y = 0; y < image->height(); ++y)
+    {
+        QRgb* line = reinterpret_cast<QRgb*>(image->scanLine(y));
+        for (int x = 0; x < image->width(); ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
+            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
+            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
+            if (qRgb(r, g, b) == color)
+            {
+                line[x] = 0;
+                changed = true;
+            }
+        }
+    }
+
+    if (changed)
+        frame->setModified(true);
+
+    // 若删除的是透明颜色本身，一并取消标记
+    if (mHasTransparentColor && color == mTransparentColor)
+        mHasTransparentColor = false;
+}
+
+QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
+{
+    QVector<QRgb> colors;
+    ColorizeImage* frame = getLastColorizeImageAtFrame(frameNumber);
+    if (frame == nullptr)
+        return colors;
+    frame->loadFile();
+
+    QImage* image = frame->image();
+    if (image == nullptr || image->isNull())
+        return colors;
+
+    QHash<QRgb, qint64> areas;
+    for (int y = 0; y < image->height(); ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+        for (int x = 0; x < image->width(); ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
+            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
+            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
+            areas[qRgb(r, g, b)] += a;
+        }
+    }
+
+    QVector<QPair<qint64, QRgb>> order;
+    for (auto it = areas.begin(); it != areas.end(); ++it)
+        order.append(qMakePair(it.value(), it.key()));
+    std::sort(order.begin(), order.end(),
+              [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) { return a.first > b.first; });
+    for (const auto& item : order)
+        colors.append(item.second);
+    return colors;
 }
 
 bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer)
@@ -168,6 +268,8 @@ bool LayerColorize::buildColorizeJob(LayerColorize* layer, int frameNumber,
     out.options.edgeDetectionSize = layer->mEdgeDetectionSize;
     out.options.fuzzyRadius = layer->mFuzzyRadius;
     out.options.cleanUpAmount = layer->mCleanUpAmount;
+    out.options.hasTransparentColor = layer->mHasTransparentColor;
+    out.options.transparentColor = layer->mTransparentColor;
 
     return true;
 }

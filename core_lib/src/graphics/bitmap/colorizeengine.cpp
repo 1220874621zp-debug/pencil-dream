@@ -398,13 +398,6 @@ public:
         for (int i = 0; i < mKeyStrokes.size(); ++i)
             parseColorIntoGroups(mKeyStrokes[i], i);
 
-        // 自动背景组：计算域边缘一圈作为「透明笔画」参与竞争（与普通笔画
-        // 同优先级——种子合并高度后同为 level>=1，靠距离公平竞争）。
-        // Krita 原版靠用户手画透明笔画保护背景，这里默认提供：
-        // 无竞争的单一颜色止于线稿范围，线稿外保持透明；
-        // 封闭且无笔画的区域仍归就近颜色（Krita 行为）。
-        addBorderBackgroundStroke();
-
         const QRect initRect = mGroupMapArea & mBoundingRect;
         initializeQueueFromGroupMap(initRect);
         if (!processQueue(0))
@@ -507,29 +500,6 @@ private:
                 }
             }
         }
-    }
-
-    // 计算域四边一圈合成「透明笔画」：与用户笔画同路径解析（合并高度、
-    // 等值成组），保证优先级对等；不与用户笔画抢像素（addKeyStroke 后加优先）
-    void addBorderBackgroundStroke()
-    {
-        QImage ring(mHeightMap.size(), QImage::Format_Grayscale8);
-        ring.fill(0);
-        const QRect& rc = mBoundingRect;
-        for (int x = rc.left(); x <= rc.right(); ++x)
-        {
-            ring.scanLine(rc.top())[x] = 255;
-            ring.scanLine(rc.bottom())[x] = 255;
-        }
-        for (int y = rc.top(); y <= rc.bottom(); ++y)
-        {
-            ring.scanLine(y)[rc.left()] = 255;
-            ring.scanLine(y)[rc.right()] = 255;
-        }
-
-        addKeyStroke(ring, 0, true);
-        mKeyStrokeIsBorder.back() = true;
-        parseColorIntoGroups(mKeyStrokes.back(), mKeyStrokeColors.size() - 1);
     }
 
     void addForeignAlly(qint32 currGroupId, qint32 prevGroupId,
@@ -1125,6 +1095,17 @@ QImage colorize(const QImage& lineArt,
 {
     const QImage heightMap = buildHeightMap(lineArt, bounds, options);
     QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesImage, bounds);
+
+    // 透明颜色标记（Krita transparentIndex：该颜色区域保持不填）
+    if (options.hasTransparentColor)
+    {
+        for (auto& stroke : strokes)
+        {
+            if (stroke.color == options.transparentColor)
+                stroke.isTransparent = true;
+        }
+    }
+
     return runWatershed(heightMap, strokes, bounds, options.cleanUpAmount, progress);
 }
 

@@ -21,12 +21,16 @@ GNU General Public License for more details.
 
 class QCheckBox;
 class QDoubleSpinBox;
+class QHBoxLayout;
+class QPushButton;
 class QSpinBox;
+class QToolButton;
 class Editor;
 class LayerColorize;
 
-/** 智能填色图层的选项面板：滤波参数（对齐 Krita Colorize Mask），
- *  当前层为填色图层时显示，改参数自动失效全部帧并重算当前帧 */
+/** 智能填色图层的选项面板（对齐 Krita Colorize Mask 工具选项）：
+ *  更新按钮(手动刷新)/编辑模式/显示填色/颜色列表(透明标记+移除)/滤波参数。
+ *  当前层为填色图层时显示 */
 class ColorizeOptionsWidget : public BaseWidget
 {
     Q_OBJECT
@@ -36,11 +40,28 @@ public:
     void initUI() override;
     void updateUI() override;
 
+private slots:
+    void refreshCurrentFrame();
+    void refreshAllFrames();
+    void applyParams();
+
 private:
     LayerColorize* currentColorizeLayer() const;
-    void applyAndRefresh();
+    void refreshColors();
+    void invalidateAllFrames(LayerColorize* layer);
+    void repaintCanvas();
 
     Editor* mEditor = nullptr;
+
+    QPushButton* mRefreshButton = nullptr;
+    QPushButton* mRefreshAllButton = nullptr;
+    QCheckBox* mEditKeyStrokesCheck = nullptr;
+    QCheckBox* mShowColoringCheck = nullptr;
+    QHBoxLayout* mColorsRow = nullptr;
+    QList<QToolButton*> mColorButtons;
+    qint64 mSelectedColor = -1; // QRgb 值或 -1=未选
+    QPushButton* mTransparentButton = nullptr;
+    QPushButton* mRemoveButton = nullptr;
 
     QCheckBox* mEdgeDetectionCheck = nullptr;
     QDoubleSpinBox* mEdgeSizeSpin = nullptr;

@@ -2982,39 +2982,99 @@ esta acción es irreversible!</translation>
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="45"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
         <source>Colorize Mask</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
-        <source>Edge detection (soft pencil lines)</source>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="60"/>
+        <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="59"/>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
-        <source> px</source>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="61"/>
+        <source>Update All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
+        <source>Regenerate coloring for the current frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
+        <source>Regenerate coloring for every frame of this layer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="69"/>
+        <source>Edit key strokes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="70"/>
+        <source>Show output</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="75"/>
+        <source>Key Strokes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
-        <source>Edge size</source>
+        <source>Transparent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <source>Remove</source>
+        <translation type="unfinished">Eliminar</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="87"/>
+        <source>Erase all strokes of the selected color on this frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
+        <source>Edge detection (soft pencil lines)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="101"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="107"/>
+        <source> px</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="126"/>
+        <source>Edge size</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="127"/>
         <source>Gap closing radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="128"/>
         <source>Cleanup strength</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="89"/>
-        <source>Paint color strokes with the brush; erase strokes to keep areas empty.</source>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="131"/>
+        <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="237"/>
+        <source>Transparent (stays unfilled)</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -6338,33 +6398,33 @@ or cancel</source>
 <context>
     <name>ScribbleArea</name>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="861"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="869"/>
         <source>Warning</source>
         <translation>Advertencia</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="862"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="870"/>
         <source>You are trying to modify a hidden layer! Please select another layer (or make the current layer visible).</source>
         <translation>Está intentando alterar una capa escondida! Por favor escoja otra capa (o haga la capa actual visible)</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="869"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="877"/>
         <source>警告</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="870"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="878"/>
         <source>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1567"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1569"/>
         <source>Delete Selection</source>
         <comment>Undo Step: clear the selection area.</comment>
         <translation>Quitar Selección</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1583"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1585"/>
         <source>Clear Image</source>
         <comment>Undo step text</comment>
         <translation>Limpiar imagen</translation>

@@ -2964,40 +2964,104 @@
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="45"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
         <source>Colorize Mask</source>
         <translation>智能填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="60"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="61"/>
+        <source>Update All</source>
+        <translation>更新全部</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
+        <source>Regenerate coloring for the current frame</source>
+        <translation>重新计算当前帧的填色</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
+        <source>Regenerate coloring for every frame of this layer</source>
+        <translation>重新计算本图层全部帧的填色</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="69"/>
+        <source>Edit key strokes</source>
+        <translation>编辑模式（显示并绘制笔画）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="70"/>
+        <source>Show output</source>
+        <translation>显示填色结果</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="75"/>
+        <source>Key Strokes</source>
+        <translation>笔画颜色</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
+        <source>Transparent</source>
+        <translation>透明</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <source>Remove</source>
+        <translation type="unfinished">删除</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
+        <translation>将选中的颜色标记为透明：该颜色的笔画区域保持不填色（用于背景）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="87"/>
+        <source>Erase all strokes of the selected color on this frame</source>
+        <translation>擦除当前帧上该颜色的全部笔画</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
         <source>Edge detection (soft pencil lines)</source>
         <translation>边缘检测（软铅笔线稿增强）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="59"/>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="101"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="107"/>
         <source> px</source>
         <translation> 像素</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="126"/>
         <source>Edge size</source>
         <translation>检测尺寸</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="127"/>
         <source>Gap closing radius</source>
         <translation>闭缝半径</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="128"/>
         <source>Cleanup strength</source>
         <translation>清理强度</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="89"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="131"/>
+        <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
+        <translation>用画笔画颜色笔画；把背景颜色标记为透明；点「刷新」计算填色。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="237"/>
+        <source>Transparent (stays unfilled)</source>
+        <translation>透明（保持不填色）</translation>
+    </message>
+    <message>
         <source>Paint color strokes with the brush; erase strokes to keep areas empty.</source>
-        <translation>用画笔画颜色笔画；想保持空白的区域用橡皮擦掉笔画。</translation>
+        <translation type="vanished">用画笔画颜色笔画；想保持空白的区域用橡皮擦掉笔画。</translation>
     </message>
 </context>
 <context>
@@ -6568,33 +6632,33 @@ or cancel</source>
 <context>
     <name>ScribbleArea</name>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="861"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="869"/>
         <source>Warning</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="862"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="870"/>
         <source>You are trying to modify a hidden layer! Please select another layer (or make the current layer visible).</source>
         <translation>你正在尝试修改一个隐藏层！请选择其它层（或将当前层设为可见）。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="869"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="877"/>
         <source>警告</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="870"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="878"/>
         <source>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</source>
         <translation>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1567"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1569"/>
         <source>Delete Selection</source>
         <comment>Undo Step: clear the selection area.</comment>
         <translation>删除选择区域</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1583"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1585"/>
         <source>Clear Image</source>
         <comment>Undo step text</comment>
         <translation>清理图像</translation>
