@@ -44,33 +44,53 @@ QString GetToolTips(QString strCommandName)
     return QString("<b>%1</b>").arg(keySequence.toString()); // don't tr() this string.
 }
 
-// 工具组按钮图标：PS 式右下角小三角标记 = 长按有变体菜单。
-// 2x 渲染 + DPR 标注，高分屏不发虚；SVG 必经 QIcon::pixmap 缩放（防 viewBox 整图加载）
-static QIcon variantIcon(ToolType toolType, bool withCornerBadge)
+// 工具组按钮图标（原样，无角标——角标由 CornerBadge 覆盖控件绘制）
+static QIcon variantIcon(ToolType toolType)
 {
-    QString svg;
     switch (toolType)
     {
-    case LASSO:  svg = ":/icons/themes/playful/tools/tool-lasso.svg"; break;
-    case SELECT: svg = ":/icons/themes/playful/tools/tool-select.svg"; break;
-    case DEFORM: svg = ":/icons/themes/playful/tools/tool-deform.svg"; break;
-    case MOVE:   svg = ":/icons/themes/playful/tools/tool-move.svg"; break;
+    case LASSO:  return QIcon(":/icons/themes/playful/tools/tool-lasso.svg");
+    case SELECT: return QIcon(":/icons/themes/playful/tools/tool-select.svg");
+    case DEFORM: return QIcon(":/icons/themes/playful/tools/tool-deform.svg");
+    case MOVE:   return QIcon(":/icons/themes/playful/tools/tool-move.svg");
     default:     return QIcon();
     }
-    QIcon icon(svg);
-    if (!withCornerBadge) { return icon; }
-
-    QPixmap pixmap = icon.pixmap(QSize(22, 22) * 2);
-    pixmap.setDevicePixelRatio(2.0);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    QPolygonF badge { QPointF(16, 22), QPointF(22, 22), QPointF(22, 16) };
-    painter.setPen(QPen(QColor(30, 30, 30), 1.0));
-    painter.setBrush(QColor(225, 225, 225));
-    painter.drawPolygon(badge);
-    painter.end();
-    return QIcon(pixmap);
 }
+
+// Krita/Qt 原生范式：变体角标画在「按钮」右下角（不是烙进图标），小三角、
+// 无描边、跟随主题调色板，双层绘制明暗主题均可见（与选区蚂蚁线同款手法）
+class CornerBadge : public QWidget
+{
+public:
+    explicit CornerBadge(QWidget* parent) : QWidget(parent)
+    {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setGeometry(parent->width() - 14, parent->height() - 14, 14, 14);
+        raise();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+
+        const qreal m = 3.0;                    // 与按钮角的留白
+        const qreal leg = width() - m * 2.0;    // 三角直角边长
+        QPolygonF triangle { QPointF(m, height() - m),
+                             QPointF(m + leg, height() - m),
+                             QPointF(m + leg, height() - m - leg) };
+
+        QPolygonF shadow = triangle.translated(0.7, 0.7);
+        painter.setBrush(QColor(0, 0, 0, 130));
+        painter.drawPolygon(shadow);
+
+        painter.setBrush(parentWidget()->palette().color(QPalette::WindowText));
+        painter.drawPolygon(triangle);
+    }
+};
 
 ToolBoxWidget::ToolBoxWidget(QWidget* parent)
     : QWidget(parent), ui(new Ui::ToolBoxWidget)
@@ -427,7 +447,7 @@ void ToolBoxWidget::setupVariantGroup(VariantGroup& group, QToolButton* button,
     for (ToolType toolType : variants)
     {
         QAction* action = group.menu->addAction(
-            variantIcon(toolType, false),
+            variantIcon(toolType),
             tr("%1（%2）：%3").arg(variantName(toolType), GetToolTips(variantCommand(toolType)), variantDesc(toolType)));
         connect(action, &QAction::triggered, this, [this, &group, toolType]() {
             setVariant(group, toolType);
@@ -443,13 +463,16 @@ void ToolBoxWidget::setupVariantGroup(VariantGroup& group, QToolButton* button,
     });
     button->installEventFilter(this);
 
+    // 变体角标：按钮右下角小三角（Krita/Qt 原生范式）
+    new CornerBadge(button);
+
     setVariant(group, defaultVariant);
 }
 
 void ToolBoxWidget::setVariant(VariantGroup& group, ToolType toolType)
 {
     group.current = toolType;
-    group.button->setIcon(variantIcon(toolType, true));
+    group.button->setIcon(variantIcon(toolType));
     group.button->setToolTip(
         tr("%1（%2）：%3；长按此按钮可切换同类工具")
             .arg(variantName(toolType), GetToolTips(variantCommand(toolType)), variantDesc(toolType)));
