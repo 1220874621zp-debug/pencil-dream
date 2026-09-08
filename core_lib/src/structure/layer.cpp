@@ -919,6 +919,10 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     {
         layerTag.setAttribute("colorIndex", mColorIndex);
     }
+    if (mGroupId >= 0)
+    {
+        layerTag.setAttribute("group", mGroupId);
+    }
     return layerTag;
 }
 
@@ -935,4 +939,5 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     setLocked(elem.attribute("locked", "0").toInt() == 1);
     setClipMask(elem.attribute("clipMask", "0").toInt() == 1);
     mColorIndex = elem.attribute("colorIndex", "-1").toInt();
+    mGroupId = elem.attribute("group", "-1").toInt();
 }

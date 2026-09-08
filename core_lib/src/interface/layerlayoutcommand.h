@@ -59,24 +59,41 @@ private:
     QList<KeyFrame*> mOwnedKeys; // not currently hosted by any layer
 };
 
-/** Undo/redo for layer reordering (insert-style drag, single step). */
+/** Undo/redo for layer reordering (insert-style drag, single step).
+ *  可选携带图层分组状态快照：组操作（建/入/离/散/整组移动/组开关）与重排
+ *  合并为同一条撤销命令。 */
 class LayerOrderCommand : public UndoRedoCommand
 {
 public:
+    struct GroupSnapshot
+    {
+        bool valid = false;
+        QHash<int, int> layerGroupId; // layerId -> groupId（-1 = 无组）
+        QList<LayerGroupInfo> groups;
+        int nextGroupId = 1;
+    };
+
+    /** 捕获当前对象的完整分组状态（时间轴拖拽成组等入口共用） */
+    static GroupSnapshot captureGroups(class Object* obj);
+
     LayerOrderCommand(Editor* editor,
                       const QList<int>& undoOrder,
                       const QList<int>& redoOrder,
                       const QString& description,
-                      QUndoCommand* parent = nullptr);
+                      QUndoCommand* parent = nullptr,
+                      const GroupSnapshot& undoGroups = GroupSnapshot(),
+                      const GroupSnapshot& redoGroups = GroupSnapshot());
 
     void undo() override;
     void redo() override;
 
 private:
-    void apply(const QList<int>& order);
+    void apply(const QList<int>& order, const GroupSnapshot& groups);
 
     QList<int> mUndoOrder;
     QList<int> mRedoOrder;
+    GroupSnapshot mUndoGroups;
+    GroupSnapshot mRedoGroups;
 };
 
 #endif // LAYERLAYOUTCOMMAND_H

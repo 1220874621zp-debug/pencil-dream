@@ -78,6 +78,22 @@ public:
     QString nameSuggestLayer(const QString& name);
     int getLastLayerIndex() { return count() - 1; }
 
+    // ---- 图层分组操作（每步一条撤销；入口保证声音/相机层不进组） ----
+    /** 右键入口：把 layerIndex 处的图层收进一个新建组，返回组 id（失败 -1） */
+    int createGroupWithLayer(int layerIndex);
+    /** 拖拽入组：把 layerIndex 图层设为 groupId 成员（调用方保证已与组相邻） */
+    bool addLayerToGroup(int layerIndex, int groupId);
+    /** Alt 拖出：把 layerIndex 图层移出所在组 */
+    bool removeLayerFromGroup(int layerIndex);
+    /** 解散组：全部成员出组并删表条目 */
+    bool dissolveGroup(int groupId);
+    void renameGroup(int groupId, const QString& name);
+    void toggleGroupCollapsed(int groupId);
+    void setGroupVisible(int groupId, bool visible);
+    void setGroupLocked(int groupId, bool locked);
+    /** 整组块移动到 toIndex（insert 语义） */
+    bool moveLayerGroup(int groupId, int toIndex);
+
 signals:
     void currentLayerWillChange(int index);
     void currentLayerChanged(int index);

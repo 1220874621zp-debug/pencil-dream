@@ -436,6 +436,7 @@ QWidget* TimeLine::playbackBottomBar() const
 
 void TimeLine::updateUI()
 {
+    updateLayerView(); // 组增删/展开收起会改变可见行数（滚动条范围跟随）
     updateContent();
 }
 
@@ -503,7 +504,8 @@ void TimeLine::updateLayerView()
     int pageDisplay = (mTracks->height() - mTracks->getOffsetY()) / mTracks->getLayerHeight();
 
     mVScrollbar->setMinimum(0);
-    mVScrollbar->setMaximum(qMax(0, mNumLayers - pageDisplay));
+    // 行数含组头行（收起时成员行不占行），滚动范围按可见行算
+    mVScrollbar->setMaximum(qMax(0, mTracks->visibleRowCount() - pageDisplay));
     updateContent();
 }
 

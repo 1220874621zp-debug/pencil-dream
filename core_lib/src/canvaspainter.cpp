@@ -548,7 +548,7 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         Layer* layer = mObject->getLayer(i);
         qDebug() << "[填色] 层循环 i=" << i << "type=" << layer->type() << "visible=" << layer->visible() << layer->name();
 
-        if (!layer->visible())
+        if (!mObject->isLayerRenderable(layer))
             continue;
 
         // the layer-panel opacity multiplies into the layer's overall presence

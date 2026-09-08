@@ -25,6 +25,8 @@ GNU General Public License for more details.
 #include <QWidget>
 #include "layercamera.h"
 
+#include "object.h"
+
 class Layer;
 enum class LayerVisibility;
 class TimeLine;
@@ -55,6 +57,8 @@ public:
     static int getOffsetX() { return mOffsetX; }
     static int getOffsetY() { return mOffsetY; }
     int getLayerHeight() const { return mLayerHeight; }
+    /** 可见行数（含组头行；滚动条范围用） */
+    int visibleRowCount() const { rebuildRows(); return mRows.size(); }
 
     int getFrameLength() const { return mFrameLength; }
     int getFrameSize() const { return mFrameSize; }
@@ -110,6 +114,28 @@ private:
     void toggleLayerCollapsed(int layerNumber);
     int getFrameX(int frameNumber) const;
     int getFrameNumber(int x) const;
+
+    // ---- 组头行模型（组头+图层行；与轨道区两列同源同序） ----
+    void rebuildRows() const;
+    int rowHeightAt(int rowIndex) const;             // 行高（组头=22，成员按层折叠态）
+    int rowYAt(int rowIndex) const;                  // 行顶 y
+    int rowIndexAtY(int y) const;                    // 命中行号；-1 = 首行之上
+    int rowIndexOfLayer(int layerNumber) const;      // 层所在行；收起组内成员 = 其组头行
+    /** 点在组头行上返回 gid（须在通用命中之前调用），否则 -1 */
+    int headerGroupIdAt(const QPoint& pos) const;
+    /** 该层的行是否因组收起而不可见 */
+    bool layerRowHidden(const Layer* layer) const;
+    void paintGroupHeader(QPainter& painter, int groupId, int x, int y, int width, int height) const;
+    void paintGroupTrack(QPainter& painter, int groupId, int y, int height) const;
+    void showGroupHeaderMenu(QPoint pos, int groupId);
+    void showLayerGroupMenu(QPoint pos, int layerIndex); // 图层右键：成组入口
+    /** 组成员帧范围带（Tracks 组头行）：[minKeyPos, maxEnd]；空组返回空 */
+    QPair<int, int> groupFrameExtent(int groupId) const;
+
+    mutable QList<Object::TimelineRowRef> mRows;
+    mutable quint64 mRowsStamp = 0;
+    int mGroupDragId = -1;        // 正在整组拖动的 gid（释放时换算插入目标）
+    static constexpr int GROUP_HEADER_HEIGHT = 22;
 
     // Dreams-style block helpers
     /** Width of the exposure block of the given keyframe, in frames (trim preview aware). */

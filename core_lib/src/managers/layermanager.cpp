@@ -19,6 +19,9 @@ GNU General Public License for more details.
 
 #include "object.h"
 #include "editor.h"
+#include "scribblearea.h"
+#include "layerlayoutcommand.h"
+#include "undoredomanager.h"
 
 #include "layersound.h"
 #include "layerbitmap.h"
@@ -342,6 +345,7 @@ Status LayerManager::deleteLayer(int index)
         setCurrentLayer(currentLayerIndex() - 1);
     }
     object()->deleteLayer(layer);
+    object()->repairLayerGroupContiguity(); // 删成员后组可能空/断开
     if (index >= currentLayerIndex())
     {
         // current layer has changed, so trigger updates
@@ -420,4 +424,164 @@ int LayerManager::getIndex(Layer* layer) const
             return i;
     }
     return -1;
+}
+
+// ---- 图层分组操作 ----
+
+namespace
+{
+LayerOrderCommand::GroupSnapshot captureGroupSnapshot(Object* obj)
+{
+    LayerOrderCommand::GroupSnapshot snap;
+    snap.valid = true;
+    snap.groups = obj->layerGroups();
+    snap.nextGroupId = obj->nextLayerGroupId();
+    for (int i = 0; i < obj->getLayerCount(); ++i)
+    {
+        snap.layerGroupId.insert(obj->getLayer(i)->id(), obj->getLayer(i)->groupId());
+    }
+    return snap;
+}
+}
+
+/** 组操作公共收尾：修复连续性→推一条合并撤销→通知 UI 刷新 */
+static void finishGroupOp(LayerManager* /*self*/, Editor* editor,
+                          const QList<int>& orderBefore,
+                          const LayerOrderCommand::GroupSnapshot& before,
+                          const QString& desc)
+{
+    editor->object()->repairLayerGroupContiguity();
+    editor->undoRedo()->pushUndoCommand(new LayerOrderCommand(
+        editor, orderBefore, editor->object()->layerIdOrder(), desc,
+        nullptr, before, captureGroupSnapshot(editor->object())));
+    emit editor->updateTimeLine();
+    editor->getScribbleArea()->onLayerChanged();
+}
+
+int LayerManager::createGroupWithLayer(int layerIndex)
+{
+    Layer* layer = object()->getLayer(layerIndex);
+    if (layer == nullptr || !layer->isGroupable() || layer->groupId() >= 0)
+    {
+        return -1;
+    }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    const int gid = object()->createLayerGroup(tr("组 %1").arg(object()->layerGroups().size() + 1));
+    layer->setGroupId(gid);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("图层成组"));
+    return gid;
+}
+
+bool LayerManager::addLayerToGroup(int layerIndex, int groupId)
+{
+    Layer* layer = object()->getLayer(layerIndex);
+    if (layer == nullptr || !layer->isGroupable()) { return false; }
+    if (object()->layerGroupInfo(groupId) == nullptr) { return false; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    layer->setGroupId(groupId);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("加入图层组"));
+    return true;
+}
+
+bool LayerManager::removeLayerFromGroup(int layerIndex)
+{
+    Layer* layer = object()->getLayer(layerIndex);
+    if (layer == nullptr || layer->groupId() < 0) { return false; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    layer->setGroupId(-1);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("移出图层组"));
+    return true;
+}
+
+bool LayerManager::dissolveGroup(int groupId)
+{
+    if (object()->layerGroupInfo(groupId) == nullptr) { return false; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    const QList<int> members = object()->layerGroupMemberIndices(groupId);
+    for (int index : members)
+    {
+        object()->getLayer(index)->setGroupId(-1);
+    }
+    object()->removeLayerGroupEntry(groupId);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("解散图层组"));
+    return true;
+}
+
+void LayerManager::renameGroup(int groupId, const QString& name)
+{
+    if (name.isEmpty()) { return; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    object()->renameLayerGroup(groupId, name);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("重命名图层组"));
+}
+
+void LayerManager::toggleGroupCollapsed(int groupId)
+{
+    const LayerGroupInfo* info = object()->layerGroupInfo(groupId);
+    if (info == nullptr) { return; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    object()->setLayerGroupCollapsed(groupId, !info->collapsed);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("展开/收起图层组"));
+}
+
+void LayerManager::setGroupVisible(int groupId, bool visible)
+{
+    if (object()->layerGroupInfo(groupId) == nullptr) { return; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    object()->setLayerGroupVisible(groupId, visible);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("图层组可见性"));
+}
+
+void LayerManager::setGroupLocked(int groupId, bool locked)
+{
+    if (object()->layerGroupInfo(groupId) == nullptr) { return; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    object()->setLayerGroupLocked(groupId, locked);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("图层组锁定"));
+}
+
+bool LayerManager::moveLayerGroup(int groupId, int toIndex)
+{
+    const QList<int> members = object()->layerGroupMemberIndices(groupId);
+    if (members.isEmpty()) { return false; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    const bool ok = object()->moveLayerRange(members.first(), members.size(), toIndex);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("移动图层组"));
+    return ok;
 }

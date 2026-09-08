@@ -28,6 +28,7 @@ GNU General Public License for more details.
 #include <QImageWriter>
 #include <QRegularExpression>
 #include <QHash>
+#include <QSet>
 
 #include "layer.h"
 #include "layerbitmap.h"
@@ -75,6 +76,22 @@ QDomElement Object::saveXML(QDomDocument& doc) const
         QDomElement layerTag = layer->createDomElement(doc);
         objectTag.appendChild(layerTag);
     }
+
+    if (!mLayerGroups.isEmpty())
+    {
+        QDomElement groupsTag = doc.createElement("layerGroups");
+        for (const LayerGroupInfo& info : mLayerGroups)
+        {
+            QDomElement g = doc.createElement("group");
+            g.setAttribute("id", info.id);
+            g.setAttribute("name", info.name);
+            g.setAttribute("collapsed", info.collapsed ? 1 : 0);
+            g.setAttribute("visible", info.visible ? 1 : 0);
+            g.setAttribute("locked", info.locked ? 1 : 0);
+            groupsTag.appendChild(g);
+        }
+        objectTag.appendChild(groupsTag);
+    }
     return objectTag;
 }
 
@@ -119,6 +136,33 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
         mLayers.append(newLayer);
         newLayer->loadDomElement(element, dataDirPath, progressForward);
     }
+
+    for (QDomNode node = docElem.firstChild(); !node.isNull(); node = node.nextSibling())
+    {
+        QDomElement element = node.toElement();
+        if (element.tagName() != "layerGroups")
+        {
+            continue;
+        }
+        for (QDomNode g = element.firstChild(); !g.isNull(); g = g.nextSibling())
+        {
+            QDomElement ge = g.toElement();
+            if (ge.tagName() != "group") { continue; }
+            LayerGroupInfo info;
+            info.id = ge.attribute("id").toInt();
+            info.name = ge.attribute("name", tr("组"));
+            info.collapsed = ge.attribute("collapsed", "0").toInt() == 1;
+            info.visible = ge.attribute("visible", "1").toInt() == 1;
+            info.locked = ge.attribute("locked", "0").toInt() == 1;
+            if (info.id > 0)
+            {
+                mLayerGroups.append(info);
+                mNextLayerGroupId = qMax(mNextLayerGroupId, info.id + 1);
+            }
+        }
+    }
+    // 防御：手工改坏的工程文件组信息不连续时自动修复
+    repairLayerGroupContiguity();
     return true;
 }
 
@@ -418,6 +462,240 @@ QList<int> Object::layerIdOrder() const
         order.append(layer->id());
     }
     return order;
+}
+
+// ---- 图层分组 ----
+
+int Object::createLayerGroup(const QString& name)
+{
+    LayerGroupInfo info;
+    info.id = mNextLayerGroupId++;
+    info.name = name;
+    mLayerGroups.append(info);
+    ++mLayerGroupGeneration;
+    return info.id;
+}
+
+void Object::renameLayerGroup(int groupId, const QString& name)
+{
+    if (LayerGroupInfo* info = layerGroupInfo(groupId))
+    {
+        info->name = name;
+        ++mLayerGroupGeneration;
+    }
+}
+
+LayerGroupInfo* Object::layerGroupInfo(int groupId)
+{
+    for (LayerGroupInfo& info : mLayerGroups)
+    {
+        if (info.id == groupId) { return &info; }
+    }
+    return nullptr;
+}
+
+const LayerGroupInfo* Object::layerGroupInfo(int groupId) const
+{
+    for (const LayerGroupInfo& info : mLayerGroups)
+    {
+        if (info.id == groupId) { return &info; }
+    }
+    return nullptr;
+}
+
+void Object::removeLayerGroupEntry(int groupId)
+{
+    for (int i = 0; i < mLayerGroups.size(); ++i)
+    {
+        if (mLayerGroups[i].id == groupId)
+        {
+            mLayerGroups.removeAt(i);
+            ++mLayerGroupGeneration;
+            return;
+        }
+    }
+}
+
+void Object::setLayerGroupCollapsed(int groupId, bool collapsed)
+{
+    if (LayerGroupInfo* info = layerGroupInfo(groupId))
+    {
+        info->collapsed = collapsed;
+        ++mLayerGroupGeneration;
+    }
+}
+
+void Object::setLayerGroupVisible(int groupId, bool visible)
+{
+    if (LayerGroupInfo* info = layerGroupInfo(groupId))
+    {
+        info->visible = visible;
+        ++mLayerGroupGeneration;
+    }
+}
+
+void Object::setLayerGroupLocked(int groupId, bool locked)
+{
+    if (LayerGroupInfo* info = layerGroupInfo(groupId))
+    {
+        info->locked = locked;
+        ++mLayerGroupGeneration;
+    }
+}
+
+bool Object::isLayerGroupVisible(int groupId) const
+{
+    const LayerGroupInfo* info = layerGroupInfo(groupId);
+    return (info == nullptr) ? true : info->visible;
+}
+
+bool Object::isLayerGroupLocked(int groupId) const
+{
+    const LayerGroupInfo* info = layerGroupInfo(groupId);
+    return (info == nullptr) ? false : info->locked;
+}
+
+bool Object::isLayerRenderable(const Layer* layer) const
+{
+    if (layer == nullptr) { return false; }
+    return layer->visible() && isLayerGroupVisible(layer->groupId());
+}
+
+bool Object::isLayerEditable(const Layer* layer) const
+{
+    if (layer == nullptr) { return false; }
+    return !layer->locked() && !isLayerGroupLocked(layer->groupId());
+}
+
+QList<int> Object::layerGroupMemberIndices(int groupId) const
+{
+    QList<int> indices;
+    int start = -1;
+    for (int i = 0; i < mLayers.size(); ++i)
+    {
+        if (mLayers[i]->groupId() == groupId)
+        {
+            start = i;
+            break;
+        }
+    }
+    if (start < 0) { return indices; }
+    for (int i = start; i < mLayers.size() && mLayers[i]->groupId() == groupId; ++i)
+    {
+        indices.append(i);
+    }
+    return indices;
+}
+
+void Object::repairLayerGroupContiguity()
+{
+    bool changed = false;
+    // 记录每个组首个（最上）成员索引，之后出现的同组成员若与主体断开则剔出
+    QHash<int, int> firstMember; // groupId -> index of first member
+    for (int i = 0; i < mLayers.size(); ++i)
+    {
+        const int gid = mLayers[i]->groupId();
+        if (gid < 0) { continue; }
+        if (!firstMember.contains(gid))
+        {
+            firstMember.insert(gid, i);
+        }
+    }
+    for (int i = 0; i < mLayers.size(); ++i)
+    {
+        const int gid = mLayers[i]->groupId();
+        if (gid < 0) { continue; }
+        // 从该组首个成员起做连续段扫描；i 不在段内 = 断开成员
+        const int start = firstMember.value(gid, -1);
+        int end = start;
+        while (end + 1 < mLayers.size() && mLayers[end + 1]->groupId() == gid) { ++end; }
+        if (i < start || i > end)
+        {
+            mLayers[i]->setGroupId(-1);
+            changed = true;
+        }
+    }
+    // 清掉没有成员的空组
+    for (int g = mLayerGroups.size() - 1; g >= 0; --g)
+    {
+        if (!firstMember.contains(mLayerGroups[g].id))
+        {
+            mLayerGroups.removeAt(g);
+            changed = true;
+        }
+    }
+    if (changed) { ++mLayerGroupGeneration; }
+}
+
+QList<Object::TimelineRowRef> Object::buildTimelineRows() const
+{
+    // 行序列表按栈序（0..n-1）生成；本时间轴视觉上是倒着画的（索引大 = 屏幕上方），
+    // 因此组头行要排在栈序最大的成员之后（视觉上正好在组块顶端）
+    QList<TimelineRowRef> rows;
+    for (int i = 0; i < mLayers.size(); ++i)
+    {
+        Layer* layer = mLayers[i];
+        const int gid = layer->groupId();
+        const LayerGroupInfo* info = (gid >= 0) ? layerGroupInfo(gid) : nullptr;
+
+        if (info == nullptr || !info->collapsed)
+        {
+            TimelineRowRef row;
+            row.layer = layer;
+            row.groupId = gid;
+            rows.append(row);
+        }
+        if (gid >= 0)
+        {
+            const bool isTopOfGroup = (i + 1 >= mLayers.size() || mLayers[i + 1]->groupId() != gid);
+            if (isTopOfGroup)
+            {
+                TimelineRowRef header;
+                header.isHeader = true;
+                header.groupId = gid;
+                rows.append(header);
+            }
+        }
+    }
+    return rows;
+}
+
+bool Object::moveLayerRange(int fromIndex, int count, int toIndex)
+{
+    if (count <= 0) { return true; }
+    if (fromIndex < 0 || fromIndex + count > mLayers.size()) { return false; }
+    if (toIndex < 0 || toIndex > mLayers.size()) { return false; }
+    if (toIndex >= fromIndex && toIndex <= fromIndex + count) { return true; } // 原地
+
+    QList<Layer*> block;
+    for (int i = 0; i < count; ++i)
+    {
+        block.append(mLayers.takeAt(fromIndex));
+    }
+    // take 之后插入目标的换算：目标是原坐标系的槽位
+    int insertAt = (toIndex > fromIndex) ? toIndex - count : toIndex;
+    insertAt = qBound(0, insertAt, mLayers.size());
+    for (int i = 0; i < count; ++i)
+    {
+        mLayers.insert(insertAt + i, block[i]);
+    }
+    ++mLayerStructureGeneration;
+    return true;
+}
+
+void Object::applyLayerGroupState(const QHash<int, int>& layerGroupIdMap,
+                                  const QList<LayerGroupInfo>& groups,
+                                  int nextGroupId)
+{
+    mLayerGroups = groups;
+    mNextLayerGroupId = qMax(mNextLayerGroupId, nextGroupId);
+    for (Layer* layer : mLayers)
+    {
+        const auto it = layerGroupIdMap.constFind(layer->id());
+        layer->setGroupId(it != layerGroupIdMap.constEnd() ? it.value() : -1);
+    }
+    repairLayerGroupContiguity();
+    ++mLayerGroupGeneration;
 }
 
 void Object::applyLayerOrder(const QList<int>& orderedIds)
@@ -1011,7 +1289,7 @@ void Object::paintImage(QPainter& painter,int frameNumber,
         for (int layerIndex = 0; layerIndex < layerCount; ++layerIndex)
         {
             Layer* layer = mLayers.at(layerIndex);
-            if (!layer->visible())
+            if (!isLayerRenderable(layer))
             {
                 continue;
             }
@@ -1068,7 +1346,7 @@ void Object::paintImage(QPainter& painter,int frameNumber,
 
     for (Layer* layer : mLayers)
     {
-        if (!layer->visible() || layer->type() != Layer::BITMAP)
+        if (!isLayerRenderable(layer) || layer->type() != Layer::BITMAP)
         {
             continue;
         }
@@ -1324,7 +1602,7 @@ void Object::updateActiveFrames(int frame) const
 
     for (Layer* layer : mLayers)
     {
-        if (layer->visible())
+        if (isLayerRenderable(layer))
         {
             for (int k = beginFrame; k < endFrame; ++k)
             {

@@ -730,7 +730,7 @@ void ScribbleArea::pointerPressEvent(PointerEvent* event)
     if ((currentTool()->type() != HAND || isCameraLayer) && (event->button() != Qt::RightButton) && (event->button() != Qt::MiddleButton || isCameraLayer))
     {
         Layer* layer = mEditor->layers()->currentLayer();
-        if (!layer->visible())
+        if (!mEditor->object()->isLayerRenderable(layer))
         {
             event->ignore();
             // This needs to be async so that mTabletInUse is set to false before
@@ -738,7 +738,7 @@ void ScribbleArea::pointerPressEvent(PointerEvent* event)
             QTimer::singleShot(0, this, &ScribbleArea::showLayerNotVisibleWarning);
             return;
         }
-        if (layer->locked())
+        if (!mEditor->object()->isLayerEditable(layer))
         {
             event->ignore();
             QTimer::singleShot(0, this, &ScribbleArea::showLayerLockedWarning);

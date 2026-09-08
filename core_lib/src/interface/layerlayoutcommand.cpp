@@ -102,21 +102,47 @@ void LayerLayoutCommand::redo()
     editor()->layers()->notifyAnimationLengthChanged();
 }
 
+LayerOrderCommand::GroupSnapshot LayerOrderCommand::captureGroups(Object* obj)
+{
+    GroupSnapshot snap;
+    snap.valid = true;
+    snap.groups = obj->layerGroups();
+    snap.nextGroupId = obj->nextLayerGroupId();
+    for (int i = 0; i < obj->getLayerCount(); ++i)
+    {
+        snap.layerGroupId.insert(obj->getLayer(i)->id(), obj->getLayer(i)->groupId());
+    }
+    return snap;
+}
+
 LayerOrderCommand::LayerOrderCommand(Editor* editor,
                                      const QList<int>& undoOrder,
                                      const QList<int>& redoOrder,
                                      const QString& description,
-                                     QUndoCommand* parent)
+                                     QUndoCommand* parent,
+                                     const GroupSnapshot& undoGroups,
+                                     const GroupSnapshot& redoGroups)
     : UndoRedoCommand(editor, parent)
     , mUndoOrder(undoOrder)
     , mRedoOrder(redoOrder)
+    , mUndoGroups(undoGroups)
+    , mRedoGroups(redoGroups)
 {
     setText(description);
 }
 
-void LayerOrderCommand::apply(const QList<int>& order)
+void LayerOrderCommand::apply(const QList<int>& order, const GroupSnapshot& groups)
 {
     editor()->object()->applyLayerOrder(order);
+    if (groups.valid)
+    {
+        editor()->object()->applyLayerGroupState(groups.layerGroupId, groups.groups, groups.nextGroupId);
+    }
+    else
+    {
+        // 纯重排也可能打散组：兜底修复连续性
+        editor()->object()->repairLayerGroupContiguity();
+    }
     editor()->scrubTo(editor()->currentFrame()); // refresh canvas state
     emit editor()->updateTimeLine();
     editor()->getScribbleArea()->onLayerChanged();
@@ -125,7 +151,7 @@ void LayerOrderCommand::apply(const QList<int>& order)
 void LayerOrderCommand::undo()
 {
     UndoRedoCommand::undo();
-    apply(mUndoOrder);
+    apply(mUndoOrder, mUndoGroups);
 }
 
 void LayerOrderCommand::redo()
@@ -136,5 +162,5 @@ void LayerOrderCommand::redo()
     // the reorder has already been applied by the caller.
     if (isFirstRedo()) { setFirstRedo(false); return; }
 
-    apply(mRedoOrder);
+    apply(mRedoOrder, mRedoGroups);
 }

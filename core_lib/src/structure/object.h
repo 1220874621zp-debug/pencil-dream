@@ -145,6 +145,44 @@ public:
     /** Current layer order as a list of layer ids (for undo snapshots). */
     QList<int> layerIdOrder() const;
 
+    // ---- 图层分组（扁平序+连续组：组成员恒相邻，组头行只是 UI 概念） ----
+    struct TimelineRowRef
+    {
+        bool isHeader = false;
+        int groupId = -1;
+        Layer* layer = nullptr; // 有效当 !isHeader
+    };
+
+    int createLayerGroup(const QString& name);          ///< 建组表条目，返回组id
+    void renameLayerGroup(int groupId, const QString& name);
+    LayerGroupInfo* layerGroupInfo(int groupId);
+    const LayerGroupInfo* layerGroupInfo(int groupId) const;
+    QList<LayerGroupInfo> layerGroups() const { return mLayerGroups; }
+    int nextLayerGroupId() const { return mNextLayerGroupId; }
+    void removeLayerGroupEntry(int groupId);            ///< 仅删表条目（成员清理由调用方负责）
+    void setLayerGroupCollapsed(int groupId, bool collapsed);
+    void setLayerGroupVisible(int groupId, bool visible);
+    void setLayerGroupLocked(int groupId, bool locked);
+    bool isLayerGroupVisible(int groupId) const;
+    bool isLayerGroupLocked(int groupId) const;
+    /** 渲染/编辑门禁合成：层自身可见 && 所在组可见 */
+    bool isLayerRenderable(const Layer* layer) const;
+    bool isLayerEditable(const Layer* layer) const;
+    /** 组成员在扁平栈中的连续索引区间（按栈顶首个成员展开），无效返回空 */
+    QList<int> layerGroupMemberIndices(int groupId) const;
+    /** 连续性修复：与组主体断开的成员剔出组（撤销/重排/建层后的兜底） */
+    void repairLayerGroupContiguity();
+    /** 时间轴可见行模型：组头行+（展开时的）成员行+散层行 */
+    QList<TimelineRowRef> buildTimelineRows() const;
+    /** 组结构/状态代数：任何组表或成员变化时自增（UI 行模型失效判据） */
+    quint32 layerGroupGeneration() const { return mLayerGroupGeneration; }
+    /** 整块移动连续层段（组拖动用）；toIndex 为插入目标（insert 语义） */
+    bool moveLayerRange(int fromIndex, int count, int toIndex);
+    /** 组状态整体回填（撤销命令用） */
+    void applyLayerGroupState(const QHash<int, int>& layerGroupIdMap,
+                              const QList<LayerGroupInfo>& groups,
+                              int nextGroupId);
+
     /** Rebuilds the layer list to match the given id order; ids that no
      *  longer exist are skipped. */
     void applyLayerOrder(const QList<int>& orderedIds);
@@ -214,6 +252,10 @@ private:
     QList<Layer*> mLayers;
     quint32 mLayerStructureGeneration = 0;
     bool modified = false;
+
+    QList<LayerGroupInfo> mLayerGroups;
+    int mNextLayerGroupId = 1;
+    quint32 mLayerGroupGeneration = 0;
 
     QList<ColorRef> mPalette; //< 当前激活色卡的实时缓冲（所有既有读写走这里）
 

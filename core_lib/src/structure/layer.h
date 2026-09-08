@@ -39,6 +39,16 @@ struct KeyFrameLayoutEntry
     bool lengthExplicit = false;
 };
 
+/** 图层分组的元信息（组表条目，存于 Object；图层自身只记 groupId） */
+struct LayerGroupInfo
+{
+    int id = 0;
+    QString name;
+    bool collapsed = false;
+    bool visible = true;
+    bool locked = false;
+};
+
 class Layer
 {
     Q_DECLARE_TR_FUNCTIONS(Layer)
@@ -70,6 +80,12 @@ public:
     /** Color label index of the layer (-1 = none, 0-7 = preset label colors) */
     int colorIndex() const { return mColorIndex; }
     void setColorIndex(int colorIndex) { mColorIndex = colorIndex; }
+
+    /** 所属图层组（-1 = 不在组；声音/相机层恒不进组，由操作入口保证） */
+    int groupId() const { return mGroupId; }
+    void setGroupId(int groupId) { mGroupId = groupId; }
+    /** 能否参与打组（位图族可；声音/相机按用户拍板不进组） */
+    bool isGroupable() const { return isBitmapKind(); }
 
     void switchVisibility() { mVisible = !mVisible; }
 
@@ -258,6 +274,7 @@ private:
     bool       mClipMask = false;
     QString    mName;
     int        mColorIndex = -1;
+    int        mGroupId = -1;
 
     std::map<int, KeyFrame*, std::greater<int>> mKeyFrames;
 
