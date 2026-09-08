@@ -97,7 +97,7 @@ public:
     void clear(QRectF rectangle) { clear(rectangle.toRect()); }
     void clear(QPolygonF polygon);
 
-    static bool floodFill(BitmapImage** replaceImage, const BitmapImage* targetImage, const QRect& cameraRect, const QPoint& point, const QRgb& fillColor, int tolerance, const int expandValue);
+    static bool floodFill(BitmapImage** replaceImage, const BitmapImage* targetImage, const QRect& cameraRect, const QPoint& point, const QRgb& fillColor, int tolerance, const int expandValue, const QRect* hardCap = nullptr);
     static bool* floodFillPoints(const BitmapImage* targetImage,
                                 const QRect& searchBounds,
                                 QPoint point,

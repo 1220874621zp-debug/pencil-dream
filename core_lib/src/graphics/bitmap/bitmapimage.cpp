@@ -946,11 +946,18 @@ bool BitmapImage::floodFill(BitmapImage** replaceImage,
                             const QPoint& point,
                             const QRgb& fillColor,
                             int tolerance,
-                            const int expandValue)
+                            const int expandValue,
+                            const QRect* hardCap)
 {
     // Fill region must be 1 pixel larger than the target image to fill regions on the edge connected only by transparent pixels
     const QRect& fillBounds = targetImage->mBounds.adjusted(-1, -1, 1, 1);
     QRect maxBounds = cameraRect.united(fillBounds).adjusted(-expandValue, -expandValue, expandValue, expandValue);
+    if (hardCap != nullptr && !hardCap->isEmpty())
+    {
+        // a hard cap bounds the sweep (e.g. the fill tool's active
+        // selection): pixels beyond it are masked away by the caller anyway
+        maxBounds = maxBounds.intersected(hardCap->adjusted(-1, -1, 1, 1));
+    }
     const int maxWidth = maxBounds.width(), left = maxBounds.left(), top = maxBounds.top();
 
     // Square tolerance for use with compareColor

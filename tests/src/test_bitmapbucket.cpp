@@ -352,16 +352,18 @@ TEST_CASE("BucketTool - lasso over a never-drawn keyframe")
     scribbleArea->testMouseRelease(QPointF(x0, y0));
     REQUIRE(!editor->select()->selectionClipPath().isEmpty());
 
+    // a click outside the selection must be a cheap no-op
     editor->color()->setFrontColor(QColor(0, 0, 255));
     editor->tools()->setCurrentTool(BUCKET);
+    const QPoint outside(clickPoint.x() + 60, clickPoint.y() + 60);
+    scribbleArea->testMousePress(QPointF(outside));
+    scribbleArea->testMouseRelease(QPointF(outside));
+
+    // the fill inside the lasso
     scribbleArea->testMousePress(QPointF(clickPoint));
     scribbleArea->testMouseRelease(QPointF(clickPoint));
 
     BitmapImage* after = static_cast<BitmapImage*>(layer->getKeyFrameAt(1));
-    if (after)
-    {
-        const QRect ab = after->bounds();
-    }
     REQUIRE(after->isLoaded());
     REQUIRE(after->constScanLine(clickPoint.x(), clickPoint.y()) == qPremultiply(QColor(0, 0, 255).rgba()));
     // outside the lasso the fresh canvas stays empty

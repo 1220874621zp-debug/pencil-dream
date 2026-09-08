@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include <QtMath>
 #include <QDebug>
 #include <QPainter>
+#include <QElapsedTimer>
 
 #include "editor.h"
 #include "layermanager.h"
@@ -128,15 +129,27 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     // the click, grow the scanned area to always cover the click and the
     // active selection (which bounds the visible result anyway).
     const QPainterPath selectionClip = mEditor->select()->selectionClipPath();
+    int expandValue = mProperties.fillExpandEnabled() ? mProperties.fillExpandAmount() : 0;
     QRect fillRegion = mMaxFillRegion;
+    QRect hardCap; // empty = the flood may sweep the whole camera region
     if (!selectionClip.isEmpty())
     {
-        fillRegion = fillRegion.united(selectionClip.boundingRect().toAlignedRect());
+        // Krita parity (kis_tool_fill): an active selection bounds the
+        // scanned area to its rect - everything outside is masked away by
+        // the caller anyway, and on an empty canvas this keeps the flood
+        // from sweeping all ~2M pixels of the camera view
+        const int margin = expandValue + 4;
+        hardCap = selectionClip.boundingRect().toAlignedRect()
+                      .adjusted(-margin, -margin, margin, margin);
+        fillRegion = fillRegion.intersected(hardCap);
     }
     if (!fillRegion.contains(point))
     {
         fillRegion = fillRegion.united(QRect(point, QSize(1, 1)));
     }
+
+    QElapsedTimer fillTimer;
+    fillTimer.start();
 
     if (!targetImage->isLoaded())
     {
@@ -162,6 +175,13 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         return;
     }
 
+    if (!selectionClip.isEmpty() && !selectionClip.contains(updatedPoint))
+    {
+        // a click outside the selection cannot produce a visible fill
+        qDebug() << "[bucket] click outside selection, dropped";
+        return;
+    }
+
     QRgb fillColor = mBucketColor;
     if (mProperties.fillMode() == 1)
     {
@@ -176,14 +196,14 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
 
     BitmapImage* replaceImage = nullptr;
 
-    int expandValue = mProperties.fillExpandEnabled() ? mProperties.fillExpandAmount() : 0;
     bool didFloodFill = BitmapImage::floodFill(&replaceImage,
                            &mReferenceImage,
                            fillRegion,
                            point,
                            fillColor,
                            mTolerance,
-                           expandValue);
+                           expandValue,
+                           hardCap.isEmpty() ? nullptr : &hardCap);
 
     if (!didFloodFill) {
         qDebug() << "[bucket] floodFill returned false";
@@ -219,7 +239,8 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     }
 
     qDebug() << "[bucket] filling bounds=" << replaceImage->bounds()
-             << " masked=" << !selectionClip.isEmpty() << " mode=" << mProperties.fillMode();
+             << " masked=" << !selectionClip.isEmpty() << " mode=" << mProperties.fillMode()
+             << " took" << fillTimer.elapsed() << "ms";
 
     state(BucketState::WillFillTarget, mTargetFillToLayerIndex, currentFrameIndex);
 
