@@ -1384,8 +1384,10 @@ void MainWindow2::readSettings()
     // Do NOT call restoreState() here: the window is not shown yet and
     // its final size arrives asynchronously (maximize), so the dock
     // layout would be clamped to the dock minimums and the saved panel
-    // sizes lost. The state is applied by applyPendingStateRestore()
-    // once the window geometry is stable (debounced in show/resize).
+    // sizes lost. The state is applied in two phases: once in showEvent
+    // (before the first paint, so no default-layout flash) and again by
+    // applyPendingStateRestore() once the window geometry is stable
+    // (debounced in show/resize) so sizes apply at full value.
     mPendingStateRestore = winState.toByteArray();
 
     int opacity = mEditor->preference()->getInt(SETTING::WINDOW_OPACITY);
@@ -1405,6 +1407,14 @@ void MainWindow2::writeSettings()
 void MainWindow2::showEvent(QShowEvent* event)
 {
     QMainWindow::showEvent(event);
+    // phase 1 (anti-flash): the show event runs before the first paint,
+    // so applying the state here makes the first frame show the saved
+    // layout instead of the code-built default (panels the user closed
+    // would flash for a frame otherwise)
+    if (!mPendingStateRestore.isEmpty())
+    {
+        restoreState(mPendingStateRestore);
+    }
     armPendingStateRestore();
 }
 
@@ -1437,7 +1447,9 @@ void MainWindow2::applyPendingStateRestore()
     if (mPendingStateRestore.isEmpty()) { return; }
     const QByteArray state = mPendingStateRestore;
     mPendingStateRestore.clear();
-    // the window geometry is stable now, so the saved dock and
+    // phase 2 (settle): restoreState is idempotent; the first pass in
+    // showEvent may run before the maximize resize, so re-apply here —
+    // the window geometry is stable now, and the saved dock and
     // toolbar sizes apply at full value instead of being clamped
     restoreState(state);
 }
