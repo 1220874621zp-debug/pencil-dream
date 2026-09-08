@@ -1,6 +1,6 @@
 # Pencil Dream
 
-**Pencil Dream** 是基于开源动画软件 [Pencil2D](https://github.com/pencil2d/pencil) 的深度改造版本：面向传统手绘动画的**纯位图工作流**，时间轴按 **TVPaint** 的交互习惯全面重塑，界面采用 **Procreate Dreams** 风格的深色主题。
+**Pencil Dream** 是基于开源动画软件 [Pencil2D](https://github.com/pencil2d/pencil) 的深度改造版本：面向传统手绘动画的**纯位图工作流**，时间轴按 **TVPaint** 的交互习惯全面重塑，界面采用 **Procreate Dreams** 风格的深色主题，并移植了 **Krita** 的智能填色与油漆桶引擎。
 
 上游英文说明保留在 [README-upstream.md](README-upstream.md)。
 <img width="3842" height="2090" alt="ScreenShot_2026-09-07_121847_579" src="https://github.com/user-attachments/assets/3c01f0dc-70f6-4551-b5ee-625fc4818088" />
@@ -19,7 +19,23 @@
 - **选中态**：仅边框高亮（内容原样透出），拖动时半透明幽灵预览
 - **指针跟随**：点击/选中块，播放头立即跳到该位置
 - **图层标签色**：点击图层行左缘循环 8 色，轨道全强度着色
-- 其他：Alt+滚轮缩放帧宽（锚定视口中心）、滚轮调行高、标尺每 5 帧编号、缩略图异步分批生成
+- 其他：Alt+滚轮缩放帧宽（默认 120，锚定视口中心）、滚轮调行高、标尺每 5 帧编号、缩略图异步分批生成、智能填色层待更新标记
+
+## 智能填色（Colorize Mask，Krita 移植）
+
+- **算法**：Krita Colorize Mask 分水岭算法全量移植（隔间泛洪 + 线稿间距场）
+- **填色图层**（LayerColorize / ColorizeImage）：独立图层类型，画布直描彩色色块，出图只保留填色
+- **后台计算**：异步引擎 + 线稿/色块失效联动，时间轴标记待更新，手动刷新出图（对齐 Krita 原生操作）
+- **颜色列表**：自动收集色块颜色，透明标记一键切换；**编辑模式**临时显示原始色块
+- **选项面板**：当前层为填色图层时显示于工具选项坞（滤波参数滑杆 + 输入框组合行）
+- **线稿源**：自动取上方最近位图层，双向就近解析当前帧非空层
+
+## 绘画工具（Krita 对齐）
+
+- **油漆桶全量移植**：封闭间隙距离场（允许溢出控制）+ 扫描线双通道引擎 + 灰度掩码管线；有选区时洪水扫描域硬裁到选区包络（空画布提速一个数量级）；从未绘制的空白关键帧点击即自动实体化（原版静默无填充）
+- **选区/变换工具组**：PS 式长按弹出变体菜单（矩形选择+套索 / 移动+变形），短按激活当前变体，按钮右下角小三角角标
+- **对位中割工具**：拖拽红/蓝幽灵对位中割，支持平移 + 绕内容中心旋转 + 等比缩放（Ctrl/Shift）
+- 画布光标专项修复：Windows 光标缓存陈旧、数位板笔悬停不显工具光标等问题逐项根治
 
 ## 撤销系统重构
 
@@ -39,6 +55,7 @@
 - 播放按钮组居中于时间轴工具栏；帧数/倍率输入框贴右边缘（框内数字右对齐）
 - 回放范围、入出点、声音开关、擦洗出声、时间码挂到主窗口状态栏右端
 - 循环图标采用 Friction 风格；实测帧率显示（低于目标变红）
+- 快捷键调整：添加帧=C、后一/前一关键帧=→/←（符合方向直觉）
 
 ## 工具集（时间轴"工具"菜单 / 图层菜单）
 
@@ -57,6 +74,7 @@
 
 - Procreate Dreams 风深色主题（主题系统含 TVP 绿等多个预设）
 - 移除全部矢量功能，纯位图工作流；有限画布（相机框即工作区）
+- 洋葱皮面板改造：参数滑杆化 + 灯泡总开关合并前后帧显示
 - 高 DPI 文字/缓存修复；中键缩放画布；帮助菜单精简（无外链）
 - 文件对话框自带缩略图
 
@@ -69,8 +87,8 @@ cmake -S pencil -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt路径> -DCMAKE_BUILD_T
 ninja
 ```
 
-或直接使用 `build-qt6.bat`（自动配置 vcvars + Qt 路径）。
+或直接使用 `build-qt6.bat`（自动配置 vcvars + Qt 路径）。测试基线：**6513 断言 / 101 用例**全绿（含填色引擎/渲染管线/撤销事务回归）。
 
 ---
 
-基于 [Pencil2D](https://github.com/pencil2d/pencil)（GPL-2.0）改造，遵循同一许可证。感谢 Pencil2D 的开发者们；时间轴交互参考了 TVPaint 与 [Friction](https://github.com/friction2d/friction) 的设计。
+基于 [Pencil2D](https://github.com/pencil2d/pencil)（GPL-2.0）改造，遵循同一许可证。感谢 Pencil2D 的开发者们；时间轴交互参考了 TVPaint 与 [Friction](https://github.com/friction2d/friction) 的设计，智能填色与油漆桶算法移植自 [Krita](https://invent.kde.org/office/krita)。
