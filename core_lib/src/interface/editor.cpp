@@ -43,6 +43,7 @@ GNU General Public License for more details.
 #include "soundmanager.h"
 #include "selectionmanager.h"
 #include "overlaymanager.h"
+#include "colorizeupdatemanager.h"
 #include "clipboardmanager.h"
 #include "undoredomanager.h"
 
@@ -70,6 +71,7 @@ bool Editor::init()
     mSoundManager = new SoundManager(this);
     mSelectionManager = new SelectionManager(this);
     mOverlayManager = new OverlayManager(this);
+    mColorizeUpdateManager = new ColorizeUpdateManager(this);
     mClipboardManager = new ClipboardManager(this);
     mUndoRedoManager = new UndoRedoManager(this);
 
@@ -84,6 +86,7 @@ bool Editor::init()
         mSoundManager,
         mSelectionManager,
         mOverlayManager,
+        mColorizeUpdateManager,
         mClipboardManager,
         mUndoRedoManager
     };
@@ -381,6 +384,12 @@ void Editor::setModified(int layerNumber, int frameNumber)
 
     layer->setModified(frameNumber, true);
     undoRedo()->rememberLastModifiedFrame(layerNumber, frameNumber);
+
+    // 位图层编辑波及其下方引用它的填色层（着色缓存按帧失效）
+    if (layer->type() == Layer::BITMAP)
+    {
+        object()->invalidateColorizeBelow(layerNumber, frameNumber);
+    }
 
     emit frameModified(frameNumber);
 }

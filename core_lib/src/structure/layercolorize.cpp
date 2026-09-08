@@ -100,9 +100,28 @@ void LayerColorize::loadDomElement(const QDomElement& element, QString dataDirPa
 
 bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer)
 {
-    ColorizeImage* frame = getLastColorizeImageAtFrame(frameNumber);
-    if (frame == nullptr)
-        return false;
+    ColorizeJobData data;
+    if (!buildColorizeJob(this, frameNumber, sourceLayer, data))
+    {
+        // 无可计算内容：清空缓存视为完成
+        if (auto* frame = getLastColorizeImageAtFrame(frameNumber))
+            frame->setColoringResult(QImage(), QRect());
+        return true;
+    }
+
+    QImage result = Colorize::colorize(data.lineImg, data.strokeImg, data.lineImg.rect(), data.options);
+    if (auto* frame = getColorizeImageAtFrame(data.keyPos))
+        frame->setColoringResult(result, data.bounds);
+    return true;
+}
+
+bool LayerColorize::buildColorizeJob(LayerColorize* layer, int frameNumber,
+                                     LayerBitmap* sourceLayer, ColorizeJobData& out)
+{
+    if (layer == nullptr) { return false; }
+
+    ColorizeImage* frame = layer->getLastColorizeImageAtFrame(frameNumber);
+    if (frame == nullptr) { return false; }
     frame->loadFile();
 
     BitmapImage* lineArt = nullptr;
@@ -119,11 +138,8 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
         bounds |= lineArt->bounds();
     bounds |= frame->bounds();
 
-    if (bounds.isEmpty())
-    {
-        frame->setColoringResult(QImage(), QRect());
-        return true;
-    }
+    if (bounds.isEmpty() || frame->image()->isNull())
+        return false;
 
     QImage lineImg(bounds.size(), QImage::Format_ARGB32_Premultiplied);
     lineImg.fill(Qt::transparent);
@@ -142,13 +158,16 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
         painter.end();
     }
 
-    Colorize::FilteringOptions options;
-    options.useEdgeDetection = mUseEdgeDetection;
-    options.edgeDetectionSize = mEdgeDetectionSize;
-    options.fuzzyRadius = mFuzzyRadius;
-    options.cleanUpAmount = mCleanUpAmount;
+    out.layerId = layer->id();
+    out.keyPos = frame->pos();
+    out.bounds = bounds;
+    out.lineImg = lineImg;
+    out.strokeImg = strokeImg;
 
-    QImage result = Colorize::colorize(lineImg, strokeImg, lineImg.rect(), options);
-    frame->setColoringResult(result, bounds);
+    out.options.useEdgeDetection = layer->mUseEdgeDetection;
+    out.options.edgeDetectionSize = layer->mEdgeDetectionSize;
+    out.options.fuzzyRadius = layer->mFuzzyRadius;
+    out.options.cleanUpAmount = layer->mCleanUpAmount;
+
     return true;
 }

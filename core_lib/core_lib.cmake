@@ -32,6 +32,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/undoredocommand.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/basemanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/clipboardmanager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/colorizeupdatemanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/colormanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/layermanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/overlaymanager.h
@@ -135,6 +136,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/interface/undoredocommand.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/basemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/clipboardmanager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/colorizeupdatemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/colormanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/layermanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/overlaymanager.cpp

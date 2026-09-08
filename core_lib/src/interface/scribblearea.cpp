@@ -33,6 +33,7 @@ GNU General Public License for more details.
 #include "undoredomanager.h"
 #include "layerbitmap.h"
 #include "layercolorize.h"
+#include "colorizeupdatemanager.h"
 #include "colorizeimage.h"
 #include "layercamera.h"
 #include "bitmapimage.h"
@@ -284,6 +285,13 @@ void ScribbleArea::invalidateCacheForFrame(int frameNumber)
         unsigned int key = cacheKeyIter.key();
         mPixmapCacheKeys.remove(key);
     }
+}
+
+void ScribbleArea::invalidateCanvasCache()
+{
+    QPixmapCache::clear();
+    mPixmapCacheKeys.clear();
+    update();
 }
 
 void ScribbleArea::invalidatePainterCaches()
@@ -992,6 +1000,12 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
     int currentFrame = mEditor->currentFrame();
     if (!currentTool()->isActive())
     {
+        // 智能填色懒更新：当前帧有过期填色层则入队后台计算（本次绘制先显示笔画）
+        if (mEditor->colorizeUpdates() != nullptr)
+        {
+            mEditor->colorizeUpdates()->requestVisibleUpdates();
+        }
+
         // --- we retrieve the canvas from the cache; we create it if it doesn't exist
         const int frameNumber = mEditor->layers()->lastFrameAtFrame(currentFrame);
 

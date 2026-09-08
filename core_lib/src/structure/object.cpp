@@ -129,6 +129,8 @@ LayerBitmap* Object::addNewBitmapLayer()
 
     layerBitmap->addNewKeyFrameAt(1);
 
+    ++mLayerStructureGeneration;
+
     return layerBitmap;
 }
 
@@ -138,6 +140,8 @@ LayerBitmap* Object::addNewColorizeLayer()
     mLayers.append(layerColorize);
 
     layerColorize->addNewKeyFrameAt(1);
+
+    ++mLayerStructureGeneration;
 
     return layerColorize;
 }
@@ -159,6 +163,8 @@ LayerSound* Object::addNewSoundLayer()
     LayerSound* layerSound = new LayerSound(getUniqueLayerID());
     mLayers.append(layerSound);
 
+    ++mLayerStructureGeneration;
+
     // No default keyFrame at position 1 for Sound layer.
 
     return layerSound;
@@ -170,6 +176,8 @@ LayerCamera* Object::addNewCameraLayer()
     mLayers.append(layerCamera);
 
     layerCamera->addNewKeyFrameAt(1);
+
+    ++mLayerStructureGeneration;
 
     return layerCamera;
 }
@@ -293,6 +301,40 @@ Layer* Object::findLayerByName(const QString& strName, Layer::LAYER_TYPE type) c
     return nullptr;
 }
 
+int Object::getIndex(Layer* layer) const
+{
+    return mLayers.indexOf(layer);
+}
+
+void Object::invalidateColorizeBelow(int layerIndex, int frameNumber)
+{
+    // 从被编辑的位图层向下走：遇到下一个位图层即止（它挡住了线稿源关系），
+    // 途经的填色层都以被编辑层为线稿源
+    for (int i = layerIndex + 1; i < mLayers.size(); ++i)
+    {
+        Layer* layer = mLayers.at(i);
+        if (layer->type() == Layer::BITMAP)
+            break;
+        if (layer->type() == Layer::COLORIZE)
+        {
+            auto colorizeLayer = static_cast<LayerColorize*>(layer);
+            if (frameNumber < 0)
+            {
+                colorizeLayer->foreachKeyFrame([](KeyFrame* key)
+                {
+                    if (auto* frame = static_cast<ColorizeImage*>(key))
+                        frame->setNeedsUpdate(true);
+                });
+            }
+            else
+            {
+                if (auto* frame = colorizeLayer->getLastColorizeImageAtFrame(frameNumber))
+                    frame->setNeedsUpdate(true);
+            }
+        }
+    }
+}
+
 Layer* Object::takeLayer(int layerId)
 {
     // Removes the layer from this Object and returns it
@@ -311,6 +353,7 @@ Layer* Object::takeLayer(int layerId)
     if (index == -1) { return nullptr; }
 
     Layer* layer = mLayers.takeAt(index);
+    ++mLayerStructureGeneration;
     return layer;
 }
 
@@ -327,6 +370,7 @@ bool Object::swapLayers(int i, int j)
         mLayers.swap(i, j);
 #endif
     }
+    ++mLayerStructureGeneration;
     return true;
 }
 
@@ -338,6 +382,7 @@ bool Object::moveLayer(int fromIndex, int toIndex)
 
     Layer* layer = mLayers.takeAt(fromIndex);
     mLayers.insert(toIndex, layer);
+    ++mLayerStructureGeneration;
     return true;
 }
 
@@ -764,8 +809,10 @@ void Object::paintImage(QPainter& painter,int frameNumber,
 
     if (!anyClipMask)
     {
-        for (Layer* layer : mLayers)
+        const int layerCount = mLayers.size();
+        for (int layerIndex = 0; layerIndex < layerCount; ++layerIndex)
         {
+            Layer* layer = mLayers.at(layerIndex);
             if (!layer->visible())
             {
                 continue;
@@ -788,12 +835,18 @@ void Object::paintImage(QPainter& painter,int frameNumber,
             }
             else if (layer->type() == Layer::COLORIZE)
             {
-                // 与 CanvasPainter::paintCurrentColorizeFrame 同式：着色垫底、笔画提示
+                // 与 CanvasPainter::paintCurrentColorizeFrame 同式：着色垫底、笔画提示；
+                // 导出/渲染是离线路径，过期帧在此同步兜底重算
                 auto layerColorize = static_cast<LayerColorize*>(layer);
                 ColorizeImage* frame = static_cast<ColorizeImage*>(layerColorize->getKeyFrameWhichCovers(frameNumber));
                 if (frame)
                 {
                     frame->loadFile();
+                    if (frame->needsUpdate() ||
+                        frame->computedStructureGeneration() != layerStructureGeneration())
+                    {
+                        layerColorize->updateColoringAtFrame(frameNumber, getBitmapLayerAbove(layerIndex));
+                    }
                     if (!frame->coloringImage().isNull())
                     {
                         painter.setOpacity(frame->getOpacity() - (1.0 - layer->opacity()));

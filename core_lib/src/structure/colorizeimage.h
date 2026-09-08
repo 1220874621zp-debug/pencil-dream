@@ -44,12 +44,16 @@ public:
     QImage coloringImage() const { return mColoring; }
     QRect coloringBounds() const { return mColoringBounds; }
 
-    void setColoringResult(QImage result, QRect bounds);
+    /** 计算时的图层结构代数（栈序变化会使缓存过期） */
+    quint32 computedStructureGeneration() const { return mComputedStructureGeneration; }
+
+    void setColoringResult(QImage result, QRect bounds, quint32 structureGeneration = 0);
 
 private:
     QImage mColoring;
     QRect mColoringBounds;
     bool mNeedsUpdate = true;
+    quint32 mComputedStructureGeneration = 0;
 };
 
 #endif // COLORIZE_IMAGE_H

@@ -18,8 +18,20 @@ GNU General Public License for more details.
 #define LAYERCOLORIZE_H
 
 #include "layerbitmap.h"
+#include "graphics/bitmap/colorizeengine.h"
 
 class ColorizeImage;
+
+/** 后台计算任务快照：主线程构建，工作线程消费（QImage 拷贝即隔离） */
+struct ColorizeJobData
+{
+    int layerId = 0;
+    int keyPos = 0;
+    QRect bounds;
+    QImage lineImg;
+    QImage strokeImg;
+    Colorize::FilteringOptions options;
+};
 
 /*
  * 智能填色图层（Krita「智能填色蒙版」移植）：继承 LayerBitmap，
@@ -44,8 +56,12 @@ public:
 
     void replaceKeyFrame(const KeyFrame*) override;
 
-    /** 同步计算指定帧的着色缓存（阶段3将改为后台线程） */
+    /** 同步计算指定帧的着色缓存（手动/导出/批量路径） */
     bool updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer);
+
+    /** 后台任务快照构建：组装计算域与输入图；无需计算时返回 false */
+    static bool buildColorizeJob(LayerColorize* layer, int frameNumber,
+                                 LayerBitmap* sourceLayer, ColorizeJobData& out);
 
     // --- 滤波选项（对齐 Krita Colorize Mask 参数） ---
     bool useEdgeDetection() const { return mUseEdgeDetection; }

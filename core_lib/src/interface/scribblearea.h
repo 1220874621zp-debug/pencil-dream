@@ -197,6 +197,9 @@ public:
     /// on an empty frame, and if so, takes action according to use preference.
     void handleDrawingOnEmptyFrame();
 
+    /** 整清画布帧缓存并重绘（后台着色结果回贴等覆盖多帧的场景用） */
+    void invalidateCanvasCache();
+
     TiledBuffer mTiledBuffer;
 private:
 

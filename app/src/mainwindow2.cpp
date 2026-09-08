@@ -45,6 +45,7 @@ GNU General Public License for more details.
 #include "pencilsettings.h"
 #include "object.h"
 #include "editor.h"
+#include "colorizeupdatemanager.h"
 
 #include "filemanager.h"
 #include "colormanager.h"
@@ -1768,6 +1769,8 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
 
     connect(pTimeline, &TimeLine::newBitmapLayer, mCommands, &ActionCommands::addNewBitmapLayer);
     connect(pTimeline, &TimeLine::newColorizeLayer, mCommands, &ActionCommands::addNewColorizeLayer);
+    connect(mEditor->colorizeUpdates(), &ColorizeUpdateManager::frameUpdated,
+            pTimeline, QOverload<>::of(&QWidget::update));
     connect(pTimeline, &TimeLine::newSoundLayer, mCommands, &ActionCommands::addNewSoundLayer);
     connect(pTimeline, &TimeLine::newCameraLayer, mCommands, &ActionCommands::addNewCameraLayer);
     connect(mTimeLine, &TimeLine::playButtonTriggered, mCommands, &ActionCommands::PlayStop);

@@ -609,13 +609,10 @@ void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& bl
     frame->loadFile();
 
     const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
+    Q_UNUSED(isDrawing);
 
-    // 着色缓存过期且当前无实时笔画时同步重算（阶段3改为后台线程+信号失效）
-    if (frame->needsUpdate() && !isDrawing)
-    {
-        LayerBitmap* source = mObject->getBitmapLayerAbove(layerIndex);
-        colorizeLayer->updateColoringAtFrame(mFrameNumber, source);
-    }
+    // 着色的过期重算由 ColorizeUpdateManager 后台执行（ScribbleArea::paintEvent 懒触发），
+    // 渲染路径只负责显示现有缓存 + 笔画
 
     QPainter currentColorizePainter;
     initializePainter(currentColorizePainter, mCurrentLayerPixmap, blitRect);

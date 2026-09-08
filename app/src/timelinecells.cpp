@@ -30,6 +30,7 @@ GNU General Public License for more details.
 #include <QThreadPool>
 #include <QRunnable>
 #include "layerbitmap.h"
+#include "colorizeimage.h"
 #include "bitmapimage.h"
 
 #include "camerapropertiesdialog.h"
@@ -793,6 +794,19 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(0x9A, 0x9A, 0xA4));
         painter.drawRoundedRect(QRectF(recLeft + recWidth - 2.0, recTop + 6.0, 2.0, recHeight - 12.0), 1.0, 1.0);
+
+        // 智能填色块：着色待更新标记（琥珀点，右下角）
+        if (layer->type() == Layer::COLORIZE)
+        {
+            auto colorizeFrame = static_cast<ColorizeImage*>(key);
+            if (colorizeFrame->needsUpdate() ||
+                colorizeFrame->computedStructureGeneration() != mEditor->object()->layerStructureGeneration())
+            {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor(0xF5, 0x9E, 0x0B));
+                painter.drawEllipse(QRectF(recLeft + recWidth - 12.0, recTop + recHeight - 12.0, 5.0, 5.0));
+            }
+        }
 
         // TVP create handle: "+" on the top-right of the trailing block;
         // drag it out to create consecutive new frames

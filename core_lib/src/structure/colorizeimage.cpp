@@ -36,9 +36,10 @@ void ColorizeImage::setModified(bool b)
         mNeedsUpdate = true;
 }
 
-void ColorizeImage::setColoringResult(QImage result, QRect bounds)
+void ColorizeImage::setColoringResult(QImage result, QRect bounds, quint32 structureGeneration)
 {
     mColoring = result;
     mColoringBounds = bounds;
+    mComputedStructureGeneration = structureGeneration;
     mNeedsUpdate = false;
 }

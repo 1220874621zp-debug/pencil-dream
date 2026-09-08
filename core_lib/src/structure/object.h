@@ -108,6 +108,16 @@ public:
     LayerBitmap* getBitmapLayerAbove(int i) const;
     Layer* findLayerByName(const QString& strName, Layer::LAYER_TYPE type = Layer::UNDEFINED) const;
     Layer* findLayerById(int layerId) const;
+
+    /** 图层在栈中的索引（0 = 栈顶），找不到返回 -1 */
+    int getIndex(Layer* layer) const;
+
+    /** 图层结构代数：栈序/增删变化时自增，填色层据此检测着色缓存过期 */
+    quint32 layerStructureGeneration() const { return mLayerStructureGeneration; }
+
+    /** 位图图层 layerIndex 的编辑波及其下直接引用的填色层；
+     *  frameNumber < 0 时失效这些填色层的全部帧 */
+    void invalidateColorizeBelow(int layerIndex, int frameNumber);
     Layer* takeLayer(int layerId); // Note: transfer ownership of the layer
 
     bool swapLayers(int i, int j);
@@ -186,6 +196,7 @@ private:
     QString mMainXMLFile;    //< the location of main.xml
 
     QList<Layer*> mLayers;
+    quint32 mLayerStructureGeneration = 0;
     bool modified = false;
 
     QList<ColorRef> mPalette;

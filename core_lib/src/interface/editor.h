@@ -56,6 +56,7 @@ class PreferenceManager;
 class SelectionManager;
 class SoundManager;
 class OverlayManager;
+class ColorizeUpdateManager;
 class ClipboardManager;
 class UndoRedoManager;
 class ScribbleArea;
@@ -101,6 +102,7 @@ public:
     SoundManager*      sound() const { return mSoundManager; }
     SelectionManager*  select() const { return mSelectionManager; }
     OverlayManager*    overlays() const { return mOverlayManager; }
+    ColorizeUpdateManager* colorizeUpdates() const { return mColorizeUpdateManager; }
     ClipboardManager*  clipboards() const { return mClipboardManager; }
     UndoRedoManager*     undoRedo() const { return mUndoRedoManager; }
 
@@ -277,6 +279,7 @@ private:
     SoundManager*      mSoundManager = nullptr;
     SelectionManager*  mSelectionManager = nullptr;
     OverlayManager*    mOverlayManager = nullptr;
+    ColorizeUpdateManager* mColorizeUpdateManager = nullptr;
     ClipboardManager*  mClipboardManager = nullptr;
     UndoRedoManager*     mUndoRedoManager = nullptr;
 
