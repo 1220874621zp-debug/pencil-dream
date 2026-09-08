@@ -376,6 +376,17 @@ bool ScribbleArea::event(QEvent *event)
     } else if (event->type() == QEvent::Leave)
     {
         processed = currentTool()->leaveEvent(event) || processed;
+    } else if (event->type() == QEvent::ShortcutOverride)
+    {
+        // 方向左右键默认是全局"跳关键帧"，有选区时留给选区微移
+        auto* keyEvt = static_cast<QKeyEvent*>(event);
+        if (keyEvt->modifiers() == Qt::NoModifier &&
+            (keyEvt->key() == Qt::Key_Left || keyEvt->key() == Qt::Key_Right) &&
+            mEditor->select()->somethingSelected())
+        {
+            event->accept();
+            processed = true;
+        }
     }
 
     return QWidget::event(event) || processed;
@@ -471,12 +482,8 @@ void ScribbleArea::keyEvent(QKeyEvent* event)
 {
     switch (event->key())
     {
-    case Qt::Key_Right:
-        mEditor->scrubForward();
-        break;
-    case Qt::Key_Left:
-        mEditor->scrubBackward();
-        break;
+    // 方向左右键已划给全局"跳关键帧"快捷键(CmdGotoNext/PreviousKeyFrame)，
+    // 不再在画布上逐帧 scrub；有选区时的微移经 ShortcutOverride 保留
     case Qt::Key_Up:
         mEditor->layers()->gotoNextLayer();
         break;
