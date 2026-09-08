@@ -17,21 +17,23 @@ GNU General Public License for more details.
 #include "onionskinwidget.h"
 #include "ui_onionskin.h"
 
+#include <QDoubleSpinBox>
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QSignalBlocker>
+#include <QSlider>
+#include <QToolButton>
+
 #include "preferencemanager.h"
 #include "editor.h"
-#include "flowlayout.h"
 #include "util.h"
 
-OnionSkinWidget::OnionSkinWidget(QWidget *parent) :
+OnionSkinWidget::OnionSkinWidget(QWidget* parent) :
     BaseDockWidget(parent),
     ui(new Ui::OnionSkin)
 {
     ui->setupUi(this);
-
-    clearFocusOnFinished(ui->onionPrevFramesNumBox);
-    clearFocusOnFinished(ui->onionNextFramesNumBox);
-    clearFocusOnFinished(ui->onionMinOpacityBox);
-    clearFocusOnFinished(ui->onionMaxOpacityBox);
 }
 
 OnionSkinWidget::~OnionSkinWidget()
@@ -41,57 +43,112 @@ OnionSkinWidget::~OnionSkinWidget()
 
 void OnionSkinWidget::initUI()
 {
+    buildParamRows();
     updateUI();
     makeConnections();
 
-    // Change the horizontal layout in the Distributed Opacity group box to a
-    // flow layout to reduce the minimum width
-    FlowLayout *opacityLayout = new FlowLayout;
-    opacityLayout->setAlignment(Qt::AlignHCenter);
-    opacityLayout->setContentsMargins(0, 6, 0, 6);
-    ui->opacityGroup->layout()->removeWidget(ui->minOpacityGroup);
-    ui->opacityGroup->layout()->removeWidget(ui->maxOpacityGroup);
-    opacityLayout->addWidget(ui->minOpacityGroup);
-    opacityLayout->addWidget(ui->maxOpacityGroup);
-    delete ui->opacityGroup->layout();
-    ui->opacityGroup->setLayout(opacityLayout);
+    clearFocusOnFinished(mPrevFramesSpin);
+    clearFocusOnFinished(mNextFramesSpin);
+    clearFocusOnFinished(mMaxOpacitySpin);
+    clearFocusOnFinished(mMinOpacitySpin);
+}
 
-#ifdef __APPLE__
+void OnionSkinWidget::buildParamRows()
+{
+    QVBoxLayout* rows = ui->paramRowsLayout;
 
-    ui->scrollAreaWidgetContents->layout()->setSpacing(8);
+    // --- 灯泡总开关：同时开启前后帧 ---
+    mOnionToggleButton = new QToolButton(this);
+    mOnionToggleButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-enable.svg"));
+    mOnionToggleButton->setIconSize(QSize(22, 22));
+    mOnionToggleButton->setCheckable(true);
+    mOnionToggleButton->setAutoRaise(true);
+    mOnionToggleButton->setToolTip(tr("Toggle onion skin (previous & next frames together)"));
 
-    // Mac only style. ToolButtons are naturally borderless on Win/Linux.
-    QString stylesheet =
-        "QToolButton { border: 0px; } "
-        "QGroupBox::title {"
-            "subcontrol-origin: padding;"
-            "left: 6px;"
-            "padding: 2px 2px 0px 0px;"
-            "background: transparent;"
-        "}"
-        "QGroupBox {"
-            "subcontrol-origin: margin;"
-            "margin-top: 8px;"
-            "padding-top: 16px;"
-        "}"
-        "QToolButton:pressed{ border: 1px solid #FFADAD; border-radius: 2px; background-color: #D5D5D5; }"
-        "QToolButton:checked{ border: 1px solid #ADADAD; border-radius: 2px; background-color: #D5D5D5; }";
-    setStyleSheet(this->styleSheet().append(stylesheet));
-#endif
+    auto* toggleRow = new QHBoxLayout;
+    toggleRow->setSpacing(6);
+    toggleRow->addWidget(mOnionToggleButton);
+    auto* toggleLabel = new QLabel(tr("Onion Skin On/Off："), this);
+    toggleRow->addWidget(toggleLabel, 1);
+    rows->addLayout(toggleRow);
+
+    // --- 滑杆+输入框参数行（见知识库 slider-spinbox-param-row.md 规范） ---
+    auto addParamRow = [this, rows](const char* label, QSlider*& slider, QDoubleSpinBox*& spin,
+                                    qreal min, qreal max, const QString& suffix,
+                                    QToolButton* extraButton = nullptr) {
+        spin = new QDoubleSpinBox(this);
+        spin->setRange(min, max);
+        spin->setDecimals(0);
+        spin->setSuffix(suffix);
+        spin->setFixedWidth(96);
+        spin->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+
+        slider = new QSlider(Qt::Horizontal, this);
+        slider->setRange(qRound(min), qRound(max));
+
+        auto* grid = new QGridLayout;
+        grid->setHorizontalSpacing(8);
+        grid->setVerticalSpacing(2);
+        grid->setContentsMargins(0, 0, 0, 0);
+        auto* labelWidget = new QLabel(tr(label) + QStringLiteral("："), this);
+        labelWidget->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        grid->addWidget(labelWidget, 0, 0);
+        grid->addWidget(slider, 1, 0);
+        grid->addWidget(spin, 0, 1, 2, 1);
+        if (extraButton != nullptr)
+            grid->addWidget(extraButton, 1, 2, Qt::AlignVCenter);
+        grid->setColumnStretch(0, 1);
+        spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        rows->addLayout(grid);
+
+        // 滑杆 → 输入框
+        connect(slider, &QSlider::valueChanged, this, [spin](int value) {
+            if (qAbs(spin->value() - value) >= 1) {
+                QSignalBlocker blocker(spin);
+                spin->setValue(value);
+            }
+        });
+        // 输入框 → 滑杆（整型参数直通）
+        connect(spin, &QDoubleSpinBox::valueChanged, this, [slider](double value) {
+            const int pos = qRound(value);
+            if (slider->value() != pos) {
+                QSignalBlocker blocker(slider);
+                slider->setValue(pos);
+            }
+        });
+    };
+
+    // 红蓝色化按钮保留在对应参数行的滑杆行尾
+    mOnionRedButton = new QToolButton(this);
+    mOnionRedButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-red.svg"));
+    mOnionRedButton->setIconSize(QSize(22, 22));
+    mOnionRedButton->setCheckable(true);
+    mOnionRedButton->setAutoRaise(true);
+    mOnionRedButton->setToolTip(tr("Onion skin color: red"));
+
+    mOnionBlueButton = new QToolButton(this);
+    mOnionBlueButton->setIcon(QIcon(":/icons/themes/playful/onion/onionskin-blue.svg"));
+    mOnionBlueButton->setIconSize(QSize(22, 22));
+    mOnionBlueButton->setCheckable(true);
+    mOnionBlueButton->setAutoRaise(true);
+    mOnionBlueButton->setToolTip(tr("Onion skin color: blue"));
+
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Previous frames"), mPrevFramesSlider, mPrevFramesSpin, 1, 60, QString(), mOnionRedButton);
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 1, 60, QString(), mOnionBlueButton);
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Max opacity"), mMaxOpacitySlider, mMaxOpacitySpin, 0, 100, tr(" %"));
+    addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Min opacity"), mMinOpacitySlider, mMinOpacitySpin, 0, 100, tr(" %"));
 }
 
 void OnionSkinWidget::makeConnections()
 {
-    auto spinBoxChanged = static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged);
-    connect(ui->onionMaxOpacityBox, spinBoxChanged, this, &OnionSkinWidget::onionMaxOpacityChange);
-    connect(ui->onionMinOpacityBox, spinBoxChanged, this, &OnionSkinWidget::onionMinOpacityChange);
-    connect(ui->onionPrevFramesNumBox, spinBoxChanged, this, &OnionSkinWidget::onionPrevFramesNumChange);
-    connect(ui->onionNextFramesNumBox, spinBoxChanged, this, &OnionSkinWidget::onionNextFramesNumChange);
+    connect(mPrevFramesSpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionPrevFramesNumChange);
+    connect(mNextFramesSpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionNextFramesNumChange);
+    connect(mMaxOpacitySpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionMaxOpacityChange);
+    connect(mMinOpacitySpin, &QDoubleSpinBox::valueChanged, this, &OnionSkinWidget::onionMinOpacityChange);
 
-    connect(ui->prevFramesGroup, &QGroupBox::clicked, this, &OnionSkinWidget::prevFramesGroupClicked);
-    connect(ui->nextFramesGroup, &QGroupBox::clicked, this, &OnionSkinWidget::nextFramesGroupClicked);
-    connect(ui->onionBlueButton, &QToolButton::clicked, this, &OnionSkinWidget::onionBlueButtonClicked);
-    connect(ui->onionRedButton, &QToolButton::clicked, this, &OnionSkinWidget::onionRedButtonClicked);
+    connect(mOnionToggleButton, &QToolButton::clicked, this, &OnionSkinWidget::onionToggleClicked);
+    connect(mOnionBlueButton, &QToolButton::clicked, this, &OnionSkinWidget::onionBlueButtonClicked);
+    connect(mOnionRedButton, &QToolButton::clicked, this, &OnionSkinWidget::onionRedButtonClicked);
 
     connect(ui->onionSkinMode, &QCheckBox::stateChanged, this, &OnionSkinWidget::onionSkinModeChange);
     connect(ui->onionWhilePlayback, &QCheckBox::stateChanged, this, &OnionSkinWidget::playbackStateChanged);
@@ -99,26 +156,30 @@ void OnionSkinWidget::makeConnections()
 
     PreferenceManager* prefs = editor()->preference();
     connect(prefs, &PreferenceManager::optionChanged, this, &OnionSkinWidget::updateUI);
-
 }
 
 void OnionSkinWidget::updateUI()
 {
     PreferenceManager* prefs = editor()->preference();
 
-    ui->prevFramesGroup->setChecked(prefs->isOn(SETTING::PREV_ONION));
-    ui->nextFramesGroup->setChecked(prefs->isOn(SETTING::NEXT_ONION));
+    QSignalBlocker b1(mOnionToggleButton);
+    mOnionToggleButton->setChecked(prefs->isOn(SETTING::PREV_ONION) && prefs->isOn(SETTING::NEXT_ONION));
 
-    QSignalBlocker b3(ui->onionBlueButton);
-    ui->onionBlueButton->setChecked(prefs->isOn(SETTING::ONION_BLUE));
+    QSignalBlocker b2(mOnionRedButton);
+    mOnionRedButton->setChecked(prefs->isOn(SETTING::ONION_RED));
 
-    QSignalBlocker b4(ui->onionRedButton);
-    ui->onionRedButton->setChecked(prefs->isOn(SETTING::ONION_RED));
+    QSignalBlocker b3(mOnionBlueButton);
+    mOnionBlueButton->setChecked(prefs->isOn(SETTING::ONION_BLUE));
 
-    ui->onionMaxOpacityBox->setValue(prefs->getInt(SETTING::ONION_MAX_OPACITY));
-    ui->onionMinOpacityBox->setValue(prefs->getInt(SETTING::ONION_MIN_OPACITY));
-    ui->onionPrevFramesNumBox->setValue(prefs->getInt(SETTING::ONION_PREV_FRAMES_NUM));
-    ui->onionNextFramesNumBox->setValue(prefs->getInt(SETTING::ONION_NEXT_FRAMES_NUM));
+    mPrevFramesSpin->setValue(prefs->getInt(SETTING::ONION_PREV_FRAMES_NUM));
+    mNextFramesSpin->setValue(prefs->getInt(SETTING::ONION_NEXT_FRAMES_NUM));
+    mMaxOpacitySpin->setValue(prefs->getInt(SETTING::ONION_MAX_OPACITY));
+    mMinOpacitySpin->setValue(prefs->getInt(SETTING::ONION_MIN_OPACITY));
+    // 滑杆手动对齐（updateUI 的 setValue 不经信号链时）
+    mPrevFramesSlider->setValue(qRound(mPrevFramesSpin->value()));
+    mNextFramesSlider->setValue(qRound(mNextFramesSpin->value()));
+    mMaxOpacitySlider->setValue(qRound(mMaxOpacitySpin->value()));
+    mMinOpacitySlider->setValue(qRound(mMinOpacitySpin->value()));
 
     QSignalBlocker b5(ui->onionSkinMode);
     ui->onionSkinMode->setChecked(prefs->getString(SETTING::ONION_TYPE) == "absolute");
@@ -130,15 +191,10 @@ void OnionSkinWidget::updateUI()
     ui->onionSkinMultiLayer->setChecked(prefs->isOn(SETTING::ONION_MUTLIPLE_LAYERS));
 }
 
-void OnionSkinWidget::prevFramesGroupClicked(bool isOn)
+void OnionSkinWidget::onionToggleClicked(bool isOn)
 {
     PreferenceManager* prefs = editor()->preference();
     prefs->set(SETTING::PREV_ONION, isOn);
-}
-
-void OnionSkinWidget::nextFramesGroupClicked(bool isOn)
-{
-    PreferenceManager* prefs = editor()->preference();
     prefs->set(SETTING::NEXT_ONION, isOn);
 }
 

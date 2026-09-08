@@ -2968,108 +2968,108 @@
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="54"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="56"/>
         <source>Colorize Mask</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="62"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="64"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="63"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
         <source>Update All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="64"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="66"/>
         <source>Regenerate coloring for the current frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="67"/>
         <source>Regenerate coloring for every frame of this layer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="71"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="73"/>
         <source>Edit key strokes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="72"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="74"/>
         <source>Show output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="81"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="83"/>
         <source>Key Strokes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="90"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="92"/>
         <source>Transparent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="91"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="93"/>
         <source>Remove</source>
         <translation type="unfinished">أزل</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="92"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
         <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="93"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="95"/>
         <source>Erase all strokes of the selected color on this frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="100"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="102"/>
         <source>Edge detection (soft pencil lines)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="107"/>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="113"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="109"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="115"/>
         <source> px</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="132"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="163"/>
         <source>Edge size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="133"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="164"/>
         <source>Gap closing radius</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="134"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="165"/>
         <source>Cleanup strength</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="137"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="168"/>
         <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="214"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="245"/>
         <source>Line art source: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="219"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="250"/>
         <source>No line art layer found! Add a bitmap layer with drawings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="262"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="297"/>
         <source>Transparent (stays unfilled)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5951,65 +5951,79 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="111"/>
-        <source>Previous Frames</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="166"/>
-        <location filename="../app/ui/onionskin.ui" line="259"/>
         <source>...</source>
-        <translation>...</translation>
+        <translation type="vanished">...</translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="163"/>
         <source>Onion skin color: red</source>
-        <translation>لون قشر البصر: أحمر</translation>
+        <translation type="vanished">لون قشر البصر: أحمر</translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="192"/>
-        <source>Next Frames</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="253"/>
         <source>Onion skin color: blue</source>
-        <translation>لون قشر البصل: أزرق</translation>
+        <translation type="vanished">لون قشر البصل: أزرق</translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="285"/>
-        <source>Distributed Opacity</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="395"/>
-        <source>Min</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="355"/>
-        <location filename="../app/ui/onionskin.ui" line="420"/>
-        <source> %</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="330"/>
-        <source>Max</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/ui/onionskin.ui" line="444"/>
+        <location filename="../app/ui/onionskin.ui" line="127"/>
         <source>Show On All Layers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="458"/>
+        <location filename="../app/ui/onionskin.ui" line="141"/>
         <source>Show Keyframes Only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="465"/>
+        <location filename="../app/ui/onionskin.ui" line="148"/>
         <source>Show During Playback</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>OnionSkinWidget</name>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="66"/>
+        <source>Toggle onion skin (previous &amp; next frames together)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="71"/>
+        <source>Onion Skin On/Off：</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="127"/>
+        <source>Onion skin color: red</source>
+        <translation type="unfinished">لون قشر البصر: أحمر</translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="134"/>
+        <source>Onion skin color: blue</source>
+        <translation type="unfinished">لون قشر البصل: أزرق</translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="136"/>
+        <source>Previous frames</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="137"/>
+        <source>Next frames</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="138"/>
+        <source>Max opacity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="138"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="139"/>
+        <source> %</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="139"/>
+        <source>Min opacity</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

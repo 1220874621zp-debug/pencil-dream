@@ -26,6 +26,8 @@ namespace Ui
 
 class Editor;
 class QToolButton;
+class QSlider;
+class QDoubleSpinBox;
 class ViewManager;
 
 class OnionSkinWidget : public BaseDockWidget
@@ -41,8 +43,6 @@ public:
 
 private slots:
     void playbackStateChanged(int);
-    void prevFramesGroupClicked(bool);
-    void nextFramesGroupClicked(bool);
     void onionBlueButtonClicked(bool);
     void onionRedButtonClicked(bool);
     void onionMaxOpacityChange(int);
@@ -51,10 +51,29 @@ private slots:
     void onionNextFramesNumChange(int);
     void onionSkinModeChange(int);
     void onionSkinMultipleLayersEnabled(bool value);
+    void onionToggleClicked(bool);
 
 private:
     void makeConnections();
+    void buildParamRows();
+
     Ui::OnionSkin* ui = nullptr;
+
+    // 灯泡开关：同时开启/关闭前后帧洋葱皮
+    QToolButton* mOnionToggleButton = nullptr;
+
+    // 滑杆+输入框参数行（输入框为数据源，滑杆双向同步）
+    QSlider* mPrevFramesSlider = nullptr;
+    QDoubleSpinBox* mPrevFramesSpin = nullptr;
+    QSlider* mNextFramesSlider = nullptr;
+    QDoubleSpinBox* mNextFramesSpin = nullptr;
+    QSlider* mMaxOpacitySlider = nullptr;
+    QDoubleSpinBox* mMaxOpacitySpin = nullptr;
+    QSlider* mMinOpacitySlider = nullptr;
+    QDoubleSpinBox* mMinOpacitySpin = nullptr;
+
+    QToolButton* mOnionRedButton = nullptr;
+    QToolButton* mOnionBlueButton = nullptr;
 };
 
 #endif // ONIONSKINWIDGET_H
