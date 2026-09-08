@@ -378,6 +378,13 @@ bool ScribbleArea::event(QEvent *event)
         qInfo() << "[cursor] canvas enter, tool" << int(currentTool()->type());
         emit requestFocus(this);
 
+        // Windows 光标缓存陈旧问题：弹窗/拖拽/后台忙之后系统显示箭头，
+        // 而 Qt 认为部件光标未变就不再重设系统光标；换一个不同的光标值
+        // 才会真正下发（点工具按钮能"修好"正是这个机理）。先 unset 再设
+        // 强制走两次原生应用，鼠标进画布即自愈
+        unsetCursor();
+        updateToolCursor();
+
         processed = currentTool()->enterEvent(static_cast<QEnterEvent*>(event)) || processed;
     } else if (event->type() == QEvent::Leave)
     {
@@ -535,7 +542,12 @@ void ScribbleArea::keyReleaseEvent(QKeyEvent *event)
     }
     else
     {
-        editor()->tools()->tryClearTemporaryTool(static_cast<Qt::Key>(event->key()));
+        if (editor()->tools()->tryClearTemporaryTool(static_cast<Qt::Key>(event->key())))
+        {
+            // 空格临时抓手结束后同样做缓存击穿重设（机理同 Enter 分支注释）
+            unsetCursor();
+            updateToolCursor();
+        }
     }
 
     if (isPointerInUse()) { return; }
