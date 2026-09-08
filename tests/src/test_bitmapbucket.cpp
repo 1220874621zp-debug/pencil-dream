@@ -301,6 +301,76 @@ namespace
     };
 }
 
+TEST_CASE("BucketTool - lasso over a never-drawn keyframe")
+{
+    // regression: a keyframe nobody has drawn into keeps a null image, and
+    // BitmapBucket::paint used to bail out silently on !isLoaded() - lasso +
+    // bucket on a fresh empty canvas filled nothing at all
+    Object* object = new Object;
+    object->init();
+    Editor* editor = new Editor;
+    BucketTestScribbleArea* scribbleArea = new BucketTestScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(object);
+    scribbleArea->setEditor(editor);
+    editor->init();
+    scribbleArea->init();
+
+    LayerBitmap* layer = editor->layers()->createBitmapLayer("empty");
+    editor->layers()->setCurrentLayer(0);
+    editor->scrubTo(1);
+
+    BitmapImage* img = static_cast<BitmapImage*>(layer->getKeyFrameAt(1));
+    REQUIRE(img != nullptr);
+    REQUIRE(!img->isLoaded()); // the precondition this bug needs
+
+    const QPoint clickPoint(70, 70);
+    editor->tools()->setCurrentTool(LASSO);
+    const qreal x0 = clickPoint.x() - 12, y0 = clickPoint.y() - 12;
+    const qreal x1 = clickPoint.x() + 12, y1 = clickPoint.y() + 12;
+    scribbleArea->testMousePress(QPointF(x0, y0));
+    for (int i = 0; i <= 6; ++i)
+    {
+        const qreal t = qreal(i) / 6.0;
+        scribbleArea->testMouseMove(QPointF(x0 + t * (x1 - x0), y0));
+    }
+    for (int i = 0; i <= 6; ++i)
+    {
+        const qreal t = qreal(i) / 6.0;
+        scribbleArea->testMouseMove(QPointF(x1, y0 + t * (y1 - y0)));
+    }
+    for (int i = 0; i <= 6; ++i)
+    {
+        const qreal t = qreal(i) / 6.0;
+        scribbleArea->testMouseMove(QPointF(x1 - t * (x1 - x0), y1));
+    }
+    for (int i = 0; i <= 6; ++i)
+    {
+        const qreal t = qreal(i) / 6.0;
+        scribbleArea->testMouseMove(QPointF(x0, y1 - t * (y1 - y0)));
+    }
+    scribbleArea->testMouseRelease(QPointF(x0, y0));
+    REQUIRE(!editor->select()->selectionClipPath().isEmpty());
+
+    editor->color()->setFrontColor(QColor(0, 0, 255));
+    editor->tools()->setCurrentTool(BUCKET);
+    scribbleArea->testMousePress(QPointF(clickPoint));
+    scribbleArea->testMouseRelease(QPointF(clickPoint));
+
+    BitmapImage* after = static_cast<BitmapImage*>(layer->getKeyFrameAt(1));
+    if (after)
+    {
+        const QRect ab = after->bounds();
+    }
+    REQUIRE(after->isLoaded());
+    REQUIRE(after->constScanLine(clickPoint.x(), clickPoint.y()) == qPremultiply(QColor(0, 0, 255).rgba()));
+    // outside the lasso the fresh canvas stays empty
+    REQUIRE(after->constScanLine(clickPoint.x(), clickPoint.y() - 30) == 0);
+
+    delete scribbleArea;
+    delete editor;
+}
+
 TEST_CASE("BucketTool - lasso over empty canvas via the real event path")
 {
     FileManager fm;

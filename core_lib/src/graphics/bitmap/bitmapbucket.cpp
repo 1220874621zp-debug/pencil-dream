@@ -118,7 +118,7 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     const int currentFrameIndex = mEditor->currentFrame();
 
     BitmapImage* targetImage = static_cast<LayerBitmap*>(mTargetFillToLayer)->getLastBitmapImageAtFrame(currentFrameIndex);
-    if (targetImage == nullptr || !targetImage->isLoaded()) { return; } // Can happen if the first frame is deleted while drawing
+    if (targetImage == nullptr) { return; } // Can happen if the first frame is deleted while drawing
 
     QPoint point = QPoint(qFloor(updatedPoint.x()), qFloor(updatedPoint.y()));
 
@@ -136,6 +136,16 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
     if (!fillRegion.contains(point))
     {
         fillRegion = fillRegion.united(QRect(point, QSize(1, 1)));
+    }
+
+    if (!targetImage->isLoaded())
+    {
+        // A keyframe nobody has drawn into yet keeps a null image, and the
+        // fill used to bail out silently on the isLoaded check. Materialize
+        // the frame over the fill region first - a transparent paste grows
+        // the bounds and allocates the image without changing any pixel.
+        BitmapImage materialize(fillRegion, Qt::transparent);
+        targetImage->paste(&materialize);
     }
 
     const QRgb& targetPixelColor = targetImage->constScanLine(point.x(), point.y());
