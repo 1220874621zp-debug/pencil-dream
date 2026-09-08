@@ -128,7 +128,18 @@ void PreferenceManager::loadPrefs()
     set(SETTING::AUTO_SAVE_BY_TIME,        settings.value(SETTING_AUTO_SAVE_BY_TIME,      false).toBool());
     set(SETTING::AUTO_SAVE_BY_TIME_TIMER,  settings.value(SETTING_AUTO_SAVE_BY_TIME_TIMER,15).toInt());
     set(SETTING::ASK_FOR_PRESET,           settings.value(SETTING_ASK_FOR_PRESET,         false).toBool());
-    set(SETTING::LOAD_MOST_RECENT,         settings.value(SETTING_LOAD_MOST_RECENT,       false).toBool());
+    // 默认启动时加载最近一次打开的工程（没有则回退空白/预设）。
+    // 一次性迁移：旧版本默认 false，把从未手动关闭过的用户翻到新默认。
+    if (!settings.contains("LoadMostRecentDefaultOnMigrated"))
+    {
+        if (!settings.value(SETTING_LOAD_MOST_RECENT, false).toBool())
+        {
+            settings.setValue(SETTING_LOAD_MOST_RECENT, true);
+        }
+        settings.setValue("LoadMostRecentDefaultOnMigrated", true);
+        settings.sync();
+    }
+    set(SETTING::LOAD_MOST_RECENT,         settings.value(SETTING_LOAD_MOST_RECENT,       true).toBool());
     set(SETTING::LOAD_DEFAULT_PRESET,      settings.value(SETTING_LOAD_DEFAULT_PRESET,    true).toBool());
     set(SETTING::DEFAULT_PRESET,           settings.value(SETTING_DEFAULT_PRESET,         0).toInt());
 
