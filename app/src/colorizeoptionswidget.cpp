@@ -159,14 +159,15 @@ void ColorizeOptionsWidget::initUI()
             layer->setTransparentColor(static_cast<QRgb>(mSelectedColor));
         invalidateAllFrames(layer);
         refreshColors();
+        refreshCurrentFrame(); // 显式面板操作：立即重算当前帧给反馈
     });
     connect(mRemoveButton, &QPushButton::clicked, this, [this]() {
         LayerColorize* layer = currentColorizeLayer();
         if (layer == nullptr || mSelectedColor < 0) { return; }
         layer->removeStrokeColor(mEditor->currentFrame(), static_cast<QRgb>(mSelectedColor));
         mSelectedColor = -1;
-        repaintCanvas();
         refreshColors();
+        refreshCurrentFrame();
     });
 
     connect(mEdgeDetectionCheck, &QCheckBox::toggled, this, &ColorizeOptionsWidget::applyParams);

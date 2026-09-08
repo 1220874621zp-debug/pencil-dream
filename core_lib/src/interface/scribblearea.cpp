@@ -939,6 +939,9 @@ void ScribbleArea::paintBitmapBuffer()
         {
             colorizeLayer->getLastColorizeImageAtFrame(frameNumber)->setNeedsUpdate(true);
         }
+
+        // 广播 frameModified：选项面板颜色列表与时间轴待更新点据此刷新
+        mEditor->setModified(mEditor->layers()->currentLayerIndex(), frameNumber);
     }
 
     mTiledBuffer.clear();

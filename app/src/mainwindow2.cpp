@@ -1771,6 +1771,9 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     connect(pTimeline, &TimeLine::newColorizeLayer, mCommands, &ActionCommands::addNewColorizeLayer);
     connect(mEditor->colorizeUpdates(), &ColorizeUpdateManager::frameUpdated,
             pTimeline, QOverload<>::of(&QWidget::update));
+    // 笔画落帧/参数变更 → 待更新琥珀点即时可见
+    connect(mEditor, &Editor::frameModified,
+            pTimeline, QOverload<>::of(&QWidget::update));
     connect(pTimeline, &TimeLine::newSoundLayer, mCommands, &ActionCommands::addNewSoundLayer);
     connect(pTimeline, &TimeLine::newCameraLayer, mCommands, &ActionCommands::addNewCameraLayer);
     connect(mTimeLine, &TimeLine::playButtonTriggered, mCommands, &ActionCommands::PlayStop);
