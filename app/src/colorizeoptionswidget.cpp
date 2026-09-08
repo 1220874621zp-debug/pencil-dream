@@ -24,6 +24,7 @@ GNU General Public License for more details.
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QGridLayout>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -127,14 +128,18 @@ void ColorizeOptionsWidget::initUI()
         // 双精度参数以 0.1 步长映射到整型滑杆
         slider->setRange(qRound(spin->minimum() * 10.0), qRound(spin->maximum() * 10.0));
 
-        auto* row = new QHBoxLayout;
-        row->setSpacing(8);
+        // 排版：标签独占一行；下一行滑杆+输入框；输入框跨两行高（右列）
+        auto* grid = new QGridLayout;
+        grid->setHorizontalSpacing(8);
+        grid->setVerticalSpacing(2);
         if (indent > 0)
-            row->setContentsMargins(indent, 0, 0, 0);
-        row->addWidget(new QLabel(tr(label), this));
-        row->addWidget(slider, 1);
-        row->addWidget(spin);
-        form->addLayout(row);
+            grid->setContentsMargins(indent, 0, 0, 0);
+        grid->addWidget(new QLabel(tr(label), this), 0, 0);
+        grid->addWidget(slider, 1, 0);
+        grid->addWidget(spin, 0, 1, 2, 1);
+        grid->setColumnStretch(0, 1);
+        spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        form->addLayout(grid);
 
         // 滑杆 → 输入框（输入框 valueChanged 统一驱动参数应用）
         connect(slider, &QSlider::valueChanged, this, [spin](int value) {
