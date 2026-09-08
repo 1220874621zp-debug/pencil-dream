@@ -535,6 +535,7 @@ TEST_CASE("Colorize LayerPipeline")
 
 #include "editor.h"
 #include "scribblearea.h"
+#include "canvaspainter.h"
 #include "layermanager.h"
 #include "undoredomanager.h"
 #include "colorizeupdatemanager.h"
@@ -637,6 +638,14 @@ TEST_CASE("Colorize FullEditorIntegration")
         REQUIRE(!frame->needsUpdate());
         REQUIRE(!frame->coloringImage().isNull());
         REQUIRE(frame->coloringBounds().width() > 30);
+
+        REQUIRE(colorizeLayer->visible());
+        // 渲染路径复现：直接实例化 CanvasPainter 走 paint()
+        QPixmap canvasPixmap(200, 200);
+        CanvasPainter canvasPainter(canvasPixmap);
+        canvasPainter.setPaintSettings(object, object->getIndex(colorizeLayer), 1, nullptr);
+        canvasPainter.paint(QRect(0, 0, 200, 200));
+        REQUIRE(!frame->coloringImage().isNull());
     }
 
     SECTION("透明颜色经真实管理器生效")

@@ -539,12 +539,14 @@ void CanvasPainter::paintTransformedSelection(QPainter& painter, BitmapImage* bi
 void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, int startLayer, int endLayer)
 {
     painter.setOpacity(1.0);
+    qDebug() << "[填色] paintCurrentFrame" << startLayer << "-" << endLayer << "当前层" << mCurrentLayerIndex << "帧" << mFrameNumber;
 
     bool isCameraLayer = mObject->getLayer(mCurrentLayerIndex)->type() == Layer::CAMERA;
 
     for (int i = startLayer; i <= endLayer; ++i)
     {
         Layer* layer = mObject->getLayer(i);
+        qDebug() << "[填色] 层循环 i=" << i << "type=" << layer->type() << "visible=" << layer->visible() << layer->name();
 
         if (!layer->visible())
             continue;
@@ -602,6 +604,7 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
 
 void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer)
 {
+    qDebug() << "[填色] 渲染函数进入";
     auto colorizeLayer = static_cast<LayerColorize*>(layer);
     ColorizeImage* frame = colorizeLayer->getLastColorizeImageAtFrame(mFrameNumber);
 
@@ -610,6 +613,7 @@ void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& bl
 
     const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
     Q_UNUSED(isDrawing);
+    qDebug() << "[填色] 渲染帧" << mFrameNumber << "着色" << (frame->coloringImage().isNull() ? QStringLiteral("空") : QString::number(frame->coloringImage().width()) + "x" + QString::number(frame->coloringImage().height())) << "显示填色" << colorizeLayer->showColoring() << "编辑模式" << colorizeLayer->editKeyStrokes();
 
     // 着色计算完全由用户手动触发（选项面板「刷新」→ ColorizeUpdateManager），
     // 渲染路径只负责显示现有缓存 + 笔画
