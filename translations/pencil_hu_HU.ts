@@ -2962,6 +2962,45 @@
     </message>
 </context>
 <context>
+    <name>ColorizeOptionsWidget</name>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="45"/>
+        <source>Colorize Mask</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="52"/>
+        <source>Edge detection (soft pencil lines)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="59"/>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
+        <source> px</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="84"/>
+        <source>Edge size</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="85"/>
+        <source>Gap closing radius</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="86"/>
+        <source>Cleanup strength</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorizeoptionswidget.cpp" line="89"/>
+        <source>Paint color strokes with the brush; erase strokes to keep areas empty.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>CommandLineExporter</name>
     <message>
         <location filename="../app/src/commandlineexporter.cpp" line="59"/>
@@ -7982,7 +8021,7 @@ or cancel</source>
 <context>
     <name>ToolOptionWidget</name>
     <message>
-        <location filename="../app/src/tooloptionwidget.cpp" line="41"/>
+        <location filename="../app/src/tooloptionwidget.cpp" line="42"/>
         <source>Options</source>
         <comment>Window title of tool option panel like pen width, feather etc..</comment>
         <translation>Beállítások</translation>
