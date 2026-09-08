@@ -22,7 +22,7 @@ GNU General Public License for more details.
 #include <QImageReader>
 #include <QImageWriter>
 #include <QRegularExpression>
-#include <QSettings>
+#include <QStandardPaths>
 
 #include "brushengine.h"
 #include "pencildef.h"
@@ -45,10 +45,10 @@ const QString BrushPresetStore::kFileExtension = ".pbp";
 
 QString BrushPresetStore::userPresetDir()
 {
-    // 跟随 QSettings 的落盘位置（%APPDATA%/<org>/<app>/brushes）
-    QSettings settings(PENCIL2D, PENCIL2D);
-    const QString baseDir = QFileInfo(settings.fileName()).absolutePath();
-    return baseDir + "/brushes";
+    // Windows 上 QSettings(PENCIL2D, PENCIL2D) 走注册表，fileName() 返回的不是
+    // 文件系统路径（QFileInfo 解析会得到无效目录），改用 AppDataLocation
+    // （%APPDATA%/Pencil2D/Pencil2D，与单实例锁同根）
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/brushes";
 }
 
 void BrushPresetStore::load()

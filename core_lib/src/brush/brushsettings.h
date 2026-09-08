@@ -61,7 +61,7 @@ struct BrushSettings
     qreal diameter = 24.0;      // 像素，1..200
     qreal ratio = 1.0;          // 椭圆短轴/长轴，0.05..1
     qreal angle = 0.0;          // 笔尖旋转角度，0..360
-    qreal hardness = 0.65;      // 硬度 0.01..1：实心核占半径的比例（= Krita 1-fade）
+    qreal hardness = 0.65;      // 硬度 0.01..1：实心核占半径的比例（= Krita MaskGenerator 的 hfade/vfade）
 
     // ---- 描边 ----
     qreal opacity = 1.0;        // 笔刷不透明度 0.05..1（橡皮预设=擦除强度）
