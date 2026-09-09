@@ -175,7 +175,10 @@ int TimeLineCells::getLayerNumber(int y) const
 void TimeLineCells::rebuildRows() const
 {
     const Object* obj = mEditor->object();
-    const quint64 stamp = static_cast<quint64>(obj->layerStructureGeneration()) * 1000003ULL
+    // 对象身份必须参与戳值：加载/恢复换 Object 时新旧代数可能同为 0，
+    // 不加指针会让 mRows 继续引用已销毁旧对象的层（启动即 UAF）
+    const quint64 stamp = reinterpret_cast<quint64>(obj) * 31ULL
+                        + static_cast<quint64>(obj->layerStructureGeneration()) * 1000003ULL
                         + static_cast<quint64>(obj->layerGroupGeneration());
     if (stamp == mRowsStamp)
     {

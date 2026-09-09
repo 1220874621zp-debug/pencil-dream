@@ -725,6 +725,7 @@ void Object::applyLayerOrder(const QList<int>& orderedIds)
         }
     }
     mLayers = reordered;
+    ++mLayerStructureGeneration;
 }
 
 bool Object::canSwapLayers(int layerIndexLeft, int layerIndexRight) const
@@ -772,6 +773,9 @@ void Object::deleteLayer(int i)
     if (i > -1 && i < mLayers.size())
     {
         delete mLayers.takeAt(i);
+        // 行缓存(TimeLineCells.mRows)按结构代数失效；删层不 bump 会让
+        // 后续重绘拿着悬空 Layer* 画时间轴（UAF/堆损坏）
+        ++mLayerStructureGeneration;
     }
 }
 
@@ -783,6 +787,7 @@ void Object::deleteLayer(Layer* layer)
     {
         delete layer;
         mLayers.erase(it);
+        ++mLayerStructureGeneration;
     }
 }
 
@@ -794,6 +799,7 @@ bool Object::addLayer(Layer* layer)
     }
     layer->setId(getUniqueLayerID());
     mLayers.append(layer);
+    ++mLayerStructureGeneration;
     return true;
 }
 
