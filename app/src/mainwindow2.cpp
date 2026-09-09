@@ -2057,7 +2057,13 @@ void MainWindow2::createToolbars()
         mMainToolbar->addAction(ocaAction);
         if (QWidget* ocaButton = mMainToolbar->widgetForAction(ocaAction))
         {
-            static_cast<QToolButton*>(ocaButton)->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            auto* toolButton = static_cast<QToolButton*>(ocaButton);
+            toolButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            // 文字与 22px 图标等高对齐：加粗 + 同号字
+            QFont ocaFont = toolButton->font();
+            ocaFont.setBold(true);
+            ocaFont.setPixelSize(22);
+            toolButton->setFont(ocaFont);
         }
     }
 
