@@ -2049,34 +2049,20 @@ void MainWindow2::createToolbars()
     mMainToolbar->setIconSize(QSize(22, 22));
     mMainToolbar->addSeparator();
 
-    // OCA 导出入口：图标+文字合成一张宽贴图，像素级控制文字竖直位置
-    // （ToolButtonTextBesideIcon 只给居中，小字号在大图标旁视觉偏高，
-    // 合成路径里文字下移 1px 校正；按钮单独设宽 iconSize 防整图缩放）
+    // OCA 导出入口（用户提供图标：盒子+上箭头导出语义）+ 按钮文字 OCA
     {
-        const QString label = QStringLiteral("OCA");
-        QFont textFont = font();
-        textFont.setBold(true);
-        textFont.setPixelSize(11);
-        const QFontMetrics fm(textFont);
-        const int textW = fm.horizontalAdvance(label);
-        const qreal dpr = devicePixelRatioF();
-        QPixmap composed(qRound((22 + 4 + textW) * dpr), qRound(22 * dpr));
-        composed.fill(Qt::transparent);
-        composed.setDevicePixelRatio(dpr);
-        QPainter cp(&composed);
-        QIcon ocaIcon(":/icons/themes/playful/misc/oca-export.svg");
-        cp.drawPixmap(0, 0, 22, 22, ocaIcon.pixmap(QSize(22, 22), dpr));
-        cp.setFont(textFont);
-        cp.setPen(QColor(0xE8, 0xE8, 0xEA));
-        cp.drawText(QRect(22 + 4, 2, textW, 20), Qt::AlignHCenter | Qt::AlignVCenter, label);
-        cp.end();
-
-        QAction* ocaAction = new QAction(QIcon(composed), tr("导出 OCA..."), this);
+        QAction* ocaAction = new QAction(QIcon(":/icons/themes/playful/misc/oca-export.svg"), QStringLiteral("OCA"), this);
+        ocaAction->setToolTip(tr("导出 OCA..."));
         connect(ocaAction, &QAction::triggered, this, &MainWindow2::exportOCA);
         mMainToolbar->addAction(ocaAction);
         if (QWidget* ocaButton = mMainToolbar->widgetForAction(ocaAction))
         {
-            static_cast<QToolButton*>(ocaButton)->setIconSize(composed.size());
+            auto* toolButton = static_cast<QToolButton*>(ocaButton);
+            toolButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            QFont ocaFont = toolButton->font();
+            ocaFont.setBold(true);
+            ocaFont.setPixelSize(13);
+            toolButton->setFont(ocaFont);
         }
     }
 
