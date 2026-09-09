@@ -1397,6 +1397,8 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
             QPixmap loopPix(":/icons/themes/playful/controls/control-loop.svg");
             if (!loopPix.isNull())
             {
+                // 与图层行其他图标（clip/lock 16px 槽位）统一大小
+                loopPix = loopPix.scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation);
                 QPixmap loopTinted(loopPix.size());
                 loopTinted.fill(Qt::transparent);
                 QPainter loopTintPainter(&loopTinted);
@@ -1409,24 +1411,24 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         }
         else
         {
-            // ping-pong: two opposing horizontal arrows
+            // ping-pong: two opposing horizontal arrows（占满同款 16px 槽位）
             const QPointF loopC(loopR.x() + 8.0, sliderY);
-            painter.setPen(QPen(loopColor, 1.6));
+            painter.setPen(QPen(loopColor, 1.8));
             painter.setBrush(loopColor);
-            const qreal halfW = 6.0;
-            painter.drawLine(QPointF(loopC.x() - halfW, loopC.y() - 2.5),
-                             QPointF(loopC.x() + halfW, loopC.y() - 2.5));
+            const qreal halfW = 5.5;
+            painter.drawLine(QPointF(loopC.x() - halfW, loopC.y() - 3.5),
+                             QPointF(loopC.x() + halfW, loopC.y() - 3.5));
             QPolygonF headRight;
-            headRight << QPointF(loopC.x() + halfW + 3.0, loopC.y() - 2.5)
-                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 4.5)
-                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 0.5);
+            headRight << QPointF(loopC.x() + halfW + 3.5, loopC.y() - 3.5)
+                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 6.0)
+                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 1.0);
             painter.drawPolygon(headRight);
-            painter.drawLine(QPointF(loopC.x() + halfW, loopC.y() + 2.5),
-                             QPointF(loopC.x() - halfW, loopC.y() + 2.5));
+            painter.drawLine(QPointF(loopC.x() + halfW, loopC.y() + 3.5),
+                             QPointF(loopC.x() - halfW, loopC.y() + 3.5));
             QPolygonF headLeft;
-            headLeft << QPointF(loopC.x() - halfW - 3.0, loopC.y() + 2.5)
-                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 0.5)
-                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 4.5);
+            headLeft << QPointF(loopC.x() - halfW - 3.5, loopC.y() + 3.5)
+                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 1.0)
+                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 6.0);
             painter.drawPolygon(headLeft);
         }
     }
