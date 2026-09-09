@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QPainter>
 
 #include "layer.h"
 #include "layerbitmap.h"
@@ -62,15 +63,31 @@ int keyDuration(const Layer* layer, KeyFrame* key, int exportEnd)
     return qMax(1, end - key->pos());
 }
 
-// 单个位图族图层 → OCA paintlayer JSON（含逐帧 PNG 落盘）
-QJsonObject exportBitmapLayer(const LayerBitmap* layer,
-                              const QString& frameDir,
-                              int camW, int camH,
-                              int startFrame, int endFrame,
-                              int exportEnd,
-                              const QString& projectKey,
-                              int layerSeq,
-                              int* savedCount)
+// 整画布渲染单层帧：透明画布 + 世界原点平移（结构清晰的 OCA 同构：帧图一律相机尺寸）
+QImage renderLayerFrameFullCanvas(BitmapImage* bmp, int camW, int camH)
+{
+    QImage canvas(camW, camH, QImage::Format_ARGB32_Premultiplied);
+    canvas.fill(Qt::transparent);
+    QPainter painter(&canvas);
+    painter.translate(camW / 2, camH / 2); // pencil 世界原点在画布中心
+    painter.drawImage(bmp->topLeft(), *bmp->image());
+    painter.end();
+    return canvas;
+}
+
+struct OcaWriteContext
+{
+    QString ocaRootDir;    ///< <输出>/<工程名>.oca/
+    QString frameSubDir;   ///< 帧图子目录名（<工程名>_oca）
+    int camW = 1920;
+    int camH = 1080;
+    int startFrame = 1;
+    int endFrame = 1;
+    int exportEnd = 1;
+};
+
+// 单个位图族图层 → OCA paintlayer JSON（整画布帧图 <子目录>/<层名>.<帧号4位>.png）
+QJsonObject exportBitmapLayer(LayerBitmap* layer, const OcaWriteContext& ctx)
 {
     QJsonObject json;
     json.insert("name", layer->name());
@@ -82,88 +99,77 @@ QJsonObject exportBitmapLayer(const LayerBitmap* layer,
     json.insert("visible", layer->visible());
     json.insert("passThrough", false);
     json.insert("inheritAlpha", layer->clipMask());
-    // 层级默认：画布中心 + 相机尺寸（OCA 语义：position 为图像中心点）
-    json.insert("position", QJsonArray{ camW / 2.0, camH / 2.0 });
-    json.insert("width", camW);
-    json.insert("height", camH);
+    json.insert("position", QJsonArray{ ctx.camW / 2.0, ctx.camH / 2.0 });
+    json.insert("width", ctx.camW);
+    json.insert("height", ctx.camH);
     json.insert("animated", layer->keyFrameCount() > 1);
 
+    const QString safeName = sanitizedFileName(layer->name());
     QJsonArray frames;
-    const QString safeName = QStringLiteral("%1_%2").arg(sanitizedFileName(layer->name())).arg(layerSeq, 3, 10, QLatin1Char('0'));
     layer->foreachKeyFrame([&](KeyFrame* key)
     {
-        if (key->pos() < startFrame || key->pos() > endFrame)
+        if (key->pos() < ctx.startFrame || key->pos() > ctx.endFrame)
         {
             return;
         }
         BitmapImage* bmp = static_cast<BitmapImage*>(key); // image()/topLeft() 非 const
-        QImage* img = bmp->image();
-        if (img == nullptr || img->isNull())
+        if (bmp->image() == nullptr || bmp->image()->isNull())
         {
             return; // 从未绘制的空帧
         }
 
-        const QString fileName = QStringLiteral("%1_%2.png")
-            .arg(safeName)
-            .arg(key->pos(), 5, 10, QLatin1Char('0'));
-        const QString filePath = QDir(frameDir).filePath(fileName);
-        if (!img->save(filePath, "PNG"))
+        const QString fileName = QStringLiteral("%1/%2.%3.png")
+            .arg(ctx.frameSubDir, safeName)
+            .arg(key->pos(), 4, 10, QLatin1Char('0'));
+        const QImage frameImg = renderLayerFrameFullCanvas(bmp, ctx.camW, ctx.camH);
+        if (!frameImg.save(QDir(ctx.ocaRootDir).filePath(fileName), "PNG"))
         {
             return;
         }
-        *savedCount += 1;
 
-        // 帧级：内容裁剪尺寸 + 图像中心（pencil 世界原点在画布中心 → OCA 原点在左上）
-        const QPoint topLeft = bmp->topLeft();
+        // 整幅帧：位置=画布中心，尺寸=相机尺寸（与参考实现同构，导入端无需逐帧对位）
         QJsonObject frame;
-        frame.insert("name", QStringLiteral("%1_%2").arg(layer->name()).arg(key->pos()));
+        frame.insert("name", QStringLiteral("%1.%2")
+            .arg(layer->name()).arg(key->pos(), 4, 10, QLatin1Char('0')));
         frame.insert("fileName", fileName);
         frame.insert("frameNumber", key->pos());
-        frame.insert("duration", keyDuration(layer, key, exportEnd));
+        frame.insert("duration", keyDuration(layer, key, ctx.exportEnd));
         frame.insert("opacity", 1.0);
-        frame.insert("position", QJsonArray{ topLeft.x() + img->width() / 2.0 + camW / 2.0,
-                                             topLeft.y() + img->height() / 2.0 + camH / 2.0 });
-        frame.insert("width", img->width());
-        frame.insert("height", img->height());
+        frame.insert("position", QJsonArray{ ctx.camW / 2.0, ctx.camH / 2.0 });
+        frame.insert("width", ctx.camW);
+        frame.insert("height", ctx.camH);
         frames.append(frame);
     });
 
     json.insert("frames", frames);
-    Q_UNUSED(projectKey)
     return json;
 }
 
-// 组 → OCA grouplayer（childLayers 递归；pencil 组是扁平连续段，子层为位图族）
-QJsonObject exportGroupLayer(const QList<LayerBitmap*>& members,
-                             const QString& frameDir,
-                             int camW, int camH,
-                             int startFrame, int endFrame,
-                             int exportEnd,
-                             int* layerSeq,
-                             int* savedCount)
+// 组 → OCA grouplayer（子层递归；组名取组表真实名称）
+QJsonObject exportGroupLayer(const Object* obj,
+                             const QList<LayerBitmap*>& members,
+                             const OcaWriteContext& ctx)
 {
     QJsonObject json;
     const int gid = members.first()->groupId();
-    json.insert("name", QStringLiteral("group_%1").arg(gid));
+    const LayerGroupInfo* info = obj->layerGroupInfo(gid);
+    json.insert("name", info != nullptr ? info->name : QStringLiteral("组"));
     json.insert("type", QStringLiteral("grouplayer"));
     json.insert("blendingMode", QStringLiteral("normal"));
     json.insert("opacity", 1.0);
-    json.insert("visible", true);
+    json.insert("visible", info != nullptr ? info->visible : true);
     json.insert("passThrough", false);
     json.insert("inheritAlpha", false);
     json.insert("animated", false);
-    json.insert("position", QJsonArray{ camW / 2.0, camH / 2.0 });
-    json.insert("width", camW);
-    json.insert("height", camH);
+    json.insert("position", QJsonArray{ ctx.camW / 2.0, ctx.camH / 2.0 });
+    json.insert("width", ctx.camW);
+    json.insert("height", ctx.camH);
 
-    // 子层按视觉序（pencil 索引大 = 屏幕上方）自上而下排列，与 OCA 数组序一致
+    // 子层按视觉序（pencil 索引大 = 屏幕上方）自上而下，与 OCA 数组序一致
     QJsonArray children;
     for (int i = members.size() - 1; i >= 0; --i)
     {
-        *layerSeq += 1;
-        children.append(exportBitmapLayer(members.at(i), frameDir, camW, camH,
-                                          startFrame, endFrame, exportEnd,
-                                          QString(), *layerSeq, savedCount));
+        children.append(exportBitmapLayer(members.at(i), ctx));
     }
     json.insert("childLayers", children);
     return json;
@@ -194,8 +200,6 @@ Status OcaExporter::run(const Object* obj,
             break;
         }
     }
-    const int camW = camera ? camera->getViewSize().width() : 1920;
-    const int camH = camera ? camera->getViewSize().height() : 1080;
 
     // 末帧：未指定则取位图族层动画长度
     int endFrame = desc.endFrame;
@@ -217,21 +221,33 @@ Status OcaExporter::run(const Object* obj,
     }
     const int startFrame = qMax(1, desc.startFrame);
 
-    // 目录布局：<输出目录>/<工程名>.oca/<工程名>.oca(JSON) + 帧图同目录
-    const QString projectName = [&obj]() {
+    // 目录布局（与参考实现同构）：
+    //   <输出>/<工程名>.oca/             ← 根目录
+    //   <输出>/<工程名>.oca/<工程名>.oca  ← JSON 清单
+    //   <输出>/<工程名>.oca/<工程名>_oca/<层名>.<帧号4位>.png
+    const QString projectName = [&obj]()
+    {
         const QString base = QFileInfo(obj->filePath()).completeBaseName();
         return base.isEmpty() ? QStringLiteral("PencilDream") : sanitizedFileName(base);
     }();
     const QString ocaDir = QDir(desc.outputDir).filePath(projectName + QStringLiteral(".oca"));
-    if (!QDir().mkpath(ocaDir))
+    const QString frameSubDir = projectName + QStringLiteral("_oca");
+    if (!QDir().mkpath(QDir(ocaDir).filePath(frameSubDir)))
     {
         return Status::FAIL;
     }
 
-    // 图层树：pencil 索引 0 = 栈顶 → OCA layers[] 首位即最上层（Krita 同序）
+    OcaWriteContext ctx;
+    ctx.ocaRootDir = ocaDir;
+    ctx.frameSubDir = frameSubDir;
+    ctx.camW = camera ? camera->getViewSize().width() : 1920;
+    ctx.camH = camera ? camera->getViewSize().height() : 1080;
+    ctx.startFrame = startFrame;
+    ctx.endFrame = endFrame;
+    ctx.exportEnd = endFrame;
+
+    // 图层树：pencil 索引 0 = 栈顶 → OCA layers[] 首位即最上层
     QJsonArray layersJson;
-    int layerSeq = 0;
-    int savedCount = 0;
     for (int i = 0; i < obj->getLayerCount(); ++i)
     {
         Layer* layer = obj->getLayer(i);
@@ -253,17 +269,12 @@ Status OcaExporter::run(const Object* obj,
                 {
                     members.append(static_cast<LayerBitmap*>(obj->getLayer(j)));
                 }
-                layersJson.append(exportGroupLayer(members, ocaDir, camW, camH,
-                                                   startFrame, endFrame, endFrame,
-                                                   &layerSeq, &savedCount));
+                layersJson.append(exportGroupLayer(obj, members, ctx));
             }
         }
         else
         {
-            layerSeq += 1;
-            layersJson.append(exportBitmapLayer(bmpLayer, ocaDir, camW, camH,
-                                                startFrame, endFrame, endFrame,
-                                                QString(), layerSeq, &savedCount));
+            layersJson.append(exportBitmapLayer(bmpLayer, ctx));
         }
     }
 
@@ -275,9 +286,10 @@ Status OcaExporter::run(const Object* obj,
     // 文档清单
     QJsonObject doc;
     doc.insert("name", projectName);
+    doc.insert("ocaVersion", QStringLiteral("1.1.0"));
     doc.insert("frameRate", desc.fps);
-    doc.insert("width", camW);
-    doc.insert("height", camH);
+    doc.insert("width", ctx.camW);
+    doc.insert("height", ctx.camH);
     doc.insert("startTime", startFrame);
     doc.insert("endTime", endFrame);
     doc.insert("colorDepth", QStringLiteral("8ui"));
