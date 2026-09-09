@@ -463,7 +463,7 @@ TEST_CASE("Colorize LayerPipeline")
     SECTION("同步更新：单色铺满 + 透明颜色保护（Krita 语义）")
     {
         // 未标记透明：红色铺满整个计算域（含框外）
-        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer));
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
         QImage coloring = frame->coloringImage();
         REQUIRE(!coloring.isNull());
         {
@@ -501,7 +501,7 @@ TEST_CASE("Colorize LayerPipeline")
 
         // 标记蓝色为透明：框外区域不再被红色覆盖（红色只剩框内+线）
         colorizeLayer->setTransparentColor(QColor(0, 0, 255).rgba());
-        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer));
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
         coloring = frame->coloringImage();
         redCount = 0;
         for (int y = 0; y < coloring.height(); ++y)

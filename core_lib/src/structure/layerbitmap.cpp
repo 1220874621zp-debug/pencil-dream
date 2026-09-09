@@ -84,6 +84,11 @@ Status LayerBitmap::saveKeyFrameFile(KeyFrame* keyframe, QString path)
         return Status::SAFE;
     }
 
+    // 帧池可能已把图像逐出内存（bounds 仍在）；writeFile 对空图像且
+    // bounds 非空会静默不写文件，XML 却照引 src -> 归档永久残缺。
+    // 存盘前先从既有文件回载，保证需要落盘的帧真的落盘
+    bitmapImage->loadFile();
+
     bitmapImage->setFileName(strFilePath);
 
     Status st = bitmapImage->writeFile(strFilePath);

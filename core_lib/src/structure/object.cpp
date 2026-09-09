@@ -1321,7 +1321,9 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                     if (frame->needsUpdate() ||
                         frame->computedStructureGeneration() != layerStructureGeneration())
                     {
-                        layerColorize->updateColoringAtFrame(frameNumber, getColorizeSourceLayer(layerIndex, frameNumber));
+                        layerColorize->updateColoringAtFrame(frameNumber,
+                                                             getColorizeSourceLayer(layerIndex, frameNumber),
+                                                             layerStructureGeneration());
                     }
                     if (layerColorize->showColoring() && !frame->coloringImage().isNull())
                     {

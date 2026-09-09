@@ -68,6 +68,7 @@ QJsonObject exportBitmapLayer(const LayerBitmap* layer,
                               int camW, int camH,
                               int startFrame, int endFrame,
                               int exportEnd,
+                              bool composedVisible,
                               const QString& projectKey,
                               int layerSeq,
                               int* savedCount)
@@ -79,7 +80,9 @@ QJsonObject exportBitmapLayer(const LayerBitmap* layer,
     json.insert("blendingMode", QStringLiteral("normal"));
     json.insert("label", layer->colorIndex());
     json.insert("opacity", layer->opacity());
-    json.insert("visible", layer->visible());
+    // 与视频导出/画布同语义：可见 = 图层眼 && 组眼（否则隐藏组里的层
+    // 会被导成 visible:true，出现"OCA 有颜色、视频没有"的不一致）
+    json.insert("visible", composedVisible);
     json.insert("passThrough", false);
     json.insert("inheritAlpha", layer->clipMask());
     // 层级默认：画布中心 + 相机尺寸（OCA 语义：position 为图像中心点）
@@ -174,7 +177,7 @@ QJsonObject exportGroupLayer(const Object* obj,
     json.insert("type", QStringLiteral("grouplayer"));
     json.insert("blendingMode", QStringLiteral("normal"));
     json.insert("opacity", 1.0);
-    json.insert("visible", true);
+    json.insert("visible", groupInfo != nullptr ? groupInfo->visible : true);
     json.insert("passThrough", false);
     json.insert("inheritAlpha", false);
     json.insert("animated", false);
@@ -190,6 +193,7 @@ QJsonObject exportGroupLayer(const Object* obj,
         *layerSeq += 1;
         children.append(wrapInGroup(exportBitmapLayer(members.at(i), frameDir, camW, camH,
                                                       startFrame, endFrame, exportEnd,
+                                                      obj->isLayerRenderable(members.at(i)),
                                                       QString(), *layerSeq, savedCount),
                                      members.at(i)->name(), camW, camH));
     }
@@ -291,6 +295,7 @@ Status OcaExporter::run(const Object* obj,
             layerSeq += 1;
             layersJson.append(wrapInGroup(exportBitmapLayer(bmpLayer, ocaDir, camW, camH,
                                                               startFrame, endFrame, endFrame,
+                                                              obj->isLayerRenderable(layer),
                                                               QString(), layerSeq, &savedCount),
                                            bmpLayer->name(), camW, camH));
         }

@@ -199,20 +199,20 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
     return colors;
 }
 
-bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer)
+bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer, quint32 structureGeneration)
 {
     ColorizeJobData data;
     if (!buildColorizeJob(this, frameNumber, sourceLayer, data))
     {
-        // 无可计算内容：清空缓存视为完成
+        // 无可计算内容：清空缓存视为完成（同时记当代数，避免逐帧重算）
         if (auto* frame = getLastColorizeImageAtFrame(frameNumber))
-            frame->setColoringResult(QImage(), QRect());
+            frame->setColoringResult(QImage(), QRect(), structureGeneration);
         return true;
     }
 
     QImage result = Colorize::colorize(data.lineImg, data.strokeImg, data.lineImg.rect(), data.options);
     if (auto* frame = getColorizeImageAtFrame(data.keyPos))
-        frame->setColoringResult(result, data.bounds);
+        frame->setColoringResult(result, data.bounds, structureGeneration);
     return true;
 }
 

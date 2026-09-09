@@ -56,8 +56,9 @@ public:
 
     void replaceKeyFrame(const KeyFrame*) override;
 
-    /** 同步计算指定帧的着色缓存（手动/导出/批量路径） */
-    bool updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer);
+    /** 同步计算指定帧的着色缓存（手动/导出/批量路径）；structureGeneration
+     *  = 计算时的图层结构代数，回填缓存，否则恒记 0 会每帧重算不停 */
+    bool updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLayer, quint32 structureGeneration);
 
     /** 后台任务快照构建：组装计算域与输入图；无需计算时返回 false */
     static bool buildColorizeJob(LayerColorize* layer, int frameNumber,
