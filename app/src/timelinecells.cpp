@@ -1549,7 +1549,6 @@ void TimeLineCells::paintGroupTrack(QPainter& painter, int groupId, int y, int h
     const QPalette palette = QApplication::palette();
     const LayerGroupInfo* info = mEditor->object()->layerGroupInfo(groupId);
     if (info == nullptr) { return; }
-    // 选中红框在函数末尾画：先画的会被底色/范围带盖掉（收起时不显示的根因）
 
     // 组行底色（比普通轨道略深）
     QColor base = palette.color(QPalette::Base);
@@ -1575,16 +1574,6 @@ void TimeLineCells::paintGroupTrack(QPainter& painter, int groupId, int y, int h
         painter.drawRect(QRectF(right - 2.0, y + 2.0, 2.0, height - 4.0));
     }
 
-    // 当前层在该组内（含收起状态）：组轨道行最上层描选中红框
-    const Layer* cur = mEditor->layers()->currentLayer();
-    if (cur != nullptr && cur->groupId() == groupId)
-    {
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setBrush(Qt::NoBrush);
-        painter.setPen(QPen(Theme::Accent, 2));
-        painter.drawRoundedRect(QRectF(mOffsetX + 2, y + 1.0, width() - mOffsetX - 4, height - 2.0), 5.0, 5.0);
-        painter.setRenderHint(QPainter::Antialiasing, false);
-    }
 }
 
 void TimeLineCells::paintLayerGutter(QPainter& painter) const

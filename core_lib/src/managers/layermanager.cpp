@@ -640,6 +640,20 @@ void LayerManager::toggleGroupCollapsed(int groupId)
 
     object()->setLayerGroupCollapsed(groupId, !info->collapsed);
 
+    // 折叠时当前层若在组内：默认切到组内最上层（展开后红框落在最上层）
+    if (!info->collapsed) // 即将变为收起
+    {
+        Layer* cur = currentLayer();
+        if (cur != nullptr && cur->groupId() == groupId)
+        {
+            const QList<int> members = object()->layerGroupMemberIndices(groupId);
+            if (!members.isEmpty())
+            {
+                setCurrentLayer(members.last());
+            }
+        }
+    }
+
     finishGroupOp(this, editor(), orderBefore, before, tr("展开/收起图层组"));
 }
 
