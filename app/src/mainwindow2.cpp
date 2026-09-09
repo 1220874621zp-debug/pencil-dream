@@ -2049,20 +2049,9 @@ void MainWindow2::createToolbars()
     mMainToolbar->setIconSize(QSize(22, 22));
     mMainToolbar->addSeparator();
 
-    // OCA 导出入口：无主题图标资源，用绘制文字的方式生成图标
+    // OCA 导出入口（用户提供图标：盒子+上箭头导出语义）
     {
-        QPixmap ocaIcon(64, 64);
-        ocaIcon.fill(Qt::transparent);
-        QPainter iconPainter(&ocaIcon);
-        QFont iconFont = font();
-        iconFont.setBold(true);
-        iconFont.setPixelSize(30);
-        iconPainter.setFont(iconFont);
-        iconPainter.setPen(QPen(QColor(0xE8, 0xE8, 0xEA)));
-        iconPainter.drawText(ocaIcon.rect(), Qt::AlignCenter, QStringLiteral("OCA"));
-        iconPainter.end();
-
-        QAction* ocaAction = new QAction(QIcon(ocaIcon), tr("导出 OCA..."), this);
+        QAction* ocaAction = new QAction(QIcon(":/icons/themes/playful/misc/oca-export.svg"), tr("导出 OCA..."), this);
         connect(ocaAction, &QAction::triggered, this, &MainWindow2::exportOCA);
         mMainToolbar->addAction(ocaAction);
     }
