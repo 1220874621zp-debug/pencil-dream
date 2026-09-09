@@ -5,6 +5,7 @@
 # Set sources
 set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/ocaexportdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.h
@@ -70,6 +71,7 @@ set(APP_HEADERS
 
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/ocaexportdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.cpp

@@ -142,6 +142,7 @@ private:
     void openPalette();
     void importPalette();
     void exportPalette();
+    void exportOCA();
 
     void readSettings();
     void writeSettings();

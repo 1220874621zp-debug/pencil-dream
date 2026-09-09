@@ -70,6 +70,9 @@ GNU General Public License for more details.
 #include "brushpresetpanel.h"
 #include "tooloptionwidget.h"
 #include "preferencesdialog.h"
+#include "ocaexportdialog.h"
+#include "layercamera.h"
+#include "ocaexporter.h"
 #include "timeline.h"
 #include "toolbox.h"
 #include "onionskinwidget.h"
@@ -1980,6 +1983,52 @@ bool MainWindow2::startProjectRecovery(const QString recoverPath)
     return true;
 }
 
+void MainWindow2::exportOCA()
+{
+    OcaExportDialog dialog(this);
+    QStringList cameraNames;
+    for (LayerCamera* cam : mEditor->object()->getLayersByType<LayerCamera>())
+    {
+        cameraNames << cam->name();
+    }
+    dialog.setCameras(cameraNames);
+    dialog.setRange(1, qMax(1, mEditor->layers()->animationLength(true)));
+
+    if (dialog.exec() != QDialog::Accepted || dialog.outputDir().isEmpty())
+    {
+        return;
+    }
+
+    OcaExportDesc desc;
+    desc.outputDir = dialog.outputDir();
+    desc.startFrame = dialog.startFrame();
+    desc.endFrame = dialog.endFrame();
+    desc.cameraName = dialog.cameraName();
+    desc.fps = mEditor->playback()->fps();
+
+    QProgressDialog progress(tr("正在导出 OCA..."), tr("取消"), 0, 100, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(200);
+    progress.setValue(0);
+
+    Status st = OcaExporter::run(mEditor->object(), desc, [&progress](int value)
+    {
+        progress.setValue(value);
+        QApplication::processEvents();
+    });
+
+    if (st.ok())
+    {
+        QMessageBox::information(this, tr("导出 OCA"),
+                                 tr("OCA 导出完成。输出目录：%1").arg(desc.outputDir));
+    }
+    else
+    {
+        QMessageBox::warning(this, tr("导出 OCA"),
+                             tr("导出失败：无法创建输出目录或写入文件，请检查导出目录。"));
+    }
+}
+
 void MainWindow2::createToolbars()
 {
     mMainToolbar = addToolBar(tr("Main Toolbar"));
@@ -1998,6 +2047,25 @@ void MainWindow2::createToolbars()
     mMainToolbar->addAction(ui->actionHorizontal_Flip);
     mMainToolbar->addAction(ui->actionVertical_Flip);
     mMainToolbar->setIconSize(QSize(22, 22));
+    mMainToolbar->addSeparator();
+
+    // OCA 导出入口：无主题图标资源，用绘制文字的方式生成图标
+    {
+        QPixmap ocaIcon(64, 64);
+        ocaIcon.fill(Qt::transparent);
+        QPainter iconPainter(&ocaIcon);
+        QFont iconFont = font();
+        iconFont.setBold(true);
+        iconFont.setPixelSize(30);
+        iconPainter.setFont(iconFont);
+        iconPainter.setPen(QPen(QColor(0xE8, 0xE8, 0xEA)));
+        iconPainter.drawText(ocaIcon.rect(), Qt::AlignCenter, QStringLiteral("OCA"));
+        iconPainter.end();
+
+        QAction* ocaAction = new QAction(QIcon(ocaIcon), tr("导出 OCA..."), this);
+        connect(ocaAction, &QAction::triggered, this, &MainWindow2::exportOCA);
+        mMainToolbar->addAction(ocaAction);
+    }
 
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");

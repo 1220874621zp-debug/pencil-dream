@@ -49,6 +49,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/viewmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/miniz.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/movieexporter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/ocaexporter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/movieimporter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/onionskinsubpainter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/overlaypainter.h
@@ -157,6 +158,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/managers/viewmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/miniz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/movieexporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/ocaexporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/movieimporter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/onionskinsubpainter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/overlaypainter.cpp
