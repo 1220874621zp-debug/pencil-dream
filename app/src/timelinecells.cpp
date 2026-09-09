@@ -669,6 +669,15 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     if (height <= 20)
     {
         paintCollapsedTrack(painter, layer, x, y, width);
+        if (selected)
+        {
+            // 瘦行选中：同款 accent 红框（细行收窄描边）
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setBrush(Qt::NoBrush);
+            painter.setPen(QPen(Theme::Accent, 1.5));
+            painter.drawRoundedRect(QRectF(x + 2.0, y + 1.0, width - 4.0, height - 2.0), 4.0, 4.0);
+            painter.setRenderHint(QPainter::Antialiasing, false);
+        }
         return;
     }
     const QPalette palette = QApplication::palette();
@@ -706,6 +715,12 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     if (selected)
     {
         paintSelection(painter, x, y, width, height);
+        // 选中层轨道：与拖拽成组落点同款 accent 红框
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(Theme::Accent, 2));
+        painter.drawRoundedRect(QRectF(x + 2, y + 1.0, width - 4, height - 2.0), 5.0, 5.0);
+        painter.setRenderHint(QPainter::Antialiasing, false);
     }
     else
     {
@@ -1534,6 +1549,18 @@ void TimeLineCells::paintGroupTrack(QPainter& painter, int groupId, int y, int h
     const QPalette palette = QApplication::palette();
     const LayerGroupInfo* info = mEditor->object()->layerGroupInfo(groupId);
     if (info == nullptr) { return; }
+
+    // 当前层在该组内（含收起状态）：组轨道行显示选中红框
+    const Layer* cur = mEditor->layers()->currentLayer();
+    const bool groupSelected = (cur != nullptr && cur->groupId() == groupId);
+    if (groupSelected)
+    {
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(Theme::Accent, 2));
+        painter.drawRoundedRect(QRectF(mOffsetX + 2, y + 1.0, width() - mOffsetX - 4, height - 2.0), 5.0, 5.0);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+    }
 
     // 组行底色（比普通轨道略深）
     QColor base = palette.color(QPalette::Base);
