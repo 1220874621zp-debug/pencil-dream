@@ -1394,12 +1394,16 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         const QRect loopR(clipR.right() + 4, 0, 16, 0);
         if (layer->loopMode() == Layer::LoopMode::Cycle)
         {
-            QPixmap loopPix(":/icons/themes/playful/controls/control-loop.svg");
+            // QIcon 按请求尺寸+设备DPR直接矢量栅格化：QPixmap(svg路径)对
+            // width=100% 的源图先按回退尺寸栅格化再 scaled 是两次有损，
+            // 高DPI屏还会被最近邻拉伸出锯齿
+            const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
+            QIcon loopIcon(":/icons/themes/playful/controls/control-loop.svg");
+            QPixmap loopPix = loopIcon.pixmap(QSize(16, 16), dpr);
             if (!loopPix.isNull())
             {
-                // 与图层行其他图标（clip/lock 16px 槽位）统一大小
-                loopPix = loopPix.scaled(16, 16, Qt::KeepAspectRatio, Qt::SmoothTransformation);
                 QPixmap loopTinted(loopPix.size());
+                loopTinted.setDevicePixelRatio(loopPix.devicePixelRatio());
                 loopTinted.fill(Qt::transparent);
                 QPainter loopTintPainter(&loopTinted);
                 loopTintPainter.drawPixmap(0, 0, loopPix);
