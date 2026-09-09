@@ -1397,9 +1397,10 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
             // QIcon 按请求尺寸+设备DPR直接矢量栅格化：QPixmap(svg路径)对
             // width=100% 的源图先按回退尺寸栅格化再 scaled 是两次有损，
             // 高DPI屏还会被最近邻拉伸出锯齿
+            // 源图形四周有内边距，16px 渲染显出来偏小；放大到 20px 并按槽位中心对齐
             const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
             QIcon loopIcon(":/icons/themes/playful/controls/control-loop.svg");
-            QPixmap loopPix = loopIcon.pixmap(QSize(16, 16), dpr);
+            QPixmap loopPix = loopIcon.pixmap(QSize(20, 20), dpr);
             if (!loopPix.isNull())
             {
                 QPixmap loopTinted(loopPix.size());
@@ -1410,7 +1411,9 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
                 loopTintPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
                 loopTintPainter.fillRect(loopTinted.rect(), loopColor);
                 loopTintPainter.end();
-                painter.drawPixmap(QPointF(loopR.x(), sliderY - 8.0), loopTinted);
+                painter.drawPixmap(QPointF(loopR.x() + 8.0 - loopTinted.width() / (2.0 * loopTinted.devicePixelRatio()),
+                                           sliderY - loopTinted.height() / (2.0 * loopTinted.devicePixelRatio())),
+                                   loopTinted);
             }
         }
         else
