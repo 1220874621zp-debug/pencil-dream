@@ -2049,11 +2049,16 @@ void MainWindow2::createToolbars()
     mMainToolbar->setIconSize(QSize(22, 22));
     mMainToolbar->addSeparator();
 
-    // OCA 导出入口（用户提供图标：盒子+上箭头导出语义）
+    // OCA 导出入口（用户提供图标：盒子+上箭头导出语义）+ 按钮文字 OCA
     {
-        QAction* ocaAction = new QAction(QIcon(":/icons/themes/playful/misc/oca-export.svg"), tr("导出 OCA..."), this);
+        QAction* ocaAction = new QAction(QIcon(":/icons/themes/playful/misc/oca-export.svg"), QStringLiteral("OCA"), this);
+        ocaAction->setToolTip(tr("导出 OCA..."));
         connect(ocaAction, &QAction::triggered, this, &MainWindow2::exportOCA);
         mMainToolbar->addAction(ocaAction);
+        if (QWidget* ocaButton = mMainToolbar->widgetForAction(ocaAction))
+        {
+            static_cast<QToolButton*>(ocaButton)->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        }
     }
 
     mViewToolbar = addToolBar(tr("View Toolbar"));
