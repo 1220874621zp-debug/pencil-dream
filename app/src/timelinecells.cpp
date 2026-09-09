@@ -2544,86 +2544,90 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
         }
         else if (layerNumber != -1 && layerNumber != mStartLayerNumber)
         {
-            mToLayer = getInbetweenLayerNumber(event->pos().y());
-            qDebug() << "[ui] layer-release: to=" << mToLayer << "from=" << mFromLayer;
-            if (mToLayer != mFromLayer && mToLayer > -1 && mToLayer < mEditor->layers()->count())
+            Layer* fromLayerObj = mEditor->object()->getLayer(mFromLayer);
+            const bool altOut = (event->modifiers() & Qt::AltModifier) && fromLayerObj != nullptr
+                                && fromLayerObj->groupId() >= 0;
+
+            // 落点判定先行：成组/入组只看落点行与中心区，与插入目标 mToLayer 无关。
+            // getInbetweenLayerNumber 是插入语义（向拖拽起点方向取整），向上拖时会把
+            // 目标层取整回起点层，用它门禁成组判定会把成组一起短路掉（探针实锤）。
+            const int dropRow = rowIndexAtY(event->pos().y());
+            Layer* dropTarget = (dropRow >= 0 && dropRow < mRows.size() && !mRows.at(dropRow).isHeader)
+                                ? mRows.at(dropRow).layer : nullptr;
+            const int rowY2 = (dropRow >= 0) ? rowYAt(dropRow) : 0;
+            const int rowH2 = (dropRow >= 0) ? rowHeightAt(dropRow) : 0;
+            const bool inCenterZone = dropRow >= 0 && dropRow < mRows.size()
+                                      && event->pos().y() >= rowY2 + rowH2 * 0.225
+                                      && event->pos().y() <= rowY2 + rowH2 * 0.775;
+            const bool ontoCenter = inCenterZone && dropTarget != nullptr && dropTarget != fromLayerObj
+                                    && fromLayerObj != nullptr && fromLayerObj->isGroupable()
+                                    && dropTarget->isGroupable();
+            const bool ontoHeader = inCenterZone && dropRow >= 0 && dropRow < mRows.size()
+                                    && mRows.at(dropRow).isHeader
+                                    && fromLayerObj != nullptr && fromLayerObj->isGroupable();
+
+            qDebug() << "[ui] layer-release: dropRow=" << dropRow
+                     << "target=" << (dropTarget ? dropTarget->name() : QString("null"))
+                     << "ontoCenter=" << ontoCenter << "ontoHeader=" << ontoHeader;
+
+            if (ontoHeader)
             {
-                Layer* fromLayerObj = mEditor->object()->getLayer(mFromLayer);
-                const bool altOut = (event->modifiers() & Qt::AltModifier) && fromLayerObj != nullptr
-                                    && fromLayerObj->groupId() >= 0;
+                // ---- 组头中心区 = 加入该组（插到组块上方紧邻位 b+1） ----
+                const auto groupsBefore2 = LayerOrderCommand::captureGroups(mEditor->object());
+                const QList<int> orderBefore2 = mEditor->object()->layerIdOrder();
 
-                // 落点行中心区（成组/入组）判定：目标是图层行且垂直居中 40%
-                const int dropRow = rowIndexAtY(event->pos().y());
-                Layer* dropTarget = (dropRow >= 0 && dropRow < mRows.size() && !mRows.at(dropRow).isHeader)
-                                    ? mRows.at(dropRow).layer : nullptr;
-                const int rowY2 = (dropRow >= 0) ? rowYAt(dropRow) : 0;
-                const int rowH2 = (dropRow >= 0) ? rowHeightAt(dropRow) : 0;
-                const bool ontoCenter = dropTarget != nullptr && dropTarget != fromLayerObj
-                                        && event->pos().y() >= rowY2 + rowH2 * 0.225
-                                        && event->pos().y() <= rowY2 + rowH2 * 0.775;
-
-                // 组头中心区 = 加入该组（插到组块上方紧邻位 b+1）
-                qDebug() << "[ui] layer-release: dropRow=" << dropRow
-                         << "target=" << (dropTarget ? dropTarget->name() : QString("null"))
-                         << "ontoCenter=" << ontoCenter
-                         << "y=" << event->pos().y() << "rowY=" << rowY2 << "rowH=" << rowH2;
-                if (!ontoCenter && dropRow >= 0 && dropRow < mRows.size() && mRows.at(dropRow).isHeader
-                    && fromLayerObj != nullptr && fromLayerObj->isGroupable()
-                    && event->pos().y() >= rowY2 + rowH2 * 0.225
-                    && event->pos().y() <= rowY2 + rowH2 * 0.775)
+                const int joinGid = mRows.at(dropRow).groupId;
+                const QList<int> joinMembers = mEditor->object()->layerGroupMemberIndices(joinGid);
+                if (!joinMembers.isEmpty() && fromLayerObj->groupId() != joinGid)
                 {
-                    const auto groupsBefore2 = LayerOrderCommand::captureGroups(mEditor->object());
-                    const QList<int> orderBefore2 = mEditor->object()->layerIdOrder();
-
-                    const int joinGid = mRows.at(dropRow).groupId;
-                    const QList<int> joinMembers = mEditor->object()->layerGroupMemberIndices(joinGid);
-                    if (!joinMembers.isEmpty() && fromLayerObj->groupId() != joinGid)
-                    {
-                        const int insertPos = joinMembers.last() + 1; // 紧贴组块上沿
-                        mEditor->object()->moveLayer(mFromLayer, insertPos);
-                        fromLayerObj->setGroupId(joinGid);
-                        mEditor->object()->repairLayerGroupContiguity();
-                        mEditor->undoRedo()->pushUndoCommand(new LayerOrderCommand(
-                            mEditor, orderBefore2, mEditor->object()->layerIdOrder(), tr("加入图层组"),
-                            nullptr, groupsBefore2, LayerOrderCommand::captureGroups(mEditor->object())));
-                        mEditor->layers()->setCurrentLayer(mEditor->object()->getIndex(fromLayerObj));
-                        emit mEditor->updateTimeLine();
-                        mEditor->getScribbleArea()->onLayerChanged();
-                    }
-                }
-                else if (ontoCenter && fromLayerObj != nullptr && fromLayerObj->isGroupable()
-                    && dropTarget->isGroupable())
-                {
-                    // ---- 拖到层上（中心）= 成组/入组，单步撤销 ----
-                    qDebug() << "[ui] group-drop: 成组/入组" << fromLayerObj->name() << "->" << dropTarget->name();
-                    const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
-                    const QList<int> orderBefore = mEditor->object()->layerIdOrder();
-
-                    const int targetIdx = mEditor->object()->getIndex(dropTarget);
-                    mEditor->object()->moveLayer(mFromLayer, targetIdx);
-                    const int newIdx = mEditor->object()->getIndex(fromLayerObj);
-                    if (dropTarget->groupId() >= 0)
-                    {
-                        fromLayerObj->setGroupId(dropTarget->groupId());
-                    }
-                    else
-                    {
-                        const int gid = mEditor->object()->createLayerGroup(
-                            tr("组 %1").arg(mEditor->object()->layerGroups().size() + 1));
-                        dropTarget->setGroupId(gid);
-                        fromLayerObj->setGroupId(gid);
-                    }
+                    const int insertPos = joinMembers.last() + 1; // 紧贴组块上沿
+                    mEditor->object()->moveLayer(mFromLayer, insertPos);
+                    fromLayerObj->setGroupId(joinGid);
                     mEditor->object()->repairLayerGroupContiguity();
                     mEditor->undoRedo()->pushUndoCommand(new LayerOrderCommand(
-                        mEditor, orderBefore, mEditor->object()->layerIdOrder(), tr("图层成组"),
-                        nullptr, groupsBefore, LayerOrderCommand::captureGroups(mEditor->object())));
-                    mEditor->layers()->setCurrentLayer(newIdx);
+                        mEditor, orderBefore2, mEditor->object()->layerIdOrder(), tr("加入图层组"),
+                        nullptr, groupsBefore2, LayerOrderCommand::captureGroups(mEditor->object())));
+                    mEditor->layers()->setCurrentLayer(mEditor->object()->getIndex(fromLayerObj));
                     emit mEditor->updateTimeLine();
                     mEditor->getScribbleArea()->onLayerChanged();
                 }
+            }
+            else if (ontoCenter)
+            {
+                // ---- 拖到层上（中心）= 成组/入组，单步撤销 ----
+                qDebug() << "[ui] group-drop: 成组/入组" << fromLayerObj->name() << "->" << dropTarget->name();
+                const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
+                const QList<int> orderBefore = mEditor->object()->layerIdOrder();
+
+                const int targetIdx = mEditor->object()->getIndex(dropTarget);
+                mEditor->object()->moveLayer(mFromLayer, targetIdx);
+                const int newIdx = mEditor->object()->getIndex(fromLayerObj);
+                if (dropTarget->groupId() >= 0)
+                {
+                    fromLayerObj->setGroupId(dropTarget->groupId());
+                }
                 else
                 {
-                    // ---- 常规插入式重排（含 Alt 出组），单步撤销 ----
+                    const int gid = mEditor->object()->createLayerGroup(
+                        tr("组 %1").arg(mEditor->object()->layerGroups().size() + 1));
+                    dropTarget->setGroupId(gid);
+                    fromLayerObj->setGroupId(gid);
+                }
+                mEditor->object()->repairLayerGroupContiguity();
+                mEditor->undoRedo()->pushUndoCommand(new LayerOrderCommand(
+                    mEditor, orderBefore, mEditor->object()->layerIdOrder(), tr("图层成组"),
+                    nullptr, groupsBefore, LayerOrderCommand::captureGroups(mEditor->object())));
+                mEditor->layers()->setCurrentLayer(newIdx);
+                emit mEditor->updateTimeLine();
+                mEditor->getScribbleArea()->onLayerChanged();
+            }
+            else
+            {
+                // ---- 常规插入式重排（含 Alt 出组），单步撤销；mToLayer 只管这一分支 ----
+                mToLayer = getInbetweenLayerNumber(event->pos().y());
+                qDebug() << "[ui] layer-release: insert to=" << mToLayer << "from=" << mFromLayer;
+                if (mToLayer != mFromLayer && mToLayer > -1 && mToLayer < mEditor->layers()->count())
+                {
                     const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
                     const QList<int> orderBefore = mEditor->object()->layerIdOrder();
                     if (mEditor->object()->moveLayer(mFromLayer, mToLayer))
