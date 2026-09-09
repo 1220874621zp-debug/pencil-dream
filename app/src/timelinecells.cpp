@@ -1693,7 +1693,8 @@ void TimeLineCells::paintEvent(QPaintEvent*)
         int currentFrame = mEditor->currentFrame();
         Layer* currentLayer = mEditor->layers()->currentLayer();
         KeyFrame* keyFrame = currentLayer->getKeyFrameWhichCovers(currentFrame);
-        if (keyFrame != nullptr)
+        // 当前层行可见才画当前帧红框：折叠组内成员经getLayerY兜底会把框画到组轨道行上
+        if (keyFrame != nullptr && rowIndexOfLayer(mEditor->currentLayerIndex()) >= 0)
         {
             int blockLen = (currentLayer->type() == Layer::CAMERA) ? 1 : blockLengthFor(currentLayer, keyFrame);
             int recWidth = mFrameSize - 2 + (blockLen - 1) * mFrameSize;
@@ -1701,7 +1702,8 @@ void TimeLineCells::paintEvent(QPaintEvent*)
             paintCurrentFrameBorder(painter, recLeft, getLayerY(mEditor->currentLayerIndex()) + 1, recWidth, mLayerHeight - 4);
         }
 
-        if (!mMovingFrames && mLayerPosMoveY != -1 && mLayerPosMoveY == mEditor->currentLayerIndex())
+        if (!mMovingFrames && mLayerPosMoveY != -1 && mLayerPosMoveY == mEditor->currentLayerIndex()
+            && rowIndexOfLayer(mLayerPosMoveY) >= 0)
         {
             // This is terrible but well...
             int recTop = getLayerY(mLayerPosMoveY) + 1;
