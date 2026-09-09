@@ -1380,6 +1380,52 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         clipTintPainter.end();
         painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
     }
+
+    // loop-mode badge: only drawn when the layer is set to Cycle/PingPong
+    // (right-click layer row -> 循环模式); slot sits right after the clip icon
+    if (layer->isBitmapKind() && layer->loopMode() != Layer::LoopMode::None)
+    {
+        const QPointF loopC(clipR.right() + 4.0 + 8.0, sliderY);
+        const QColor loopColor = Theme::Accent;
+        painter.setPen(QPen(loopColor, 1.6));
+        painter.setBrush(loopColor);
+        if (layer->loopMode() == Layer::LoopMode::Cycle)
+        {
+            // circular arrow (two semicircle arcs, clockwise arrowheads)
+            const QRectF circle(loopC.x() - 5.0, loopC.y() - 5.0, 10.0, 10.0);
+            painter.drawArc(circle, 0, 180 * 16);
+            painter.drawArc(circle, 180 * 16, 180 * 16);
+            QPolygonF headDown;
+            headDown << QPointF(loopC.x() + 5.5, loopC.y() - 2.0)
+                     << QPointF(loopC.x() + 2.0, loopC.y() - 2.0)
+                     << QPointF(loopC.x() + 3.5, loopC.y() + 3.0);
+            painter.drawPolygon(headDown);
+            QPolygonF headUp;
+            headUp << QPointF(loopC.x() - 5.5, loopC.y() + 2.0)
+                   << QPointF(loopC.x() - 2.0, loopC.y() + 2.0)
+                   << QPointF(loopC.x() - 3.5, loopC.y() - 3.0);
+            painter.drawPolygon(headUp);
+        }
+        else
+        {
+            // ping-pong: two opposing horizontal arrows
+            const qreal halfW = 6.0;
+            painter.drawLine(QPointF(loopC.x() - halfW, loopC.y() - 2.5),
+                             QPointF(loopC.x() + halfW, loopC.y() - 2.5));
+            QPolygonF headRight;
+            headRight << QPointF(loopC.x() + halfW + 3.0, loopC.y() - 2.5)
+                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 4.5)
+                      << QPointF(loopC.x() + halfW - 1.0, loopC.y() - 0.5);
+            painter.drawPolygon(headRight);
+            painter.drawLine(QPointF(loopC.x() + halfW, loopC.y() + 2.5),
+                             QPointF(loopC.x() - halfW, loopC.y() + 2.5));
+            QPolygonF headLeft;
+            headLeft << QPointF(loopC.x() - halfW - 3.0, loopC.y() + 2.5)
+                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 0.5)
+                     << QPointF(loopC.x() - halfW + 1.0, loopC.y() + 4.5);
+            painter.drawPolygon(headLeft);
+        }
+    }
     painter.setRenderHint(QPainter::Antialiasing, false);
 }
 
@@ -2887,7 +2933,44 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         dissolveAction = menu.addAction(tr("解散所在组"));
     }
 
+    // 循环模式（TVP式）：开放尾块区域的取帧回绕；显式尾块 = 播完即不受影响
+    menu.addSeparator();
+    QMenu* loopMenu = menu.addMenu(tr("循环模式"));
+    QAction* loopHoldAction = loopMenu->addAction(tr("保持（默认）"));
+    QAction* loopCycleAction = loopMenu->addAction(tr("循环"));
+    QAction* loopPingPongAction = loopMenu->addAction(tr("往复循环"));
+    loopHoldAction->setCheckable(true);
+    loopCycleAction->setCheckable(true);
+    loopPingPongAction->setCheckable(true);
+    loopHoldAction->setChecked(layer->loopMode() == Layer::LoopMode::None);
+    loopCycleAction->setChecked(layer->loopMode() == Layer::LoopMode::Cycle);
+    loopPingPongAction->setChecked(layer->loopMode() == Layer::LoopMode::PingPong);
+
     QAction* chosen = menu.exec(mapToGlobal(pos));
+    Layer::LoopMode newLoopMode = layer->loopMode();
+    if (chosen == loopHoldAction)
+    {
+        newLoopMode = Layer::LoopMode::None;
+    }
+    else if (chosen == loopCycleAction)
+    {
+        newLoopMode = Layer::LoopMode::Cycle;
+    }
+    else if (chosen == loopPingPongAction)
+    {
+        newLoopMode = Layer::LoopMode::PingPong;
+    }
+
+    if (newLoopMode != layer->loopMode())
+    {
+        layer->setLoopMode(newLoopMode);
+        qDebug() << "[ui] layer" << layerIndex << "loopMode ->" << static_cast<int>(newLoopMode);
+        // 取帧方式变化影响整段显示与渲染缓存
+        mEditor->getScribbleArea()->onLayerChanged();
+        updateContent();
+        return;
+    }
+
     if (chosen == groupSelectedAction)
     {
         mEditor->layers()->groupSelectedLayers();

@@ -21,10 +21,13 @@ GNU General Public License for more details.
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
+#include <QPainter>
+#include <QImage>
 #include "filemanager.h"
 #include "layercamera.h"
 #include "object.h"
 #include "layerbitmap.h"
+#include "bitmapimage.h"
 #include "layersound.h"
 
 
@@ -250,3 +253,47 @@ void TestObject::testExportColorPalette()
 
 }
 */
+
+TEST_CASE("Object::paintImage renders loop-mode wrapped frames", "[Object]")
+{
+    Object obj;
+    LayerBitmap* layer = obj.addNewBitmapLayer();
+    delete layer->takeKeyFrame(1); // drop the auto-created empty key@1
+    layer->addKeyFrame(1, new BitmapImage(QRect(0, 0, 10, 10), QColor(255, 0, 0)));
+    layer->addKeyFrame(2, new BitmapImage(QRect(0, 0, 10, 10), QColor(0, 0, 255)));
+    layer->addKeyFrame(3, new BitmapImage(QRect(0, 0, 10, 10), QColor(0, 255, 0)));
+
+    auto paintAt = [&obj](int frame)
+    {
+        QImage img(32, 32, QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter painter(&img);
+        obj.paintImage(painter, frame, false, true);
+        painter.end();
+        return img.pixelColor(5, 5);
+    };
+
+    SECTION("Hold (default): tail frame persists")
+    {
+        REQUIRE(paintAt(1).red() > 200);
+        REQUIRE(paintAt(5).green() > 200);
+    }
+
+    SECTION("Cycle: export renders wrapped frames")
+    {
+        layer->setLoopMode(Layer::LoopMode::Cycle);
+        // cycle = [1,4): 4->red, 5->blue, 6->green
+        REQUIRE(paintAt(4).red() > 200);
+        REQUIRE(paintAt(5).blue() > 200);
+        REQUIRE(paintAt(6).green() > 200);
+    }
+
+    SECTION("PingPong: export renders the triangle wave")
+    {
+        layer->setLoopMode(Layer::LoopMode::PingPong);
+        // sequence 1,2,3,2,1,...: 4->blue, 5->red, 6->blue
+        REQUIRE(paintAt(4).blue() > 200);
+        REQUIRE(paintAt(5).red() > 200);
+        REQUIRE(paintAt(6).blue() > 200);
+    }
+}

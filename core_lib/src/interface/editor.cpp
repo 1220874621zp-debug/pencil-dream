@@ -195,7 +195,8 @@ void Editor::copy()
     if (currentLayer->hasAnySelectedFrames() && !select()->somethingSelected()) {
         clipboards()->copySelectedFrames(currentLayer);
     } else if (currentLayer->type() == Layer::BITMAP) {
-        BitmapImage* bitmapImage = static_cast<BitmapImage*>(currentLayer->getKeyFrameWhichCovers(currentFrame()));
+        BitmapImage* bitmapImage = static_cast<BitmapImage*>(currentLayer->getKeyFrameWhichCovers(
+            currentLayer->displayFrameFor(currentFrame())));
         if (bitmapImage != nullptr)
         {
             clipboards()->copyBitmapImage(bitmapImage, select()->mySelectionRect());
@@ -760,7 +761,8 @@ void Editor::selectAll() const
     {
         // Selects the drawn area (bigger or smaller than the screen). It may be more accurate to select all this way
         // as the drawing area is not limited
-        BitmapImage *bitmapImage = static_cast<BitmapImage*>(layer->getKeyFrameWhichCovers(mFrame));
+        BitmapImage *bitmapImage = static_cast<BitmapImage*>(layer->getKeyFrameWhichCovers(
+            layer->displayFrameFor(mFrame)));
         if (bitmapImage == nullptr) { return; }
 
         rect = bitmapImage->bounds();

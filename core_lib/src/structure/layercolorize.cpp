@@ -41,7 +41,7 @@ ColorizeImage* LayerColorize::getColorizeImageAtFrame(int frameNumber)
 ColorizeImage* LayerColorize::getLastColorizeImageAtFrame(int frameNumber)
 {
     Q_ASSERT(frameNumber >= 1);
-    return static_cast<ColorizeImage*>(getLastKeyFrameAtPosition(frameNumber));
+    return static_cast<ColorizeImage*>(getLastKeyFrameAtPosition(displayFrameFor(frameNumber)));
 }
 
 void LayerColorize::replaceKeyFrame(const KeyFrame* keyframe)

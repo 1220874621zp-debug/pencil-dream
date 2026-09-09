@@ -40,7 +40,8 @@ namespace
     {
         Q_ASSERT(layer->type() == Layer::BITMAP);
         auto bitmapLayer = static_cast<LayerBitmap*>(layer);
-        return static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(editor->currentFrame()));
+        return static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(
+            bitmapLayer->displayFrameFor(editor->currentFrame())));
     }
 
     QPointF rightUnitNormal(const QPointF& v)

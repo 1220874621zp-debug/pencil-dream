@@ -17,6 +17,7 @@ GNU General Public License for more details.
 
 #include "layer.h"
 #include "layerbitmap.h"
+#include <QDomDocument>
 #include "layercamera.h"
 #include "layersound.h"
 #include "bitmapimage.h"
@@ -653,3 +654,125 @@ TEST_CASE("layer::insertExposureAt(int position)") {
 
 
 //TEST_CASE("Layer::")
+
+TEST_CASE("Layer::displayFrameFor() loop-mode remap", "[Layer]")
+{
+    SECTION("None mode is identity")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->addNewKeyFrameAt(3);
+        layer->addNewKeyFrameAt(5);
+        REQUIRE(layer->displayFrameFor(1) == 1);
+        REQUIRE(layer->displayFrameFor(9) == 9);
+        REQUIRE(layer->displayFrameFor(100) == 100);
+        delete obj;
+    }
+
+    SECTION("Cycle wraps after open-ended tail")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->addNewKeyFrameAt(3);
+        layer->addNewKeyFrameAt(5);
+        layer->setLoopMode(Layer::LoopMode::Cycle);
+        // cycle = [1,6), length 5
+        REQUIRE(layer->displayFrameFor(5) == 5);   // inside first cycle
+        REQUIRE(layer->displayFrameFor(6) == 1);   // wrap
+        REQUIRE(layer->displayFrameFor(7) == 2);
+        REQUIRE(layer->displayFrameFor(10) == 5);
+        REQUIRE(layer->displayFrameFor(11) == 1);
+        REQUIRE(layer->displayFrameFor(0) == 0);   // before first key
+        delete obj;
+    }
+
+    SECTION("Cycle keeps exposure pattern via cover lookup")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->addNewKeyFrameAt(4);   // key@1 holds 1-3 (auto)
+        layer->addNewKeyFrameAt(6);   // key@4 holds 4-5
+        layer->setLoopMode(Layer::LoopMode::Cycle);
+        // cycle = [1,7)
+        KeyFrame* k = layer->getKeyFrameWhichCovers(layer->displayFrameFor(8));
+        REQUIRE(k != nullptr);
+        REQUIRE(k->pos() == 1);       // (8-1)%6=1 -> covered by key@1
+        k = layer->getKeyFrameWhichCovers(layer->displayFrameFor(10));
+        REQUIRE(k != nullptr);
+        REQUIRE(k->pos() == 4);       // (10-1)%6=3 -> covered by key@4
+        delete obj;
+    }
+
+    SECTION("PingPong triangle wave")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->addNewKeyFrameAt(2);
+        layer->addNewKeyFrameAt(3);
+        layer->setLoopMode(Layer::LoopMode::PingPong);
+        // sequence 1,2,3,2,1,2,3,...
+        REQUIRE(layer->displayFrameFor(3) == 3);
+        REQUIRE(layer->displayFrameFor(4) == 2);
+        REQUIRE(layer->displayFrameFor(5) == 1);
+        REQUIRE(layer->displayFrameFor(6) == 2);
+        REQUIRE(layer->displayFrameFor(7) == 3);
+        delete obj;
+    }
+
+    SECTION("Explicit tail block never wraps")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->addNewKeyFrameAt(5);
+        if (KeyFrame* last = layer->getKeyFrameAt(5))
+        {
+            last->setLength(3);
+            last->setLengthExplicit(true);
+        }
+        layer->setLoopMode(Layer::LoopMode::Cycle);
+        // cycle end = 5+3 = 8; beyond it the layer ends (trim = play-once)
+        REQUIRE(layer->displayFrameFor(7) == 7);
+        REQUIRE(layer->displayFrameFor(9) == 9);
+        REQUIRE(layer->getKeyFrameWhichCovers(layer->displayFrameFor(9)) == nullptr);
+        delete obj;
+    }
+
+    SECTION("Single key and non-bitmap layers stay literal")
+    {
+        Object* obj = new Object;
+        LayerBitmap* layer = obj->addNewBitmapLayer();
+        layer->addNewKeyFrameAt(1);
+        layer->setLoopMode(Layer::LoopMode::Cycle);
+        REQUIRE(layer->displayFrameFor(50) == 50);  // degenerate cycle
+
+        Layer* sound = obj->addNewSoundLayer();
+        sound->setLoopMode(Layer::LoopMode::Cycle);
+        REQUIRE(sound->displayFrameFor(50) == 50);  // guard: bitmap kinds only
+        delete obj;
+    }
+}
+
+TEST_CASE("Layer loopMode DOM round-trip", "[Layer]")
+{
+    Object obj;
+    LayerBitmap* layer = obj.addNewBitmapLayer();
+    layer->setLoopMode(Layer::LoopMode::PingPong);
+    QDomDocument doc;
+    QDomElement elem = layer->createDomElement(doc);
+    REQUIRE(elem.attribute("loopMode").toInt() == 2);
+
+    LayerBitmap restored(2);
+    restored.loadDomElement(elem, "", []() {});
+    REQUIRE(restored.loopMode() == Layer::LoopMode::PingPong);
+
+    // default (None) writes no attribute; old files load as None
+    LayerBitmap plain(3);
+    elem.removeAttribute("loopMode");
+    plain.loadDomElement(elem, "", []() {});
+    REQUIRE(plain.loopMode() == Layer::LoopMode::None);
+}

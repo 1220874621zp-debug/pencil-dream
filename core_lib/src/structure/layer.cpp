@@ -689,6 +689,8 @@ bool Layer::keyExistsWhichCovers(int frameNumber)
 
 KeyFrame* Layer::getKeyFrameWhichCovers(int frameNumber) const
 {
+    // 字面覆盖查找：时间轴几何/命中测试/碰撞检测/声音调度依赖它，
+    // 不做循环重映射（循环层取帧显示走 displayFrameFor 显式重映射）
     auto keyFrame = getLastKeyFrameAtPosition(frameNumber);
     if (keyFrame != nullptr)
     {
@@ -705,6 +707,45 @@ KeyFrame* Layer::getKeyFrameWhichCovers(int frameNumber) const
         }
     }
     return nullptr;
+}
+
+int Layer::displayFrameFor(int frameNumber) const
+{
+    if (mLoopMode == LoopMode::None || !isBitmapKind() || mKeyFrames.empty())
+    {
+        return frameNumber;
+    }
+
+    // mKeyFrames 降序：begin() = 末键（最大 pos），rbegin() = 首键
+    const int start = mKeyFrames.rbegin()->first;
+    const KeyFrame* lastKey = mKeyFrames.begin()->second;
+    // 显式尾块（trim过）= 播完即无，永不回绕
+    if (lastKey->isLengthExplicit())
+    {
+        return frameNumber;
+    }
+    // 开放尾块内容记 1 帧
+    const int cycleEnd = lastKey->pos() + 1;
+    const int cycleLen = cycleEnd - start;
+    if (cycleLen <= 1 || frameNumber < cycleEnd)
+    {
+        return frameNumber;
+    }
+
+    const int offset = frameNumber - start;
+    if (mLoopMode == LoopMode::Cycle)
+    {
+        return start + offset % cycleLen;
+    }
+
+    // 往复：周期 2N-2 的三角波（首尾帧不重复出现）
+    const int period = 2 * cycleLen - 2;
+    int index = offset % period;
+    if (index >= cycleLen)
+    {
+        index = period - index;
+    }
+    return start + index;
 }
 
 int Layer::getBlockEnd(const KeyFrame* key) const
@@ -923,6 +964,10 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     {
         layerTag.setAttribute("group", mGroupId);
     }
+    if (mLoopMode != LoopMode::None)
+    {
+        layerTag.setAttribute("loopMode", static_cast<int>(mLoopMode));
+    }
     return layerTag;
 }
 
@@ -940,4 +985,5 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     setClipMask(elem.attribute("clipMask", "0").toInt() == 1);
     mColorIndex = elem.attribute("colorIndex", "-1").toInt();
     mGroupId = elem.attribute("group", "-1").toInt();
+    mLoopMode = static_cast<LoopMode>(qBound(0, elem.attribute("loopMode", "0").toInt(), 2));
 }

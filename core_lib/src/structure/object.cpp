@@ -1300,7 +1300,9 @@ void Object::paintImage(QPainter& painter,int frameNumber,
             {
 
                 LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
-                BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
+                // 循环层按显示帧取内容（开放尾块区域回绕；cover 本身保持字面语义）
+                BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(
+                    layerBitmap->displayFrameFor(frameNumber)));
                 if (bitmap)
                 {
                     // same layer-opacity blend as CanvasPainter::paintCurrentBitmapFrame
@@ -1314,7 +1316,8 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                 // 导出/渲染为最终观感：只画着色结果（受 Show output 控制），
                 // 笔画不进导出；离线路径上过期帧同步兜底重算
                 auto layerColorize = static_cast<LayerColorize*>(layer);
-                ColorizeImage* frame = static_cast<ColorizeImage*>(layerColorize->getKeyFrameWhichCovers(frameNumber));
+                ColorizeImage* frame = static_cast<ColorizeImage*>(layerColorize->getKeyFrameWhichCovers(
+                    layerColorize->displayFrameFor(frameNumber)));
                 if (frame)
                 {
                     frame->loadFile();
@@ -1606,7 +1609,11 @@ void Object::updateActiveFrames(int frame) const
     {
         if (isLayerRenderable(layer))
         {
-            for (int k = beginFrame; k < endFrame; ++k)
+            // 循环层按显示帧预载（回绕到周期内的帧号），否则循环区永远不预热
+            const int center = layer->displayFrameFor(frame);
+            const int layerBegin = std::max(center - 3, 1);
+            const int layerEnd = center + 4;
+            for (int k = layerBegin; k < layerEnd; ++k)
             {
                 KeyFrame* key = layer->getKeyFrameAt(k);
                 mActiveFramePool->put(key);

@@ -1107,7 +1107,9 @@ BitmapImage* ScribbleArea::currentBitmapImage(Layer* layer) const
 {
     Q_ASSERT(layer->type() == Layer::BITMAP);
     auto bitmapLayer = static_cast<LayerBitmap*>(layer);
-    return static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(mEditor->currentFrame()));
+    // 循环层落笔目标 = 显示帧（所见即所编辑）
+    return static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(
+        bitmapLayer->displayFrameFor(mEditor->currentFrame())));
 }
 
 void ScribbleArea::prepCameraPainter(int frame)

@@ -35,6 +35,9 @@ void OnionSkinSubPainter::paint(QPainter& painter, const Layer* layer, const Oni
     if (layer->keyFrameCount() == 0)
         return;
 
+    // 循环层洋葱皮在显示帧域工作（回绕到周期内再取邻帧）
+    frameIndex = layer->displayFrameFor(frameIndex);
+
     qreal minOpacity = static_cast<qreal>(options.minOpacity / 100);
     qreal maxOpacity = static_cast<qreal>(options.maxOpacity / 100);
 

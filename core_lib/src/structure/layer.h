@@ -87,6 +87,22 @@ public:
     /** 能否参与打组（位图族可；声音/相机按用户拍板不进组） */
     bool isGroupable() const { return isBitmapKind(); }
 
+    /** 图层循环模式（TVP式）：改变"开放尾块"区域的取帧回绕方式。
+     *  仅位图族生效；显式（trim过）尾块 = 播完即无，永不回绕 */
+    enum class LoopMode
+    {
+        None = 0,     // 保持：尾帧延续（现状默认）
+        Cycle = 1,    // 循环：周期回绕
+        PingPong = 2, // 往复循环：三角波回绕
+    };
+
+    LoopMode loopMode() const { return mLoopMode; }
+    void setLoopMode(LoopMode mode) { mLoopMode = mode; }
+
+    /** 显示帧重映射：循环/往复在开放尾块区域回绕（渲染与落笔所见即所编辑，
+     *  不改关键帧数据；其余区域原样返回） */
+    int displayFrameFor(int frameNumber) const;
+
     void switchVisibility() { mVisible = !mVisible; }
 
     bool visible() const { return mVisible; }
@@ -272,6 +288,7 @@ private:
     qreal      mOpacity = 1.0;
     bool       mLocked = false;
     bool       mClipMask = false;
+    LoopMode   mLoopMode = LoopMode::None;
     QString    mName;
     int        mColorIndex = -1;
     int        mGroupId = -1;
