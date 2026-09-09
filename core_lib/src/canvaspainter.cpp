@@ -380,8 +380,10 @@ void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPa
 void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask)
 {
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
-    // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing
-    BitmapImage* paintedImage = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(mFrameNumber));
+    // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing.
+    // 循环层按显示帧取图（开放尾块回绕；cover 本身保持字面语义）
+    BitmapImage* paintedImage = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(
+        bitmapLayer->displayFrameFor(mFrameNumber)));
 
     if (paintedImage == nullptr) { return; }
     paintedImage->loadFile(); // Critical! force the BitmapImage to load the image

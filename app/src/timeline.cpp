@@ -308,6 +308,7 @@ void TimeLine::initUI()
 
     setWindowFlags(Qt::WindowStaysOnTopHint);
 
+    connect(mLayerList, &TimeLineCells::deleteLayerRequested, this, [this](int) { emit deleteCurrentLayerClick(); });
     connect(mHScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::hScrollChange);
     connect(mTracks, &TimeLineCells::offsetChanged, mHScrollbar, &QScrollBar::setValue);
     connect(mVScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::vScrollChange);

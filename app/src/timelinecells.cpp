@@ -1385,33 +1385,34 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     }
 
     // loop-mode badge: only drawn when the layer is set to Cycle/PingPong
-    // (right-click layer row -> 循环模式); slot sits right after the clip icon
+    // (right-click layer row -> 循环模式); slot sits right after the clip icon.
+    // Cycle reuses the playback loop button icon (control-loop.svg); PingPong
+    // keeps a hand-drawn double-arrow glyph to stay distinguishable
     if (layer->isBitmapKind() && layer->loopMode() != Layer::LoopMode::None)
     {
-        const QPointF loopC(clipR.right() + 4.0 + 8.0, sliderY);
         const QColor loopColor = Theme::Accent;
-        painter.setPen(QPen(loopColor, 1.6));
-        painter.setBrush(loopColor);
+        const QRect loopR(clipR.right() + 4, 0, 16, 0);
         if (layer->loopMode() == Layer::LoopMode::Cycle)
         {
-            // circular arrow (two semicircle arcs, clockwise arrowheads)
-            const QRectF circle(loopC.x() - 5.0, loopC.y() - 5.0, 10.0, 10.0);
-            painter.drawArc(circle, 0, 180 * 16);
-            painter.drawArc(circle, 180 * 16, 180 * 16);
-            QPolygonF headDown;
-            headDown << QPointF(loopC.x() + 5.5, loopC.y() - 2.0)
-                     << QPointF(loopC.x() + 2.0, loopC.y() - 2.0)
-                     << QPointF(loopC.x() + 3.5, loopC.y() + 3.0);
-            painter.drawPolygon(headDown);
-            QPolygonF headUp;
-            headUp << QPointF(loopC.x() - 5.5, loopC.y() + 2.0)
-                   << QPointF(loopC.x() - 2.0, loopC.y() + 2.0)
-                   << QPointF(loopC.x() - 3.5, loopC.y() - 3.0);
-            painter.drawPolygon(headUp);
+            QPixmap loopPix(":/icons/themes/playful/controls/control-loop.svg");
+            if (!loopPix.isNull())
+            {
+                QPixmap loopTinted(loopPix.size());
+                loopTinted.fill(Qt::transparent);
+                QPainter loopTintPainter(&loopTinted);
+                loopTintPainter.drawPixmap(0, 0, loopPix);
+                loopTintPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                loopTintPainter.fillRect(loopTinted.rect(), loopColor);
+                loopTintPainter.end();
+                painter.drawPixmap(QPointF(loopR.x(), sliderY - 8.0), loopTinted);
+            }
         }
         else
         {
             // ping-pong: two opposing horizontal arrows
+            const QPointF loopC(loopR.x() + 8.0, sliderY);
+            painter.setPen(QPen(loopColor, 1.6));
+            painter.setBrush(loopColor);
             const qreal halfW = 6.0;
             painter.drawLine(QPointF(loopC.x() - halfW, loopC.y() - 2.5),
                              QPointF(loopC.x() + halfW, loopC.y() - 2.5));
@@ -2936,6 +2937,9 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         dissolveAction = menu.addAction(tr("解散所在组"));
     }
 
+    menu.addSeparator();
+    QAction* deleteLayerAction = menu.addAction(tr("删除图层…"));
+
     // 循环模式（TVP式）：开放尾块区域的取帧回绕；显式尾块 = 播完即不受影响
     menu.addSeparator();
     QMenu* loopMenu = menu.addMenu(tr("循环模式"));
@@ -2971,6 +2975,14 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         // 取帧方式变化影响整段显示与渲染缓存
         mEditor->getScribbleArea()->onLayerChanged();
         updateContent();
+        return;
+    }
+
+    if (chosen == deleteLayerAction)
+    {
+        // 与工具栏删除按钮同链：确认弹窗 + 相机守卫都在 ActionCommands
+        mEditor->layers()->setCurrentLayer(layerIndex);
+        Q_EMIT deleteLayerRequested(layerIndex);
         return;
     }
 
