@@ -1774,6 +1774,20 @@ void TimeLineCells::paintGroupTrack(QPainter& painter, int groupId, int y, int h
         painter.drawRect(QRectF(right - 2.0, y + 2.0, 2.0, height - 4.0));
     }
 
+    // 轨道开头组图标：高度随轨道行高缩放（DPR 栅格化后按尺寸缓存）
+    {
+        const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
+        const int iconH = qMax(12, qRound(height * 0.55));
+        const QString iconKey = QStringLiteral("group-track:%1@%2").arg(iconH).arg(dpr);
+        const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
+            QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/group-track.svg"))
+                                 .scaledToHeight(qMax(1, qRound(iconH * dpr)), Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
+            return scaled;
+        });
+        painter.drawPixmap(QPoint(mOffsetX + 6, y + (height - iconH) / 2), icon);
+    }
+
 }
 
 void TimeLineCells::paintLayerGutter(QPainter& painter) const
