@@ -3060,7 +3060,10 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     const int edgeX = getFrameX(blockEnd - 1);
     const int nextPos = layer->getNextKeyFramePosition(key->pos());
     const bool nearEdge = qAbs(pos.x() - edgeX) <= 7;
-    const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos);
+    // 空隙内可拖动拉伸前块，但只认紧贴块右缘一个单元格内的区域；
+    // 更远的空白留给点击定位播放头（否则整段空隙都点不动播放头）
+    const bool inGap = frameNumber >= blockEnd && (nextPos < 0 || frameNumber < nextPos)
+                       && pos.x() <= edgeX + mFrameSize;
     if (nearEdge || inGap) { return key->pos(); }
 
     // TVP seam between adjacent blocks: hovering the start edge of a block
