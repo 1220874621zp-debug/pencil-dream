@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #include "ui_colorpalette.h"
 
 // Standard libraries
+#include <algorithm>
 #include <cmath>
 
 // Qt
@@ -251,7 +252,43 @@ void ColorPaletteWidget::showContextMenu(const QPoint& pos)
     menu->addAction(tr("Replace"),  this, &ColorPaletteWidget::replaceItem, 0);
     menu->addAction(tr("Remove"), this, &ColorPaletteWidget::removeItem, 0);
 
+    if (mObject != nullptr && mObject->getColorCount() > 1)
+    {
+        menu->addSeparator();
+        menu->addAction(tr("按色相排序"), this, &ColorPaletteWidget::sortPaletteByHue);
+    }
+
     menu->exec(globalPos);
+}
+
+void ColorPaletteWidget::sortPaletteByHue()
+{
+    if (mObject == nullptr) { return; }
+
+    const int count = mObject->getColorCount();
+    QVector<ColorRef> refs;
+    refs.reserve(count);
+    for (int i = 0; i < count; ++i)
+    {
+        refs.append(mObject->getColor(i));
+    }
+
+    // 彩色按色相升序（红→黄→绿→青→蓝→洋红），近无彩色排尾部按明度降序
+    std::sort(refs.begin(), refs.end(), [](const ColorRef& a, const ColorRef& b)
+    {
+        const bool grayA = a.color.saturation() < 10;
+        const bool grayB = b.color.saturation() < 10;
+        if (grayA != grayB) { return grayB; }
+        if (grayA) { return a.color.lightness() > b.color.lightness(); }
+        if (a.color.hsvHue() != b.color.hsvHue()) { return a.color.hsvHue() < b.color.hsvHue(); }
+        return a.color.saturation() > b.color.saturation();
+    });
+
+    for (int i = 0; i < count; ++i)
+    {
+        mObject->setColorRef(i, refs[i]);
+    }
+    refreshColorList();
 }
 
 void ColorPaletteWidget::renameItem()
@@ -347,9 +384,11 @@ void ColorPaletteWidget::refreshColorList()
 
 void ColorPaletteWidget::addSwatch(int colorIndex) const
 {
-    QPixmap originalColorSwatch(mIconSize);
+    const QSize tile = swatchTileSize();
+
+    QPixmap originalColorSwatch(tile);
     QPainter painter(&originalColorSwatch);
-    painter.drawTiledPixmap(0, 0, mIconSize.width(), mIconSize.height(), QPixmap(":/background/checkerboard.png"));
+    painter.drawTiledPixmap(0, 0, tile.width(), tile.height(), QPixmap(":/background/checkerboard.png"));
     painter.end();
 
     const ColorRef colorRef = mObject->getColor(colorIndex);
@@ -366,12 +405,12 @@ void ColorPaletteWidget::addSwatch(int colorIndex) const
 
     QPixmap colorSwatch = originalColorSwatch;
     QPainter swatchPainter(&colorSwatch);
-    swatchPainter.fillRect(0, 0, mIconSize.width(), mIconSize.height(), colorRef.color);
+    swatchPainter.fillRect(0, 0, tile.width(), tile.height(), colorRef.color);
 
     // 名称画在底图上：普通态/选中态都可见
     if (ui->colorListWidget->viewMode() == QListView::IconMode)
     {
-        drawSwatchName(swatchPainter, mIconSize, colorRef.color, colorRef.name);
+        drawSwatchName(swatchPainter, tile, colorRef.color, colorRef.name);
     }
 
     QIcon swatchIcon;
@@ -387,7 +426,7 @@ void ColorPaletteWidget::addSwatch(int colorIndex) const
             selectionBorder = QColor(0xE8, 0x38, 0x5A);
         }
         swatchPainter.setPen(QPen(selectionBorder, 2));
-        swatchPainter.drawRect(1, 1, mIconSize.width() - 3, mIconSize.height() - 3);
+        swatchPainter.drawRect(1, 1, tile.width() - 3, tile.height() - 3);
     }
     swatchIcon.addPixmap(colorSwatch, QIcon::Selected);
 
@@ -522,6 +561,7 @@ void ColorPaletteWidget::setListMode()
     ui->colorListWidget->setViewMode(QListView::ListMode);
     ui->colorListWidget->setDragDropMode(QAbstractItemView::InternalMove);
     ui->colorListWidget->setGridSize(QSize(-1, -1));
+    mStretchedWidth = 0; // 列表模式用基础尺寸
     if (mFitSwatches)
     {
         fitSwatchSize();
@@ -537,13 +577,7 @@ void ColorPaletteWidget::setGridMode()
     ui->colorListWidget->setViewMode(QListView::IconMode);
     ui->colorListWidget->setMovement(QListView::Static); // TODO: update swatch index on move
     ui->colorListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    ui->colorListWidget->setSpacing(0);
-    // 扁平拼接：网格尺寸=图标尺寸，色块间零间隙无边框
-    ui->colorListWidget->setGridSize(QSize(mIconSize.width(), mIconSize.height()));
-    if (mFitSwatches)
-    {
-        fitSwatchSize();
-    }
+    mStretchedWidth = 0; // 重新计算列拉伸宽
     updateUI();
 
     QSettings settings(PENCIL2D, PENCIL2D);
@@ -658,24 +692,37 @@ void ColorPaletteWidget::resizeEvent(QResizeEvent* event)
 void ColorPaletteWidget::updateGridUI()
 {
     if (ui->colorListWidget->viewMode() == QListView::IconMode) {
-        // Find the value to divide with
+        // 找一个能整除面板可用宽、且落在基础宽 ~+8px 内的列宽，
+        // 让列恰好铺满（减滚动条宽 18）
+        const int baseWidth = mIconSize.width();
+        const int available = ui->colorListWidget->width() - 18;
+        int effective = baseWidth;
         for (int i = 1; i < 75; i++)
         {
-            int size = (ui->colorListWidget->width() - 18) / i; // subtract scrollbar width
-            if (size >= mIconSize.width() && size <= mIconSize.width() + 8)
+            const int size = available / i;
+            if (size >= baseWidth && size <= baseWidth + 8)
             {
-                stepper = size;
+                effective = size;
             }
         }
-        QSize tempSize = QSize(stepper, mIconSize.height());
 
-        ui->colorListWidget->setIconSize(QSize(tempSize.width(), mIconSize.height()));
-        // 扁平拼接：网格=图标尺寸，色块直接相邻
-        ui->colorListWidget->setGridSize(QSize(tempSize.width(), mIconSize.height()));
-        mIconSize.setWidth(mIconSize.width());
+        // 拉伸宽变了 → 位图必须按新宽重建（iconSize 大于位图时委托居中绘制会露缝）。
+        // refreshColorList 尾部回访本函数，届时宽度已一致不再重建，无死循环
+        if (effective != mStretchedWidth)
+        {
+            mStretchedWidth = effective;
+            refreshColorList();
+            return;
+        }
+
+        const QSize tile(effective, mIconSize.height());
+        ui->colorListWidget->setSpacing(0);
+        ui->colorListWidget->setIconSize(tile);
+        ui->colorListWidget->setGridSize(tile);
     }
     else
     {
+        mStretchedWidth = 0;
         ui->colorListWidget->setIconSize(mIconSize);
         ui->colorListWidget->setGridSize(QSize(-1, -1));
     }
@@ -768,16 +815,18 @@ void ColorPaletteWidget::showPaletteReminder()
 
 void ColorPaletteWidget::updateItemColor(int itemIndex, QColor newColor)
 {
-    QPixmap colorSwatch(mIconSize);
+    const QSize tile = swatchTileSize();
+
+    QPixmap colorSwatch(tile);
     QPainter swatchPainter(&colorSwatch);
-    swatchPainter.drawTiledPixmap(0, 0, mIconSize.width(), mIconSize.height(), QPixmap(":/background/checkerboard.png"));
-    swatchPainter.fillRect(0, 0, mIconSize.width(), mIconSize.height(), newColor);
+    swatchPainter.drawTiledPixmap(0, 0, tile.width(), tile.height(), QPixmap(":/background/checkerboard.png"));
+    swatchPainter.fillRect(0, 0, tile.width(), tile.height(), newColor);
 
     // 名称画在底图上：普通态/选中态都可见
     const bool iconMode = ui->colorListWidget->viewMode() == QListView::IconMode;
     if (iconMode)
     {
-        drawSwatchName(swatchPainter, mIconSize, newColor, mObject->getColor(itemIndex).name);
+        drawSwatchName(swatchPainter, tile, newColor, mObject->getColor(itemIndex).name);
     }
 
     QIcon swatchIcon;
@@ -795,9 +844,9 @@ void ColorPaletteWidget::updateItemColor(int itemIndex, QColor newColor)
         borderHighlight.setDashOffset(4);
 
         swatchPainter.setPen(borderHighlight);
-        swatchPainter.drawRect(0, 0, mIconSize.width() - 1, mIconSize.height() - 1);
+        swatchPainter.drawRect(0, 0, tile.width() - 1, tile.height() - 1);
         swatchPainter.setPen(borderShadow);
-        swatchPainter.drawRect(0, 0, mIconSize.width() - 1, mIconSize.height() - 1);
+        swatchPainter.drawRect(0, 0, tile.width() - 1, tile.height() - 1);
     }
     swatchIcon.addPixmap(colorSwatch, QIcon::Selected);
 

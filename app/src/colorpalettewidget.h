@@ -71,6 +71,7 @@ private slots:
     void clickAddColorButton();
     void clickRemoveColorButton();
     void renameItem();
+    void sortPaletteByHue();
     void palettePreferences();
     void setListMode();
     void setGridMode();
@@ -106,7 +107,14 @@ private:
 
     QSize mIconSize{ 34, 34 };
     QMenu* mToolMenu = nullptr;
-    int stepper = 0;
+    // 网格模式下列宽被拉伸以整除面板宽（基础宽 ~ +8px 内）；0=未拉伸。
+    // 色块位图按此宽生成，与 iconSize/gridSize 严格一致 → 零间隙拼接
+    int mStretchedWidth = 0;
+
+    QSize swatchTileSize() const
+    {
+        return QSize(mStretchedWidth > 0 ? mStretchedWidth : mIconSize.width(), mIconSize.height());
+    }
 
     QString buttonStylesheet;
 
