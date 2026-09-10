@@ -448,11 +448,17 @@ void Layer::extendSelectionTo(int position)
             endPos = lastSelected;
         }
 
+        // 按块跳跃而非逐帧：块内所有帧都解析到同一关键帧，逐帧循环在大跨度
+        // （Alt/Shift 选中数千帧）时是 O(跨度 × 已选数)，块跳跃是 O(块数 log)
         int i = startPos;
         while (i <= endPos)
         {
+            KeyFrame* key = getKeyFrameWhichCovers(i);
+            if (key == nullptr) { ++i; continue; }
             setFrameSelected(i, true);
-            i++;
+            const int blockEnd = getBlockEnd(key);
+            if (blockEnd < 0) { break; } // 开放式末块：后面没有别的键了
+            i = (blockEnd > i) ? blockEnd : (i + 1);
         }
     }
 }
@@ -503,12 +509,20 @@ void Layer::deselectAll()
 
 bool Layer::canMoveSelectedFramesToOffset(int offset) const
 {
-    QList<int> newByPositions = mSelectedFrames_byPosition;
-
-    for (int pos : newByPositions)
+    // 目标位置一次性入 QSet：原来对 QList 的 contains 内层循环是 O(n²)，
+    // moveSelectedFrames 的位移递增重试还会把它再放大一个量级
+    QSet<int> targetSet;
+    targetSet.reserve(mSelectedFrames_byPosition.count());
+    for (int pos : mSelectedFrames_byPosition)
     {
-        pos += offset;
-        if (keyExists(pos) && !newByPositions.contains(pos)) {
+        targetSet.insert(pos + offset);
+    }
+
+    for (int pos : mSelectedFrames_byPosition)
+    {
+        const int newPos = pos + offset;
+        // 目标位被占用且占用者不在本次移动集合内（不会被腾出来）→ 不可移
+        if (keyExists(newPos) && !targetSet.contains(newPos)) {
             return false;
         }
     }
