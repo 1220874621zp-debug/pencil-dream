@@ -217,31 +217,8 @@ Status ActionCommands::importSound(FileType type)
 
     if (layer->type() != Layer::SOUND)
     {
-        QMessageBox msg;
-        msg.setText(tr("No sound layer exists as a destination for your import. Create a new sound layer?"));
-        msg.addButton(tr("Create sound layer"), QMessageBox::AcceptRole);
-        msg.addButton(tr("Don't create layer"), QMessageBox::RejectRole);
-
-        int buttonClicked = msg.exec();
-        if (buttonClicked != QMessageBox::AcceptRole)
-        {
-            return Status::SAFE;
-        }
-
-        // Create new sound layer.
-        bool ok = false;
-        QString strLayerName = QInputDialog::getText(mParent, tr("Layer Properties", "Dialog title on creating a sound layer"),
-                                                     tr("Layer name:"), QLineEdit::Normal,
-                                                     mEditor->layers()->nameSuggestLayer(tr("Sound Layer", "Default name on creating a sound layer")), &ok);
-        if (ok && !strLayerName.isEmpty())
-        {
-            Layer* newLayer = mEditor->layers()->createSoundLayer(strLayerName);
-            mEditor->layers()->setCurrentLayer(newLayer);
-        }
-        else
-        {
-            return Status::SAFE;
-        }
+        // 自动创建声音层作为导入目标（不再弹问询/命名框）
+        mEditor->layers()->createSoundLayer(mEditor->layers()->nameSuggestLayer(tr("Sound Layer", "Default name on creating a sound layer")));
     }
 
     layer = mEditor->layers()->currentLayer();
@@ -1016,16 +993,13 @@ Status ActionCommands::addNewCameraLayer()
 
 Status ActionCommands::addNewSoundLayer()
 {
-    bool ok = false;
-    QString strLayerName = QInputDialog::getText(nullptr, tr("Layer Properties"),
-                                                 tr("Layer name:"), QLineEdit::Normal,
-                                                 mEditor->layers()->nameSuggestLayer(tr("Sound Layer")), &ok);
-    if (ok && !strLayerName.isEmpty())
+    // 自动用建议名建层（不弹命名框），随即直接进入音频导入
+    Layer* layer = mEditor->layers()->createSoundLayer(mEditor->layers()->nameSuggestLayer(tr("Sound Layer")));
+    if (layer != nullptr)
     {
-        Layer* layer = mEditor->layers()->createSoundLayer(strLayerName);
         mEditor->layers()->setCurrentLayer(layer);
-   }
-    return Status::OK;
+    }
+    return importSound(FileType::SOUND);
 }
 
 Status ActionCommands::deleteCurrentLayer()

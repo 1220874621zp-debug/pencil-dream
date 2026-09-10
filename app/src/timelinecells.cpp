@@ -1007,6 +1007,18 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         int recWidth = standardWidth + (blockLen - 1) * frameSize;
         if (recLeft >= viewW || recLeft + recWidth < 0) { return; } // 视口外
 
+        // 声音块走独立外观（参考图：深灰胶囊+波形），无缩略图/图纸号/"+"
+        if (layer->type() == Layer::SOUND)
+        {
+            paintSoundWaveform(painter, static_cast<SoundClip*>(key), recLeft, recTop, recWidth, recHeight);
+            // 右缘 trim 把手指示与位图块一致
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0x9A, 0x9A, 0xA4));
+            painter.drawRoundedRect(QRectF(recLeft + recWidth - 2.0, recTop + 6.0, 2.0, recHeight - 12.0), 1.0, 1.0);
+            painter.setPen(QPen(QBrush(Theme::TimelineFrameBorder), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            return;
+        }
+
         // uniform black block base (TVP): selection is border-only
         painter.setBrush(Theme::TimelineFrameFill);
 
@@ -1101,6 +1113,52 @@ void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int 
     painter.setBrush(Qt::NoBrush);
     painter.setPen(QPen(Theme::TimelineCurrentFrameBorder, 2));
     painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
+    painter.restore();
+}
+
+// 声音块（参考图设计）：深灰胶囊底 + 白色细柱波形，无声文字/缩略图。
+// 峰值数据由 SoundClip 按文件懒解析缓存，这里只做像素→桶映射绘制。
+void TimeLineCells::paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const
+{
+    const qreal capsTop = recTop + 1.0;
+    const qreal capsH = recHeight - 2.0;
+    const qreal capsW = recWidth - 2.0;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor(0x5A, 0x5D, 0x68), 1.0)); // 极细浅描边区分边界
+    painter.setBrush(QColor(0x3B, 0x3E, 0x47));
+    painter.drawRoundedRect(QRectF(recLeft + 1.0, capsTop, capsW, capsH), capsH / 2.0, capsH / 2.0);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+
+    const qreal centerY = capsTop + capsH / 2.0;
+    const qreal maxBar = (capsH - 8.0) / 2.0;
+    const QVector<qreal>& peaks = clip->waveformPeaks();
+    painter.setPen(QPen(QColor(0xFF, 0xFF, 0xFF), 1.0));
+
+    if (peaks.isEmpty())
+    {
+        // 无波形数据（非 WAV 或解码失败）：中线占位
+        painter.drawLine(QPointF(recLeft + 5.0, centerY), QPointF(recLeft + recWidth - 5.0, centerY));
+        painter.restore();
+        return;
+    }
+
+    const int peakCount = peaks.size();
+    const qreal innerLeft = recLeft + 4.0;
+    const qreal innerW = recWidth - 8.0;
+    const int barStep = 3; // 2px 柱 + 1px 间隙
+    for (int x = 0; innerW > 6 && x + barStep <= static_cast<int>(innerW); x += barStep)
+    {
+        // 像素区间映射到桶区间，取区间内最大峰值
+        const int b0 = qBound(0, static_cast<int>(x * peakCount / innerW), peakCount - 1);
+        const int b1 = qBound(0, static_cast<int>((x + barStep) * peakCount / innerW), peakCount - 1);
+        qreal peak = 0;
+        for (int b = b0; b <= b1; ++b) { peak = qMax(peak, peaks[b]); }
+        const qreal h = qMax(1.0, peak * maxBar);
+        const qreal bx = innerLeft + x + 1.0;
+        painter.drawLine(QPointF(bx, centerY - h), QPointF(bx, centerY + h));
+    }
     painter.restore();
 }
 

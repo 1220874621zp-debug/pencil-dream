@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #define SOUNDCLIP_H
 
 #include <memory>
+#include <QVector>
 #include "keyframe.h"
 
 class SoundPlayer;
@@ -41,7 +42,7 @@ public:
 
     void attachPlayer(SoundPlayer* player);
     void detachPlayer();
-    SoundPlayer* player() const { return mPlayer.get(); }
+    SoundPlayer* player() const;
 
     void play();
     void playFromPosition(int frameNumber, int fps);
@@ -53,10 +54,17 @@ public:
 
     void updateLength(int fps);
 
+    /// 峰值包络：整段音频按等长桶取多声道最大幅度（0..1），供时间轴
+    /// 波形绘制；首次调用时解析 WAV 文件并缓存，非 WAV/损坏文件返回空
+    const QVector<qreal>& waveformPeaks();
+
 private:
     std::shared_ptr<SoundPlayer> mPlayer;
 
     QString mOriginalSoundClipName;
+
+    QVector<qreal> mWaveformPeaks;
+    bool mWaveformParsed = false;
 
     // Duration in seconds.
     // This is stored to update the length of the frame when the FPS changes.
