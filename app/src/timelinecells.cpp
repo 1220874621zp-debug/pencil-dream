@@ -2460,9 +2460,16 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
     {
         // We should affect the current layer based on what's selected, not where the mouse currently is.
         Layer* currentLayer = mEditor->layers()->getLayer(mCurrentLayerNumber);
-        Q_ASSERT(currentLayer);
-
-        if (mPlusCreating)
+        if (currentLayer == nullptr)
+        {
+            // 手势进行中途图层被删除（快捷键等）：丢弃手势状态，落到末尾统一复位
+            mTrimming = false;
+            mTrimLayer = nullptr;
+            mTrimKeyPos = -1;
+            mPlusCreating = false;
+            mPlusPreviewCount = 0;
+        }
+        else if (mPlusCreating)
         {
             mPlusCreating = false;
             const int n = mPlusPreviewCount;
@@ -2554,19 +2561,23 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                          << (isTrailingBlock ? "(trailing)" : "(ripple)");
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
                 mEditor->endLayerLayoutEdit(tr("拉伸帧块"));
+                // 仅真变更才通知：空点击若发射 framesModified 会白清缩略图缓存
+                mEditor->layers()->notifyAnimationLengthChanged();
+                emit mEditor->framesModified();
             }
             mTrimKeyPos = -1;
             mTrimLayer = nullptr;
-            mEditor->layers()->notifyAnimationLengthChanged();
-            emit mEditor->framesModified();
             updateContent();
         }
         else if (mMovingFrames && mDropTargetLayer != -1 && mDropTargetLayer != mCurrentLayerNumber)
         {
             // Vertical drag onto another track: carry the selected frames over
-            moveSelectedFramesAcrossLayers(mCurrentLayerNumber, mDropTargetLayer);
-            mEditor->layers()->notifyAnimationLengthChanged();
-            emit mEditor->framesModified();
+            // （预检冲突时整批放弃并返回 false，不落任何变更）
+            if (moveSelectedFramesAcrossLayers(mCurrentLayerNumber, mDropTargetLayer))
+            {
+                mEditor->layers()->notifyAnimationLengthChanged();
+                emit mEditor->framesModified();
+            }
             updateContent();
         }
         else if (mMovingFrames)
@@ -2574,7 +2585,8 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             int posUnderCursor = getFrameNumber(mMousePressX);
             int offset = frameNumber - posUnderCursor;
 
-            if (!currentLayer->locked() && currentLayer->canMoveSelectedFramesToOffset(offset)) {
+            // offset==0（点了没拖动）跳过：否则事务会推入一个空撤销步
+            if (offset != 0 && !currentLayer->locked() && currentLayer->canMoveSelectedFramesToOffset(offset)) {
                 // Layout transaction: one undo step for the whole move, plus
                 // TVP gap absorption for the vacated spots
                 const QList<int> vacated = currentLayer->selectedKeyFramesPositions();
@@ -2585,9 +2597,9 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 currentLayer->absorbGapsAt(vacated);
 
                 mEditor->endLayerLayoutEdit(tr("移动帧"));
+                mEditor->layers()->notifyAnimationLengthChanged();
+                emit mEditor->framesModified();
             }
-            mEditor->layers()->notifyAnimationLengthChanged();
-            emit mEditor->framesModified();
             updateContent();
         }
         else if (!mTimeLine->scrubbing && !mMovingFrames && !mClickSelecting && !mBoxSelecting)
@@ -3075,20 +3087,16 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
     return -1;
 }
 
-void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
+bool TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex)
 {
     Layer* source = mEditor->layers()->getLayer(sourceIndex);
     Layer* target = mEditor->layers()->getLayer(targetIndex);
-    if (source == nullptr || target == nullptr || source == target) { return; }
-    if (source->type() != target->type()) { return; }
-    if (source->locked() || target->locked()) { return; } // locked layers reject edits
+    if (source == nullptr || target == nullptr || source == target) { return false; }
+    if (source->type() != target->type()) { return false; }
+    if (source->locked() || target->locked()) { return false; } // locked layers reject edits
 
     const QList<int> positions = source->selectedKeyFramesPositions();
-    if (positions.isEmpty()) { return; }
-
-    // Two layers take part in the transaction: one undo step restores both
-    mEditor->beginLayerLayoutEdit(source);
-    mEditor->addLayerToLayoutEdit(target);
+    if (positions.isEmpty()) { return false; }
 
     const int posUnderCursor = getFrameNumber(mMousePressX);
     int dx = mFramePosMoveX - posUnderCursor + mDropShiftFrames;
@@ -3096,6 +3104,21 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     // Keep every frame inside the timeline
     const int minPos = positions.first();
     if (minPos + dx < 1) { dx = 1 - minPos; }
+
+    // 预检：任何落点被占（避让位移超出搜索范围时可能发生）则整批放弃，
+    // 绝不半移半留——部分移动会把一次拖拽静默拆到两层
+    for (int pos : positions)
+    {
+        if (target->keyExists(pos + dx))
+        {
+            qDebug() << "[ui] cross-layer drop aborted: target occupied at" << pos + dx;
+            return false;
+        }
+    }
+
+    // Two layers take part in the transaction: one undo step restores both
+    mEditor->beginLayerLayoutEdit(source);
+    mEditor->addLayerToLayoutEdit(target);
 
     target->deselectAll();
 
@@ -3117,7 +3140,7 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
 
         if (target->keyExists(newPos))
         {
-            // Should not happen (shift avoided collisions); put it back as a fallback
+            // Unreachable after the pre-check; keep as a defensive fallback
             source->addKeyFrame(pair.first, key);
             continue;
         }
@@ -3137,6 +3160,7 @@ void TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     source->deselectAll();
 
     mEditor->endLayerLayoutEdit(tr("跨层移动帧"));
+    return true;
 }
 
 void TimeLineCells::vScrollChange(int x)

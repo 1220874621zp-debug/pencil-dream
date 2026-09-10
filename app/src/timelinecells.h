@@ -150,8 +150,9 @@ private:
     int hitTestPlusHandle(const QPoint& pos) const;
     void paintPlusPreview(QPainter& painter) const;
     QPixmap thumbnailFor(const Layer* layer, int framePos) const;
-    /** Move the selected frames of the source layer to the target layer (same type only). */
-    void moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex);
+    /** Move the selected frames of the source layer to the target layer (same type only).
+     *  Returns false (without touching anything) when the drop is impossible. */
+    bool moveSelectedFramesAcrossLayers(int sourceIndex, int targetIndex);
 
     void onDidLeaveWidget();
 
