@@ -1085,8 +1085,17 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
         painter.setWorldMatrixEnabled(false);
         painter.setPen(QColor(0x8A, 0x8A, 0x90));
         QFont timeFont = painter.font();
-        // Consolas 的 0 中带斜杠，用零为纯椭圆的等宽字体
+        // 0 为纯椭圆的等宽字体：按平台给字体栈，全部未命中时由
+        // styleHint(Monospace) 让 Qt 选系统等宽字体兜底
+#if defined(Q_OS_WIN)
         timeFont.setFamilies({ QStringLiteral("Lucida Console"), QStringLiteral("Courier New") });
+#elif defined(Q_OS_MAC)
+        timeFont.setFamilies({ QStringLiteral("Courier"), QStringLiteral("Menlo") });
+#else
+        timeFont.setFamilies({ QStringLiteral("Liberation Mono"), QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Noto Sans Mono") });
+#endif
+        timeFont.setStyleHint(QFont::Monospace);
+        timeFont.setFixedPitch(true);
         timeFont.setPixelSize(26);
         painter.setFont(timeFont);
         painter.drawText(QPoint(12, height() - 10),
