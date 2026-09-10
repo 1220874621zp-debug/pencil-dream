@@ -86,9 +86,12 @@ void ColorPaletteWidget::initUI()
     mIconSize = QSize(colorGridSize, colorGridSize);
 
     ui->colorListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
-    // selection feedback is the swatch border itself: no highlight strip
+    // selection feedback is the swatch border itself: no highlight strip;
+    // padding 0 overrides the global theme's item padding so swatches tile
+    // flush (any inset shows up as gaps between rows)
     ui->colorListWidget->setStyleSheet(
-        QStringLiteral("QListWidget::item:selected { background: transparent; border: none; }"
+        QStringLiteral("QListWidget::item { padding: 0px; border: none; border-radius: 0px; }"
+                        "QListWidget::item:selected { background: transparent; border: none; }"
                         "QListWidget::item:hover { background: transparent; }"));
 
     QString sViewMode = settings.value("ColorPaletteViewMode", "ListMode").toString();
