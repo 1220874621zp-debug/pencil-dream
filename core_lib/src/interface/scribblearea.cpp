@@ -1073,6 +1073,28 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
         }
     }
 
+    // 左下角固定时间码：随播放头帧号按 fps 换算 HH:MM:SS（帧1=0秒），灰字。
+    // 画在设备空间上，不随视图缩放/平移移动；播放中也保持显示
+    {
+        const int fps = qMax(1, mEditor->playback()->fps());
+        const int totalSeconds = qMax(0, currentFrame - 1) / fps;
+        const int hours = totalSeconds / 3600;
+        const int minutes = (totalSeconds % 3600) / 60;
+        const int seconds = totalSeconds % 60;
+
+        painter.setWorldMatrixEnabled(false);
+        painter.setPen(QColor(0x8A, 0x8A, 0x90));
+        QFont timeFont = painter.font();
+        timeFont.setFamilies({ QStringLiteral("Consolas"), QStringLiteral("Courier New") });
+        timeFont.setPixelSize(13);
+        painter.setFont(timeFont);
+        painter.drawText(QPoint(12, height() - 10),
+                         QStringLiteral("%1:%2:%3")
+                             .arg(hours, 2, 10, QChar('0'))
+                             .arg(minutes, 2, 10, QChar('0'))
+                             .arg(seconds, 2, 10, QChar('0')));
+    }
+
     // outlines the frame of the viewport
 #ifdef _DEBUG
     painter.setWorldMatrixEnabled(false);
