@@ -125,6 +125,7 @@ private:
     Editor* mEditor = nullptr;
     int mFps = 12;
     int mTimecodeLabelEnum;
+    bool mFpsWarned = false; // 实测帧率告警色状态（仅在翻转时重设样式表）
 };
 
 #endif

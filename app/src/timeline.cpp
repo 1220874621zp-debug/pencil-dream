@@ -379,7 +379,7 @@ void TimeLine::initUI()
     connect(mTimeControls, &TimeControls::fpsChanged, this, &TimeLine::updateLength);
     connect(mTimeControls, &TimeControls::playButtonTriggered, this, &TimeLine::playButtonTriggered);
     connect(editor(), &Editor::scrubbed, mTimeControls, &TimeControls::updateTimecodeLabel);
-    connect(mTimeControls, &TimeControls::fpsChanged, mTimeControls, &TimeControls::setFps);
+    // （fpsChanged→setFps 已由 TimeControls::makeConnections 直连，这里不再重复）
     connect(this, &TimeLine::fpsChanged, mTimeControls, &TimeControls::setFps);
 
     connect(newBitmapLayerAct, &QAction::triggered, this, &TimeLine::newBitmapLayer);
@@ -401,7 +401,6 @@ void TimeLine::initUI()
     LayerManager* layer = editor()->layers();
     connect(layer, &LayerManager::layerCountChanged, this, &TimeLine::updateLayerNumber);
     connect(layer, &LayerManager::currentLayerChanged, this, &TimeLine::onCurrentLayerChanged);
-    mNumLayers = layer->count();
 
     scrubbing = false;
 }
@@ -481,6 +480,7 @@ void TimeLine::wheelEvent(QWheelEvent* event)
     {
         mVScrollbar->event(event);
     }
+    event->accept();
 }
 
 void TimeLine::onScrollbarValueChanged()
@@ -512,7 +512,7 @@ void TimeLine::updateLayerView()
 
 void TimeLine::updateLayerNumber(int numberOfLayers)
 {
-    mNumLayers = numberOfLayers;
+    Q_UNUSED(numberOfLayers)
     updateLayerView();
 }
 
@@ -571,20 +571,21 @@ void TimeLine::onCurrentLayerChanged()
 
 void TimeLine::updateVerticalScrollbarPosition()
 {
-    // invert index so 0 is at the top
-    int idx = mNumLayers - editor()->currentLayerIndex() - 1;
-    // number of visible layers
-    int height = mNumLayers - mVScrollbar->maximum();
+    // 组头行/收起组会改变行序与行数，必须走行模型换算而非裸层数
+    const int idx = mTracks->visualRowFromTop(editor()->currentLayerIndex());
+    if (idx < 0) { return; } // 当前层藏在收起的组内，不滚动
+    // number of rows visible per page（按标准行高近似）
+    const int pageDisplay = qMax(1, (mTracks->height() - mTracks->getOffsetY()) / mTracks->getLayerHeight());
     // scroll bar position/offset
-    int pos = mVScrollbar->value();
+    const int pos = mVScrollbar->value();
 
     if (idx < pos) // above visible area
     {
         mVScrollbar->setValue(idx);
     }
-    else if (idx >= pos + height) // below visible area
+    else if (idx >= pos + pageDisplay) // below visible area
     {
-        mVScrollbar->setValue(idx - height + 1);
+        mVScrollbar->setValue(idx - pageDisplay + 1);
     }
 }
 

@@ -437,9 +437,14 @@ void TimeControls::updateFpsLabel(qreal actualFps)
 {
     const qreal targetFps = mEditor->playback()->fps() * mEditor->playback()->playbackSpeed();
     // warn in red when the measured rate falls below 80 percent of the target
-    const QString color = (actualFps < targetFps * 0.8) ? QString("#F43F5E") : QString("#8A8A90");
+    // （播放中逐帧触发：仅在告警状态翻转时重设样式表，避免每帧样式重算）
+    const bool warn = (actualFps < targetFps * 0.8);
     mFpsLabel->setText(QString("%1fps").arg(QString::number(actualFps, 'f', 1)));
-    mFpsLabel->setStyleSheet(QString("color: %1;").arg(color));
+    if (warn != mFpsWarned)
+    {
+        mFpsWarned = warn;
+        mFpsLabel->setStyleSheet(QString("color: %1;").arg(warn ? QString("#F43F5E") : QString("#8A8A90")));
+    }
 }
 
 void TimeControls::updateTimecodeLabel(int frame)

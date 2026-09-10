@@ -59,6 +59,8 @@ public:
     int getLayerHeight() const { return mLayerHeight; }
     /** 可见行数（含组头行；滚动条范围用） */
     int visibleRowCount() const { rebuildRows(); return mRows.size(); }
+    /** 层在可视行序列中从上往下的行号；-1 = 藏在收起组内（滚动定位用） */
+    int visualRowFromTop(int layerNumber) const;
 
     int getFrameLength() const { return mFrameLength; }
     int getFrameSize() const { return mFrameSize; }
@@ -168,7 +170,7 @@ private:
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintFrameCursorOnCurrentLayer(QPainter& painter, int recTop, int recWidth, int recHeight) const;
     void paintSelectedFrames(QPainter& painter, const Layer* layer, const int layerIndex) const;
-    void paintLabel(QPainter& painter, const Layer* layer, int x, int y, int height, int width, bool selected, LayerVisibility layerVisibility) const;
+    void paintLabel(QPainter& painter, const Layer* layer, int x, int y, int width, int height, bool selected, LayerVisibility layerVisibility) const;
     void paintSelection(QPainter& painter, int x, int y, int width, int height) const;
     void paintHighlightedFrame(QPainter& painter, int framePos, int recTop, int recWidth, int recHeight) const;
 

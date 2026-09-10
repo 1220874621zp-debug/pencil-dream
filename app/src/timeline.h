@@ -122,7 +122,6 @@ private:
     LipsyncDialog* mLipsyncDialog = nullptr;
     PaletteExtractDialog* mPaletteDialog = nullptr;
     VideoExtractDialog* mVideoDialog = nullptr;
-    int mNumLayers = 0;
     int mLastUpdatedFrame = 0;
 };
 

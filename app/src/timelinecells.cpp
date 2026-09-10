@@ -251,6 +251,14 @@ int TimeLineCells::rowIndexOfLayer(int layerNumber) const
     return -1; // 收起组内的成员没有自己的行
 }
 
+int TimeLineCells::visualRowFromTop(int layerNumber) const
+{
+    const int row = rowIndexOfLayer(layerNumber);
+    if (row < 0) { return -1; }
+    // mRows 按栈序递增，屏幕从上往下反之（顶行 = 末尾索引）
+    return mRows.size() - 1 - row;
+}
+
 int TimeLineCells::getInbetweenLayerNumber(int y) const {
     int layerNumber = getLayerNumber(y);
     // Round the layer number towards the drag start
@@ -763,6 +771,7 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
     if (layerIndex < 0 || layerIndex >= mEditor->object()->getLayerCount()) return -1;
     Layer* layer = mEditor->object()->getLayer(layerIndex);
     if (!layer->isBitmapKind() || layer->locked()) return -1;
+    if (isLayerCollapsed(layerIndex)) return -1; // 折叠行不画把手也不响应
 
     int lastPos = -1;
     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
@@ -1676,7 +1685,6 @@ void TimeLineCells::paintOnionSkin(QPainter& painter) const
             painter.setPen(Qt::NoPen);
             QRect onionRect;
             onionRect.setTopLeft(QPoint(getFrameX(onionFrameNumber - 1), 0));
-            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), height()));
             onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 23));
             painter.drawRect(onionRect);
 
@@ -1696,7 +1704,6 @@ void TimeLineCells::paintOnionSkin(QPainter& painter) const
             painter.setPen(Qt::NoPen);
             QRect onionRect;
             onionRect.setTopLeft(QPoint(getFrameX(onionFrameNumber - 1), 0));
-            onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), height()));
             onionRect.setBottomRight(QPoint(getFrameX(onionFrameNumber), 23));
             painter.drawRect(onionRect);
 
@@ -2141,7 +2148,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 
 
 
-            if (frameNumber == mEditor->currentFrame() && mStartY < 20)
+            if (frameNumber == mEditor->currentFrame() && mStartY < mOffsetY)
             {
                 if (mEditor->playback()->isPlaying())
                 {
@@ -2786,7 +2793,7 @@ void TimeLineCells::mouseDoubleClickEvent(QMouseEvent* event)
     int layerNumber = getLayerNumber(event->pos().y());
 
     // -- short scrub --
-    if (event->pos().y() < 20 && (mType != TIMELINE_CELL_TYPE::Layers || event->pos().x() >= 15))
+    if (event->pos().y() < mOffsetY && (mType != TIMELINE_CELL_TYPE::Layers || event->pos().x() >= 15))
     {
         mPrefs->set(SETTING::SHORT_SCRUB, !mbShortScrub);
     }
@@ -3041,6 +3048,7 @@ int TimeLineCells::hitTestTrimHandle(const QPoint& pos) const
 
     Layer* layer = mEditor->object()->getLayer(layerNumber);
     if (layer == nullptr || !layer->isBitmapKind() || layer->locked()) { return -1; }
+    if (isLayerCollapsed(layerNumber)) { return -1; } // 折叠行不画把手也不响应
 
     const int frameNumber = getFrameNumber(pos.x());
     KeyFrame* key = layer->getKeyFrameWhichCovers(frameNumber);
