@@ -211,7 +211,8 @@ int TimeLineCells::rowHeightAt(int rowIndex) const
     const Object::TimelineRowRef& r = mRows.at(rowIndex);
     if (r.isHeader)
     {
-        return GROUP_HEADER_HEIGHT;
+        // 组头行与普通图层同高（收起组就是一条全高轨道，仅显示帧范围带）
+        return mLayerHeight;
     }
     return mCollapsedLayerIds.contains(r.layer->id()) ? 18 : mLayerHeight;
 }
@@ -440,14 +441,15 @@ void TimeLineCells::drawContent()
         {
             if (groupDrag && rowRef.groupId == mGroupDragId) { continue; } // 拖动中单独绘制
             const int rowY = rowYAt(r);
-            if (rowY + GROUP_HEADER_HEIGHT <= mOffsetY || rowY >= viewH) { continue; } // 视口外
+            const int rowH = rowHeightAt(r);
+            if (rowY + rowH <= mOffsetY || rowY >= viewH) { continue; } // 视口外
             if (mType == TIMELINE_CELL_TYPE::Layers)
             {
-                paintGroupHeader(painter, rowRef.groupId, 0, rowY, widgetWidth - 1, GROUP_HEADER_HEIGHT);
+                paintGroupHeader(painter, rowRef.groupId, 0, rowY, widgetWidth - 1, rowH);
             }
             else
             {
-                paintGroupTrack(painter, rowRef.groupId, rowY, GROUP_HEADER_HEIGHT);
+                paintGroupTrack(painter, rowRef.groupId, rowY, rowH);
             }
             continue;
         }
@@ -567,11 +569,11 @@ void TimeLineCells::drawContent()
                 const int headerY = rowYAt(r) + groupYOff;
                 if (mType == TIMELINE_CELL_TYPE::Layers)
                 {
-                    paintGroupHeader(painter, mGroupDragId, 0, headerY, widgetWidth - 1, GROUP_HEADER_HEIGHT);
+                    paintGroupHeader(painter, mGroupDragId, 0, headerY, widgetWidth - 1, mLayerHeight);
                 }
                 else
                 {
-                    paintGroupTrack(painter, mGroupDragId, headerY, GROUP_HEADER_HEIGHT);
+                    paintGroupTrack(painter, mGroupDragId, headerY, mLayerHeight);
                 }
             }
         }

@@ -145,7 +145,6 @@ private:
     mutable quint64 mRowsStamp = 0;
     mutable QList<int> mRowPrefixHeights; // P[i]=第0..i-1行行高之和；空=待重建
     int mGroupDragId = -1;        // 正在整组拖动的 gid（释放时换算插入目标）
-    static constexpr int GROUP_HEADER_HEIGHT = 22;
 
     // Dreams-style block helpers
     /** Width of the exposure block of the given keyframe, in frames (trim preview aware). */
