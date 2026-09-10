@@ -33,7 +33,9 @@ GNU General Public License for more details.
 #include <QScrollBar>
 #include <QAbstractItemModel>
 #include <QFontMetrics>
+#include <QListView>
 #include <QPainter>
+#include <QStyledItemDelegate>
 
 // Project
 #include "colorref.h"
@@ -59,6 +61,36 @@ namespace
         painter.drawText(QRect(4, swatchSize.height() - 16, swatchSize.width() - 8, 14),
                          Qt::AlignLeft | Qt::AlignVCenter, shown);
     }
+
+    // QListView IconMode 的网格行步进恒比 gridSize 高 1px（Qt 内置布局行为，
+    // 与样式表/位图尺寸无关），行间会露 1px 背景缝；列方向无此问题。
+    // 该委托在网格模式把色块位图上提 1px（高度 +1）盖掉行缝（已探针验证）。
+    class SwatchGridDelegate : public QStyledItemDelegate
+    {
+    public:
+        using QStyledItemDelegate::QStyledItemDelegate;
+
+        void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+        {
+            const QListView* view = qobject_cast<const QListView*>(option.widget);
+            if (view == nullptr || view->viewMode() != QListView::IconMode)
+            {
+                QStyledItemDelegate::paint(painter, option, index);
+                return;
+            }
+
+            QStyleOptionViewItem opt = option;
+            initStyleOption(&opt, index);
+            if (opt.icon.isNull())
+            {
+                QStyledItemDelegate::paint(painter, option, index);
+                return;
+            }
+            const QIcon::Mode mode = (opt.state & QStyle::State_Selected) ? QIcon::Selected : QIcon::Normal;
+            const QPixmap pixmap = opt.icon.pixmap(opt.decorationSize, mode);
+            painter->drawPixmap(option.rect.adjusted(0, -1, 0, 1), pixmap);
+        }
+    };
 }
 
 ColorPaletteWidget::ColorPaletteWidget(QWidget* parent) :
@@ -93,6 +125,9 @@ void ColorPaletteWidget::initUI()
         QStringLiteral("QListWidget::item { padding: 0px; border: none; border-radius: 0px; }"
                         "QListWidget::item:selected { background: transparent; border: none; }"
                         "QListWidget::item:hover { background: transparent; }"));
+
+    // 网格模式吃掉行距 +1 的专用委托（见 SwatchGridDelegate 注释）
+    ui->colorListWidget->setItemDelegate(new SwatchGridDelegate(ui->colorListWidget));
 
     QString sViewMode = settings.value("ColorPaletteViewMode", "ListMode").toString();
     if (sViewMode == "ListMode")
