@@ -61,6 +61,7 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     connect(mEditor, &Editor::framesModified, this, [this]()
     {
         mThumbCache.clear();
+        mThumbLru.clear();
         mThumbQueue.clear();
         mThumbQueued.clear();
     });
@@ -809,12 +810,24 @@ int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
             && pos.y() >= y + 2 && pos.y() <= y + 18) ? layerIndex : -1;
 }
 
+// 缩略图缓存键：layerId 高 32 位 | framePos 低 32 位（原来每块每次重绘都
+// 拼 "%1_%2" 字符串做哈希键）
+static inline qint64 thumbCacheKey(int layerId, int framePos)
+{
+    return (static_cast<qint64>(layerId) << 32) | static_cast<quint32>(framePos);
+}
+
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
 {
-    const QString key = QString("%1_%2").arg(layer->id()).arg(framePos);
+    const qint64 key = thumbCacheKey(layer->id(), framePos);
     const auto it = mThumbCache.constFind(key);
     if (it != mThumbCache.constEnd())
+    {
+        // LRU touch：挪到末尾（容量上限 400，线性移动代价可忽略）
+        mThumbLru.removeOne(key);
+        mThumbLru.append(key);
         return it.value();
+    }
 
     // cache miss: queue for async generation, the placeholder shows meanwhile
     if (!mThumbQueued.contains(key))
@@ -840,7 +853,7 @@ void TimeLineCells::processThumbQueue()
     while (!mThumbQueue.isEmpty() && generated < 8)
     {
         const ThumbRequest request = mThumbQueue.takeFirst();
-        const QString key = QString("%1_%2").arg(request.layerId).arg(request.framePos);
+        const qint64 key = thumbCacheKey(request.layerId, request.framePos);
         mThumbQueued.remove(key);
         if (mThumbCache.contains(key)) { continue; }
 
@@ -870,8 +883,12 @@ void TimeLineCells::processThumbQueue()
             }
         }
         mThumbCache.insert(key, thumb);
-        if (mThumbCache.size() > 400)
-            mThumbCache.erase(mThumbCache.begin()); // simple bound; refresh clears it anyway
+        mThumbLru.append(key);
+        // LRU 驱逐最久未用（原来 erase(begin()) 是任意序，可能踢掉正在显示的）
+        while (mThumbCache.size() > 400 && !mThumbLru.isEmpty())
+        {
+            mThumbCache.remove(mThumbLru.takeFirst());
+        }
         ++generated;
     }
 
@@ -1260,6 +1277,15 @@ QRect TimeLineCells::clipIconRect(int rowWidth) const
     return QRect(178, 0, 16, 0);
 }
 
+QPixmap TimeLineCells::cachedRowIcon(const QString& key, const std::function<QPixmap()>& make) const
+{
+    const auto it = mRowIconCache.constFind(key);
+    if (it != mRowIconCache.constEnd()) { return it.value(); }
+    const QPixmap pix = make();
+    mRowIconCache.insert(key, pix);
+    return pix;
+}
+
 void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
                        int x, int y, int width, int height,
                        bool selected, LayerVisibility layerVisibility) const
@@ -1341,10 +1367,24 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     const int nameCenterY = y + qRound(height * 0.32);
     painter.drawEllipse(QRectF(x + 10, nameCenterY - 4.5, 9.0, 9.0));
 
-    if (layer->type() == Layer::BITMAP) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
-    if (layer->type() == Layer::COLORIZE) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-bitmap.svg").scaledToHeight(18, Qt::SmoothTransformation));
-    if (layer->type() == Layer::SOUND) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-sound.svg").scaledToHeight(18, Qt::SmoothTransformation));
-    if (layer->type() == Layer::CAMERA) painter.drawPixmap(QPoint(28, nameCenterY - 9), QPixmap(":icons/themes/playful/timeline/cell-camera.svg").scaledToHeight(18, Qt::SmoothTransformation));
+    // 行类型图标：SVG 按 DPR 一次性栅格化后缓存（原来每行每次重绘都重新
+    // 从资源加载并缩放；顺便补上 devicePixelRatio，高 DPI 下不再模糊）
+    const char* typeIconRes = nullptr;
+    if (layer->type() == Layer::BITMAP || layer->type() == Layer::COLORIZE) typeIconRes = ":icons/themes/playful/timeline/cell-bitmap.svg";
+    else if (layer->type() == Layer::SOUND) typeIconRes = ":icons/themes/playful/timeline/cell-sound.svg";
+    else if (layer->type() == Layer::CAMERA) typeIconRes = ":icons/themes/playful/timeline/cell-camera.svg";
+    if (typeIconRes != nullptr)
+    {
+        const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
+        const QString iconKey = QStringLiteral("type:%1@%2").arg(QLatin1String(typeIconRes)).arg(dpr);
+        const QPixmap typeIcon = cachedRowIcon(iconKey, [typeIconRes, dpr]() {
+            QPixmap scaled = QPixmap(QLatin1String(typeIconRes))
+                                 .scaledToHeight(qMax(1, qRound(18 * dpr)), Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
+            return scaled;
+        });
+        painter.drawPixmap(QPoint(28, nameCenterY - 9), typeIcon);
+    }
 
     if (selected)
     {
@@ -1408,17 +1448,24 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
         // bitmap-only feature: keep the control visible but inert
         clipColor = QColor(0x3A, 0x3A, 0x40);
     }
-    QPixmap clipPix(layer->clipMask() ? ":/icons/themes/playful/timeline/clip-on.svg"
-                                      : ":/icons/themes/playful/timeline/clip-off.svg");
-    if (!clipPix.isNull())
+    // 染色结果按 状态+颜色 缓存（原来每行每次重绘都建 QPixmap+QPainter 现染）
+    const bool clipOn = layer->clipMask();
+    const QString clipKey = QStringLiteral("clip:%1:%2").arg(clipOn).arg(clipColor.rgba());
+    const QPixmap clipTinted = cachedRowIcon(clipKey, [clipOn, clipColor]() {
+        QPixmap clipPix(clipOn ? ":/icons/themes/playful/timeline/clip-on.svg"
+                               : ":/icons/themes/playful/timeline/clip-off.svg");
+        if (clipPix.isNull()) { return QPixmap(); }
+        QPixmap tinted(clipPix.size());
+        tinted.fill(Qt::transparent);
+        QPainter tp(&tinted);
+        tp.drawPixmap(0, 0, clipPix);
+        tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        tp.fillRect(tinted.rect(), clipColor);
+        tp.end();
+        return tinted;
+    });
+    if (!clipTinted.isNull())
     {
-        QPixmap clipTinted(clipPix.size());
-        clipTinted.fill(Qt::transparent);
-        QPainter clipTintPainter(&clipTinted);
-        clipTintPainter.drawPixmap(0, 0, clipPix);
-        clipTintPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        clipTintPainter.fillRect(clipTinted.rect(), clipColor);
-        clipTintPainter.end();
         painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
     }
 
@@ -1436,19 +1483,25 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
             // width=100% 的源图先按回退尺寸栅格化再 scaled 是两次有损，
             // 高DPI屏还会被最近邻拉伸出锯齿
             // 源图形四周有内边距，16px 渲染显出来偏小；放大到 20px 并按槽位中心对齐
+            // 染色结果按 DPR+颜色 缓存（原来每行每次重绘都现染）
             const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
-            QIcon loopIcon(":/icons/themes/playful/controls/control-loop.svg");
-            QPixmap loopPix = loopIcon.pixmap(QSize(20, 20), dpr);
-            if (!loopPix.isNull())
+            const QString loopKey = QStringLiteral("loopcycle:%1:%2").arg(dpr).arg(loopColor.rgba());
+            const QPixmap loopTinted = cachedRowIcon(loopKey, [dpr, loopColor]() {
+                QIcon loopIcon(":/icons/themes/playful/controls/control-loop.svg");
+                QPixmap loopPix = loopIcon.pixmap(QSize(20, 20), dpr);
+                if (loopPix.isNull()) { return QPixmap(); }
+                QPixmap tinted(loopPix.size());
+                tinted.setDevicePixelRatio(loopPix.devicePixelRatio());
+                tinted.fill(Qt::transparent);
+                QPainter tp(&tinted);
+                tp.drawPixmap(0, 0, loopPix);
+                tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                tp.fillRect(tinted.rect(), loopColor);
+                tp.end();
+                return tinted;
+            });
+            if (!loopTinted.isNull())
             {
-                QPixmap loopTinted(loopPix.size());
-                loopTinted.setDevicePixelRatio(loopPix.devicePixelRatio());
-                loopTinted.fill(Qt::transparent);
-                QPainter loopTintPainter(&loopTinted);
-                loopTintPainter.drawPixmap(0, 0, loopPix);
-                loopTintPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-                loopTintPainter.fillRect(loopTinted.rect(), loopColor);
-                loopTintPainter.end();
                 painter.drawPixmap(QPointF(loopR.x() + 8.0 - loopTinted.width() / (2.0 * loopTinted.devicePixelRatio()),
                                            sliderY - loopTinted.height() / (2.0 * loopTinted.devicePixelRatio())),
                                    loopTinted);

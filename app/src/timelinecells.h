@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QPixmap>
 #include <QSet>
 #include <QWidget>
+#include <functional>
 #include "layercamera.h"
 
 #include "object.h"
@@ -193,11 +194,16 @@ private:
     TIMELINE_CELL_TYPE mType;
 
     QPixmap* mCache = nullptr;
-    mutable QHash<QString, QPixmap> mThumbCache;
+    mutable QHash<qint64, QPixmap> mThumbCache;  // key = layerId<<32 | framePos
+    mutable QList<qint64> mThumbLru;             // 末尾=最近使用，驱逐从头取
     // async thumbnail generation: misses are queued and rendered in batches
     struct ThumbRequest { int layerId; int framePos; };
     mutable QList<ThumbRequest> mThumbQueue;
-    mutable QSet<QString> mThumbQueued;
+    mutable QSet<qint64> mThumbQueued;
+    // 图层行内图标（类型/clip/循环徽章）的一次性栅格化缓存：原来每行每次
+    // 重绘都从资源重新加载 SVG 并缩放/染色
+    mutable QHash<QString, QPixmap> mRowIconCache;
+    QPixmap cachedRowIcon(const QString& key, const std::function<QPixmap()>& make) const;
     QTimer* mThumbTimer = nullptr;
     QSet<int> mCollapsedLayerIds;
     bool mRedrawContent = false;
