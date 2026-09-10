@@ -1086,7 +1086,7 @@ void ScribbleArea::paintEvent(QPaintEvent* event)
         painter.setPen(QColor(0x8A, 0x8A, 0x90));
         QFont timeFont = painter.font();
         timeFont.setFamilies({ QStringLiteral("Consolas"), QStringLiteral("Courier New") });
-        timeFont.setPixelSize(13);
+        timeFont.setPixelSize(26);
         painter.setFont(timeFont);
         painter.drawText(QPoint(12, height() - 10),
                          QStringLiteral("%1:%2:%3")
