@@ -723,9 +723,10 @@ void TimeLine::duplicateLayerCleared()
     editor()->object()->moveLayer(copyIndex, sourceIndex + 1);
 
     editor()->beginLayerLayoutEdit(copy);
-    // the fresh layer ships with a default keyframe at position 1
-    KeyFrame* defaultKey = editor()->takeLayerKeyFrame(copy, 1);
-    delete defaultKey;
+    // the fresh layer ships with a default keyframe at position 1: take it
+    // into the transaction's custody (undo re-inserts it, the command owns
+    // and frees it — deleting it here would double-free on undo/clearStack)
+    editor()->takeLayerKeyFrame(copy, 1);
     for (const KeyFrameLayoutEntry& entry : structure)
     {
         QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
