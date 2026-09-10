@@ -1104,22 +1104,6 @@ void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int 
     painter.restore();
 }
 
-void TimeLineCells::paintFrameCursorOnCurrentLayer(QPainter &painter, int recTop, int recWidth, int recHeight) const
-{
-    int recLeft = getFrameX(mFramePosMoveX) - recWidth;
-
-    painter.save();
-    const QPalette palette = QApplication::palette();
-    // Don't fill
-    painter.setBrush(Qt::NoBrush);
-    // paint border
-    QColor penColor = palette.color(QPalette::WindowText);
-    penColor.setAlpha(127);
-    painter.setPen(penColor);
-    painter.drawRect(recLeft, recTop, recWidth, recHeight);
-    painter.restore();
-}
-
 void TimeLineCells::paintHighlightedFrame(QPainter& painter, int framePos, int recTop, int recWidth, int recHeight) const
 {
     int recLeft = getFrameX(framePos) - recWidth;
@@ -1861,10 +1845,6 @@ void TimeLineCells::paintEvent(QPaintEvent*)
             if (mHighlightFrameEnabled)
             {
                 paintHighlightedFrame(painter, mHighlightedFrame, recTop, standardWidth, recHeight);
-            }
-            if (currentLayer->visible())
-            {
-                paintFrameCursorOnCurrentLayer(painter, recTop, standardWidth, recHeight);
             }
         }
 

@@ -171,7 +171,6 @@ private:
     void drawCollapseTriangle(QPainter& painter, const Layer* layer, int x, int y, int width, int height) const;
     void paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const;
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
-    void paintFrameCursorOnCurrentLayer(QPainter& painter, int recTop, int recWidth, int recHeight) const;
     void paintSelectedFrames(QPainter& painter, const Layer* layer, const int layerIndex) const;
     void paintLabel(QPainter& painter, const Layer* layer, int x, int y, int width, int height, bool selected, LayerVisibility layerVisibility) const;
     void paintSelection(QPainter& painter, int x, int y, int width, int height) const;
