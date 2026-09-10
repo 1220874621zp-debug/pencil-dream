@@ -31,6 +31,7 @@ GNU General Public License for more details.
 #include <QtMath>
 #include <QScrollBar>
 #include <QAbstractItemModel>
+#include <QFontMetrics>
 #include <QPainter>
 
 // Project
@@ -40,6 +41,24 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "colormanager.h"
 
+namespace
+{
+    // 色块名称：左下角直排，浅色块黑字、深色块白字，超出右缘省略
+    void drawSwatchName(QPainter& painter, const QSize& swatchSize, const QColor& swatchColor, const QString& name)
+    {
+        if (name.isEmpty()) { return; }
+
+        QFont nameFont = painter.font();
+        nameFont.setPixelSize(11);
+        const QFontMetrics metrics(nameFont);
+        const QString shown = metrics.elidedText(name, Qt::ElideRight, swatchSize.width() - 8);
+
+        painter.setFont(nameFont);
+        painter.setPen(swatchColor.lightnessF() > 0.6 ? QColor(0x2A, 0x2A, 0x2E) : QColor(0xFF, 0xFF, 0xFF));
+        painter.drawText(QRect(4, swatchSize.height() - 16, swatchSize.width() - 8, 14),
+                         Qt::AlignLeft | Qt::AlignVCenter, shown);
+    }
+}
 
 ColorPaletteWidget::ColorPaletteWidget(QWidget* parent) :
     BaseDockWidget(parent),
@@ -219,11 +238,35 @@ void ColorPaletteWidget::showContextMenu(const QPoint& pos)
     QMenu* menu = new QMenu;
     connect(menu, &QMenu::triggered, menu, &QMenu::deleteLater);
 
+    // 右键落在色块上才提供重命名，并把选中切到该块
+    QListWidgetItem* itemUnderCursor = ui->colorListWidget->itemAt(pos);
+    if (itemUnderCursor != nullptr)
+    {
+        ui->colorListWidget->setCurrentItem(itemUnderCursor);
+        menu->addAction(tr("重命名"), this, &ColorPaletteWidget::renameItem);
+        menu->addSeparator();
+    }
+
     menu->addAction(tr("Add"), this, &ColorPaletteWidget::addItem, 0);
     menu->addAction(tr("Replace"),  this, &ColorPaletteWidget::replaceItem, 0);
     menu->addAction(tr("Remove"), this, &ColorPaletteWidget::removeItem, 0);
 
     menu->exec(globalPos);
+}
+
+void ColorPaletteWidget::renameItem()
+{
+    QListWidgetItem* item = ui->colorListWidget->currentItem();
+    if (item == nullptr) { return; }
+
+    if (ui->colorListWidget->viewMode() == QListView::IconMode)
+    {
+        changeColorName(item);
+    }
+    else
+    {
+        ui->colorListWidget->editItem(item);
+    }
 }
 
 void ColorPaletteWidget::addItem()
@@ -324,6 +367,12 @@ void ColorPaletteWidget::addSwatch(int colorIndex) const
     QPixmap colorSwatch = originalColorSwatch;
     QPainter swatchPainter(&colorSwatch);
     swatchPainter.fillRect(0, 0, mIconSize.width(), mIconSize.height(), colorRef.color);
+
+    // 名称画在底图上：普通态/选中态都可见
+    if (ui->colorListWidget->viewMode() == QListView::IconMode)
+    {
+        drawSwatchName(swatchPainter, mIconSize, colorRef.color, colorRef.name);
+    }
 
     QIcon swatchIcon;
     swatchIcon.addPixmap(colorSwatch, QIcon::Normal);
@@ -724,20 +773,27 @@ void ColorPaletteWidget::updateItemColor(int itemIndex, QColor newColor)
     swatchPainter.drawTiledPixmap(0, 0, mIconSize.width(), mIconSize.height(), QPixmap(":/background/checkerboard.png"));
     swatchPainter.fillRect(0, 0, mIconSize.width(), mIconSize.height(), newColor);
 
-    QPen borderShadow(QColor(0, 0, 0, 200), 1, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
-    QVector<qreal> dashPattern;
-    dashPattern << 4 << 4;
-    borderShadow.setDashPattern(dashPattern);
-    QPen borderHighlight(borderShadow);
-    borderHighlight.setColor(QColor(255, 255, 255, 200));
-    borderHighlight.setDashOffset(4);
+    // 名称画在底图上：普通态/选中态都可见
+    const bool iconMode = ui->colorListWidget->viewMode() == QListView::IconMode;
+    if (iconMode)
+    {
+        drawSwatchName(swatchPainter, mIconSize, newColor, mObject->getColor(itemIndex).name);
+    }
 
     QIcon swatchIcon;
     swatchIcon.addPixmap(colorSwatch, QIcon::Normal);
 
-    if(ui->colorListWidget->viewMode() == QListView::IconMode)
+    if (iconMode)
     {
         // Draw selection border
+        QPen borderShadow(QColor(0, 0, 0, 200), 1, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
+        QVector<qreal> dashPattern;
+        dashPattern << 4 << 4;
+        borderShadow.setDashPattern(dashPattern);
+        QPen borderHighlight(borderShadow);
+        borderHighlight.setColor(QColor(255, 255, 255, 200));
+        borderHighlight.setDashOffset(4);
+
         swatchPainter.setPen(borderHighlight);
         swatchPainter.drawRect(0, 0, mIconSize.width() - 1, mIconSize.height() - 1);
         swatchPainter.setPen(borderShadow);

@@ -70,6 +70,7 @@ private slots:
     void onRowsMoved(const QModelIndex &parent, int start, int end, const QModelIndex &destination, int row);
     void clickAddColorButton();
     void clickRemoveColorButton();
+    void renameItem();
     void palettePreferences();
     void setListMode();
     void setGridMode();
