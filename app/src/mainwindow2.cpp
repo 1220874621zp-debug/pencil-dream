@@ -90,6 +90,7 @@ GNU General Public License for more details.
 #include "shortcutfilter.h"
 #include "app_util.h"
 #include "presetdialog.h"
+#include "projectmanagerdialog.h"
 #include "pegbaralignmentdialog.h"
 #include "autosaverbytime.h"
 
@@ -753,6 +754,20 @@ void MainWindow2::openStartupFile(const QString& filename)
 
     if (!filename.isEmpty() && openObject(filename))
     {
+        return;
+    }
+
+    // 启动工程管理面板：打开/删除最近工程或新建；直接关闭则回退原有
+    // 自动加载流程（自动载最近/预设问询）
+    ProjectManagerDialog manager(this);
+    const int result = manager.exec();
+    if (result == ProjectManagerDialog::OpenProject && openObject(manager.selectedProject()))
+    {
+        return;
+    }
+    if (result == ProjectManagerDialog::NewProject)
+    {
+        tryLoadPreset();
         return;
     }
 

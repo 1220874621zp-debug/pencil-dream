@@ -108,6 +108,8 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/importlayersdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/importpositiondialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/layeropacitydialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/projectmanagerdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/projectthumb.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mainwindow2.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionskinwidget.cpp
