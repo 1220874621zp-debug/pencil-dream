@@ -69,7 +69,6 @@ private slots:
     void onItemChanged(QListWidgetItem* item);
     void onRowsMoved(const QModelIndex &parent, int start, int end, const QModelIndex &destination, int row);
     void clickAddColorButton();
-    void clickColorDialogButton();
     void clickRemoveColorButton();
     void palettePreferences();
     void setListMode();
@@ -110,13 +109,12 @@ private:
 
     QString buttonStylesheet;
 
-    bool mIsColorDialog = false;
     bool mMultipleSelected = false;
     bool mFitSwatches = false;
 
     const int MIN_ICON_SIZE = 19;
     const int MEDIUM_ICON_SIZE = 26;
-    const int MAX_ICON_SIZE = 36;
+    const int MAX_ICON_SIZE = 54;
 
     Editor* mEditor = nullptr;
     Object* mObject = nullptr;

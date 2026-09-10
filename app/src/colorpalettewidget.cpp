@@ -24,7 +24,6 @@ GNU General Public License for more details.
 #include <QDebug>
 #include <QListWidgetItem>
 #include <QInputDialog>
-#include <QColorDialog>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
@@ -85,7 +84,6 @@ void ColorPaletteWidget::initUI()
 
     ui->addColorButton->setStyleSheet(buttonStylesheet);
     ui->removeColorButton->setStyleSheet(buttonStylesheet);
-    ui->colorDialogButton->setStyleSheet(buttonStylesheet);
 
     palettePreferences();
 
@@ -96,7 +94,6 @@ void ColorPaletteWidget::initUI()
     connect(ui->colorListWidget, &QListWidget::itemChanged, this, &ColorPaletteWidget::onItemChanged);
 
     connect(ui->addColorButton, &QPushButton::clicked, this, &ColorPaletteWidget::clickAddColorButton);
-    connect(ui->colorDialogButton, &QPushButton::clicked, this, &ColorPaletteWidget::clickColorDialogButton);
     connect(ui->removeColorButton, &QPushButton::clicked, this, &ColorPaletteWidget::clickRemoveColorButton);
     connect(ui->colorListWidget, &QListWidget::customContextMenuRequested, this, &ColorPaletteWidget::showContextMenu);
 
@@ -491,7 +488,9 @@ void ColorPaletteWidget::setGridMode()
     ui->colorListWidget->setViewMode(QListView::IconMode);
     ui->colorListWidget->setMovement(QListView::Static); // TODO: update swatch index on move
     ui->colorListWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    ui->colorListWidget->setGridSize(QSize(mIconSize.width() + 1, mIconSize.height() + 1));
+    ui->colorListWidget->setSpacing(0);
+    // 扁平拼接：网格尺寸=图标尺寸，色块间零间隙无边框
+    ui->colorListWidget->setGridSize(QSize(mIconSize.width(), mIconSize.height()));
     if (mFitSwatches)
     {
         fitSwatchSize();
@@ -622,7 +621,8 @@ void ColorPaletteWidget::updateGridUI()
         QSize tempSize = QSize(stepper, mIconSize.height());
 
         ui->colorListWidget->setIconSize(QSize(tempSize.width(), mIconSize.height()));
-        ui->colorListWidget->setGridSize(QSize(tempSize.width(), mIconSize.height() + 2));
+        // 扁平拼接：网格=图标尺寸，色块直接相邻
+        ui->colorListWidget->setGridSize(QSize(tempSize.width(), mIconSize.height()));
         mIconSize.setWidth(mIconSize.width());
     }
     else
@@ -632,23 +632,9 @@ void ColorPaletteWidget::updateGridUI()
     }
 }
 
-void ColorPaletteWidget::clickColorDialogButton()
-{
-    mIsColorDialog = true;
-    clickAddColorButton();
-    mIsColorDialog = false;
-}
-
 void ColorPaletteWidget::clickAddColorButton()
 {
-    QColor prevColor = Qt::white;
-
-    QColor newColor;
-
-    if (mIsColorDialog)
-        newColor = QColorDialog::getColor(prevColor.rgba(), this, QString(), QColorDialog::ShowAlphaChannel);
-    else
-        newColor = mEditor->color()->frontColor(false);
+    QColor newColor = mEditor->color()->frontColor(false);
 
     if (!newColor.isValid())
     {
