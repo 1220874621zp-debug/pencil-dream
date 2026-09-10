@@ -1116,23 +1116,29 @@ void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int 
     painter.restore();
 }
 
-// 声音块（参考图设计）：深灰胶囊底 + 白色细柱波形，无声文字/缩略图。
-// 峰值数据由 SoundClip 按文件懒解析缓存，这里只做像素→桶映射绘制。
+// 声音块：黑色圆角底（与位图块同款），顶部音频名称，下方白色细柱波形
 void TimeLineCells::paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const
 {
-    const qreal capsTop = recTop + 1.0;
-    const qreal capsH = recHeight - 2.0;
-    const qreal capsW = recWidth - 2.0;
-
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(0x5A, 0x5D, 0x68), 1.0)); // 极细浅描边区分边界
-    painter.setBrush(QColor(0x3B, 0x3E, 0x47));
-    painter.drawRoundedRect(QRectF(recLeft + 1.0, capsTop, capsW, capsH), capsH / 2.0, capsH / 2.0);
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Theme::TimelineFrameFill);
+    painter.drawRoundedRect(QRectF(recLeft + 1.0, recTop + 1.0, recWidth - 2.0, recHeight - 2.0), 6.0, 6.0);
 
-    const qreal centerY = capsTop + capsH / 2.0;
-    const qreal maxBar = (capsH - 8.0) / 2.0;
+    // 音频名称：左上一行，过长中段省略
+    const QString clipName = clip->soundClipName();
+    if (!clipName.isEmpty())
+    {
+        const QRectF nameRect(recLeft + 8.0, recTop + 3.0, recWidth - 16.0, 13.0);
+        const QString shown = QFontMetrics(painter.font()).elidedText(clipName, Qt::ElideMiddle, qMax<qreal>(20.0, nameRect.width()));
+        painter.setPen(QColor(0xE8, 0xE8, 0xEA));
+        painter.drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter, shown);
+    }
+
+    // 波形：名称下方剩余区域，白柱上下对称
+    const qreal waveTop = recTop + 17.0;
+    const qreal waveBottom = recTop + recHeight - 4.0;
+    const qreal centerY = (waveTop + waveBottom) / 2.0;
+    const qreal maxBar = qMax(1.0, (waveBottom - waveTop) / 2.0 - 2.0);
     const QVector<qreal>& peaks = clip->waveformPeaks();
     painter.setPen(QPen(QColor(0xFF, 0xFF, 0xFF), 1.0));
 
