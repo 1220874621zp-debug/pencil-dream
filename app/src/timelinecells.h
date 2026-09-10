@@ -121,6 +121,7 @@ private:
 
     // ---- 组头行模型（组头+图层行；与轨道区两列同源同序） ----
     void rebuildRows() const;
+    void rebuildRowPrefix() const;                   // 行高前缀和（rowYAt 的 O(1) 化）
     int rowHeightAt(int rowIndex) const;             // 行高（组头=22，成员按层折叠态）
     int rowYAt(int rowIndex) const;                  // 行顶 y
     int rowIndexAtY(int y) const;                    // 命中行号；-1 = 首行之上
@@ -140,6 +141,7 @@ private:
 
     mutable QList<Object::TimelineRowRef> mRows;
     mutable quint64 mRowsStamp = 0;
+    mutable QList<int> mRowPrefixHeights; // P[i]=第0..i-1行行高之和；空=待重建
     int mGroupDragId = -1;        // 正在整组拖动的 gid（释放时换算插入目标）
     static constexpr int GROUP_HEADER_HEIGHT = 22;
 

@@ -186,6 +186,18 @@ void TimeLineCells::rebuildRows() const
     }
     mRows = obj->buildTimelineRows();
     mRowsStamp = stamp;
+    mRowPrefixHeights.clear(); // 行集变了，前缀和一并失效
+}
+
+void TimeLineCells::rebuildRowPrefix() const
+{
+    mRowPrefixHeights.clear();
+    mRowPrefixHeights.reserve(mRows.size() + 1);
+    mRowPrefixHeights.append(0);
+    for (int i = 0; i < mRows.size(); ++i)
+    {
+        mRowPrefixHeights.append(mRowPrefixHeights.last() + rowHeightAt(i));
+    }
 }
 
 int TimeLineCells::rowHeightAt(int rowIndex) const
@@ -206,13 +218,16 @@ int TimeLineCells::rowHeightAt(int rowIndex) const
 int TimeLineCells::rowYAt(int rowIndex) const
 {
     rebuildRows();
-    const int n = mRows.size();
-    int y = mOffsetY;
-    for (int i = n - 1 - mLayerOffset; i > rowIndex; --i)
+    if (mRowPrefixHeights.size() != mRows.size() + 1)
     {
-        y += rowHeightAt(i);
+        rebuildRowPrefix();
     }
-    return y;
+    const int n = mRows.size();
+    if (rowIndex < 0 || rowIndex >= n) { return mOffsetY; }
+    // 屏幕顶可见行 = 索引 n-1-mLayerOffset，y 向下随索引递减而增大：
+    // rowYAt(r) = mOffsetY + sum_{i in (r, n-1-mLayerOffset]} h(i)
+    const int topExclusive = n - mLayerOffset;
+    return mOffsetY + (mRowPrefixHeights.at(topExclusive) - mRowPrefixHeights.at(rowIndex + 1));
 }
 
 int TimeLineCells::rowIndexAtY(int y) const
@@ -303,6 +318,7 @@ void TimeLineCells::setLayerCollapsed(int layerId, bool collapsed)
         mCollapsedLayerIds.insert(layerId);
     else
         mCollapsedLayerIds.remove(layerId);
+    mRowPrefixHeights.clear(); // 行高变了，前缀和失效
     clearCache();
     updateContent();
     update();
@@ -415,6 +431,7 @@ void TimeLineCells::drawContent()
     rebuildRows();
     const int currentIdx = mEditor->layers()->currentLayerIndex();
     const bool groupDrag = (mGroupDragId >= 0) && didDetachLayer();
+    const int viewH = height(); // 行级视口裁剪用
     for (int r = 0; r < mRows.size(); r++)
     {
         const Object::TimelineRowRef& rowRef = mRows.at(r);
@@ -422,6 +439,7 @@ void TimeLineCells::drawContent()
         {
             if (groupDrag && rowRef.groupId == mGroupDragId) { continue; } // 拖动中单独绘制
             const int rowY = rowYAt(r);
+            if (rowY + GROUP_HEADER_HEIGHT <= mOffsetY || rowY >= viewH) { continue; } // 视口外
             if (mType == TIMELINE_CELL_TYPE::Layers)
             {
                 paintGroupHeader(painter, rowRef.groupId, 0, rowY, widgetWidth - 1, GROUP_HEADER_HEIGHT);
@@ -437,7 +455,9 @@ void TimeLineCells::drawContent()
         {
             continue;
         }
+        const int rowH = rowHeightAt(r);
         const int rowY = rowYAt(r) + ((groupDrag && rowRef.groupId == mGroupDragId) ? mMouseMoveY : 0);
+        if (rowY + rowH <= mOffsetY || rowY >= viewH) { continue; } // 视口外整行跳过
 
         if (rowRef.layer != nullptr)
         {
@@ -447,13 +467,13 @@ void TimeLineCells::drawContent()
             case TIMELINE_CELL_TYPE::Tracks:
                 paintTrack(painter, rowRef.layer, mOffsetX,
                            rowY, widgetWidth - mOffsetX,
-                           rowHeightAt(r), rowSelected, mFrameSize);
+                           rowH, rowSelected, mFrameSize);
                 break;
 
             case TIMELINE_CELL_TYPE::Layers:
                 paintLabel(painter, rowRef.layer, 0,
                            rowY, widgetWidth - 1,
-                           rowHeightAt(r), rowSelected, mEditor->layerVisibility());
+                           rowH, rowSelected, mEditor->layerVisibility());
                 break;
             }
         }
@@ -906,11 +926,13 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     if (layer->type() == Layer::CAMERA)
     {
         // Camera keyframes are interpolated: keep the classic single-cell look
+        const int viewW = width();
         layer->foreachKeyFrame([&](KeyFrame* key)
         {
             int framePos = key->pos();
             int recWidth = standardWidth;
             int recLeft = getFrameX(framePos) - recWidth;
+            if (recLeft >= viewW || recLeft + recWidth < 0) { return; } // 视口外
 
             if (selectedFrames.contains(framePos)) {
                 return;
@@ -928,22 +950,25 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
     // Bitmap & sound layers render TVPaint-style exposure blocks:
     // a wide card per keyframe spanning its exposure length, with a
     // thumbnail zone, frame number, trim-handle bar and a trailing "+".
-    int lastPos = -1;
-    layer->foreachKeyFrame([&](KeyFrame* key) { lastPos = qMax(lastPos, key->pos()); });
-
+    //
     // sheet numbering: blocks are sheets of drawing paper, so a block shows
     // its ordinal among the layer's keyframes (1, 2, 3...) instead of the
-    // timeline frame position
+    // timeline frame position. mKeyFrames 降序迭代（begin=最大 pos）：
+    // 第 idx 个块的图纸号 = 总数 - idx；lastPos 同一趟顺手记录
+    // （原来是 lastPos 扫描 + 收集排序两趟，现合并为一趟）
     QHash<int, int> sheetNumber;
+    int lastPos = -1;
     {
-        QList<int> sortedPos;
-        layer->foreachKeyFrame([&sortedPos](KeyFrame* key) { sortedPos.append(key->pos()); });
-        std::sort(sortedPos.begin(), sortedPos.end());
-        for (int i = 0; i < sortedPos.count(); ++i)
+        const int total = layer->keyFrameCount();
+        int idx = 0;
+        layer->foreachKeyFrame([&](KeyFrame* key)
         {
-            sheetNumber[sortedPos[i]] = i + 1;
-        }
+            sheetNumber.insert(key->pos(), total - idx);
+            lastPos = qMax(lastPos, key->pos()); // 防御：不硬靠迭代序取末块
+            ++idx;
+        });
     }
+    const int viewW = width(); // 块级视口裁剪用
 
     auto paintOneBlock = [&](KeyFrame* key)
     {
@@ -963,6 +988,7 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
 
         int blockLen = blockLengthFor(layer, key);
         int recWidth = standardWidth + (blockLen - 1) * frameSize;
+        if (recLeft >= viewW || recLeft + recWidth < 0) { return; } // 视口外
 
         // uniform black block base (TVP): selection is border-only
         painter.setBrush(Theme::TimelineFrameFill);
@@ -1109,6 +1135,8 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
     }
     const int recTop = getLayerY(previewRow) + 1;
     const int lift = previewing ? -4 : 0;
+    // 视口外整层跳过
+    if (recTop + recHeight <= mOffsetY || recTop >= height()) { return; }
 
     // Horizontal offset (in frames) of the preview position
     int dx = 0;
@@ -1161,6 +1189,7 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
         const int blockLen = runEndExclusive - runStart;
         const int recWidth = standardWidth + (blockLen - 1) * mFrameSize;
         const int recLeft = getFrameX(runStart + dx) - standardWidth;
+        if (recLeft >= width() || recLeft + recWidth < 0) { continue; } // 视口外
         painter.drawRoundedRect(QRectF(recLeft, recTop + lift, recWidth, recHeight), 3.0, 3.0);
 
         // One marker dot per selected keyframe inside the run
@@ -1828,6 +1857,7 @@ void TimeLineCells::paintEvent(QPaintEvent*)
 void TimeLineCells::setLayerHeight(int h)
 {
     mLayerHeight = qBound(26, h, 110);
+    mRowPrefixHeights.clear(); // 行高变了，前缀和失效
     clearCache();
     updateContent();
     update();
