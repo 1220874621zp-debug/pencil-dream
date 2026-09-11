@@ -259,3 +259,11 @@ endif()
 if(UNIX AND NOT APPLE)
     list(APPEND CORE_LIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/external/linux)
 endif()
+
+# MLS 变形是数值敏感代码：禁用 GCC/Clang 的 FMA 收缩（默认 fast），
+# 减小与 MSVC 的跨平台浮点差异（变形网格包围盒量化对舍入敏感）
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/mlswarp.cpp
+        PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()

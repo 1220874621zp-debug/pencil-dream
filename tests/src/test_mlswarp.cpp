@@ -64,8 +64,9 @@ TEST_CASE("MlsWarp rigid translate of all control points")
     QImage result = MlsWarp::warpImage(src, orig, moved, 1.0, true, &offset);
 
     // uniform translation: result offset follows the delta and content moves
-    REQUIRE(offset.x() == Approx(10.0).margin(1.5));
-    REQUIRE(offset.y() == Approx(5.0).margin(1.5));
+    //（容差按平台留量：MSVC/GCC 的浮点与 libm 差异会让网格量化偏 1~2px）
+    REQUIRE(offset.x() == Approx(10.0).margin(2.5));
+    REQUIRE(offset.y() == Approx(5.0).margin(2.5));
     REQUIRE(result.width() >= src.width());
     REQUIRE(result.height() >= src.height());
 
