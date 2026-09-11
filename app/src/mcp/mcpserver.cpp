@@ -154,12 +154,10 @@ void McpServer::onReadyRead()
     if (!req->headerDone && !tryParseHeaders(req))
         return;
 
-    if (req->headerDone)
-    {
-        const qint64 bodyLen = req->buffer.size() - req->bodyStart;
-        if (req->contentLength >= 0 && bodyLen >= req->contentLength)
-            handleRequest(socket, *req);
-    }
+    // GET/无 Content-Length 的请求头部齐了就处理；带 body 的等收满
+    const bool needsBody = req->contentLength > 0;
+    if (!needsBody || req->buffer.size() - req->bodyStart >= req->contentLength)
+        handleRequest(socket, *req);
 }
 
 void McpServer::onDisconnected()
