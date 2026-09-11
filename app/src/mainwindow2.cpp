@@ -2121,8 +2121,8 @@ void MainWindow2::createToolbars()
         }
     }
 
-    // 导入视频参考：白色版视频轨道图标（原图标灰色留给时间轴轨道），动作复用菜单项 actionImport_ReferenceVideo
-    ui->actionImport_ReferenceVideo->setIcon(QIcon(":/icons/themes/playful/misc/video-track-white.svg"));
+    // 导入视频参考：文档+播放图标(用户指定)，动作复用菜单项 actionImport_ReferenceVideo
+    ui->actionImport_ReferenceVideo->setIcon(QIcon(":/icons/themes/playful/misc/import-refvideo.svg"));
     ui->actionImport_ReferenceVideo->setToolTip(tr("导入参考视频..."));
     mMainToolbar->addAction(ui->actionImport_ReferenceVideo);
 
