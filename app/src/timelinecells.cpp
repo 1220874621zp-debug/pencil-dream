@@ -2535,7 +2535,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     mOpacityDragLayer = layerNumber;
                     const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
                     hitLayer->setOpacity(value);
-                    mEditor->getScribbleArea()->update();
+                    mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
                     update(QRect(0, getLayerY(layerNumber), width(), rowHeightOf(layerNumber)));
                     break;
                 }
@@ -2922,7 +2922,8 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                 const QRect slider = opacitySliderRect(width());
                 const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
                 layer->setOpacity(value);
-                mEditor->getScribbleArea()->update();
+                // 单侧缓存失效:非当前层拖动也有实时预览(原先贴旧缓存无变化)
+                mEditor->getScribbleArea()->onLayerDisplayChanged(mOpacityDragLayer);
                 // 只重绘被拖行的窄条:全量 update 会把所有图层行重画一遍,拖不动
                 update(QRect(0, getLayerY(mOpacityDragLayer), width(), rowHeightOf(mOpacityDragLayer)));
             }
@@ -3394,10 +3395,9 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
     {
         if (mOpacityDragLayer != -1)
         {
-            // finished an opacity drag: invalidate frame caches and thumbnails
-            emit mEditor->frameModified(mEditor->currentFrame());
+            // 拖动中已单侧失效+行内局部重绘实时反映;opacity 不改帧内容,
+            // 轨道块/缩略图无变化——松手不再走 frameModified→updateContent 全量链
             mOpacityDragLayer = -1;
-            updateContent();
         }
         emit mouseMovedY(0);
     }
