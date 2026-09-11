@@ -226,7 +226,8 @@ Status ActionCommands::importReferenceVideo()
     const int frames = qMax(1, qRound(duration * videoFps));
     const QFileInfo info(filePath);
     LayerVideo* layer = mEditor->layers()->createVideoLayer(info.completeBaseName());
-    layer->setVideoSource(info.absoluteFilePath(), videoFps, frames, mEditor->currentFrame());
+    // 入点固定帧1(不以时间指针为入点)
+    layer->setVideoSource(info.absoluteFilePath(), videoFps, frames, 1);
 
     mEditor->layers()->notifyAnimationLengthChanged();
     mEditor->getScribbleArea()->update();

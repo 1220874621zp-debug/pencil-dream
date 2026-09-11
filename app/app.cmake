@@ -46,7 +46,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/layeropacitydialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mainwindow2.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionskinwidget.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/videolayerpanel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/videolayerpropspopup.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pegbaralignmentdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pencil2d.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/predefinedsetmodel.h
@@ -117,7 +117,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mainwindow2.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/onionskinwidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/videolayerpanel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/videolayerpropspopup.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pegbaralignmentdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/pencil2d.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/theme.cpp

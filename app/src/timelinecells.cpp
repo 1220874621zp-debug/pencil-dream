@@ -33,6 +33,7 @@ GNU General Public License for more details.
 #include <QRunnable>
 #include "layerbitmap.h"
 #include "layervideo.h"
+#include "videolayerpropspopup.h"
 #include "colorizeimage.h"
 #include "bitmapimage.h"
 
@@ -1521,6 +1522,20 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     }
     drawCollapseTriangle(painter, layer, x, y, width, height);
 
+    // 参考视频层:属性面板下拉小三角(紧挨行尾折叠三角左侧)
+    if (layer->type() == Layer::MOVIE)
+    {
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x8A, 0x8A, 0x90));
+        const QPointF c(x + width - 33.0, y + height / 2.0);
+        QPolygonF tri;
+        tri << QPointF(c.x() - 3.0, c.y() - 4.0) << QPointF(c.x() + 4.0, c.y()) << QPointF(c.x() - 3.0, c.y() + 4.0);
+        painter.drawPolygon(tri);
+        painter.restore();
+    }
+
     // Row background: rounded card, selected rows get a subtle raised tone
     painter.setRenderHint(QPainter::Antialiasing, true);
     if (selected)
@@ -2349,6 +2364,14 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 labelLayer->setColorIndex((labelLayer->colorIndex() + 2) % 9 - 1);
                 qDebug() << "[ui] layer" << layerNumber << "label color ->" << labelLayer->colorIndex();
                 mTimeLine->updateContent(); // both the layer list and the track tint
+            }
+            else if (layerNumber < mEditor->object()->getLayerCount()
+                     && mEditor->object()->getLayer(layerNumber)->type() == Layer::MOVIE
+                     && event->pos().x() > width() - 46 && event->pos().x() <= width() - 24)
+            {
+                VideoLayerPropsPopup::showPopup(
+                    static_cast<LayerVideo*>(mEditor->object()->getLayer(layerNumber)),
+                    mEditor, mapToGlobal(event->pos()), this);
             }
             else if (event->pos().x() > width() - 24)
             {

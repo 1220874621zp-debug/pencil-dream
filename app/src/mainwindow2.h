@@ -31,7 +31,6 @@ class ScribbleArea;
 class BaseDockWidget;
 class ColorPaletteWidget;
 class OnionSkinWidget;
-class VideoLayerPanel;
 class ToolOptionWidget;
 class TimeLine;
 class ToolBoxDockWidget;
@@ -204,7 +203,6 @@ private:
     ColorInspector*       mColorInspector = nullptr;
     BrushPresetPanel*     mBrushPresetPanel = nullptr;
     OnionSkinWidget*      mOnionSkinWidget = nullptr;
-    VideoLayerPanel*      mVideoLayerPanel = nullptr;
     QToolBar*             mMainToolbar = nullptr;
     QToolBar*             mViewToolbar = nullptr;
     QToolBar*             mOverlayToolbar = nullptr;
