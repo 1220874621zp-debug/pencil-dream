@@ -394,6 +394,11 @@ void CanvasPainter::paintXrayFrames(QPainter& painter, const QRect& blitRect, La
 {
     Q_UNUSED(blitRect)
 
+    // 上游 paintCurrentFrame/paintOnionSkinFrame 用完不恢复世界变换（world 常被禁用），
+    // 这里必须显式复位到视图变换，否则画布坐标会被当设备坐标用——随缩放/平移偏移失真
+    painter.setWorldMatrixEnabled(true);
+    painter.setWorldTransform(mViewTransform);
+
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
 
     // 当前显示帧覆盖的关键帧不画幽灵（它已作为正式内容全不透明绘制）
@@ -437,8 +442,10 @@ void CanvasPainter::paintXrayFrames(QPainter& painter, const QRect& blitRect, La
             painter.translate(-drag->scaleAnchor);
         }
         painter.drawImage(topLeft, *bitmapImage->image());
+        painter.restore();
 
-        // 帧号徽标：标在幽灵包围盒左上角，拖拽预览时跟随变换后的角
+        // 帧号徽标：在纯视图空间画（restore 之后，勿再吃拖拽变换），
+        // 位置手工做同一映射到变换后的包围盒左上角
         QPointF badgePos = QPointF(topLeft);
         if (isDragged)
         {
@@ -456,7 +463,6 @@ void CanvasPainter::paintXrayFrames(QPainter& painter, const QRect& blitRect, La
         painter.fillRect(badgeRect, QColor(0, 0, 0, 168));
         painter.setPen(isSelected || isDragged ? QColor(0xFF, 0x8A, 0xA8) : QColor(0xCF, 0xCF, 0xD4));
         painter.drawText(badgePos + badgeOffset + QPointF(pad, badgePixelSize * 1.05), badgeText);
-        painter.restore();
     }
     painter.setOpacity(1.0);
 }
