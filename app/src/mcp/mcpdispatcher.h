@@ -63,15 +63,21 @@ private:
     ToolResult toolSelectLayer(const QJsonObject& args);
     ToolResult toolRenameLayer(const QJsonObject& args);
 
+    // —— 图层（原生时间轴能力） ——
+    ToolResult toolDuplicateLayerCleared(const QJsonObject& args);
+    ToolResult toolMoveLayer(const QJsonObject& args);
+
     // —— 帧 ——
     ToolResult toolAddKeyFrame(const QJsonObject& args);
     ToolResult toolDuplicateFrame(const QJsonObject& args);
     ToolResult toolDeleteFrame(const QJsonObject& args);
     ToolResult toolScrubTo(const QJsonObject& args);
+    ToolResult toolApplyHoldLength(const QJsonObject& args);
 
     // —— 绘制原语 ——
     ToolResult toolDrawStroke(const QJsonObject& args);
     ToolResult toolFillRegion(const QJsonObject& args);
+    ToolResult toolBucketFill(const QJsonObject& args);
     ToolResult toolClearFrame(const QJsonObject& args);
 
     // —— 智能填色 ——

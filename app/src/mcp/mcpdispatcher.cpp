@@ -17,6 +17,8 @@ GNU General Public License for more details.
 
 #include "mcpdispatcher.h"
 
+#include <algorithm>
+
 #include <QBuffer>
 #include <QDir>
 #include <QEventLoop>
@@ -26,6 +28,7 @@ GNU General Public License for more details.
 #include <QTimer>
 
 #include "bitmapimage.h"
+#include "bitmapbucket.h"
 #include "colorizeimage.h"
 #include "colorizeupdatemanager.h"
 #include "editor.h"
@@ -33,12 +36,15 @@ GNU General Public License for more details.
 #include "inbetween.h"
 #include "layer.h"
 #include "layerbitmap.h"
+#include "layercamera.h"
 #include "layercolorize.h"
 #include "layermanager.h"
 #include "movieexporter.h"
 #include "playbackmanager.h"
 #include "preferencemanager.h"
+#include "scribblearea.h"
 #include "structure/object.h"
+#include "toolproperties.h"
 #include "undoredomanager.h"
 #include "util/pencildef.h"
 #include "util/util.h"
@@ -162,6 +168,21 @@ QJsonArray McpDispatcher::toolsSchema() const
         props.insert("name", prop("string", QStringLiteral("新名称")));
         tools.append(makeTool("rename_layer", QStringLiteral("重命名图层。"), props, {"layer", "name"}));
     }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("源图层（位图族）")));
+        props.insert("name", prop("string", QStringLiteral("新图层名称（可选，默认「源层名_清空」）")));
+        props.insert("render_below", prop("boolean", QStringLiteral("false=副本渲染在源层上方（原生默认）；true=副本渲染在源层下方。注意：时间轴行序与渲染叠放是倒序——行号大反而盖在上面，填色层要压在线稿下须传 true")));
+        tools.append(makeTool("duplicate_layer_cleared",
+            QStringLiteral("TVP式「复制清空」：复制指定位图族图层，保留关键帧结构（位置与曝光长度）但全部置为空白，单步撤销。上色的标准流程：对线稿层用它（render_below=true）造一个垫在线稿下面的空层，再用 bucket_fill 逐帧上色。"),
+            props, {"layer"}));
+    }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("要移动的图层")));
+        props.insert("to_row", prop("number", QStringLiteral("目标显示行号（1-based）。注意：行序与渲染叠放倒序——行号越大渲染越靠上；想垫在某层下面就要移到比它小的行")));
+        tools.append(makeTool("move_layer", QStringLiteral("把图层移动到指定行（可撤销）。"), props, {"layer", "to_row"}));
+    }
 
     // —— 帧 ——
     {
@@ -187,6 +208,14 @@ QJsonArray McpDispatcher::toolsSchema() const
         QJsonObject props;
         props.insert("frame", prop("number", QStringLiteral("目标帧号（从1开始）")));
         tools.append(makeTool("scrub_to", QStringLiteral("把播放头跳到指定帧。"), props, {"frame"}));
+    }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("目标图层（位图族；默认当前图层）")));
+        props.insert("n", prop("number", QStringLiteral("一拍几（1-20），即每张画持有的帧数")));
+        tools.append(makeTool("apply_hold_length",
+            QStringLiteral("时间轴「一拍N」原生逻辑：把图层全部关键帧等距重排为间隔 N 帧（首帧位置不动），并清除旧的显式曝光长度，单步撤销。例如 7 个键一拍三 → 1,4,7,...,19。"),
+            props, {"n"}));
     }
 
     // —— 绘制原语 ——
@@ -215,11 +244,24 @@ QJsonArray McpDispatcher::toolsSchema() const
     }
     {
         QJsonObject props;
-        props.insert("layer", prop("any", QStringLiteral("目标图层")));
+        props.insert("layer", prop("any", QStringLiteral("目标图层（默认当前图层）")));
         props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧）")));
         tools.append(makeTool("clear_frame",
             QStringLiteral("清空指定帧的图像内容（关键帧保留为空白，可撤销）。"),
             props, {}));
+    }
+    {
+        QJsonObject props;
+        props.insert("point", prop("array", QStringLiteral("点击位置画布坐标 [x,y]；左上角为(0,0)")));
+        props.insert("color", prop("string", QStringLiteral("填充颜色，如 \"#ffcc00\"")));
+        props.insert("layer", prop("any", QStringLiteral("目标图层（位图族；默认当前图层）")));
+        props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧；无关键帧时自动创建）")));
+        props.insert("reference", prop("string", QStringLiteral("取色参照：\"all_layers\"=全图层合成（垫在线稿下的填色层用它，以线稿为边界）（默认）；\"current_layer\"=只看本层")));
+        props.insert("tolerance", prop("number", QStringLiteral("颜色容差 0-100（默认32；默认不启用，传本参数即启用）")));
+        props.insert("expand", prop("number", QStringLiteral("填充外扩像素 -40..40（默认2）")));
+        tools.append(makeTool("bucket_fill",
+            QStringLiteral("油漆桶工具（原生 BucketTool 引擎）：在指定图层指定帧上对点击位置做泛洪填充。配合 duplicate_layer_cleared 的空层 + reference=all_layers，可沿另一图层的线稿边界上色。可撤销。"),
+            props, {"point", "color"}));
     }
 
     // —— 智能填色 ——
@@ -313,13 +355,17 @@ McpDispatcher::ToolResult McpDispatcher::dispatch(const QString& tool, const QJs
     if (tool == "set_layer_visibility")    return toolSetLayerVisibility(args);
     if (tool == "select_layer")            return toolSelectLayer(args);
     if (tool == "rename_layer")            return toolRenameLayer(args);
+    if (tool == "duplicate_layer_cleared") return toolDuplicateLayerCleared(args);
+    if (tool == "move_layer")              return toolMoveLayer(args);
     if (tool == "add_key_frame")           return toolAddKeyFrame(args);
     if (tool == "duplicate_frame")         return toolDuplicateFrame(args);
     if (tool == "delete_frame")            return toolDeleteFrame(args);
     if (tool == "scrub_to")                return toolScrubTo(args);
+    if (tool == "apply_hold_length")       return toolApplyHoldLength(args);
     if (tool == "draw_stroke")             return toolDrawStroke(args);
     if (tool == "fill_region")             return toolFillRegion(args);
     if (tool == "clear_frame")             return toolClearFrame(args);
+    if (tool == "bucket_fill")             return toolBucketFill(args);
     if (tool == "set_colorize_options")    return toolSetColorizeOptions(args);
     if (tool == "request_colorize_update") return toolRequestColorizeUpdate(args);
     if (tool == "generate_inbetweens")     return toolGenerateInbetweens(args);
@@ -511,6 +557,98 @@ McpDispatcher::ToolResult McpDispatcher::toolRenameLayer(const QJsonObject& args
     return ok(data);
 }
 
+// 与 TimeLine::duplicateLayerCleared 同构：复制位图族图层的关键帧结构并全部置空。
+// 差异：源层按参数解析而非当前层；render_below=true 时副本垫在源层渲染之下
+//（Object::mLayers 序即叠放序，索引大者在上；时间轴行序与之倒序）。
+McpDispatcher::ToolResult McpDispatcher::toolDuplicateLayerCleared(const QJsonObject& args)
+{
+    QString err;
+    Layer* source = resolveLayer(args, &err);
+    if (source == nullptr)
+        return fail(err);
+    if (!source->isBitmapKind())
+        return fail(tr("复制清空需要位图族图层（当前类型: %1）").arg(layerTypeName(source)));
+    if (source->locked())
+        return fail(tr("图层 %1 已锁定").arg(source->name()));
+
+    const int sourceIndex = mEditor->object()->getIndex(source);
+
+    QList<KeyFrameLayoutEntry> structure;
+    source->foreachKeyFrame([&structure](KeyFrame* key)
+    {
+        KeyFrameLayoutEntry entry;
+        entry.pos = key->pos();
+        entry.length = key->length();
+        entry.lengthExplicit = key->isLengthExplicit();
+        structure.append(entry);
+    });
+
+    QString name = args.value("name").toString();
+    if (name.isEmpty())
+        name = tr("%1_清空").arg(source->name());
+    LayerBitmap* copy = mEditor->layers()->createBitmapLayer(mEditor->layers()->nameSuggestLayer(name));
+    if (copy == nullptr)
+        return fail(tr("创建图层失败"));
+
+    const bool renderBelow = args.value("render_below").toBool(false);
+    const int copyIndex = mEditor->layers()->count() - 1;
+    mEditor->object()->moveLayer(copyIndex, renderBelow ? sourceIndex : sourceIndex + 1);
+
+    mEditor->beginLayerLayoutEdit(copy);
+    // 新层自带 1 号关键帧：交给布局事务托管（undo 会回插，命令拥有并释放它）
+    mEditor->takeLayerKeyFrame(copy, 1);
+    for (const KeyFrameLayoutEntry& entry : structure)
+    {
+        QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
+        blank.fill(Qt::transparent);
+        BitmapImage* blankImage = new BitmapImage(QPoint(0, 0), blank);
+        copy->addKeyFrame(entry.pos, blankImage);
+        blankImage->setLength(entry.length);
+        blankImage->setLengthExplicit(entry.lengthExplicit);
+    }
+    mEditor->endLayerLayoutEdit(tr("MCP：复制图层并清空"));
+
+    mEditor->layers()->setCurrentLayer(source);
+    mEditor->getScribbleArea()->onLayerChanged();
+    mEditor->layers()->notifyAnimationLengthChanged();
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(copy, mEditor->object()->getIndex(copy) + 1));
+    data.insert("source", layerSummary(source, sourceIndex + 1));
+    data.insert("render_below", renderBelow);
+    return ok(data);
+}
+
+McpDispatcher::ToolResult McpDispatcher::toolMoveLayer(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+
+    const int count = mEditor->object()->getLayerCount();
+    const int fromIndex = mEditor->object()->getIndex(layer);
+    const int toRow = args.value("to_row").toInt(0);
+    if (toRow < 1 || toRow > count)
+        return fail(tr("to_row 超出范围（当前共 %1 行）").arg(count));
+    const int toIndex = toRow - 1;
+    if (fromIndex == toIndex)
+    {
+        QJsonObject data;
+        data.insert("layer", layerSummary(layer, toRow));
+        return ok(data);
+    }
+
+    mEditor->object()->moveLayer(fromIndex, toIndex);
+
+    mEditor->layers()->setCurrentLayer(layer);
+    mEditor->getScribbleArea()->onLayerChanged();
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    return ok(data);
+}
+
 // ---------------------------------------------------------------- 帧 ---
 
 McpDispatcher::ToolResult McpDispatcher::toolAddKeyFrame(const QJsonObject& args)
@@ -604,6 +742,86 @@ McpDispatcher::ToolResult McpDispatcher::toolScrubTo(const QJsonObject& args)
 
     QJsonObject data;
     data.insert("currentFrame", mEditor->currentFrame());
+    return ok(data);
+}
+
+// 与 TimeLine::applyHoldLength 同构（一拍N按钮）：等距重排 + 停车场搬运 +
+// 清除显式曝光。差异：MCP 无选区概念，恒作用于该图层全部关键帧。
+McpDispatcher::ToolResult McpDispatcher::toolApplyHoldLength(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = args.contains("layer") ? resolveLayer(args, &err)
+                                          : mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+        return fail(err.isEmpty() ? tr("找不到目标图层") : err);
+    if (layer->type() == Layer::SOUND)
+        return fail(tr("声音图层不能设置一拍N"));
+
+    const int n = qBound(1, args.value("n").toInt(1), 20);
+
+    QList<int> selected;
+    layer->foreachKeyFrame([&selected](KeyFrame* key) { selected.append(key->pos()); });
+    std::sort(selected.begin(), selected.end());
+    if (selected.count() < 2)
+        return fail(tr("一拍%1 需要图层上至少有 2 个关键帧").arg(n));
+
+    const int start = selected.first();
+    QVector<QPair<int, int>> moves; // oldPos -> newPos
+    for (int pos : selected)
+        moves.append(qMakePair(pos, start + (moves.count()) * n));
+
+    bool anyMove = false;
+    for (const auto& move : moves)
+    {
+        if (move.first != move.second) { anyMove = true; break; }
+    }
+    if (!anyMove)
+    {
+        QJsonObject data;
+        data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+        data.insert("note", tr("关键帧已是该间距，无需调整"));
+        return ok(data);
+    }
+
+    mEditor->beginLayerLayoutEdit(layer);
+
+    // 停车场重排：先全部搬到层尾之外，再逐个落到目标位（目标位互不相同，
+    // 也不会被留守帧占据，不会覆盖）
+    const int parkBase = layer->getMaxKeyFramePosition() + moves.count() + 1000;
+    for (int i = 0; i < moves.count(); i++)
+    {
+        if (moves[i].first == moves[i].second) { continue; }
+        KeyFrame* key = layer->takeKeyFrame(moves[i].first);
+        Q_ASSERT(key != nullptr);
+        layer->addKeyFrame(parkBase + i, key);
+    }
+    for (int i = 0; i < moves.count(); i++)
+    {
+        if (moves[i].first == moves[i].second) { continue; }
+        KeyFrame* key = layer->takeKeyFrame(parkBase + i);
+        Q_ASSERT(key != nullptr);
+        layer->addKeyFrame(moves[i].second, key);
+    }
+
+    // 间距即曝光：清掉旧的显式（裁剪过的）长度
+    for (int i = 0; i < selected.count(); i++)
+    {
+        KeyFrame* key = layer->getKeyFrameAt(start + i * n);
+        if (key != nullptr)
+        {
+            key->setLengthExplicit(false);
+            key->setLength(1);
+        }
+    }
+
+    mEditor->endLayerLayoutEdit(tr("MCP：一拍 %1").arg(n));
+
+    mEditor->layers()->notifyAnimationLengthChanged();
+    mEditor->updateFrame();
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("n", n);
     return ok(data);
 }
 
@@ -731,6 +949,109 @@ McpDispatcher::ToolResult McpDispatcher::toolFillRegion(const QJsonObject& args)
     QJsonObject data;
     data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
     data.insert("frame", frame);
+    return ok(data);
+}
+
+// 油漆桶：驱动原生 BitmapBucket（与 BucketTool 同引擎、同默认参数）。
+// BitmapBucket 在构造时从编辑器当前层/当前帧解析目标，须先 setCurrentLayer + scrubTo。
+McpDispatcher::ToolResult McpDispatcher::toolBucketFill(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = args.contains("layer") ? resolveLayer(args, &err)
+                                          : mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+        return fail(err.isEmpty() ? tr("找不到目标图层") : err);
+    if (!layer->isBitmapKind())
+        return fail(tr("油漆桶只能在位图族图层上填充（当前类型: %1）").arg(layerTypeName(layer)));
+    if (layer->locked())
+        return fail(tr("图层 %1 已锁定，无法填充").arg(layer->name()));
+    if (!layer->visible())
+        return fail(tr("图层 %1 当前隐藏，请先 set_layer_visibility 显示它").arg(layer->name()));
+
+    const int frame = args.contains("frame") ? qMax(1, args.value("frame").toInt()) : mEditor->currentFrame();
+    const QColor color = parseColor(args.value("color"), 1.0, &err);
+    if (!color.isValid())
+        return fail(err);
+
+    const QJsonArray pointJson = args.value("point").toArray();
+    if (pointJson.size() < 2 || !pointJson[0].isDouble() || !pointJson[1].isDouble())
+        return fail(tr("point 必须是 [x,y] 画布坐标"));
+    const QPointF worldPoint = canvasToWorld(QPointF(pointJson[0].toDouble(), pointJson[1].toDouble()));
+
+    // 目标帧没有关键帧时先补一个空键（空层逐帧上色的前提）
+    BitmapImage* bitmap = ensureBitmapAtFrame(layer, frame, &err);
+    if (bitmap == nullptr)
+        return fail(err);
+
+    // 属性默认值与 BucketTool::loadSettings 一致
+    BucketToolProperties props;
+    QHash<int, PropertyInfo> info;
+    info[BucketToolProperties::COLORTOLERANCE_VALUE] = { 1, 100, 32 };
+    info[BucketToolProperties::COLORTOLERANCE_ENABLED] = false;
+    info[BucketToolProperties::FILLEXPAND_VALUE] = { -40, 40, 2 };
+    info[BucketToolProperties::FILLEXPAND_ENABLED] = true;
+    info[BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE] = { 0, 1, 0 };
+    info[BucketToolProperties::FILLMODE_VALUE] = { 0, 2, 0 };
+    info[BucketToolProperties::CLOSEGAP_VALUE] = { 0, 32, 0 };
+    info[BucketToolProperties::FEATHER_VALUE] = { 0, 40, 0 };
+    info[BucketToolProperties::ANTIALIASING_ENABLED] = false;
+    info[BucketToolProperties::GROWSTOPDARKEST_ENABLED] = false;
+    info[BucketToolProperties::REGIONMODE_VALUE] = { 0, 3, 0 };
+    info[BucketToolProperties::BOUNDARYCOLOR_VALUE] = { INT_MIN, INT_MAX, static_cast<int>(QColor(Qt::black).rgba()) };
+    info[BucketToolProperties::DRAGMODE_VALUE] = { 0, 2, 0 };
+    props.toolProperties().insertProperties(info);
+
+    const QString reference = args.value("reference").toString(QStringLiteral("all_layers"));
+    props.toolProperties().setBaseValue(BucketToolProperties::FILLLAYERREFERENCEMODE_VALUE,
+                                        reference == QStringLiteral("current_layer") ? 0 : 1);
+    if (args.contains("tolerance"))
+    {
+        props.toolProperties().setBaseValue(BucketToolProperties::COLORTOLERANCE_VALUE,
+                                            qBound(0, args.value("tolerance").toInt(), 100));
+        props.toolProperties().setBaseValue(BucketToolProperties::COLORTOLERANCE_ENABLED, true);
+    }
+    if (args.contains("expand"))
+    {
+        props.toolProperties().setBaseValue(BucketToolProperties::FILLEXPAND_VALUE,
+                                            qBound(-40, args.value("expand").toInt(), 40));
+        props.toolProperties().setBaseValue(BucketToolProperties::FILLEXPAND_ENABLED, true);
+    }
+
+    // BitmapBucket 构造期读取当前层/当前帧
+    const int layerIndex = mEditor->object()->getIndex(layer);
+    mEditor->layers()->setCurrentLayer(layer);
+    mEditor->scrubTo(frame);
+
+    LayerCamera* layerCam = mEditor->layers()->getCameraLayerBelow(layerIndex);
+    const QRect maxFillRegion = layerCam
+        ? layerCam->getViewAtFrame(frame).inverted().mapRect(layerCam->getViewRect())
+        : QRect();
+
+    const SAVESTATE_ID undoState = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+
+    BitmapBucket bucket(mEditor, color, maxFillRegion, worldPoint, props, -1);
+    bool didFill = false;
+    bucket.paint(worldPoint, [&](BucketState progress, int filledLayerIndex, int filledFrame)
+    {
+        if (progress == BucketState::WillFillTarget)
+        {
+            mEditor->backup(filledLayerIndex, filledFrame, QStringLiteral("MCP"));
+        }
+        else if (progress == BucketState::DidFillTarget)
+        {
+            mEditor->undoRedo()->record(undoState, tr("MCP：油漆桶填充"));
+            mEditor->setModified(filledLayerIndex, filledFrame);
+            didFill = true;
+        }
+    });
+
+    if (!didFill)
+        return fail(tr("填充未产生变化：点击点可能落在参照线稿之外，或与目标色相同"));
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("frame", frame);
+    data.insert("point", pointJson);
     return ok(data);
 }
 
