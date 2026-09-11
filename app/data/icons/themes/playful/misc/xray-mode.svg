@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <!-- 穿透模式占位图标：三层错位帧叠透（不透明度递减）+ 四向移动箭头；待用户 iconfont 同名覆盖 -->
+  <rect x="96" y="96" width="640" height="640" rx="64" fill="#ffffff" fill-opacity="1"/>
+  <rect x="192" y="192" width="640" height="640" rx="64" fill="#ffffff" fill-opacity="0.45"/>
+  <rect x="288" y="288" width="640" height="640" rx="64" fill="#ffffff" fill-opacity="0.22"/>
+  <g fill="#ffffff">
+    <path d="M512 32l72 96h-144z"/>
+    <path d="M512 992l72-96h-144z"/>
+    <path d="M32 512l96-72v144z"/>
+    <path d="M992 512l-96-72v144z"/>
+    <circle cx="512" cy="512" r="56"/>
+  </g>
+</svg>

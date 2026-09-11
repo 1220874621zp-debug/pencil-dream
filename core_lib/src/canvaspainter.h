@@ -59,6 +59,33 @@ struct OnionGhostOffset
 };
 using OnionGhostOffsetMap = QMap<int, OnionGhostOffset>;
 
+/** 穿透模式：拖拽预览变换（画布坐标系）。
+ *  p ↦ scaleAnchor + translation + (p − scaleAnchor)·(scaleX, scaleY)；
+ *  提交时同一数学用 QTransform 烤进位图像素。 */
+struct XrayDragPreview
+{
+    bool active = false;
+    int layerId = -1;        ///< 目标图层 id（当前位图层）
+    int framePos = -1;       ///< 目标关键帧位
+    QPointF translation;
+    qreal scaleX = 1.0;
+    qreal scaleY = 1.0;
+    QPointF scaleAnchor;
+
+    bool isIdentity() const
+    {
+        return translation.isNull() && qFuzzyCompare(scaleX, 1.0) && qFuzzyCompare(scaleY, 1.0);
+    }
+};
+
+/** 穿透模式画布显示态（ScribbleArea 持有，渲染只读） */
+struct XrayVisualState
+{
+    bool enabled = false;
+    int selectedFrame = -1;             ///< 当前层被选中的幽灵关键帧位（提亮+手柄）
+    XrayDragPreview drag;
+};
+
 struct CanvasPainterOptions
 {
     bool  bAntiAlias = false;
@@ -87,6 +114,8 @@ public:
     void setOptions(const CanvasPainterOptions& p) { mOptions = p; }
     /** 洋葱皮对位工具：传入按图层 id 索引的幽灵偏移表（调用方保证生命周期） */
     void setOnionGhostOffsets(const OnionGhostOffsetMap* offsets) { mOnionGhostOffsets = offsets; }
+    /** 穿透模式：传入显示态（模式开关/选中帧/拖拽预览，调用方保证生命周期） */
+    void setXrayState(const XrayVisualState* state) { mXrayState = state; }
     void setTransformedSelection(QRect selection, QTransform transform, QPolygonF selectionPolygon = QPolygonF());
     void ignoreTransformedSelection();
 
@@ -134,6 +163,9 @@ private:
     void paintBitmapOnionSkinFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int nFrame, bool colorize);
     void paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPainter, int nFrame, bool colorize, qreal frameOpacity);
     OnionGhostTransform onionGhostTransform(const Layer* layer, int nFrame) const;
+
+    /** 穿透模式：当前位图层全部关键帧幽灵（叠加显示，激活时取代洋葱皮） */
+    void paintXrayFrames(QPainter& painter, const QRect& blitRect, Layer* layer);
 
     void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
 
@@ -206,6 +238,9 @@ private:
 
     // 洋葱皮对位工具的幽灵偏移（所有权在 ScribbleArea，这里只读）
     const OnionGhostOffsetMap* mOnionGhostOffsets = nullptr;
+
+    // 穿透模式显示态（所有权在 ScribbleArea，这里只读）
+    const XrayVisualState* mXrayState = nullptr;
 
     const static int OVERLAY_SAFE_CENTER_CROSS_SIZE = 25;
 };

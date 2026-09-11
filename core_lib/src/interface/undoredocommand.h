@@ -127,6 +127,14 @@ public:
                   const QString& description,
                   Editor* editor,
                   QUndoCommand* parent = nullptr);
+    /** 穿透模式：显式双快照构造（操作任意关键帧，不经"当前帧"快照链）。
+     *  两份快照的 pos 即命令定位的目标关键帧位。 */
+    BitmapReplaceCommand(const BitmapImage* undoBitmap,
+                  const BitmapImage* redoBitmap,
+                  const int layerId,
+                  const QString& description,
+                  Editor* editor,
+                  QUndoCommand* parent = nullptr);
 
     void undo() override;
     void redo() override;

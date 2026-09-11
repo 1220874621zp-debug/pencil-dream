@@ -30,227 +30,314 @@
 <context>
     <name>ActionCommands</name>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="121"/>
         <source>Importing movie...</source>
-        <translation>导入电影中...</translation>
+        <translation type="vanished">导入电影中...</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="87"/>
-        <location filename="../app/src/actioncommands.cpp" line="121"/>
-        <location filename="../app/src/actioncommands.cpp" line="244"/>
-        <location filename="../app/src/actioncommands.cpp" line="471"/>
+        <location filename="../app/src/actioncommands.cpp" line="130"/>
+        <location filename="../app/src/actioncommands.cpp" line="298"/>
+        <location filename="../app/src/actioncommands.cpp" line="530"/>
         <source>Abort</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="87"/>
+        <location filename="../app/src/actioncommands.cpp" line="130"/>
         <source>Importing Animated Image...</source>
         <translation>正在导入动图...</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="129"/>
         <source>You are importing a lot of frames, beware this could take some time. Are you sure you want to proceed?</source>
-        <translation>您正在导入大量帧，请注意，这可能需要一些时间。您确定要继续吗？</translation>
+        <translation type="vanished">您正在导入大量帧，请注意，这可能需要一些时间。您确定要继续吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="177"/>
         <source>No sound layer exists as a destination for your import. Create a new sound layer?</source>
-        <translation>没有声音层当作导入目的地。要新建声音层吗？</translation>
+        <translation type="vanished">没有声音层当作导入目的地。要新建声音层吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="178"/>
         <source>Create sound layer</source>
-        <translation>创建声音层</translation>
+        <translation type="vanished">创建声音层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="179"/>
         <source>Don&apos;t create layer</source>
-        <translation>不创建层</translation>
+        <translation type="vanished">不创建层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="189"/>
         <source>Layer Properties</source>
         <comment>Dialog title on creating a sound layer</comment>
-        <translation>层属性</translation>
+        <translation type="vanished">层属性</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="190"/>
-        <location filename="../app/src/actioncommands.cpp" line="928"/>
-        <location filename="../app/src/actioncommands.cpp" line="941"/>
-        <location filename="../app/src/actioncommands.cpp" line="954"/>
-        <location filename="../app/src/actioncommands.cpp" line="967"/>
+        <location filename="../app/src/actioncommands.cpp" line="992"/>
+        <location filename="../app/src/actioncommands.cpp" line="1005"/>
+        <location filename="../app/src/actioncommands.cpp" line="1018"/>
         <source>Layer name:</source>
         <translation>层名:</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="191"/>
+        <location filename="../app/src/actioncommands.cpp" line="249"/>
         <source>Sound Layer</source>
         <comment>Default name on creating a sound layer</comment>
         <translation>声音层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="244"/>
+        <location filename="../app/src/actioncommands.cpp" line="84"/>
+        <source>未找到 FFmpeg</source>
+        <translation>未找到 FFmpeg</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="85"/>
+        <source>导出视频/GIF、导入视频或音频需要 FFmpeg 程序，但未能找到可用的 FFmpeg。</source>
+        <translation>导出视频/GIF、导入视频或音频需要 FFmpeg 程序，但未能找到可用的 FFmpeg。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="86"/>
+        <source>请先下载 FFmpeg（https://www.gyan.dev/ffmpeg/builds/ ），然后点击“浏览”选择 ffmpeg 程序。
+也可以稍后在 首选项 → 文件 页设置路径，或把 ffmpeg 放进程序目录的 plugins 文件夹。</source>
+        <translation>请先下载 FFmpeg（https://www.gyan.dev/ffmpeg/builds/ ），然后点击“浏览”选择 ffmpeg 程序。
+也可以稍后在 首选项 → 文件 页设置路径，或把 ffmpeg 放进程序目录的 plugins 文件夹。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="88"/>
+        <source>浏览...</source>
+        <translation>浏览...</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="89"/>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="97"/>
+        <source>可执行程序 (*.exe);;所有文件 (*)</source>
+        <translation>可执行程序 (*.exe);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="99"/>
+        <source>所有文件 (*)</source>
+        <translation>所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="101"/>
+        <source>选择 FFmpeg 程序</source>
+        <translation>选择 FFmpeg 程序</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="174"/>
+        <location filename="../app/src/actioncommands.cpp" line="220"/>
+        <source>导入参考视频</source>
+        <translation>导入参考视频</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="175"/>
+        <source>未找到 ffprobe，将用 ffmpeg 解析视频时长。
+如需更快更准的探测，可把 ffprobe.exe 放到 ffmpeg 同目录（plugins 文件夹或首选项所设路径）。</source>
+        <translation>未找到 ffprobe，将用 ffmpeg 解析视频时长。
+如需更快更准的探测，可把 ffprobe.exe 放到 ffmpeg 同目录（plugins 文件夹或首选项所设路径）。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="221"/>
+        <source>无法解析视频时长:请确认文件完好,且 ffmpeg/ffprobe 可正常执行(看首选项→文件的 ffmpeg 路径)。</source>
+        <translation>无法解析视频时长:请确认文件完好,且 ffmpeg/ffprobe 可正常执行(看首选项→文件的 ffmpeg 路径)。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="298"/>
         <source>Importing sound...</source>
         <translation>导入声音中...</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="285"/>
-        <location filename="../app/src/actioncommands.cpp" line="490"/>
-        <location filename="../app/src/actioncommands.cpp" line="592"/>
+        <location filename="../app/src/actioncommands.cpp" line="344"/>
+        <location filename="../app/src/actioncommands.cpp" line="549"/>
+        <location filename="../app/src/actioncommands.cpp" line="651"/>
         <source>Something went wrong</source>
         <translation>出错了</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="285"/>
-        <location filename="../app/src/actioncommands.cpp" line="1111"/>
+        <location filename="../app/src/actioncommands.cpp" line="344"/>
+        <location filename="../app/src/actioncommands.cpp" line="1229"/>
         <source>You currently have a total of %1 sound clips. Due to current limitations, you will be unable to export any animation exceeding %2 sound clips. We recommend splitting up larger projects into multiple smaller project to stay within this limit.</source>
         <translation>当前动画含有1%的音频。基于当前限制，暂时无法导出含有超过2%音频的动画。建议将较大的项目分成多个较小的项目，从而不受限制影响。</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="343"/>
+        <location filename="../app/src/actioncommands.cpp" line="402"/>
         <source>Exporting movie</source>
         <translation>导出电影</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="387"/>
+        <location filename="../app/src/actioncommands.cpp" line="446"/>
         <source>Finished. Open file location?</source>
         <translation>完成。打开文件位置？</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="397"/>
+        <location filename="../app/src/actioncommands.cpp" line="456"/>
         <source>Finished. Open movie now?</source>
         <comment>When movie export done.</comment>
         <translation>完成。现在打开电影吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="405"/>
+        <location filename="../app/src/actioncommands.cpp" line="464"/>
         <source>Unknown export error</source>
         <translation>未知的导出错误</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="405"/>
+        <location filename="../app/src/actioncommands.cpp" line="464"/>
         <source>The export did not produce any errors, however we can&apos;t find the output file. Your export may not have completed successfully.</source>
         <translation>导出没有产生任何错误，但是我们找不到输出文件。您的导出可能没有成功完成。</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="471"/>
+        <location filename="../app/src/actioncommands.cpp" line="530"/>
         <source>Exporting image sequence...</source>
         <translation>导出图像序列...</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="490"/>
+        <location filename="../app/src/actioncommands.cpp" line="549"/>
         <source>Unable to export one or more images in the image sequence.</source>
         <translation>图片序列中有一张或多张无法导出。</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="718"/>
+        <location filename="../app/src/actioncommands.cpp" line="777"/>
         <source>增加曝光</source>
         <translation>增加曝光</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="718"/>
+        <location filename="../app/src/actioncommands.cpp" line="777"/>
         <source>减少曝光</source>
         <translation>减少曝光</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="761"/>
+        <location filename="../app/src/actioncommands.cpp" line="820"/>
         <source>Insert frame</source>
         <translation>插入帧</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="798"/>
+        <location filename="../app/src/actioncommands.cpp" line="857"/>
         <source>删除选中帧</source>
         <translation>删除选中帧</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="812"/>
+        <location filename="../app/src/actioncommands.cpp" line="871"/>
         <source>Reverse frames</source>
         <translation>反转帧</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="877"/>
+        <location filename="../app/src/actioncommands.cpp" line="941"/>
         <source>Duplicate frame</source>
         <translation>复制帧</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="898"/>
+        <location filename="../app/src/actioncommands.cpp" line="962"/>
         <source>Move frame forward</source>
         <translation>帧前移</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="915"/>
+        <location filename="../app/src/actioncommands.cpp" line="979"/>
         <source>Move frame backward</source>
         <translation>帧后移</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="942"/>
+        <location filename="../app/src/actioncommands.cpp" line="1006"/>
         <source>Colorize Layer</source>
         <translation>填色图层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="1092"/>
-        <location filename="../app/src/actioncommands.cpp" line="1111"/>
+        <location filename="../app/src/actioncommands.cpp" line="1073"/>
+        <source>向下合并图层</source>
+        <translation>向下合并图层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1076"/>
+        <source>只有位图图层可以向下合并。</source>
+        <translation>只有位图图层可以向下合并。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1082"/>
+        <source>当前图层下方没有可合并的图层。</source>
+        <translation>当前图层下方没有可合并的图层。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1088"/>
+        <source>下方图层不是位图图层，无法合并。</source>
+        <translation>下方图层不是位图图层，无法合并。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1093"/>
+        <source>下方图层已锁定，无法合并。</source>
+        <translation>下方图层已锁定，无法合并。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1099"/>
+        <source>将把“%1”并入下方“%2”，并删除“%1”。
+此操作不可撤销，是否继续？</source>
+        <translation>将把“%1”并入下方“%2”，并删除“%1”。
+此操作不可撤销，是否继续？</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1112"/>
+        <source>合并失败。</source>
+        <translation>合并失败。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/actioncommands.cpp" line="1210"/>
+        <location filename="../app/src/actioncommands.cpp" line="1229"/>
         <source>Warning</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="592"/>
+        <location filename="../app/src/actioncommands.cpp" line="651"/>
         <source>Unable to export image.</source>
         <translation>不能导出图像。</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="835"/>
+        <location filename="../app/src/actioncommands.cpp" line="895"/>
         <source>%1 (copy)</source>
         <comment>Default duplicate layer name</comment>
         <translation>%1（副本）</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="927"/>
-        <location filename="../app/src/actioncommands.cpp" line="940"/>
-        <location filename="../app/src/actioncommands.cpp" line="966"/>
+        <location filename="../app/src/actioncommands.cpp" line="991"/>
+        <location filename="../app/src/actioncommands.cpp" line="1004"/>
         <source>Layer Properties</source>
         <translation>层属性</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="929"/>
+        <location filename="../app/src/actioncommands.cpp" line="993"/>
         <source>Bitmap Layer</source>
         <translation>位图层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="953"/>
+        <location filename="../app/src/actioncommands.cpp" line="1017"/>
         <source>Layer Properties</source>
         <comment>A popup when creating a new layer</comment>
         <translation>图层属性</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="955"/>
+        <location filename="../app/src/actioncommands.cpp" line="1019"/>
         <source>Camera Layer</source>
         <translation>相机层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="968"/>
+        <location filename="../app/src/actioncommands.cpp" line="1030"/>
         <source>Sound Layer</source>
         <translation>声音层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="987"/>
+        <location filename="../app/src/actioncommands.cpp" line="1048"/>
         <source>Delete Layer</source>
         <comment>Windows title of Delete current layer pop-up.</comment>
         <translation>删除层</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="988"/>
+        <location filename="../app/src/actioncommands.cpp" line="1049"/>
         <source>Are you sure you want to delete layer: %1? This cannot be undone.</source>
         <translation>您确定要删除图层：1%吗？这无法被撤回。</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="997"/>
+        <location filename="../app/src/actioncommands.cpp" line="1058"/>
         <source>Please keep at least one camera layer in project</source>
         <comment>text when failed to delete camera layer</comment>
         <translation>请至少保留一个相机层在项目里</translation>
     </message>
     <message>
-        <location filename="../app/src/actioncommands.cpp" line="1092"/>
+        <location filename="../app/src/actioncommands.cpp" line="1210"/>
         <source>The temporary directory is meant to be used only by Pencil2D. Do not modify it unless you know what you are doing.</source>
         <translation>临时目录只能由 Pencil2D 使用。除非您知道自己在做什么，否则请勿对其进行修改。</translation>
     </message>
@@ -348,7 +435,7 @@
     <message>
         <location filename="../core_lib/src/tool/basetool.cpp" line="46"/>
         <source>洋葱皮对位</source>
-        <translation type="unfinished"></translation>
+        <translation>洋葱皮对位</translation>
     </message>
     <message>
         <location filename="../core_lib/src/tool/basetool.cpp" line="47"/>
@@ -407,300 +494,6 @@
     </message>
 </context>
 <context>
-    <name>BrushOptionsWidget</name>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="64"/>
-        <source>笔尖</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="67"/>
-        <source>大小</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="68"/>
-        <source>不透明度 %</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="69"/>
-        <location filename="../app/src/brushoptionswidget.cpp" line="235"/>
-        <source>流量 %</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="70"/>
-        <source>硬度 %</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="71"/>
-        <source>纵横比 %</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="72"/>
-        <source>角度 °</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="82"/>
-        <source>描边</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="85"/>
-        <source>自动间距</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="86"/>
-        <source>自动间距系数</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="87"/>
-        <source>固定间距 %（直径比例）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="94"/>
-        <source>动态</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="97"/>
-        <source>压感</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="99"/>
-        <source>防抖</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="101"/>
-        <source>关</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="102"/>
-        <source>弱</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="103"/>
-        <source>中</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="104"/>
-        <source>强</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="111"/>
-        <source>高级</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="114"/>
-        <source>散布 %（直径比例）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="115"/>
-        <source>喷枪</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="116"/>
-        <source>喷枪速率 /秒</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="120"/>
-        <source>涂料模式</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="122"/>
-        <source>涂抹（同笔不变深）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="123"/>
-        <source>叠加（越描越深）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="125"/>
-        <source>笔尖混合</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="128"/>
-        <source>正常</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="129"/>
-        <source>正片叠底</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="130"/>
-        <source>滤色</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="135"/>
-        <source>镜像</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="136"/>
-        <source>水平</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="137"/>
-        <source>垂直</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushoptionswidget.cpp" line="235"/>
-        <source>混合速率 %</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>BrushPresetPanel</name>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="68"/>
-        <source>笔刷</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="83"/>
-        <source>新建</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="84"/>
-        <source>删除</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="85"/>
-        <source>导入</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="86"/>
-        <source>导出</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="88"/>
-        <source>把当前画笔参数保存为新预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="89"/>
-        <source>删除选中的用户预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="90"/>
-        <source>从 .pbp 文件导入预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="91"/>
-        <source>把选中的预设导出为 .pbp 文件</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="230"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="241"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="245"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="253"/>
-        <source>新建笔刷预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="231"/>
-        <source>预设名称:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="232"/>
-        <source>我的笔刷</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="242"/>
-        <source>“%1”是内置笔刷的名字，请换一个名字。</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="246"/>
-        <source>预设“%1”已存在，要覆盖它吗？</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="253"/>
-        <source>预设保存失败。</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="272"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="275"/>
-        <source>删除笔刷预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="272"/>
-        <source>内置笔刷不能删除。</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="276"/>
-        <source>确定删除预设“%1”吗？</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="288"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="295"/>
-        <source>导入笔刷预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="290"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="314"/>
-        <source>笔刷预设 (*.pbp)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="296"/>
-        <source>无法读取该文件，可能不是有效的笔刷预设。</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="312"/>
-        <location filename="../app/src/brushpresetpanel.cpp" line="319"/>
-        <source>导出笔刷预设</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="319"/>
-        <source>预设导出失败。</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
     <name>BucketOptionsWidget</name>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="20"/>
@@ -720,62 +513,62 @@
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="102"/>
         <source>模式</source>
-        <translation type="unfinished"></translation>
+        <translation>模式</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="115"/>
         <source>连续区域：填充点击处的封闭区域；相似颜色：填充全图中颜色相近的所有区域（Shift+点击临时使用）；到边界色：填充直到指定颜色为止；选区填充：填充活动选区（Alt+点击临时使用）</source>
-        <translation type="unfinished"></translation>
+        <translation>连续区域：填充点击处的封闭区域；相似颜色：填充全图中颜色相近的所有区域（Shift+点击临时使用）；到边界色：填充直到指定颜色为止；选区填充：填充活动选区（Alt+点击临时使用）</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="129"/>
         <source>边界色</source>
-        <translation type="unfinished"></translation>
+        <translation>边界色</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="142"/>
         <source>到边界色模式停止填充的颜色，通常为线稿颜色</source>
-        <translation type="unfinished"></translation>
+        <translation>到边界色模式停止填充的颜色，通常为线稿颜色</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="156"/>
         <source>拖拽填充</source>
-        <translation type="unfinished"></translation>
+        <translation>拖拽填充</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="169"/>
         <source>按住拖动时的填充行为：仅相似区域只填充与起笔处颜色相近的区域（适合线稿上色）；任意区域填充拖过的一切；不用则仅单击填充</source>
-        <translation type="unfinished"></translation>
+        <translation>按住拖动时的填充行为：仅相似区域只填充与起笔处颜色相近的区域（适合线稿上色）；任意区域填充拖过的一切；不用则仅单击填充</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="254"/>
         <source>封闭线稿中不超过该像素数的缺口，防止填充物涌出（Krita 同款算法）</source>
-        <translation type="unfinished"></translation>
+        <translation>封闭线稿中不超过该像素数的缺口，防止填充物涌出（Krita 同款算法）</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="274"/>
         <source>用高斯模糊羽化填充边缘</source>
-        <translation type="unfinished"></translation>
+        <translation>用高斯模糊羽化填充边缘</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="288"/>
         <source>边缘抗锯齿</source>
-        <translation type="unfinished"></translation>
+        <translation>边缘抗锯齿</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="291"/>
         <source>平滑填充边缘的锯齿（与羽化互斥，羽化优先）</source>
-        <translation type="unfinished"></translation>
+        <translation>平滑填充边缘的锯齿（与羽化互斥，羽化优先）</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="298"/>
         <source>扩展止于最深色</source>
-        <translation type="unfinished"></translation>
+        <translation>扩展止于最深色</translation>
     </message>
     <message>
         <location filename="../app/ui/bucketoptionswidget.ui" line="301"/>
         <source>扩展填充时遇到更深或更不透明的线稿像素即停止，避免越过线条</source>
-        <translation type="unfinished"></translation>
+        <translation>扩展填充时遇到更深或更不透明的线稿像素即停止，避免越过线条</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="60"/>
@@ -789,17 +582,17 @@
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="61"/>
         <source>扩展/收缩</source>
-        <translation type="unfinished"></translation>
+        <translation>扩展/收缩</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="62"/>
         <source>封闭间隙</source>
-        <translation type="unfinished"></translation>
+        <translation>封闭间隙</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="63"/>
         <source>羽化</source>
-        <translation type="unfinished"></translation>
+        <translation>羽化</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="73"/>
@@ -844,42 +637,42 @@
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="82"/>
         <source>连续区域</source>
-        <translation type="unfinished"></translation>
+        <translation>连续区域</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="83"/>
         <source>相似颜色</source>
-        <translation type="unfinished"></translation>
+        <translation>相似颜色</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="84"/>
         <source>到边界色</source>
-        <translation type="unfinished"></translation>
+        <translation>到边界色</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="85"/>
         <source>选区填充</source>
-        <translation type="unfinished"></translation>
+        <translation>选区填充</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="87"/>
         <source>仅相似区域</source>
-        <translation type="unfinished"></translation>
+        <translation>仅相似区域</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="88"/>
         <source>任意区域</source>
-        <translation type="unfinished"></translation>
+        <translation>任意区域</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="89"/>
         <source>不用</source>
-        <translation type="unfinished"></translation>
+        <translation>不用</translation>
     </message>
     <message>
         <location filename="../app/src/bucketoptionswidget.cpp" line="283"/>
         <source>选择边界色</source>
-        <translation type="unfinished"></translation>
+        <translation>选择边界色</translation>
     </message>
 </context>
 <context>
@@ -1321,6 +1114,14 @@
     </message>
 </context>
 <context>
+    <name>CanvasPainter</name>
+    <message>
+        <location filename="../core_lib/src/canvaspainter.cpp" line="711"/>
+        <source>参考视频文件缺失:%1</source>
+        <translation>参考视频文件缺失:%1</translation>
+    </message>
+</context>
+<context>
     <name>CheckUpdatesDialog</name>
     <message>
         <location filename="../app/src/checkupdatesdialog.cpp" line="46"/>
@@ -1481,81 +1282,91 @@
     </message>
     <message>
         <location filename="../app/ui/colorpalette.ui" line="53"/>
+        <source>切换色卡（右键可重命名/删除）</source>
+        <translation>切换色卡（右键可重命名/删除）</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/colorpalette.ui" line="66"/>
+        <location filename="../app/ui/colorpalette.ui" line="69"/>
+        <source>新建色卡</source>
+        <translation>新建色卡</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/colorpalette.ui" line="92"/>
         <source>Add Color</source>
         <translation>增加颜色</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="88"/>
+        <location filename="../app/ui/colorpalette.ui" line="127"/>
         <source>Remove Color</source>
         <translation>删除颜色</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="148"/>
         <source>Native color dialog window</source>
-        <translation>操作系统原生颜色对话窗口</translation>
+        <translation type="vanished">操作系统原生颜色对话窗口</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="279"/>
+        <location filename="../app/ui/colorpalette.ui" line="271"/>
         <source>List Mode</source>
         <translation>列表模式</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="282"/>
+        <location filename="../app/ui/colorpalette.ui" line="274"/>
         <source>Show palette as a list</source>
         <translation>列表显示调色板</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="290"/>
+        <location filename="../app/ui/colorpalette.ui" line="282"/>
         <source>Grid Mode</source>
         <translation>栅格模式</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="293"/>
+        <location filename="../app/ui/colorpalette.ui" line="285"/>
         <source>Show palette as icons</source>
         <translation>图标显示调色板</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="303"/>
+        <location filename="../app/ui/colorpalette.ui" line="295"/>
         <source>Small swatch</source>
         <translation>小色块</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="306"/>
+        <location filename="../app/ui/colorpalette.ui" line="298"/>
         <source>Sets swatch size to: 16x16px</source>
         <translation>设置色块尺寸为: 16x16px</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="314"/>
+        <location filename="../app/ui/colorpalette.ui" line="306"/>
         <source>Medium Swatch</source>
         <translation>中色块</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="317"/>
+        <location filename="../app/ui/colorpalette.ui" line="309"/>
         <source>Sets swatch size to: 26x26px</source>
         <translation>设置色块尺寸为: 26x26px</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="328"/>
+        <location filename="../app/ui/colorpalette.ui" line="320"/>
         <source>Large Swatch</source>
         <translation>大色块</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="331"/>
+        <location filename="../app/ui/colorpalette.ui" line="323"/>
         <source>Sets swatch size to: 36x36px</source>
         <translation>设置色块尺寸为: 36x36px</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="339"/>
+        <location filename="../app/ui/colorpalette.ui" line="331"/>
         <source>Fit Swatch</source>
         <translation>适配色块</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="342"/>
+        <location filename="../app/ui/colorpalette.ui" line="334"/>
         <source>Fit swatch to window (19-36 px)</source>
         <translation>色块适配窗口（19-36 像素）</translation>
     </message>
     <message>
-        <location filename="../app/ui/colorpalette.ui" line="345"/>
+        <location filename="../app/ui/colorpalette.ui" line="337"/>
         <source>Swatch fits window</source>
         <translation>色块适配窗口</translation>
     </message>
@@ -1563,48 +1374,91 @@
 <context>
     <name>ColorPaletteWidget</name>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="126"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="199"/>
+        <source>色卡 %1</source>
+        <translation>色卡 %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="201"/>
+        <source>新建色卡</source>
+        <translation>新建色卡</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="201"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="231"/>
+        <source>色卡名称：</source>
+        <translation>色卡名称：</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="223"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="231"/>
+        <source>重命名色卡</source>
+        <translation>重命名色卡</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="224"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="241"/>
+        <source>删除色卡</source>
+        <translation>删除色卡</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="242"/>
+        <source>确定删除色卡“%1”吗？其中 %2 个颜色将一并移除。</source>
+        <translation>确定删除色卡“%1”吗？其中 %2 个颜色将一并移除。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="285"/>
+        <source>重命名</source>
+        <translation>重命名</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="289"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="127"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="290"/>
         <source>Replace</source>
         <translation>置换</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="128"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="291"/>
         <source>Remove</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="266"/>
-        <location filename="../app/src/colorpalettewidget.cpp" line="267"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="296"/>
+        <source>按色相排序</source>
+        <translation>按色相排序</translation>
+    </message>
+    <message>
+        <location filename="../app/src/colorpalettewidget.cpp" line="488"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="489"/>
         <source>Color name</source>
         <translation>颜色名称</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="613"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="832"/>
         <source>The color(s) you are about to delete are currently being used by one or multiple strokes.</source>
         <translation>你要删除的颜色用在了一个或多个笔划中。</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="614"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="833"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="615"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="834"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="631"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="850"/>
         <source>Palette Restriction</source>
         <translation>调色板限制集</translation>
     </message>
     <message>
-        <location filename="../app/src/colorpalettewidget.cpp" line="632"/>
+        <location filename="../app/src/colorpalettewidget.cpp" line="851"/>
         <source>The palette requires at least one swatch to remain functional</source>
         <translation>调色板至少需要保留一个色块</translation>
     </message>
@@ -2955,7 +2809,7 @@
 <context>
     <name>ColorWheel</name>
     <message>
-        <location filename="../app/src/colorwheel.cpp" line="30"/>
+        <location filename="../app/src/colorwheel.cpp" line="31"/>
         <source>Color Wheel</source>
         <comment>Color Wheel&apos;s window title</comment>
         <translation>色轮</translation>
@@ -2964,110 +2818,88 @@
 <context>
     <name>ColorizeOptionsWidget</name>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="56"/>
         <source>Colorize Mask</source>
-        <translation>智能填色</translation>
+        <translation type="vanished">智能填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="64"/>
         <source>Refresh</source>
-        <translation>刷新</translation>
+        <translation type="vanished">刷新</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="65"/>
         <source>Update All</source>
-        <translation>更新全部</translation>
+        <translation type="vanished">更新全部</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="66"/>
         <source>Regenerate coloring for the current frame</source>
-        <translation>重新计算当前帧的填色</translation>
+        <translation type="vanished">重新计算当前帧的填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="67"/>
         <source>Regenerate coloring for every frame of this layer</source>
-        <translation>重新计算本图层全部帧的填色</translation>
+        <translation type="vanished">重新计算本图层全部帧的填色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="73"/>
         <source>Edit key strokes</source>
-        <translation>编辑模式（显示并绘制笔画）</translation>
+        <translation type="vanished">编辑模式（显示并绘制笔画）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="74"/>
         <source>Show output</source>
-        <translation>显示填色结果</translation>
+        <translation type="vanished">显示填色结果</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="83"/>
         <source>Key Strokes</source>
-        <translation>笔画颜色</translation>
+        <translation type="vanished">笔画颜色</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="92"/>
         <source>Transparent</source>
-        <translation>透明</translation>
+        <translation type="vanished">透明</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="93"/>
         <source>Remove</source>
-        <translation type="unfinished">删除</translation>
+        <translation type="obsolete">删除</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="94"/>
         <source>Mark the selected color as transparent: its stroke areas stay unfilled (use for background)</source>
-        <translation>将选中的颜色标记为透明：该颜色的笔画区域保持不填色（用于背景）</translation>
+        <translation type="vanished">将选中的颜色标记为透明：该颜色的笔画区域保持不填色（用于背景）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="95"/>
         <source>Erase all strokes of the selected color on this frame</source>
-        <translation>擦除当前帧上该颜色的全部笔画</translation>
+        <translation type="vanished">擦除当前帧上该颜色的全部笔画</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="102"/>
         <source>Edge detection (soft pencil lines)</source>
-        <translation>边缘检测（软铅笔线稿增强）</translation>
+        <translation type="vanished">边缘检测（软铅笔线稿增强）</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="109"/>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="115"/>
         <source> px</source>
-        <translation> 像素</translation>
+        <translation type="vanished"> 像素</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="163"/>
         <source>Edge size</source>
-        <translation>检测尺寸</translation>
+        <translation type="vanished">检测尺寸</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="164"/>
         <source>Gap closing radius</source>
-        <translation>闭缝半径</translation>
+        <translation type="vanished">闭缝半径</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="165"/>
         <source>Cleanup strength</source>
-        <translation>清理强度</translation>
+        <translation type="vanished">清理强度</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="168"/>
         <source>Paint color strokes with the brush; mark background color as transparent; press Refresh to fill.</source>
-        <translation>用画笔画颜色笔画；把背景颜色标记为透明；点「刷新」计算填色。</translation>
+        <translation type="vanished">用画笔画颜色笔画；把背景颜色标记为透明；点「刷新」计算填色。</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="245"/>
         <source>Line art source: %1</source>
-        <translation>线稿源：%1</translation>
+        <translation type="vanished">线稿源：%1</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="250"/>
         <source>No line art layer found! Add a bitmap layer with drawings.</source>
-        <translation>未找到线稿层！需要含有画作的位图图层。</translation>
+        <translation type="vanished">未找到线稿层！需要含有画作的位图图层。</translation>
     </message>
     <message>
-        <location filename="../app/src/colorizeoptionswidget.cpp" line="297"/>
         <source>Transparent (stays unfilled)</source>
-        <translation>透明（保持不填色）</translation>
+        <translation type="vanished">透明（保持不填色）</translation>
     </message>
     <message>
         <source>Paint color strokes with the brush; erase strokes to keep areas empty.</source>
@@ -3236,122 +3068,122 @@
 <context>
     <name>Editor</name>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="220"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="221"/>
         <source>Cut frames</source>
         <translation>剪切帧</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="255"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="256"/>
         <source>Paste from Previous Keyframe</source>
         <translation>从上一关键帧粘贴</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="327"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="328"/>
         <source>Paste frames</source>
         <translation>粘贴帧</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="349"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="350"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="362"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="363"/>
         <source>Flip selection vertically</source>
         <translation>垂直翻转选中区域</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="362"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="363"/>
         <source>Flip selection horizontally</source>
         <translation>水平翻转选中区域</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="376"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="377"/>
         <source>Reposition frame</source>
         <translation>重排帧位置</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="464"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="473"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="482"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="514"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="465"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="474"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="483"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="515"/>
         <source>Could not open file</source>
         <translation>无法打开文件</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="465"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="466"/>
         <source>The file you have selected is a directory, so we are unable to open it. If you are are trying to open a project that uses the old structure, please open the file ending with .pcl, not the data folder.</source>
         <translation>你选的文件是个目录，我们不能打开它。如果你在试图打开用了旧结构的项目，请直接打开后续带 .pcl 的文件，而非数据文件夹。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="474"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="475"/>
         <source>The file you have selected does not exist, so we are unable to open it. Please make sure that you&apos;ve entered the correct path and that the file is accessible and try again.</source>
         <translation>你选择的文件不存在，所以打不开。请确定你输入了可访问的正确文件路径，然后重试。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="483"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="484"/>
         <source>This program does not have permission to read the file you have selected. Please check that you have read permissions for this file and try again.</source>
         <translation>程序没有权限读取你选的文件。请检查并确认你有读取权限后再试一次。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="515"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="516"/>
         <source>An unknown error occurred while trying to load the file and we are not able to load your file.</source>
         <translation>加载文件时发生了未知错误，我们无法加载你的文件。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="604"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="717"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="605"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="718"/>
         <source>File not found at path &quot;%1&quot;. Please check the image is present at the specified location and try again.</source>
         <translation>路径 &quot;%1&quot; 下未找到文件。请确认图片位于指定位置后重试。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="607"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="720"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="608"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="721"/>
         <source>Image format is not supported. Please convert the image file to one of the following formats and try again:
 %1</source>
         <translation>不支持该图片格式。请将图片转换为以下格式之一后重试：
 %1</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="611"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="724"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="612"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="725"/>
         <source>An error has occurred while reading the image. Please check that the file is a valid image and try again.</source>
         <translation>读取图片时发生错误。请确认文件是有效的图片后重试。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="614"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="678"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="693"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="700"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="727"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="615"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="679"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="694"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="701"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="728"/>
         <source>Import failed</source>
         <translation>导入失败</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="630"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="739"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="631"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="740"/>
         <source>Import Image</source>
         <translation>导入图像</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="678"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="693"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="679"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="694"/>
         <source>You can only import images to a bitmap layer.</source>
         <translation>只能将图片导入到位图图层。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="700"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="701"/>
         <source>The selected image has a format that does not support animation.</source>
         <translation>所选图片的格式不支持动画。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="887"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="899"/>
         <source>Add frame</source>
         <translation>添加帧</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/editor.cpp" line="916"/>
-        <location filename="../core_lib/src/interface/editor.cpp" line="923"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="934"/>
+        <location filename="../core_lib/src/interface/editor.cpp" line="941"/>
         <source>Remove frame</source>
         <translation>删除帧</translation>
     </message>
@@ -3802,6 +3634,11 @@
         <translation>Miniz 错误</translation>
     </message>
     <message>
+        <location filename="../core_lib/src/structure/filemanager.cpp" line="1077"/>
+        <source>参考视频 %1</source>
+        <translation>参考视频 %1</translation>
+    </message>
+    <message>
         <location filename="../core_lib/src/structure/filemanager.cpp" line="357"/>
         <location filename="../core_lib/src/structure/filemanager.cpp" line="385"/>
         <source>Internal Error</source>
@@ -3845,7 +3682,7 @@
     </message>
     <message>
         <source>Reference Video %1</source>
-        <translation>参考视频 %1</translation>
+        <translation type="vanished">参考视频 %1</translation>
     </message>
 </context>
 <context>
@@ -3914,15 +3751,50 @@
         <translation>自动保存间隔（分钟）</translation>
     </message>
     <message>
+        <location filename="../app/ui/filespage.ui" line="189"/>
+        <source>FFmpeg（视频导出）</source>
+        <translation>FFmpeg（视频导出）</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/filespage.ui" line="195"/>
+        <source>导出视频/GIF、导入视频或音频需要 FFmpeg 程序。留空则使用程序目录 plugins 文件夹中的 ffmpeg。</source>
+        <translation>导出视频/GIF、导入视频或音频需要 FFmpeg 程序。留空则使用程序目录 plugins 文件夹中的 ffmpeg。</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/filespage.ui" line="207"/>
+        <source>未设置 — 使用程序 plugins 目录</source>
+        <translation>未设置 — 使用程序 plugins 目录</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/filespage.ui" line="217"/>
+        <source>浏览...</source>
+        <translation>浏览...</translation>
+    </message>
+    <message>
         <location filename="../app/ui/filespage.ui" line="113"/>
         <source>Number of modifications before autosaving:</source>
         <comment>Preference</comment>
         <translation>自动保存前的修改数:</translation>
     </message>
     <message>
-        <location filename="../app/src/filespage.cpp" line="98"/>
+        <location filename="../app/src/filespage.cpp" line="101"/>
         <source>&lt;br&gt;&lt;br&gt;Error: your preset may not have saved successfully. If you believe that this error is an issue with Pencil2D, please create a new issue at:&lt;br&gt;&lt;a href=&apos;https://github.com/pencil2d/pencil/issues&apos;&gt;https://github.com/pencil2d/pencil/issues&lt;/a&gt;&lt;br&gt;Please include the following details in your issue:</source>
         <translation>&lt;br&gt;&lt;br&gt;错误：预设可能未成功保存。如果你认为这是 Pencil2D 的问题，请到以下地址提交 issue：&lt;br&gt;&lt;a href=&apos;https://github.com/pencil2d/pencil/issues&apos;&gt;https://github.com/pencil2d/pencil/issues&lt;/a&gt;&lt;br&gt;请在 issue 中包含以下详细信息：</translation>
+    </message>
+    <message>
+        <location filename="../app/src/filespage.cpp" line="263"/>
+        <source>可执行程序 (*.exe);;所有文件 (*)</source>
+        <translation>可执行程序 (*.exe);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/filespage.cpp" line="265"/>
+        <source>所有文件 (*)</source>
+        <translation>所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/filespage.cpp" line="267"/>
+        <source>选择 FFmpeg 程序</source>
+        <translation>选择 FFmpeg 程序</translation>
     </message>
 </context>
 <context>
@@ -4790,9 +4662,67 @@ Read the instructions and try again</source>
 <context>
     <name>LayerColorize</name>
     <message>
-        <location filename="../core_lib/src/structure/layercolorize.cpp" line="28"/>
         <source>Colorize Layer</source>
-        <translation>填色图层</translation>
+        <translation type="vanished">填色图层</translation>
+    </message>
+</context>
+<context>
+    <name>LayerManager</name>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="595"/>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="672"/>
+        <source>组 %1</source>
+        <translation>组 %1</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="617"/>
+        <source>选中图层成组</source>
+        <translation>选中图层成组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="675"/>
+        <source>图层成组</source>
+        <translation>图层成组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="690"/>
+        <source>加入图层组</source>
+        <translation>加入图层组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="704"/>
+        <source>移出图层组</source>
+        <translation>移出图层组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="722"/>
+        <source>解散图层组</source>
+        <translation>解散图层组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="735"/>
+        <source>重命名图层组</source>
+        <translation>重命名图层组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="762"/>
+        <source>展开/收起图层组</source>
+        <translation>展开/收起图层组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="774"/>
+        <source>图层组可见性</source>
+        <translation>图层组可见性</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="786"/>
+        <source>图层组锁定</source>
+        <translation>图层组锁定</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/managers/layermanager.cpp" line="799"/>
+        <source>移动图层组</source>
+        <translation>移动图层组</translation>
     </message>
 </context>
 <context>
@@ -4890,50 +4820,40 @@ Read the instructions and try again</source>
 <context>
     <name>LipsyncDialog</name>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="92"/>
         <source>口型同步切换器</source>
-        <translation>口型同步切换器</translation>
+        <translation type="vanished">口型同步切换器</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="97"/>
         <source>口型图层命名 A/E/I/O/U/N/MBP/FV/L/WQ，点击即在“口型”图层的当前帧插入该口型。</source>
-        <translation>口型图层命名 A/E/I/O/U/N/MBP/FV/L/WQ，点击即在“口型”图层的当前帧插入该口型。</translation>
+        <translation type="vanished">口型图层命名 A/E/I/O/U/N/MBP/FV/L/WQ，点击即在“口型”图层的当前帧插入该口型。</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="105"/>
         <source>刷新口型</source>
-        <translation>刷新口型</translation>
+        <translation type="vanished">刷新口型</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="106"/>
         <source>清空此帧</source>
-        <translation>清空此帧</translation>
+        <translation type="vanished">清空此帧</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="119"/>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="122"/>
         <source>口型</source>
-        <translation>口型</translation>
+        <translation type="vanished">口型</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="153"/>
         <source>在当前帧插入口型 %1</source>
-        <translation>在当前帧插入口型 %1</translation>
+        <translation type="vanished">在当前帧插入口型 %1</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="184"/>
         <source>未找到口型图层（图层名为 A/E/I/O/U 等）</source>
-        <translation>未找到口型图层（图层名为 A/E/I/O/U 等）</translation>
+        <translation type="vanished">未找到口型图层（图层名为 A/E/I/O/U 等）</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="211"/>
         <source>插入口型 %1</source>
-        <translation>插入口型 %1</translation>
+        <translation type="vanished">插入口型 %1</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="233"/>
         <source>清空口型帧</source>
-        <translation>清空口型帧</translation>
+        <translation type="vanished">清空口型帧</translation>
     </message>
 </context>
 <context>
@@ -5087,9 +5007,8 @@ Read the instructions and try again</source>
         <translation>调色板</translation>
     </message>
     <message>
-        <location filename="../app/ui/mainwindow2.ui" line="424"/>
         <source>Movie Video...</source>
-        <translation>电影视频...</translation>
+        <translation type="vanished">电影视频...</translation>
     </message>
     <message>
         <location filename="../app/ui/mainwindow2.ui" line="429"/>
@@ -5315,7 +5234,7 @@ Read the instructions and try again</source>
     </message>
     <message>
         <location filename="../app/ui/mainwindow2.ui" line="632"/>
-        <location filename="../app/src/mainwindow2.cpp" line="1856"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1913"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
@@ -5598,6 +5517,7 @@ Read the instructions and try again</source>
         <translation>电影音频...</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="424"/>
         <source>Reference Video...</source>
         <translation>导入参考视频...</translation>
     </message>
@@ -5682,141 +5602,141 @@ Read the instructions and try again</source>
         <translation>状态栏</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="192"/>
+        <location filename="../app/src/mainwindow2.cpp" line="228"/>
         <source>color palette:&lt;br&gt;use &lt;b&gt;(C)&lt;/b&gt;&lt;br&gt;toggle at cursor</source>
         <translation>调色板&lt;br&gt;使用 &lt;b&gt;(C)&lt;/b&gt;&lt;br&gt;光标位置切换</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="196"/>
+        <location filename="../app/src/mainwindow2.cpp" line="232"/>
         <source>Color inspector</source>
         <translation>颜色检视器</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="525"/>
+        <location filename="../app/src/mainwindow2.cpp" line="561"/>
         <source>Open Recent</source>
         <translation>打开最近使用</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="532"/>
+        <location filename="../app/src/mainwindow2.cpp" line="568"/>
         <source>工作区</source>
         <translation>工作区</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="571"/>
-        <location filename="../app/src/mainwindow2.cpp" line="595"/>
+        <location filename="../app/src/mainwindow2.cpp" line="607"/>
+        <location filename="../app/src/mainwindow2.cpp" line="631"/>
         <source>Dialog is already open!</source>
         <translation>对话框已经打开！</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="645"/>
+        <location filename="../app/src/mainwindow2.cpp" line="681"/>
         <source>Please select at least 2 frames!</source>
         <translation>请选择至少2帧</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="769"/>
+        <location filename="../app/src/mainwindow2.cpp" line="819"/>
         <source>Opening document...</source>
         <translation>打开文档中...</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="769"/>
-        <location filename="../app/src/mainwindow2.cpp" line="826"/>
+        <location filename="../app/src/mainwindow2.cpp" line="819"/>
+        <location filename="../app/src/mainwindow2.cpp" line="876"/>
         <source>Abort</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="814"/>
-        <location filename="../app/src/mainwindow2.cpp" line="915"/>
+        <location filename="../app/src/mainwindow2.cpp" line="864"/>
+        <location filename="../app/src/mainwindow2.cpp" line="965"/>
         <source>Warning</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="815"/>
+        <location filename="../app/src/mainwindow2.cpp" line="865"/>
         <source>This program does not currently have permission to write to the file you have selected. Please make sure you have write permission for this file before attempting to save it. Alternatively, you can use the Save As... menu option to save to a writable location.</source>
         <translation>程序没有权限写入你选的文件。请在保存文件之前确认有该文件的写入权限。另外，你可以用 另存为.. 菜单项保存到一个可以写的地方。</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="826"/>
+        <location filename="../app/src/mainwindow2.cpp" line="876"/>
         <source>Saving document...</source>
         <translation>保存文档中...</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="916"/>
+        <location filename="../app/src/mainwindow2.cpp" line="966"/>
         <source>This animation has been modified.
  Do you want to save your changes?</source>
         <translation>该动画被修改过了。
 你要保存所做的变动吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="939"/>
+        <location filename="../app/src/mainwindow2.cpp" line="989"/>
         <source>AutoSave Reminder</source>
         <translation>自动保存提醒</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="940"/>
+        <location filename="../app/src/mainwindow2.cpp" line="990"/>
         <source>The animation is not saved yet.
  Do you want to save now?</source>
         <translation>该动画还没被保存。
 你要现在保存吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="941"/>
+        <location filename="../app/src/mainwindow2.cpp" line="991"/>
         <source>Never ask again</source>
         <comment>AutoSave reminder button</comment>
         <translation>不要再问</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1157"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1207"/>
         <source>保存工作区</source>
         <translation>保存工作区</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1158"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1208"/>
         <source>工作区名称：</source>
         <translation>工作区名称：</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1169"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1219"/>
         <source>覆盖工作区</source>
         <translation>覆盖工作区</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1170"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1220"/>
         <source>工作区“%1”已存在，是否覆盖？</source>
         <translation>工作区“%1”已存在，是否覆盖？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1196"/>
-        <location filename="../app/src/mainwindow2.cpp" line="1261"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1246"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1311"/>
         <source>删除工作区</source>
         <translation>删除工作区</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1197"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1247"/>
         <source>确定删除工作区“%1”？</source>
         <translation>确定删除工作区“%1”？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1241"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1291"/>
         <source>重置默认布局</source>
         <translation>重置默认布局</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1243"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1293"/>
         <source>保存当前工作区…</source>
         <translation>保存当前工作区…</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1760"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1810"/>
         <source>时间轴工具</source>
         <translation>时间轴工具</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1761"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1811"/>
         <source>口型同步切换器</source>
         <translation>口型同步切换器</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1762"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1812"/>
         <source>调色板提取</source>
         <translation>调色板提取</translation>
     </message>
@@ -5825,71 +5745,688 @@ Read the instructions and try again</source>
         <translation type="vanished">对位中割参考</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1763"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1813"/>
         <source>视频抽帧中割</source>
         <translation>视频抽帧中割</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="869"/>
+        <location filename="../app/src/mainwindow2.cpp" line="919"/>
         <source>&lt;br&gt;&lt;br&gt;An error has occurred and your file may not have saved successfully.
 If you believe that this error is an issue with Pencil2D, please create a new issue at:&lt;br&gt;&lt;a href=&apos;https://github.com/pencil2d/pencil/issues&apos;&gt;https://github.com/pencil2d/pencil/issues&lt;/a&gt;&lt;br&gt;Please be sure to include the following details in your issue:</source>
         <translation>&lt;br&gt;&lt;br&gt;发生错误，你的文件可能未成功保存。
 如果你认为这是 Pencil2D 的问题，请到以下地址提交 issue：&lt;br&gt;&lt;a href=&apos;https://github.com/pencil2d/pencil/issues&apos;&gt;https://github.com/pencil2d/pencil/issues&lt;/a&gt;&lt;br&gt;请在 issue 中包含以下详细信息：</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1851"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1834"/>
+        <source>向下合并图层</source>
+        <translation>向下合并图层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="1908"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1927"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1985"/>
         <source>Restore Project?</source>
         <translation>恢复项目？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1928"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1986"/>
         <source>Pencil2D didn&apos;t close correctly. Would you like to restore the project?</source>
         <translation>Pencil2D上次没有被正常关闭。您要恢复项目吗？</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1932"/>
+        <location filename="../app/src/mainwindow2.cpp" line="1990"/>
         <source>Restore project</source>
         <translation>恢复项目</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1965"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2023"/>
         <source>Recovery Failed.</source>
         <translation>项目恢复失败。</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1966"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2024"/>
         <source>Sorry! Pencil2D is unable to restore your project</source>
         <translation>抱歉！ Pencil2D 无法恢复您的项目</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1976"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2034"/>
         <source>Recovery Succeeded!</source>
         <translation>项目恢复成功！</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1977"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2035"/>
         <source>Please save your work immediately to prevent loss of data</source>
         <translation>请立即保存您的工作以防止数据丢失</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="1985"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2064"/>
+        <source>正在导出 OCA...</source>
+        <translation>正在导出 OCA...</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2064"/>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2077"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2082"/>
+        <source>导出 OCA</source>
+        <translation>导出 OCA</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2078"/>
+        <source>OCA 导出完成。输出目录：%1</source>
+        <translation>OCA 导出完成。输出目录：%1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2083"/>
+        <source>导出失败：无法创建输出目录或写入文件，请检查导出目录。</source>
+        <translation>导出失败：无法创建输出目录或写入文件，请检查导出目录。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2089"/>
         <source>Main Toolbar</source>
         <translation>主工具栏</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="2002"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2110"/>
+        <source>导出 OCA...</source>
+        <translation>导出 OCA...</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2126"/>
+        <source>导入参考视频...</source>
+        <translation>导入参考视频...</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2131"/>
+        <source>导出电影...</source>
+        <translation>导出电影...</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2137"/>
+        <source>穿透模式</source>
+        <translation>穿透模式</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2138"/>
+        <source>穿透模式：叠加显示当前图层全部关键帧，用移动工具直接移动/缩放任意帧图像</source>
+        <translation>穿透模式：叠加显示当前图层全部关键帧，用移动工具直接移动/缩放任意帧图像</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mainwindow2.cpp" line="2144"/>
         <source>View Toolbar</source>
         <translation>显示工具栏</translation>
     </message>
     <message>
-        <location filename="../app/src/mainwindow2.cpp" line="2009"/>
+        <location filename="../app/src/mainwindow2.cpp" line="2151"/>
         <source>Overlay Toolbar</source>
         <translation>叠加工具栏</translation>
+    </message>
+</context>
+<context>
+    <name>McpDispatcher</name>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="350"/>
+        <source>编辑器尚未就绪</source>
+        <translation>编辑器尚未就绪</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="383"/>
+        <source>未知工具: %1</source>
+        <translation>未知工具: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="471"/>
+        <source>未知图层类型: %1（支持 bitmap / colorize / camera / sound）</source>
+        <translation>未知图层类型: %1（支持 bitmap / colorize / camera / sound）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="478"/>
+        <source>填色层</source>
+        <translation>填色层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="479"/>
+        <source>相机层</source>
+        <translation>相机层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="480"/>
+        <source>声音层</source>
+        <translation>声音层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="481"/>
+        <source>参考视频层</source>
+        <translation>参考视频层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="482"/>
+        <source>位图层</source>
+        <translation>位图层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="489"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="594"/>
+        <source>创建图层失败</source>
+        <translation>创建图层失败</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="505"/>
+        <source>该图层不能删除（工程至少要保留一个图层）</source>
+        <translation>该图层不能删除（工程至少要保留一个图层）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="509"/>
+        <source>删除图层失败: %1</source>
+        <translation>删除图层失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="554"/>
+        <source>图层名称不能为空</source>
+        <translation>图层名称不能为空</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="573"/>
+        <source>复制清空需要位图族图层（当前类型: %1）</source>
+        <translation>复制清空需要位图族图层（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="575"/>
+        <source>图层 %1 已锁定</source>
+        <translation>图层 %1 已锁定</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="591"/>
+        <source>%1_清空</source>
+        <translation>%1_清空</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="612"/>
+        <source>MCP：复制图层并清空</source>
+        <translation>MCP：复制图层并清空</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="636"/>
+        <source>to_row 超出范围（当前共 %1 行）</source>
+        <translation>to_row 超出范围（当前共 %1 行）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="665"/>
+        <source>只能在位图/填色图层上创建关键帧（当前类型: %1）</source>
+        <translation>只能在位图/填色图层上创建关键帧（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="667"/>
+        <source>图层 %1 当前处于隐藏状态，请先 set_layer_visibility 显示它</source>
+        <translation>图层 %1 当前处于隐藏状态，请先 set_layer_visibility 显示它</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="671"/>
+        <source>帧 %1 上已有关键帧</source>
+        <translation>帧 %1 上已有关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="675"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1578"/>
+        <source>MCP：新增关键帧</source>
+        <translation>MCP：新增关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="678"/>
+        <source>创建关键帧失败</source>
+        <translation>创建关键帧失败</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="695"/>
+        <source>只能在位图族图层上复制关键帧（当前类型: %1）</source>
+        <translation>只能在位图族图层上复制关键帧（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="702"/>
+        <source>帧 %1 上没有可复制的内容</source>
+        <translation>帧 %1 上没有可复制的内容</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="704"/>
+        <source>帧 %1 上已有关键帧，无法放置副本</source>
+        <translation>帧 %1 上已有关键帧，无法放置副本</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="711"/>
+        <source>MCP：复制关键帧</source>
+        <translation>MCP：复制关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="729"/>
+        <source>帧 %1 上没有关键帧（只能删除精确命中的关键帧）</source>
+        <translation>帧 %1 上没有关键帧（只能删除精确命中的关键帧）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="733"/>
+        <source>MCP：删除关键帧</source>
+        <translation>MCP：删除关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="759"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="966"/>
+        <source>找不到目标图层</source>
+        <translation>找不到目标图层</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="761"/>
+        <source>声音图层不能设置一拍N</source>
+        <translation>声音图层不能设置一拍N</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="769"/>
+        <source>一拍%1 需要图层上至少有 2 个关键帧</source>
+        <translation>一拍%1 需要图层上至少有 2 个关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="785"/>
+        <source>关键帧已是该间距，无需调整</source>
+        <translation>关键帧已是该间距，无需调整</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="820"/>
+        <source>MCP：一拍 %1</source>
+        <translation>MCP：一拍 %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="840"/>
+        <source>只能在位图/填色图层上绘制（当前类型: %1）</source>
+        <translation>只能在位图/填色图层上绘制（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="842"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="909"/>
+        <source>图层 %1 已锁定，无法绘制</source>
+        <translation>图层 %1 已锁定，无法绘制</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="844"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="911"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="972"/>
+        <source>图层 %1 当前隐藏，请先 set_layer_visibility 显示它</source>
+        <translation>图层 %1 当前隐藏，请先 set_layer_visibility 显示它</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="855"/>
+        <source>points 至少要有一个 [x,y] 点</source>
+        <translation>points 至少要有一个 [x,y] 点</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="866"/>
+        <source>points 中存在非 [x,y] 形式的项</source>
+        <translation>points 中存在非 [x,y] 形式的项</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="890"/>
+        <source>MCP：绘制笔画</source>
+        <translation>MCP：绘制笔画</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="907"/>
+        <source>只能在位图/填色图层上填充（当前类型: %1）</source>
+        <translation>只能在位图/填色图层上填充（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="921"/>
+        <source>polygon 至少要三个顶点</source>
+        <translation>polygon 至少要三个顶点</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="933"/>
+        <source>polygon 中存在非 [x,y] 形式的项</source>
+        <translation>polygon 中存在非 [x,y] 形式的项</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="949"/>
+        <source>MCP：填充区域</source>
+        <translation>MCP：填充区域</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="968"/>
+        <source>油漆桶只能在位图族图层上填充（当前类型: %1）</source>
+        <translation>油漆桶只能在位图族图层上填充（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="970"/>
+        <source>图层 %1 已锁定，无法填充</source>
+        <translation>图层 %1 已锁定，无法填充</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="981"/>
+        <source>point 必须是 [x,y] 画布坐标</source>
+        <translation>point 必须是 [x,y] 画布坐标</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1045"/>
+        <source>MCP：油漆桶填充</source>
+        <translation>MCP：油漆桶填充</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1052"/>
+        <source>填充未产生变化：点击点可能落在参照线稿之外，或与目标色相同</source>
+        <translation>填充未产生变化：点击点可能落在参照线稿之外，或与目标色相同</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1068"/>
+        <source>只能在位图/填色图层上清空帧（当前类型: %1）</source>
+        <translation>只能在位图/填色图层上清空帧（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1074"/>
+        <source>帧 %1 上没有关键帧，无需清空</source>
+        <translation>帧 %1 上没有关键帧，无需清空</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1078"/>
+        <source>MCP：清空帧</source>
+        <translation>MCP：清空帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1098"/>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1140"/>
+        <source>图层 %1 不是智能填色层（type=colorize）。当前图层：%2</source>
+        <translation>图层 %1 不是智能填色层（type=colorize）。当前图层：%2</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1120"/>
+        <source>transparent_color 不是合法颜色: %1</source>
+        <translation>transparent_color 不是合法颜色: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1151"/>
+        <source>找不到线稿源：填色层上/下方没有当前帧非空的位图图层。当前图层：%1</source>
+        <translation>找不到线稿源：填色层上/下方没有当前帧非空的位图图层。当前图层：%1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1155"/>
+        <source>填色层在帧 %1 上没有关键帧，请先 draw_stroke 落一颗种子</source>
+        <translation>填色层在帧 %1 上没有关键帧，请先 draw_stroke 落一颗种子</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1180"/>
+        <source>填色计算超时（30秒）；工程太大或算法参数过重</source>
+        <translation>填色计算超时（30秒）；工程太大或算法参数过重</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1184"/>
+        <source>填色结果为空：检查种子笔画是否落在封闭区域内</source>
+        <translation>填色结果为空：检查种子笔画是否落在封闭区域内</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1217"/>
+        <source>中割只能在位图族图层上生成（当前类型: %1）</source>
+        <translation>中割只能在位图族图层上生成（当前类型: %1）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1222"/>
+        <source>frame_b 必须比 frame_a 至少大 2（中间才有空位放中割帧）</source>
+        <translation>frame_b 必须比 frame_a 至少大 2（中间才有空位放中割帧）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1229"/>
+        <source>帧 %1 或 %2 上没有原画内容</source>
+        <translation>帧 %1 或 %2 上没有原画内容</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1242"/>
+        <source>目标位置上已有关键帧: %1；请先删除或换个 count</source>
+        <translation>目标位置上已有关键帧: %1；请先删除或换个 count</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1283"/>
+        <source>MCP：生成中割</source>
+        <translation>MCP：生成中割</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1312"/>
+        <source>工程文件不存在: %1</source>
+        <translation>工程文件不存在: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1317"/>
+        <source>打开工程失败: %1</source>
+        <translation>打开工程失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1333"/>
+        <source>工程尚未保存过，请提供保存路径</source>
+        <translation>工程尚未保存过，请提供保存路径</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1339"/>
+        <source>保存工程失败: %1</source>
+        <translation>保存工程失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1352"/>
+        <source>必须提供输出图片路径</source>
+        <translation>必须提供输出图片路径</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1365"/>
+        <source>导出失败: %1</source>
+        <translation>导出失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1377"/>
+        <source>必须提供输出文件路径</source>
+        <translation>必须提供输出文件路径</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1381"/>
+        <source>未找到 ffmpeg，无法导出视频。请在 首选项 → 文件 中配置 ffmpeg 路径（或在软件安装目录 plugins 下放置 ffmpeg.exe）后再试；PNG 序列可用 export_frame 逐帧导出</source>
+        <translation>未找到 ffmpeg，无法导出视频。请在 首选项 → 文件 中配置 ffmpeg 路径（或在软件安装目录 plugins 下放置 ffmpeg.exe）后再试；PNG 序列可用 export_frame 逐帧导出</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1399"/>
+        <source>导出视频失败: %1</source>
+        <translation>导出视频失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1450"/>
+        <source>找不到图层（按 id=%1 或行号=%1 均未命中）。当前图层：%2</source>
+        <translation>找不到图层（按 id=%1 或行号=%1 均未命中）。当前图层：%2</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1471"/>
+        <source>找不到名为「%1」的图层。当前图层：%2</source>
+        <translation>找不到名为「%1」的图层。当前图层：%2</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1475"/>
+        <source>缺少图层引用参数 layer（数字=id或1-based行号，字符串=名称）。当前图层：%1</source>
+        <translation>缺少图层引用参数 layer（数字=id或1-based行号，字符串=名称）。当前图层：%1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1570"/>
+        <source>图层不是位图族类型</source>
+        <translation>图层不是位图族类型</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1581"/>
+        <source>在帧 %1 上创建关键帧失败</source>
+        <translation>在帧 %1 上创建关键帧失败</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1589"/>
+        <source>帧 %1 上取不到位图关键帧</source>
+        <translation>帧 %1 上取不到位图关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpdispatcher.cpp" line="1602"/>
+        <source>颜色格式不合法: 「%1」（应为 #RRGGBB 或 #AARRGGBB）</source>
+        <translation>颜色格式不合法: 「%1」（应为 #RRGGBB 或 #AARRGGBB）</translation>
+    </message>
+</context>
+<context>
+    <name>McpPage</name>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="14"/>
+        <source>MCP</source>
+        <translation>MCP</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="20"/>
+        <source>服务器状态</source>
+        <translation>服务器状态</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="26"/>
+        <source>状态：</source>
+        <translation>状态：</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="33"/>
+        <location filename="../app/src/mcppage.cpp" line="159"/>
+        <source>已停止</source>
+        <translation>已停止</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="40"/>
+        <source>地址：</source>
+        <translation>地址：</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="47"/>
+        <source>—</source>
+        <translation>—</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="60"/>
+        <source>连接设置</source>
+        <translation>连接设置</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="66"/>
+        <source>启用 MCP 服务器（允许外部智能体控制本软件）</source>
+        <translation>启用 MCP 服务器（允许外部智能体控制本软件）</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="73"/>
+        <source>启动软件时自动开启服务器</source>
+        <translation>启动软件时自动开启服务器</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="82"/>
+        <source>端口：</source>
+        <translation>端口：</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="119"/>
+        <source>访问令牌：</source>
+        <translation>访问令牌：</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="133"/>
+        <source>复制</source>
+        <translation>复制</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="140"/>
+        <source>重新生成</source>
+        <translation>重新生成</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="149"/>
+        <source>重启服务器</source>
+        <translation>重启服务器</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="159"/>
+        <source>智能体接入</source>
+        <translation>智能体接入</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="165"/>
+        <source>把下面的配置添加到支持 MCP 的智能体客户端（如 Claude Code / Cursor / ZCode），即可通过对话操控 Pencil Dream。</source>
+        <translation>把下面的配置添加到支持 MCP 的智能体客户端（如 Claude Code / Cursor / ZCode），即可通过对话操控 Pencil Dream。</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="175"/>
+        <source>复制 MCP 客户端配置</source>
+        <translation>复制 MCP 客户端配置</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mcppage.ui" line="182"/>
+        <source>复制智能体连接提示词</source>
+        <translation>复制智能体连接提示词</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcppage.cpp" line="141"/>
+        <source>你是 Pencil Dream（传统二维动画软件）的操作智能体，通过 MCP 工具直接操控软件完成动画工作。
+工作方式：
+1. 先调用 get_scene_status 了解图层与关键帧结构；用 get_frame_image 查看画面再做决策。
+2. 图层引用：数字=图层id（优先）或时间轴行号（顶行=1），字符串=图层名称；引用失败时错误信息会附带当前图层清单。
+3. 坐标系：画布左上角为(0,0)，x向右、y向下；get_frame_image 返回的图像与 draw_stroke 等绘制工具使用同一坐标系。
+4. 所有修改都可撤销（undo 工具等效 Ctrl+Z）；每次改动后用 get_frame_image 复查效果，不满意就调整再查。
+5. 自动填色：create_layer(type=colorize) 建填色层 → draw_stroke 在填色层对应帧点彩色种子（小笔画即可） → request_colorize_update 触发计算 → 看图复查、补种子或调 set_colorize_options。
+6. 自动画中割：用 get_frame_image 看两张原画 → generate_inbetweens 在两帧之间生成中间帧 → 逐帧查看并微调。
+7. 涉及打开/覆盖工程的危险操作，先向用户确认。</source>
+        <translation>你是 Pencil Dream（传统二维动画软件）的操作智能体，通过 MCP 工具直接操控软件完成动画工作。
+工作方式：
+1. 先调用 get_scene_status 了解图层与关键帧结构；用 get_frame_image 查看画面再做决策。
+2. 图层引用：数字=图层id（优先）或时间轴行号（顶行=1），字符串=图层名称；引用失败时错误信息会附带当前图层清单。
+3. 坐标系：画布左上角为(0,0)，x向右、y向下；get_frame_image 返回的图像与 draw_stroke 等绘制工具使用同一坐标系。
+4. 所有修改都可撤销（undo 工具等效 Ctrl+Z）；每次改动后用 get_frame_image 复查效果，不满意就调整再查。
+5. 自动填色：create_layer(type=colorize) 建填色层 → draw_stroke 在填色层对应帧点彩色种子（小笔画即可） → request_colorize_update 触发计算 → 看图复查、补种子或调 set_colorize_options。
+6. 自动画中割：用 get_frame_image 看两张原画 → generate_inbetweens 在两帧之间生成中间帧 → 逐帧查看并微调。
+7. 涉及打开/覆盖工程的危险操作，先向用户确认。</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcppage.cpp" line="159"/>
+        <source>运行中</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcppage.cpp" line="165"/>
+        <source>已停止（%1）</source>
+        <translation>已停止（%1）</translation>
+    </message>
+</context>
+<context>
+    <name>McpServer</name>
+    <message>
+        <location filename="../app/src/mcp/mcpserver.cpp" line="62"/>
+        <source>无法监听端口 %1：%2</source>
+        <translation>无法监听端口 %1：%2</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpserver.cpp" line="315"/>
+        <source>JSON 解析失败: %1</source>
+        <translation>JSON 解析失败: %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpserver.cpp" line="336"/>
+        <source>非法的 JSON-RPC 请求</source>
+        <translation>非法的 JSON-RPC 请求</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpserver.cpp" line="394"/>
+        <source>另一个工具调用正在进行中，请稍后重试</source>
+        <translation>另一个工具调用正在进行中，请稍后重试</translation>
+    </message>
+    <message>
+        <location filename="../app/src/mcp/mcpserver.cpp" line="443"/>
+        <source>未知方法: %1</source>
+        <translation>未知方法: %1</translation>
+    </message>
+</context>
+<context>
+    <name>MoveTool</name>
+    <message>
+        <location filename="../core_lib/src/tool/movetool.cpp" line="618"/>
+        <source>穿透模式：变换帧图像</source>
+        <translation>穿透模式：变换帧图像</translation>
     </message>
 </context>
 <context>
@@ -5900,42 +6437,42 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation>检查环境中...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="120"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="117"/>
         <source>Generating GIF...</source>
         <translation>生成 GIF 中...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="127"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="124"/>
         <source>Assembling audio...</source>
         <translation>合成音轨...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="132"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="129"/>
         <source>Generating movie...</source>
         <translation>生成电影中...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="137"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="134"/>
         <source>Done</source>
         <translation>完成</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="595"/>
-        <location filename="../core_lib/src/movieexporter.cpp" line="607"/>
-        <location filename="../core_lib/src/movieexporter.cpp" line="732"/>
-        <location filename="../core_lib/src/movieexporter.cpp" line="744"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="592"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="604"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="729"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="741"/>
         <source>Something went wrong</source>
         <translation>出错了</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="596"/>
-        <location filename="../core_lib/src/movieexporter.cpp" line="733"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="593"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="730"/>
         <source>Looks like our video backend did not exit normally. Your movie may not have exported correctly. Please try again and report this if it persists.</source>
         <translation>看起来我们的视频后端没有正常退出。您的电影可能没有正确导出。请重试并报告此问题如果它仍然存在。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieexporter.cpp" line="608"/>
-        <location filename="../core_lib/src/movieexporter.cpp" line="745"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="605"/>
+        <location filename="../core_lib/src/movieexporter.cpp" line="742"/>
         <source>Couldn&apos;t start the video backend, please try again.</source>
         <translation>無法啟動視訊引擎，請再嘗試一次。</translation>
     </message>
@@ -5943,272 +6480,247 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 <context>
     <name>MovieImporter</name>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="54"/>
-        <location filename="../core_lib/src/movieimporter.cpp" line="248"/>
         <source>Bitmap only</source>
-        <translation>仅位图</translation>
+        <translation type="vanished">仅位图</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="55"/>
-        <location filename="../core_lib/src/movieimporter.cpp" line="249"/>
         <source>You need to be on the bitmap layer to import a movie clip</source>
-        <translation>您需要在位图层上才能导入电影片段</translation>
+        <translation type="vanished">您需要在位图层上才能导入电影片段</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="155"/>
         <source>Loading video failed</source>
-        <translation>加载视频失败</translation>
+        <translation type="vanished">加载视频失败</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="156"/>
         <source>Could not get duration from the specified video. Are you sure you are importing a valid video file?</source>
-        <translation>無法取得影片長度。請確定您匯入的是支援的影片格式。</translation>
+        <translation type="vanished">無法取得影片長度。請確定您匯入的是支援的影片格式。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="181"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="62"/>
         <source>Error creating folder</source>
         <translation>创建文件夹时出错</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="182"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="63"/>
         <source>Unable to create a temporary folder, cannot import video.</source>
         <translation>无法创建临时文件夹，无法导入视频。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="196"/>
         <source>Imported movie too big!</source>
-        <translation>导入的影片过大！</translation>
+        <translation type="vanished">导入的影片过大！</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="197"/>
         <source>The movie clip is too long. Pencil2D can only hold %1 frames, but this movie would go up to about frame %2. Please make your video shorter and try again.</source>
-        <translation>影片剪辑太长。Pencil2D 只能容纳 %1 帧，但该影片达到 %2 帧。请缩短您的视频，然后重试。</translation>
+        <translation type="vanished">影片剪辑太长。Pencil2D 只能容纳 %1 帧，但该影片达到 %2 帧。请缩短您的视频，然后重试。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="232"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="74"/>
         <source>Unknown error</source>
         <translation>未知错误</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="233"/>
         <source>This should not happen...</source>
-        <translation>这不应该发生...</translation>
+        <translation type="vanished">这不应该发生...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="265"/>
         <source>Video processed, adding frames...</source>
-        <translation>视频已处理，正在添加帧...</translation>
+        <translation type="vanished">视频已处理，正在添加帧...</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="301"/>
         <source>Failed import</source>
-        <translation>导入失败</translation>
+        <translation type="vanished">导入失败</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="302"/>
         <source>Was unable to find internal files, import unsuccessful.</source>
-        <translation>无法找到内部文件，导入失败。</translation>
+        <translation type="vanished">无法找到内部文件，导入失败。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="317"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="75"/>
+        <source>不支持的导入类型:此路径只处理音频导入。</source>
+        <translation>不支持的导入类型:此路径只处理音频导入。</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/movieimporter.cpp" line="93"/>
         <source>Sound only</source>
         <translation>只有声音</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="318"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="94"/>
         <source>You need to be on a sound layer to import the audio</source>
         <translation>您需要在声音层上才能导入音频</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="330"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="106"/>
         <source>Move to an empty frame</source>
         <translation>移动到空白帧</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="331"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="107"/>
         <source>A frame already exists on frame: %1 Move the scrubber to a empty position on the timeline and try again</source>
         <translation>第 %1 帧已存在帧。请把播放头移到时间轴的空位后重试</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="373"/>
-        <source>FFmpeg Not Found</source>
-        <translation>找不到 FFmpeg</translation>
+        <location filename="../core_lib/src/movieimporter.cpp" line="149"/>
+        <source>未找到 FFmpeg</source>
+        <translation>未找到 FFmpeg</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/movieimporter.cpp" line="374"/>
+        <location filename="../core_lib/src/movieimporter.cpp" line="150"/>
+        <source>请在 首选项 → 文件 页设置 FFmpeg 路径（可从 https://www.gyan.dev/ffmpeg/builds/ 下载），或把 ffmpeg 放进程序目录的 plugins 文件夹后重试。</source>
+        <translation>请在 首选项 → 文件 页设置 FFmpeg 路径（可从 https://www.gyan.dev/ffmpeg/builds/ 下载），或把 ffmpeg 放进程序目录的 plugins 文件夹后重试。</translation>
+    </message>
+    <message>
+        <source>FFmpeg Not Found</source>
+        <translation type="vanished">找不到 FFmpeg</translation>
+    </message>
+    <message>
         <source>Please place the ffmpeg binary in plugins directory and try again</source>
-        <translation>请将 ffmpeg 二进制文件放在 plugins 目录中，然后重试</translation>
+        <translation type="vanished">请将 ffmpeg 二进制文件放在 plugins 目录中，然后重试</translation>
     </message>
 </context>
 <context>
     <name>Object</name>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="524"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="157"/>
+        <source>组</source>
+        <translation>组</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/structure/object.cpp" line="838"/>
         <source>error</source>
         <translation>错误</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="778"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="917"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1138"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1214"/>
+        <source>默认色卡</source>
+        <translation>默认色卡</translation>
+    </message>
+    <message>
+        <location filename="../core_lib/src/structure/object.cpp" line="1111"/>
         <source>Black</source>
         <translation>黑色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="779"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1112"/>
         <source>Red</source>
         <translation>红色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="780"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1113"/>
         <source>Dark Red</source>
         <translation>暗红色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="781"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1114"/>
         <source>Orange</source>
         <translation>橙色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="782"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1115"/>
         <source>Dark Orange</source>
         <translation>暗橙色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="783"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1116"/>
         <source>Yellow</source>
         <translation>黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="784"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1117"/>
         <source>Dark Yellow</source>
         <translation>暗黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="785"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1118"/>
         <source>Green</source>
         <translation>绿色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="786"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1119"/>
         <source>Dark Green</source>
         <translation>暗绿色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="787"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1120"/>
         <source>Cyan</source>
         <translation>青色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="788"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1121"/>
         <source>Dark Cyan</source>
         <translation>暗青色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="789"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1122"/>
         <source>Blue</source>
         <translation>蓝色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="790"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1123"/>
         <source>Dark Blue</source>
         <translation>暗蓝色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="791"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1124"/>
         <source>White</source>
         <translation>白色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="792"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1125"/>
         <source>Very Light Grey</source>
         <translation>极浅灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="793"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1126"/>
         <source>Light Grey</source>
         <translation>浅灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="794"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1127"/>
         <source>Grey</source>
         <translation>灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="795"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1128"/>
         <source>Dark Grey</source>
         <translation>暗灰色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="796"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1129"/>
         <source>Pale Orange Yellow</source>
         <translation>淡橙黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="797"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1130"/>
         <source>Pale Grayish Orange Yellow</source>
         <translation>淡灰橙黄</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="798"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1131"/>
         <source>Orange Yellow </source>
         <translation>橙黄色 </translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="799"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1132"/>
         <source>Grayish Orange Yellow</source>
         <translation>灰橙黄</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="800"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1133"/>
         <source>Light Orange Yellow</source>
         <translation>浅橙黄色</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/structure/object.cpp" line="801"/>
+        <location filename="../core_lib/src/structure/object.cpp" line="1134"/>
         <source>Light Grayish Orange Yellow</source>
         <translation>浅灰橙黄</translation>
     </message>
-</context>
-<context>
-    <name>OnionAlignOptionsWidget</name>
     <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="54"/>
-        <source>中心对齐</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="54"/>
-        <source>前后帧内容中心对齐到中点（等同双击画布）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="55"/>
-        <source>复位前帧</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="55"/>
-        <source>归零红色（前帧）幽灵的全部变换（位移/旋转/缩放）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="56"/>
-        <source>复位后帧</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="56"/>
-        <source>归零蓝色（后帧）幽灵的全部变换（位移/旋转/缩放）</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="57"/>
-        <source>全部复位</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/onionalignoptionswidget.cpp" line="57"/>
-        <source>清空当前图层全部幽灵变换（等同 Alt+点空白）</source>
-        <translation type="unfinished"></translation>
+        <location filename="../core_lib/src/structure/object.cpp" line="1274"/>
+        <source>色卡</source>
+        <translation>色卡</translation>
     </message>
 </context>
 <context>
@@ -6261,12 +6773,12 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation>在所有图层上显示</translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="141"/>
+        <location filename="../app/ui/onionskin.ui" line="134"/>
         <source>Show Keyframes Only</source>
         <translation>仅显示关键帧</translation>
     </message>
     <message>
-        <location filename="../app/ui/onionskin.ui" line="148"/>
+        <location filename="../app/ui/onionskin.ui" line="141"/>
         <source>Show During Playback</source>
         <translation>在播放时显示</translation>
     </message>
@@ -6279,43 +6791,43 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation>洋葱皮开关（同时开启前后帧）</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="71"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="86"/>
         <source>Onion Skin On/Off：</source>
         <translation>洋葱皮开关：</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="127"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="74"/>
         <source>Onion skin color: red</source>
-        <translation type="unfinished">洋葱皮颜色: 红</translation>
+        <translation>洋葱皮颜色：红</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="134"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="81"/>
         <source>Onion skin color: blue</source>
-        <translation type="unfinished">洋葱皮颜色: 蓝</translation>
+        <translation>洋葱皮颜色：蓝</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="136"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="135"/>
         <source>Previous frames</source>
         <translation>前帧数</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="137"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="136"/>
         <source>Next frames</source>
         <translation>后帧数</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="138"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="137"/>
         <source>Max opacity</source>
         <translation>最大不透明度</translation>
     </message>
     <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="137"/>
         <location filename="../app/src/onionskinwidget.cpp" line="138"/>
-        <location filename="../app/src/onionskinwidget.cpp" line="139"/>
         <source> %</source>
-        <translation type="unfinished">%</translation>
+        <translation> %</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="139"/>
+        <location filename="../app/src/onionskinwidget.cpp" line="138"/>
         <source>Min opacity</source>
         <translation>最小不透明度</translation>
     </message>
@@ -6336,45 +6848,36 @@ If you believe that this error is an issue with Pencil2D, please create a new is
 <context>
     <name>PaletteExtractDialog</name>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="245"/>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="281"/>
         <source>调色板提取</source>
-        <translation>调色板提取</translation>
+        <translation type="vanished">调色板提取</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="251"/>
         <source>颜色数量：</source>
-        <translation>颜色数量：</translation>
+        <translation type="vanished">颜色数量：</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="257"/>
         <source>选择图片并提取</source>
-        <translation>选择图片并提取</translation>
+        <translation type="vanished">选择图片并提取</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="261"/>
         <source>提取后将生成色块图层，并将色值复制到剪贴板。</source>
-        <translation>提取后将生成色块图层，并将色值复制到剪贴板。</translation>
+        <translation type="vanished">提取后将生成色块图层，并将色值复制到剪贴板。</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="272"/>
         <source>选择图片</source>
-        <translation>选择图片</translation>
+        <translation type="vanished">选择图片</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="281"/>
         <source>无法读取图片：%1</source>
-        <translation>无法读取图片：%1</translation>
+        <translation type="vanished">无法读取图片：%1</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="370"/>
         <source>_调色板</source>
-        <translation>_调色板</translation>
+        <translation type="vanished">_调色板</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="379"/>
         <source>生成调色板</source>
-        <translation>生成调色板</translation>
+        <translation type="vanished">生成调色板</translation>
     </message>
 </context>
 <context>
@@ -6521,6 +7024,11 @@ Check selection, and please try again.</source>
         <source>Shortcuts</source>
         <translation>快捷键</translation>
     </message>
+    <message>
+        <location filename="../app/ui/preferencesdialog.ui" line="149"/>
+        <source>MCP</source>
+        <translation>MCP</translation>
+    </message>
 </context>
 <context>
     <name>PresetDialog</name>
@@ -6548,61 +7056,8 @@ Check selection, and please try again.</source>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="42"/>
-        <source>大小</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="43"/>
-        <source>不透明度</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="44"/>
-        <source>无</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="45"/>
         <source>、</source>
-        <translation>、</translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="46"/>
-        <source>%1｜直径 %2px｜硬度 %3%
-笔尖：%4｜压感控制：%5
-%6</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="47"/>
-        <source>橡皮</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="47"/>
-        <source>画笔</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="50"/>
-        <source>圆形</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="50"/>
-        <source>方形</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="52"/>
-        <source>内置笔刷</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../app/src/brushpresetpanel.cpp" line="52"/>
-        <source>用户笔刷</source>
-        <translation type="unfinished"></translation>
+        <translation type="vanished">、</translation>
     </message>
 </context>
 <context>
@@ -6688,33 +7143,33 @@ or cancel</source>
 <context>
     <name>ScribbleArea</name>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="869"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="890"/>
         <source>Warning</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="870"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="891"/>
         <source>You are trying to modify a hidden layer! Please select another layer (or make the current layer visible).</source>
         <translation>你正在尝试修改一个隐藏层！请选择其它层（或将当前层设为可见）。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="877"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="898"/>
         <source>警告</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="878"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="899"/>
         <source>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</source>
         <translation>该图层已锁定，无法编辑。请点击图层行上的锁图标解锁。</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1572"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1652"/>
         <source>Delete Selection</source>
         <comment>Undo Step: clear the selection area.</comment>
         <translation>删除选择区域</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1588"/>
+        <location filename="../core_lib/src/interface/scribblearea.cpp" line="1668"/>
         <source>Clear Image</source>
         <comment>Undo step text</comment>
         <translation>清理图像</translation>
@@ -7046,10 +7501,9 @@ or cancel</source>
         <translation>导入预定义图片集</translation>
     </message>
     <message>
-        <location filename="../app/src/shortcutspage.cpp" line="341"/>
         <source>Import Movie Video</source>
         <comment>Shortcut</comment>
-        <translation>导入影片视频</translation>
+        <translation type="vanished">导入影片视频</translation>
     </message>
     <message>
         <location filename="../app/src/shortcutspage.cpp" line="342"/>
@@ -7059,6 +7513,12 @@ or cancel</source>
     </message>
     <message>
         <source>Import Reference Video</source>
+        <translation type="vanished">导入参考视频</translation>
+    </message>
+    <message>
+        <location filename="../app/src/shortcutspage.cpp" line="341"/>
+        <source>Import Reference Video</source>
+        <comment>Shortcut</comment>
         <translation>导入参考视频</translation>
     </message>
     <message>
@@ -7359,7 +7819,7 @@ or cancel</source>
         <location filename="../app/src/shortcutspage.cpp" line="392"/>
         <source>洋葱皮对位工具</source>
         <comment>Shortcut</comment>
-        <translation type="unfinished"></translation>
+        <translation>洋葱皮对位工具</translation>
     </message>
     <message>
         <location filename="../app/src/shortcutspage.cpp" line="393"/>
@@ -7592,17 +8052,17 @@ or cancel</source>
     <message>
         <location filename="../app/src/statusbar.cpp" line="158"/>
         <source>拖动绘制自由形状选区；Shift=加选, Alt=减选, Shift+Alt=相交, Ctrl+Alt=对称差, Ctrl=替换（可拖动途中按）；动作与扩展/收缩在工具选项。</source>
-        <translation type="unfinished"></translation>
+        <translation>拖动绘制自由形状选区；Shift=加选, Alt=减选, Shift+Alt=相交, Ctrl+Alt=对称差, Ctrl=替换（可拖动途中按）；动作与扩展/收缩在工具选项。</translation>
     </message>
     <message>
         <location filename="../app/src/statusbar.cpp" line="161"/>
         <source>变形工具：液化=笔刷推挤像素，弯曲=拖网格点，笼罩=画轮廓拖顶点，透视=拖四角；模式与参数在工具选项；回车/双击=应用，Esc=取消，Backspace=复位。</source>
-        <translation type="unfinished"></translation>
+        <translation>变形工具：液化=笔刷推挤像素，弯曲=拖网格点，笼罩=画轮廓拖顶点，透视=拖四角；模式与参数在工具选项；回车/双击=应用，Esc=取消，Backspace=复位。</translation>
     </message>
     <message>
         <location filename="../app/src/statusbar.cpp" line="164"/>
         <source>拖动洋葱皮红/蓝幽灵像对位参考；Ctrl+拖动=绕幽灵中心旋转（Shift 吸附步进），Shift+拖动=缩放；双击=前后帧中心自动对齐；Alt+点击=归零该侧，Alt+点空白=清空全部。</source>
-        <translation type="unfinished"></translation>
+        <translation>拖动洋葱皮红/蓝幽灵像对位参考；Ctrl+拖动=绕幽灵中心旋转（Shift 吸附步进），Shift+拖动=缩放；双击=前后帧中心自动对齐；Alt+点击=归零该侧，Alt+点空白=清空全部。</translation>
     </message>
     <message>
         <location filename="../app/src/statusbar.cpp" line="205"/>
@@ -7800,19 +8260,19 @@ or cancel</source>
     </message>
     <message>
         <location filename="../app/src/timecontrols.cpp" line="83"/>
-        <location filename="../app/src/timecontrols.cpp" line="400"/>
+        <location filename="../app/src/timecontrols.cpp" line="414"/>
         <source>Actual frame number</source>
         <translation>实际帧数</translation>
     </message>
     <message>
         <location filename="../app/src/timecontrols.cpp" line="86"/>
-        <location filename="../app/src/timecontrols.cpp" line="418"/>
+        <location filename="../app/src/timecontrols.cpp" line="432"/>
         <source>Timecode format MM:SS:FF</source>
         <translation>时间码格式 MM:SS:FF</translation>
     </message>
     <message>
         <location filename="../app/src/timecontrols.cpp" line="89"/>
-        <location filename="../app/src/timecontrols.cpp" line="409"/>
+        <location filename="../app/src/timecontrols.cpp" line="423"/>
         <source>Timecode format S:FF</source>
         <translation>时间码格式 S:FF</translation>
     </message>
@@ -7847,40 +8307,45 @@ or cancel</source>
         <translation>回放范围</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="171"/>
-        <location filename="../app/src/timecontrols.cpp" line="322"/>
+        <location filename="../app/src/timecontrols.cpp" line="174"/>
+        <location filename="../app/src/timecontrols.cpp" line="336"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="172"/>
+        <location filename="../app/src/timecontrols.cpp" line="175"/>
         <source>Loop</source>
         <translation>循环</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="173"/>
+        <location filename="../app/src/timecontrols.cpp" line="176"/>
+        <source>透明网格（把画布白色纸面换成透明棋盘格）</source>
+        <translation>透明网格（把画布白色纸面换成透明棋盘格）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timecontrols.cpp" line="177"/>
         <source>声音开/关</source>
         <translation>声音开/关</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="174"/>
+        <location filename="../app/src/timecontrols.cpp" line="178"/>
         <source>擦洗时间轴时播放声音</source>
         <translation>擦洗时间轴时播放声音</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="175"/>
+        <location filename="../app/src/timecontrols.cpp" line="179"/>
         <source>Jump to the End</source>
         <comment>Tooltip of the jump to end button</comment>
         <translation>跳到结尾</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="176"/>
+        <location filename="../app/src/timecontrols.cpp" line="180"/>
         <source>Jump to the Start</source>
         <comment>Tooltip of the jump to start button</comment>
         <translation>跳到开头</translation>
     </message>
     <message>
-        <location filename="../app/src/timecontrols.cpp" line="317"/>
+        <location filename="../app/src/timecontrols.cpp" line="331"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
@@ -8002,22 +8467,22 @@ or cancel</source>
         <translation>循环克隆帧：把选中的帧（未选中则整层）按原间隔重复指定次数</translation>
     </message>
     <message>
-        <location filename="../app/src/timeline.cpp" line="687"/>
+        <location filename="../app/src/timeline.cpp" line="692"/>
         <source>一拍 %1</source>
         <translation>一拍 %1</translation>
     </message>
     <message>
-        <location filename="../app/src/timeline.cpp" line="715"/>
+        <location filename="../app/src/timeline.cpp" line="720"/>
         <source>%1_清空</source>
         <translation>%1_清空</translation>
     </message>
     <message>
-        <location filename="../app/src/timeline.cpp" line="735"/>
+        <location filename="../app/src/timeline.cpp" line="741"/>
         <source>复制图层并清空</source>
         <translation>复制图层并清空</translation>
     </message>
     <message>
-        <location filename="../app/src/timeline.cpp" line="787"/>
+        <location filename="../app/src/timeline.cpp" line="793"/>
         <source>循环克隆 ×%1</source>
         <translation>循环克隆 ×%1</translation>
     </message>
@@ -8029,7 +8494,7 @@ or cancel</source>
     <message>
         <location filename="../app/src/timeline.cpp" line="126"/>
         <source>口型同步 / 调色板提取 / 视频抽帧</source>
-        <translation type="unfinished"></translation>
+        <translation>口型同步 / 调色板提取 / 视频抽帧</translation>
     </message>
     <message>
         <location filename="../app/src/timeline.cpp" line="153"/>
@@ -8066,37 +8531,169 @@ or cancel</source>
 <context>
     <name>TimeLineCells</name>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="1972"/>
+        <location filename="../app/src/timelinecells.cpp" line="516"/>
+        <source>加入此组</source>
+        <translation>加入此组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="516"/>
+        <source>成组</source>
+        <translation>成组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="1826"/>
+        <source>缩放</source>
+        <translation>缩放</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="1838"/>
+        <source>位移 X</source>
+        <translation>位移 X</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="1840"/>
+        <source>位移 Y</source>
+        <translation>位移 Y</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3134"/>
         <source>新建 %1 帧</source>
         <translation>新建 %1 帧</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2049"/>
+        <location filename="../app/src/timelinecells.cpp" line="3203"/>
         <source>拉伸帧块</source>
         <translation>拉伸帧块</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2079"/>
+        <location filename="../app/src/timelinecells.cpp" line="3239"/>
         <source>移动帧</source>
         <translation>移动帧</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2108"/>
+        <location filename="../app/src/timelinecells.cpp" line="3261"/>
+        <source>移动相机关键帧</source>
+        <translation>移动相机关键帧</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3340"/>
+        <source>加入图层组</source>
+        <translation>加入图层组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3364"/>
+        <source>组 %1</source>
+        <translation>组 %1</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3370"/>
+        <source>图层成组</source>
+        <translation>图层成组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3411"/>
         <source>重排图层</source>
         <translation>重排图层</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2212"/>
+        <location filename="../app/src/timelinecells.cpp" line="3411"/>
+        <source>移出图层组</source>
+        <translation>移出图层组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3479"/>
+        <location filename="../app/src/timelinecells.cpp" line="3586"/>
+        <source>重命名图层组</source>
+        <translation>重命名图层组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3480"/>
+        <location filename="../app/src/timelinecells.cpp" line="3587"/>
+        <source>组名：</source>
+        <translation>组名：</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3555"/>
         <source>Layer Properties</source>
         <translation>层属性</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2213"/>
+        <location filename="../app/src/timelinecells.cpp" line="3556"/>
         <source>Layer name:</source>
         <translation>层名:</translation>
     </message>
     <message>
-        <location filename="../app/src/timelinecells.cpp" line="2346"/>
+        <location filename="../app/src/timelinecells.cpp" line="3573"/>
+        <source>展开组</source>
+        <translation>展开组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3573"/>
+        <source>收起组</source>
+        <translation>收起组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3574"/>
+        <source>重命名组</source>
+        <translation>重命名组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3576"/>
+        <source>解散组</source>
+        <translation>解散组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3623"/>
+        <source>将选中 %1 个图层成组</source>
+        <translation>将选中 %1 个图层成组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3629"/>
+        <source>新建组（包含“%1”）</source>
+        <translation>新建组（包含“%1”）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3633"/>
+        <source>移出组</source>
+        <translation>移出组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3634"/>
+        <source>解散所在组</source>
+        <translation>解散所在组</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3644"/>
+        <source>向下合并图层 (Ctrl+E)</source>
+        <translation>向下合并图层 (Ctrl+E)</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3649"/>
+        <source>删除图层…</source>
+        <translation>删除图层…</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3653"/>
+        <source>循环模式</source>
+        <translation>循环模式</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3654"/>
+        <source>保持（默认）</source>
+        <translation>保持（默认）</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3655"/>
+        <source>循环</source>
+        <translation>循环</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3656"/>
+        <source>往复循环</source>
+        <translation>往复循环</translation>
+    </message>
+    <message>
+        <location filename="../app/src/timelinecells.cpp" line="3861"/>
         <source>跨层移动帧</source>
         <translation>跨层移动帧</translation>
     </message>
@@ -8244,7 +8841,7 @@ or cancel</source>
     <message>
         <location filename="../app/ui/toolboxwidget.ui" line="223"/>
         <source>洋葱皮对位工具</source>
-        <translation type="unfinished"></translation>
+        <translation>洋葱皮对位工具</translation>
     </message>
     <message>
         <location filename="../app/ui/toolboxwidget.ui" line="450"/>
@@ -8275,7 +8872,7 @@ or cancel</source>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="133"/>
         <source>洋葱皮对位工具 (%1)：拖动移动红/蓝幽灵，Ctrl=旋转，Shift=缩放；双击=中心对齐；Alt+点击=归零</source>
-        <translation type="unfinished"></translation>
+        <translation>洋葱皮对位工具 (%1)：拖动移动红/蓝幽灵，Ctrl=旋转，Shift=缩放；双击=中心对齐；Alt+点击=归零</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="135"/>
@@ -8335,7 +8932,7 @@ or cancel</source>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="158"/>
         <source>洋葱皮对位工具 (%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>洋葱皮对位工具 (%1)</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="453"/>
@@ -8345,52 +8942,52 @@ or cancel</source>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="481"/>
         <source>%1（%2）：%3；长按此按钮可切换同类工具</source>
-        <translation type="unfinished"></translation>
+        <translation>%1（%2）：%3；长按此按钮可切换同类工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="508"/>
         <source>矩形选择工具</source>
-        <translation type="unfinished"></translation>
+        <translation>矩形选择工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="509"/>
         <source>套索工具</source>
-        <translation type="unfinished"></translation>
+        <translation>套索工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="510"/>
         <source>变形工具</source>
-        <translation type="unfinished"></translation>
+        <translation>变形工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="511"/>
         <source>移动工具</source>
-        <translation type="unfinished"></translation>
+        <translation>移动工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="512"/>
         <source>工具</source>
-        <translation type="unfinished">工具</translation>
+        <translation>工具</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="520"/>
         <source>拖拽框选区域</source>
-        <translation type="unfinished"></translation>
+        <translation>拖拽框选区域</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="521"/>
         <source>圈选任意形状区域</source>
-        <translation type="unfinished"></translation>
+        <translation>圈选任意形状区域</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="522"/>
         <source>自由/液化/弯曲/笼罩/透视（见工具选项）</source>
-        <translation type="unfinished"></translation>
+        <translation>自由/液化/弯曲/笼罩/透视（见工具选项）</translation>
     </message>
     <message>
         <location filename="../app/src/toolboxwidget.cpp" line="523"/>
         <source>移动对象，相机层上为移动相机</source>
-        <translation type="unfinished"></translation>
+        <translation>移动对象，相机层上为移动相机</translation>
     </message>
     <message>
         <source>Select Tool (%1)</source>
@@ -8696,21 +9293,21 @@ or cancel</source>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="323"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="343"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="344"/>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="350"/>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="353"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="364"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="370"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="373"/>
         <source>Undo</source>
         <comment>Menu item text</comment>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="370"/>
-        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="377"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="390"/>
+        <location filename="../core_lib/src/managers/undoredomanager.cpp" line="397"/>
         <source>Redo</source>
         <comment>Menu item text</comment>
         <translation>重做</translation>
@@ -8719,97 +9316,76 @@ or cancel</source>
 <context>
     <name>VideoExtractDialog</name>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="404"/>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="513"/>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="540"/>
         <source>视频抽帧中割</source>
-        <translation>视频抽帧中割</translation>
+        <translation type="vanished">视频抽帧中割</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="411"/>
         <source>ffmpeg：</source>
-        <translation>ffmpeg：</translation>
+        <translation type="vanished">ffmpeg：</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="419"/>
         <source>视频：</source>
-        <translation>视频：</translation>
+        <translation type="vanished">视频：</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="422"/>
         <source>浏览</source>
-        <translation>浏览</translation>
+        <translation type="vanished">浏览</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="424"/>
         <source>探测</source>
-        <translation>探测</translation>
+        <translation type="vanished">探测</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="434"/>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="643"/>
         <source>播放</source>
-        <translation>播放</translation>
+        <translation type="vanished">播放</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="436"/>
         <source>帧 0 / 0</source>
-        <translation>帧 0 / 0</translation>
+        <translation type="vanished">帧 0 / 0</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="449"/>
         <source>起始帧：</source>
-        <translation>起始帧：</translation>
+        <translation type="vanished">起始帧：</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="452"/>
         <source>结束帧：</source>
-        <translation>结束帧：</translation>
+        <translation type="vanished">结束帧：</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="455"/>
         <source>导入到时间轴</source>
-        <translation>导入到时间轴</translation>
+        <translation type="vanished">导入到时间轴</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="491"/>
         <source>选择视频</source>
-        <translation>选择视频</translation>
+        <translation type="vanished">选择视频</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="493"/>
         <source>视频文件 (*.mp4 *.avi *.mov *.mkv *.webm *.gif)</source>
-        <translation>视频文件 (*.mp4 *.avi *.mov *.mkv *.webm *.gif)</translation>
+        <translation type="vanished">视频文件 (*.mp4 *.avi *.mov *.mkv *.webm *.gif)</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="514"/>
         <source>无法运行 ffmpeg/ffprobe，请在上方填写正确的 ffmpeg 路径。</source>
-        <translation>无法运行 ffmpeg/ffprobe，请在上方填写正确的 ffmpeg 路径。</translation>
+        <translation type="vanished">无法运行 ffmpeg/ffprobe，请在上方填写正确的 ffmpeg 路径。</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="540"/>
         <source>无法解析视频时长或帧率。</source>
-        <translation>无法解析视频时长或帧率。</translation>
+        <translation type="vanished">无法解析视频时长或帧率。</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="566"/>
         <source>帧 %1 / %2</source>
-        <translation>帧 %1 / %2</translation>
+        <translation type="vanished">帧 %1 / %2</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="648"/>
         <source>暂停</source>
-        <translation>暂停</translation>
+        <translation type="vanished">暂停</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="684"/>
         <source>AI中割</source>
-        <translation>AI中割</translation>
+        <translation type="vanished">AI中割</translation>
     </message>
     <message>
-        <location filename="../app/src/tvptoolsdialog.cpp" line="705"/>
         <source>导入视频帧 %1 张</source>
-        <translation>导入视频帧 %1 张</translation>
+        <translation type="vanished">导入视频帧 %1 张</translation>
     </message>
 </context>
 </TS>

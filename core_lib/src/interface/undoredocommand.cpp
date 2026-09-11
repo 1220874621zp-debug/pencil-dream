@@ -222,6 +222,23 @@ BitmapReplaceCommand::BitmapReplaceCommand(const BitmapImage* undoBitmap,
     setText(description);
 }
 
+BitmapReplaceCommand::BitmapReplaceCommand(const BitmapImage* undoBitmap,
+                                           const BitmapImage* redoBitmap,
+                                           const int layerId,
+                                           const QString& description,
+                                           Editor* editor,
+                                           QUndoCommand* parent) : UndoRedoCommand(editor, parent)
+{
+    Q_ASSERT(undoBitmap != nullptr && redoBitmap != nullptr);
+
+    this->undoBitmap = *undoBitmap;
+    this->redoBitmap = *redoBitmap;
+    this->undoLayerId = layerId;
+    this->redoLayerId = layerId;
+
+    setText(description);
+}
+
 void BitmapReplaceCommand::undo()
 {
     Layer* layer = editor()->layers()->findLayerById(undoLayerId);

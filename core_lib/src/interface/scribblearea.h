@@ -82,6 +82,14 @@ public:
     /** 洋葱皮对位工具：偏移变化后重绘（洋葱皮在 pre-layer 缓存里，须重置缓存） */
     void invalidateOnionGhostVisual();
 
+    /** 穿透模式：开关（主工具栏按钮驱动，非持久化，默认关） */
+    void setXrayMode(bool on);
+    bool xrayMode() const { return mXrayState.enabled; }
+    /** 穿透模式：显示态可变引用（MoveTool 操纵选中帧/拖拽预览） */
+    XrayVisualState& xrayStateRef() { return mXrayState; }
+    /** 穿透模式：显示态变化后重绘（双层缓存失效，同洋葱幽灵铁律） */
+    void invalidateXrayVisual();
+
     void setEffect(SETTING e, bool isOn);
 
     LayerVisibility getLayerVisibility() const { return mLayerVisibility; }
@@ -285,6 +293,9 @@ private:
 
     // 洋葱皮对位工具的幽灵偏移表（按图层 id；显示辅助态，不存盘不入撤销栈）
     OnionGhostOffsetMap mOnionGhostOffsets;
+
+    // 穿透模式显示态（显示辅助态；像素修改走撤销栈）
+    XrayVisualState mXrayState;
 
     // Pixmap Cache keys
     QMap<unsigned int, QPixmapCache::Key> mPixmapCacheKeys;

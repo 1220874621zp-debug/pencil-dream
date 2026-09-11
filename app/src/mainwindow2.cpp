@@ -2131,6 +2131,16 @@ void MainWindow2::createToolbars()
     ui->actionExport_Movie->setToolTip(tr("导出电影..."));
     mMainToolbar->addAction(ui->actionExport_Movie);
 
+    // 穿透模式：叠加显示当前位图层全部关键帧幽灵，移动工具直接拖动/缩放任意帧图像
+    // （checkable，主题 QToolButton:checked 全局红粉高亮；非持久化，每次启动默认关）
+    {
+        QAction* xrayAction = new QAction(QIcon(":/icons/themes/playful/misc/xray-mode.svg"), tr("穿透模式"), this);
+        xrayAction->setToolTip(tr("穿透模式：叠加显示当前图层全部关键帧，用移动工具直接移动/缩放任意帧图像"));
+        xrayAction->setCheckable(true);
+        connect(xrayAction, &QAction::toggled, ui->scribbleArea, &ScribbleArea::setXrayMode);
+        mMainToolbar->addAction(xrayAction);
+    }
+
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");
     mViewToolbar->addAction(ui->actionCut);

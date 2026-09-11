@@ -374,6 +374,9 @@ void ScribbleArea::onViewChanged()
 
 void ScribbleArea::onLayerChanged()
 {
+    // 穿透选中帧按当前层语义，换层即失效
+    mXrayState.selectedFrame = -1;
+    mXrayState.drag = XrayDragPreview();
     invalidateAllCache();
 }
 
@@ -392,6 +395,8 @@ void ScribbleArea::onOnionSkinTypeChanged()
 void ScribbleArea::onObjectLoaded()
 {
     mOnionGhostOffsets.clear();
+    mXrayState.selectedFrame = -1;
+    mXrayState.drag = XrayDragPreview();
     invalidateAllCache();
 }
 
@@ -1224,6 +1229,7 @@ void ScribbleArea::prepCanvas(int frame)
     mCanvasPainter.setOnionSkinOptions(onionSkinOptions);
     mCanvasPainter.setOptions(o);
     mCanvasPainter.setOnionGhostOffsets(&mOnionGhostOffsets);
+    mCanvasPainter.setXrayState(&mXrayState);
 
     ViewManager* vm = mEditor->view();
     SelectionManager* sm = mEditor->select();
@@ -1523,6 +1529,30 @@ void ScribbleArea::invalidateOnionGhostVisual()
 {
     mCanvasPainter.resetLayerCache();
     // paintEvent 非活动态直接贴帧级 QPixmapCache 旧画面，须一并作废
+    const int currentFrame = mEditor->currentFrame();
+    invalidateCacheForFrame(currentFrame);
+    const int coveringFrame = mEditor->layers()->lastFrameAtFrame(currentFrame);
+    if (coveringFrame >= 0 && coveringFrame != currentFrame)
+    {
+        invalidateCacheForFrame(coveringFrame);
+    }
+    updateFrame();
+}
+
+void ScribbleArea::setXrayMode(bool on)
+{
+    if (mXrayState.enabled == on) { return; }
+    mXrayState.enabled = on;
+    mXrayState.selectedFrame = -1;
+    mXrayState.drag = XrayDragPreview();
+    invalidateXrayVisual();
+}
+
+void ScribbleArea::invalidateXrayVisual()
+{
+    // 与洋葱幽灵同一双层缓存铁律：穿透幽灵画在 pre-layer 缓存里，
+    // 帧级 QPixmapCache 键是当前帧号，两层都作废才实时
+    mCanvasPainter.resetLayerCache();
     const int currentFrame = mEditor->currentFrame();
     invalidateCacheForFrame(currentFrame);
     const int coveringFrame = mEditor->layers()->lastFrameAtFrame(currentFrame);

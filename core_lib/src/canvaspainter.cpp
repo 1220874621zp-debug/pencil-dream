@@ -190,7 +190,18 @@ void CanvasPainter::renderPreLayers(QPainter& painter, const QRect& blitRect)
         paintCurrentFrame(painter, blitRect, 0, mCurrentLayerIndex - 1);
     }
 
-    paintOnionSkin(painter, blitRect);
+    // 穿透模式激活时画全部关键帧幽灵并抑制洋葱皮（同批幽灵叠加只会更乱）
+    const bool xrayOn = (mXrayState != nullptr && mXrayState->enabled
+                         && mObject->getLayer(mCurrentLayerIndex) != nullptr
+                         && mObject->getLayer(mCurrentLayerIndex)->type() == Layer::BITMAP);
+    if (xrayOn)
+    {
+        paintXrayFrames(painter, blitRect, mObject->getLayer(mCurrentLayerIndex));
+    }
+    else
+    {
+        paintOnionSkin(painter, blitRect);
+    }
     painter.setOpacity(1.0);
 }
 
@@ -377,6 +388,77 @@ void CanvasPainter::paintOnionSkinFrame(QPainter& painter, QPainter& onionSkinPa
         onionSkinPainter.drawRect(painter.viewport());
     }
     painter.drawPixmap(mPointZero, mOnionSkinPixmap);
+}
+
+void CanvasPainter::paintXrayFrames(QPainter& painter, const QRect& blitRect, Layer* layer)
+{
+    Q_UNUSED(blitRect)
+
+    LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
+
+    // 当前显示帧覆盖的关键帧不画幽灵（它已作为正式内容全不透明绘制）
+    const KeyFrame* coveringKey = bitmapLayer->getKeyFrameWhichCovers(
+        bitmapLayer->displayFrameFor(mFrameNumber));
+    const int skipPos = (coveringKey != nullptr) ? coveringKey->pos() : -1;
+
+    const int selectedFrame = (mXrayState != nullptr) ? mXrayState->selectedFrame : -1;
+    const XrayDragPreview* drag = (mXrayState != nullptr && mXrayState->drag.active) ? &mXrayState->drag : nullptr;
+
+    // 徽标字号按视图缩放补偿，保证设备像素恒定大小（transform 含 DPR）
+    const qreal viewScale = qMax<qreal>(0.01, painter.transform().m11());
+    const int badgePixelSize = qMax(8, qRound(11.0 / viewScale));
+    QFont badgeFont = painter.font();
+    badgeFont.setPixelSize(badgePixelSize);
+    const QPointF badgeOffset(4.0 / viewScale, 4.0 / viewScale);
+
+    for (int k = bitmapLayer->firstKeyFramePosition(); k <= bitmapLayer->getMaxKeyFramePosition(); k++)
+    {
+        if (!bitmapLayer->keyExists(k) || k == skipPos) { continue; }
+
+        BitmapImage* bitmapImage = bitmapLayer->getBitmapImageAtFrame(k);
+        if (bitmapImage == nullptr || bitmapImage->image() == nullptr || bitmapImage->image()->isNull()) { continue; }
+        bitmapImage->loadFile(); // Critical! force the BitmapImage to load the image
+
+        const bool isSelected = (k == selectedFrame);
+        const bool isDragged = (drag != nullptr && drag->layerId == layer->id() && drag->framePos == k);
+
+        const QPoint topLeft = bitmapImage->topLeft();
+
+        painter.setOpacity(bitmapImage->getOpacity() * ((isSelected || isDragged) ? 0.8 : 0.3));
+
+        painter.save();
+        if (isDragged)
+        {
+            // 拖拽预览：与提交 QTransform 同一数学（对角锚点缩放 + 平移），
+            // painter 操作叠加在视图变换之上，勿整体替换
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+            painter.translate(drag->scaleAnchor + drag->translation);
+            painter.scale(drag->scaleX, drag->scaleY);
+            painter.translate(-drag->scaleAnchor);
+        }
+        painter.drawImage(topLeft, *bitmapImage->image());
+
+        // 帧号徽标：标在幽灵包围盒左上角，拖拽预览时跟随变换后的角
+        QPointF badgePos = QPointF(topLeft);
+        if (isDragged)
+        {
+            const QPointF rel = QPointF(topLeft) - drag->scaleAnchor;
+            badgePos = drag->scaleAnchor + drag->translation
+                       + QPointF(rel.x() * drag->scaleX, rel.y() * drag->scaleY);
+        }
+        const QString badgeText = QString::number(k);
+        painter.setOpacity(1.0);
+        painter.setFont(badgeFont);
+        const qreal pad = 2.0 / viewScale;
+        QRectF badgeRect(badgePos + badgeOffset, QSizeF(0, 0));
+        badgeRect.setWidth(badgeText.size() * badgePixelSize * 0.65 + pad * 2);
+        badgeRect.setHeight(badgePixelSize * 1.3 + pad * 2);
+        painter.fillRect(badgeRect, QColor(0, 0, 0, 168));
+        painter.setPen(isSelected || isDragged ? QColor(0xFF, 0x8A, 0xA8) : QColor(0xCF, 0xCF, 0xD4));
+        painter.drawText(badgePos + badgeOffset + QPointF(pad, badgePixelSize * 1.05), badgeText);
+        painter.restore();
+    }
+    painter.setOpacity(1.0);
 }
 
 void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask)

@@ -22,8 +22,10 @@ GNU General Public License for more details.
 #include "movemode.h"
 #include "preferencemanager.h"
 #include "undoredomanager.h"
+#include "bitmapimage.h"
 
 class Layer;
+class LayerBitmap;
 
 
 class MoveTool : public TransformTool
@@ -46,6 +48,9 @@ public:
     bool leavingThisTool() override;
     bool isActive() const override;
 
+    /** 穿透模式：选中幽灵的包围盒 + 角柄（画布坐标系叠加层） */
+    void paint(QPainter& painter, const QRect& blitRect) override;
+
     void applyTransformationAndDeselect();
 
 private:
@@ -57,6 +62,18 @@ private:
 
     Layer* currentPaintableLayer();
 
+    // --- 穿透模式：拖拽任意关键帧幽灵像（真改位图像素，走撤销栈） ---
+    enum class XrayDragMode { None, Move, Scale };
+    bool xrayApplicable() const;
+    bool xrayBeginInteraction(const QPointF& pos);
+    void xrayUpdateDrag(const QPointF& pos);
+    void xrayCommitDrag();
+    void xrayCancelDrag();
+    int xrayHitGhost(const QPointF& pos) const;
+    int xrayHitScaleHandle(const QPointF& pos) const;
+    bool xrayAlphaHit(BitmapImage* image, const QPointF& canvasPos) const;
+    QTransform xrayCurrentTransform() const;
+
     QPointF mCurrentPoint;
     qreal mRotatedAngle = 0.0;
     int mRotationIncrement = 0;
@@ -64,6 +81,18 @@ private:
     QPointF mOffset;
 
     SAVESTATE_ID mUndoSaveStateId = 0;
+
+    bool mXrayDragging = false;
+    XrayDragMode mXrayDragMode = XrayDragMode::None;
+    int mXrayTargetFrame = -1;
+    QPointF mXrayPressPos;
+    QPointF mXrayDragTranslation;
+    qreal mXrayScaleX = 1.0;
+    qreal mXrayScaleY = 1.0;
+    QPointF mXrayScaleAnchor;
+    BitmapImage mXrayUndoSnapshot;
+    int mXrayHoverFrame = -1;
+    int mXrayHoverHandle = -1;
 };
 
 #endif
