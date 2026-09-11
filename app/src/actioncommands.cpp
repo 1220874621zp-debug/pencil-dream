@@ -170,9 +170,9 @@ Status ActionCommands::importReferenceVideo()
     double duration = 0.0;
     double videoFps = 0.0;
     QProcess probe(this);
+    // 注意 -show_entries 只认最后一次(选项覆盖),多 section 用冒号合并
     probe.start(ffprobeLocation(), { "-v", "error", "-select_streams", "v:0",
-                                     "-show_entries", "stream=r_frame_rate,duration",
-                                     "-show_entries", "format=duration",
+                                     "-show_entries", "stream=r_frame_rate,duration:format=duration",
                                      "-of", "default=noprint_wrappers=1", filePath });
     if (probe.waitForStarted(3000) && probe.waitForFinished(10000))
     {
@@ -184,7 +184,7 @@ Status ActionCommands::importReferenceVideo()
             const double v = it.next().captured(1).toDouble();
             if (v > 0.0 && (duration <= 0.0 || v < duration)) { duration = v; }
         }
-        QRegularExpression fpsRx("r_frame_rate=(\d+)/(\d+)");
+        QRegularExpression fpsRx("r_frame_rate=(\\d+)/(\\d+)");
         const auto fpsMatch = fpsRx.match(out);
         if (fpsMatch.hasMatch() && fpsMatch.captured(2).toInt() > 0)
         {
@@ -193,7 +193,26 @@ Status ActionCommands::importReferenceVideo()
     }
     if (duration <= 0.0)
     {
-        QMessageBox::warning(mParent, tr("导入参考视频"), tr("无法解析视频时长,请确认文件完好。"));
+        // 兜底:环境里只有 ffmpeg 单文件(gyan.dev 默认只下 ffmpeg.exe)没有
+        // ffprobe 时,从 ffmpeg -i 的 stderr 抓 Duration 行(音频导入同依赖级)
+        QProcess ffmpegProc(this);
+        ffmpegProc.setProcessChannelMode(QProcess::MergedChannels);
+        ffmpegProc.start(ffmpegLocation(), { "-i", filePath });
+        if (ffmpegProc.waitForStarted(3000) && ffmpegProc.waitForFinished(10000))
+        {
+            const QString out = ffmpegProc.readAll();
+            QRegularExpression durRx("Duration:\\s*(\\d+):(\\d+):(\\d+(?:\\.\\d+)?)");
+            const auto m = durRx.match(out);
+            if (m.hasMatch())
+            {
+                duration = m.captured(1).toInt() * 3600 + m.captured(2).toInt() * 60 + m.captured(3).toDouble();
+            }
+        }
+    }
+    if (duration <= 0.0)
+    {
+        QMessageBox::warning(mParent, tr("导入参考视频"),
+                             tr("无法解析视频时长:请确认文件完好,且 ffmpeg/ffprobe 可正常执行(看首选项→文件的 ffmpeg 路径)。"));
         return Status::FAIL;
     }
     if (videoFps <= 0.0) { videoFps = mEditor->playback()->fps(); }
