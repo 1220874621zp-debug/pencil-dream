@@ -73,6 +73,10 @@ public:
     double videoFps() const { return mVideoFps; }
     bool isFileMissing() const;
 
+    /** 显示缩放(1.0=原始尺寸);静态属性不参与关键帧 */
+    qreal videoScale() const { return mScale; }
+    void setVideoScale(qreal scale) { mScale = qBound(0.05, scale, 8.0); }
+
     // 时间轴同步(pull 模式,Editor::scrubTo 每帧驱动):
     // 区间外暂停;区间内首次起步/失步超阈值才 setPosition——
     // 播放中让解码器自由前进,不逐帧 seek。
@@ -92,6 +96,7 @@ private:
 
     QString mFilePath;
     double mVideoFps = 24.0;
+    qreal mScale = 1.0;
     QMediaPlayer* mPlayer = nullptr;
     QVideoSink* mSink = nullptr;
     QAudioOutput* mAudioOutput = nullptr;

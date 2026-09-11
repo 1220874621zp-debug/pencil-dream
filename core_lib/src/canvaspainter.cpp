@@ -630,7 +630,19 @@ void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)
         }
         return;
     }
-    painter.drawImage(QPointF(-img.width() / 2.0, -img.height() / 2.0), img);
+    // 显示缩放(双击层行修改):围绕画布原点(=内容中心)等比缩放
+    const qreal s = videoLayer->videoScale();
+    if (qAbs(s - 1.0) < 0.001)
+    {
+        painter.drawImage(QPointF(-img.width() / 2.0, -img.height() / 2.0), img);
+    }
+    else
+    {
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(QRectF(-img.width() * s / 2.0, -img.height() * s / 2.0,
+                                 img.width() * s, img.height() * s), img);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    }
 }
 
 void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer)

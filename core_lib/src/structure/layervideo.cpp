@@ -176,6 +176,7 @@ QDomElement LayerVideo::createDomElement(QDomDocument& doc) const
     QDomElement layerElem = createBaseDomElement(doc);
     layerElem.setAttribute("src", mFilePath);
     layerElem.setAttribute("fps", QString::number(mVideoFps, 'f', 6));
+    layerElem.setAttribute("scale", QString::number(mScale, 'f', 4));
 
     foreachKeyFrame([&doc, &layerElem](KeyFrame* keyFrame)
     {
@@ -213,6 +214,8 @@ void LayerVideo::loadDomElement(const QDomElement& element, QString dataDirPath,
 
     mFilePath = element.attribute("src");
     mVideoFps = (fps > 0.0) ? fps : 24.0;
+    mScale = element.attribute("scale", "1.0").toDouble();
+    if (mScale <= 0.0) { mScale = 1.0; }
     mSyncStarted = false;
     mLastFrameStartTime = -1;
     ensurePlayer();

@@ -3185,6 +3185,21 @@ void TimeLineCells::mouseDoubleClickEvent(QMouseEvent* event)
 
 void TimeLineCells::editLayerProperties(Layer *layer) const
 {
+    if (layer->type() == Layer::MOVIE)
+    {
+        // 双击参考视频层行改显示缩放(静态属性,不参与关键帧)
+        auto videoLayer = static_cast<LayerVideo*>(layer);
+        bool ok = false;
+        const double percent = QInputDialog::getDouble(nullptr, tr("参考视频缩放"),
+                                                        tr("显示缩放(%):"),
+                                                        videoLayer->videoScale() * 100.0,
+                                                        5.0, 800.0, 1, &ok);
+        if (!ok) { return; }
+        videoLayer->setVideoScale(percent / 100.0);
+        mEditor->getScribbleArea()->update();
+        return;
+    }
+
     if (layer->type() != Layer::CAMERA)
     {
         editLayerName(layer);
