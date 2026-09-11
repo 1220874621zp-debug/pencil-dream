@@ -150,6 +150,9 @@ private:
     // Dreams-style block helpers
     /** Width of the exposure block of the given keyframe, in frames (trim preview aware). */
     int blockLengthFor(const Layer* layer, const KeyFrame* key) const;
+    /** Camera key dot diameter in px (shared by paintFrames/paintSelectedFrames
+     *  so the selection ring always hugs the drawn dot). */
+    qreal cameraKeyDotDiameter(int recHeight) const;
     /** Returns the keyframe pos whose block's right edge is under the given position, or -1. */
     int hitTestTrimHandle(const QPoint& pos) const;
     /** Returns the layer index whose trailing "+" handle is under the position, or -1. */

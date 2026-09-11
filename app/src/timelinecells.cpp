@@ -787,6 +787,14 @@ int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
     return qMax(1, end - key->pos());
 }
 
+qreal TimeLineCells::cameraKeyDotDiameter(int recHeight) const
+{
+    // ~62% of the row (reference proportions), shrunk when frames are narrow
+    qreal d = qMin(recHeight * 0.62, 22.0);
+    d = qMin(d, mFrameSize - 4.0);
+    return qMax(d, 5.0);
+}
+
 int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
 {
     if (headerGroupIdAt(pos) >= 0) { return -1; } // 组头行不可新建帧
@@ -944,25 +952,54 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
 
     if (layer->type() == Layer::CAMERA)
     {
-        // Camera keyframes are interpolated: keep the classic single-cell look
+        // Camera keys are interpolated values, not exposures: friction-style
+        // solid accent dots centered on the frame cell, joined by a thin line.
+        // Carried keys hide at their original spot (the ghost in
+        // paintSelectedFrames follows the drag), and line segments touching a
+        // carried key drop out so no stub points at a vacated position.
+        QList<int> keyPos;
+        keyPos.reserve(layer->keyFrameCount());
+        layer->foreachKeyFrame([&](KeyFrame* key) { keyPos.append(key->pos()); });
+        std::sort(keyPos.begin(), keyPos.end()); // mKeyFrames 迭代为降序
+
         const int viewW = width();
-        layer->foreachKeyFrame([&](KeyFrame* key)
+        const qreal centerY = recTop + recHeight / 2.0;
+        const qreal dotRadius = cameraKeyDotDiameter(recHeight) / 2.0;
+        auto keyCenterX = [&](int framePos)
         {
-            int framePos = key->pos();
-            int recWidth = standardWidth;
-            int recLeft = getFrameX(framePos) - recWidth;
-            if (recLeft >= viewW || recLeft + recWidth < 0) { return; } // 视口外
+            return getFrameX(framePos) - mFrameSize / 2.0;
+        };
+        auto carried = [&](int framePos)
+        {
+            return mMovingFrames && selectedFrames.contains(framePos);
+        };
 
-            if (selectedFrames.contains(framePos)) {
-                return;
-            }
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
 
-            // uniform black block base (TVP): the current layer is marked by
-            // the track background, not by recoloring its blocks
-            painter.setBrush(Theme::TimelineFrameFill);
+        painter.setPen(QPen(Theme::Accent, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        for (int i = 0; i + 1 < keyPos.count(); ++i)
+        {
+            if (carried(keyPos[i]) || carried(keyPos[i + 1])) { continue; }
+            const qreal x1 = keyCenterX(keyPos[i]);
+            const qreal x2 = keyCenterX(keyPos[i + 1]);
+            if (x2 < 0.0) { continue; }         // 整段在视口左
+            if (x1 >= viewW) { break; }         // 升序：之后全在视口右
+            painter.drawLine(QPointF(x1, centerY), QPointF(x2, centerY));
+        }
 
-            painter.drawRoundedRect(QRectF(recLeft, recTop, recWidth, recHeight), 3.0, 3.0);
-        });
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Theme::Accent);
+        for (int framePos : keyPos)
+        {
+            if (carried(framePos)) { continue; }
+            const qreal cx = keyCenterX(framePos);
+            if (cx + dotRadius < 0.0 || cx - dotRadius >= viewW) { continue; } // 视口外
+            painter.drawEllipse(QPointF(cx, centerY), dotRadius, dotRadius);
+        }
+
+        painter.restore();
         return;
     }
 
@@ -1215,6 +1252,37 @@ void TimeLineCells::paintSelectedFrames(QPainter& painter, const Layer* layer, c
         {
             dx += mDropShiftFrames;
         }
+    }
+
+    if (layer->type() == Layer::CAMERA)
+    {
+        // 相机键选中态：白环套住 paintFrames 画好的红点（拖动时改为半透明
+        // 幽灵点随光标浮动）；不画矩形框，避免"方框套圆点"的混搭
+        const qreal dotRadius = cameraKeyDotDiameter(recHeight) / 2.0;
+        const qreal centerY = recTop + lift + recHeight / 2.0;
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        for (int framePos : selectedFrames)
+        {
+            const qreal cx = getFrameX(framePos + dx) - mFrameSize / 2.0;
+            if (cx + dotRadius < 0.0 || cx - dotRadius >= width()) { continue; } // 视口外
+            if (previewing)
+            {
+                QColor ghost = Theme::Accent;
+                ghost.setAlpha(140);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(ghost);
+                painter.drawEllipse(QPointF(cx, centerY), dotRadius, dotRadius);
+            }
+            else
+            {
+                painter.setBrush(Qt::NoBrush);
+                painter.setPen(QPen(QColor(0xE8, 0xE8, 0xEA), 2.0));
+                painter.drawEllipse(QPointF(cx, centerY), dotRadius + 2.5, dotRadius + 2.5);
+            }
+        }
+        painter.restore();
+        return;
     }
 
     painter.save();
