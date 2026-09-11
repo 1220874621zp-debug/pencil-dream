@@ -85,6 +85,7 @@ private:
     ToolResult toolOpenProject(const QJsonObject& args);
     ToolResult toolSaveProject(const QJsonObject& args);
     ToolResult toolExportFrame(const QJsonObject& args);
+    ToolResult toolExportMovie(const QJsonObject& args);
     ToolResult toolPlay(const QJsonObject& args);
     ToolResult toolStop(const QJsonObject& args);
     ToolResult toolUndo(const QJsonObject& args);

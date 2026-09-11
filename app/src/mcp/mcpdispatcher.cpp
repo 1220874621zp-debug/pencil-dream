@@ -35,11 +35,13 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "layercolorize.h"
 #include "layermanager.h"
+#include "movieexporter.h"
 #include "playbackmanager.h"
 #include "preferencemanager.h"
 #include "structure/object.h"
 #include "undoredomanager.h"
 #include "util/pencildef.h"
+#include "util/util.h"
 
 namespace
 {
@@ -277,6 +279,19 @@ QJsonArray McpDispatcher::toolsSchema() const
         props.insert("transparent", prop("boolean", QStringLiteral("透明底（默认false）")));
         tools.append(makeTool("export_frame", QStringLiteral("导出指定帧为图片文件。"), props, {"path"}));
     }
+    {
+        QJsonObject props;
+        props.insert("path", prop("string", QStringLiteral("输出文件绝对路径，扩展名决定格式（.mp4/.gif/.webm 等，默认.mp4）")));
+        props.insert("start", prop("number", QStringLiteral("起始帧（默认1）")));
+        props.insert("end", prop("number", QStringLiteral("结束帧（默认动画末尾）")));
+        props.insert("fps", prop("number", QStringLiteral("导出帧率（默认取工程帧率）")));
+        props.insert("width", prop("number", QStringLiteral("画面宽（默认画布宽）")));
+        props.insert("height", prop("number", QStringLiteral("画面高（默认画布高）")));
+        props.insert("transparent", prop("boolean", QStringLiteral("透明背景（仅部分格式支持，默认false）")));
+        tools.append(makeTool("export_movie",
+            QStringLiteral("导出动画为视频/GIF文件（需要 ffmpeg：若未配置会返回配置指引）。导出期间界面会短暂忙碌。"),
+            props, {"path"}));
+    }
     tools.append(makeTool("play", QStringLiteral("开始播放动画（让用户观看效果）。"), QJsonObject(), {}));
     tools.append(makeTool("stop", QStringLiteral("停止播放。"), QJsonObject(), {}));
     tools.append(makeTool("undo", QStringLiteral("撤销上一步操作（等效Ctrl+Z）。"), QJsonObject(), {}));
@@ -311,6 +326,7 @@ McpDispatcher::ToolResult McpDispatcher::dispatch(const QString& tool, const QJs
     if (tool == "open_project")            return toolOpenProject(args);
     if (tool == "save_project")            return toolSaveProject(args);
     if (tool == "export_frame")            return toolExportFrame(args);
+    if (tool == "export_movie")            return toolExportMovie(args);
     if (tool == "play")                    return toolPlay(args);
     if (tool == "stop")                    return toolStop(args);
     if (tool == "undo")                    return toolUndo(args);
@@ -1027,6 +1043,42 @@ McpDispatcher::ToolResult McpDispatcher::toolExportFrame(const QJsonObject& args
     QJsonObject data;
     data.insert("exported", path);
     data.insert("frame", frame);
+    return ok(data);
+}
+
+McpDispatcher::ToolResult McpDispatcher::toolExportMovie(const QJsonObject& args)
+{
+    const QString path = args.value("path").toString();
+    if (path.isEmpty())
+        return fail(tr("必须提供输出文件路径"));
+
+    const QString ffmpeg = ffmpegLocation();
+    if (ffmpeg.isEmpty() || !QFileInfo::exists(ffmpeg))
+        return fail(tr("未找到 ffmpeg，无法导出视频。请在 首选项 → 文件 中配置 ffmpeg 路径"
+                       "（或在软件安装目录 plugins 下放置 ffmpeg.exe）后再试；PNG 序列可用 export_frame 逐帧导出"));
+
+    const QSize canvas = canvasSize();
+    ExportMovieDesc desc;
+    desc.strFileName = path;
+    desc.startFrame = args.contains("start") ? qMax(1, args.value("start").toInt()) : 1;
+    desc.endFrame = args.contains("end") ? qMax(1, args.value("end").toInt()) : mEditor->layers()->animationLength();
+    desc.fps = args.contains("fps") ? qMax(1, args.value("fps").toInt()) : mEditor->fps();
+    desc.exportSize = QSize(args.contains("width") ? qMax(1, args.value("width").toInt()) : canvas.width(),
+                            args.contains("height") ? qMax(1, args.value("height").toInt()) : canvas.height());
+    desc.alpha = args.value("transparent").toBool(false);
+
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    MovieExporter exporter;
+    const Status st = exporter.run(mEditor->object(), desc,
+                                   [](float, float) {}, [](float) {}, [](QString) {});
+    if (!st.ok())
+        return fail(tr("导出视频失败: %1").arg(exporter.error().isEmpty() ? st.msg() : exporter.error()));
+
+    QJsonObject data;
+    data.insert("exported", path);
+    data.insert("start", desc.startFrame);
+    data.insert("end", desc.endFrame);
+    data.insert("fps", desc.fps);
     return ok(data);
 }
 

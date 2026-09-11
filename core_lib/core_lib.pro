@@ -30,6 +30,7 @@ HEADERS +=  \
     src/corelib-pch.h \
     src/graphics/bitmap/bitmapbucket.h \
     src/graphics/bitmap/bitmapimage.h \
+    src/graphics/bitmap/inbetween.h \
     src/graphics/bitmap/tile.h \
     src/graphics/bitmap/tiledbuffer.h \
     src/graphics/vector/colorref.h \
@@ -118,6 +119,7 @@ HEADERS +=  \
 
 
 SOURCES +=  src/graphics/bitmap/bitmapimage.cpp \
+    src/graphics/bitmap/inbetween.cpp \
     src/canvascursorpainter.cpp \
     src/graphics/bitmap/bitmapbucket.cpp \
     src/graphics/bitmap/tile.cpp \
