@@ -156,6 +156,10 @@ public:
     QAction* createUndoAction(QObject* parent, const QIcon& icon);
     QAction* createRedoAction(QObject* parent, const QIcon& icon);
 
+    /** 程序化触发一步撤销/重做（MCP 智能体入口；与菜单动作等效） */
+    void undo();
+    void redo();
+
     void updateUndoAction(QAction* undoAction);
     void updateRedoAction(QAction* redoAction);
 

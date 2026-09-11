@@ -144,6 +144,12 @@ void PreferenceManager::loadPrefs()
     set(SETTING::DEFAULT_PRESET,           settings.value(SETTING_DEFAULT_PRESET,         0).toInt());
     set(SETTING::FFMPEG_PATH,              settings.value(SETTING_FFMPEG_PATH,            "").toString());
 
+    // MCP 智能体服务器（默认关闭，用户显式启用）
+    set(SETTING::MCP_ENABLED,              settings.value(SETTING_MCP_ENABLED,            false).toBool());
+    set(SETTING::MCP_AUTOSTART,            settings.value(SETTING_MCP_AUTOSTART,          true).toBool());
+    set(SETTING::MCP_PORT,                 settings.value(SETTING_MCP_PORT,               9528).toInt());
+    set(SETTING::MCP_TOKEN,                settings.value(SETTING_MCP_TOKEN,              "").toString());
+
     // Timeline
     set(SETTING::SHORT_SCRUB,              settings.value(SETTING_SHORT_SCRUB,            false ).toBool());
     // TVP-style default frame width: maximum (120). Two one-time migrations
@@ -261,6 +267,9 @@ void PreferenceManager::set(SETTING option, QString value)
         break;
     case SETTING::FFMPEG_PATH:
         settings.setValue(SETTING_FFMPEG_PATH, value);
+        break;
+    case SETTING::MCP_TOKEN:
+        settings.setValue(SETTING_MCP_TOKEN, value);
         break;
     default:
         break;
@@ -398,6 +407,11 @@ void PreferenceManager::set(SETTING option, int value)
     case SETTING::FIELD_H:
         settings.setValue(SETTING_FIELD_H, value);
         break;
+    case SETTING::MCP_PORT:
+        if (value < 1024) { value = 1024; }
+        else if (value > 65535) { value = 65535; }
+        settings.setValue(SETTING_MCP_PORT, value);
+        break;
     case SETTING::LAYER_VISIBILITY:
         settings.setValue(SETTING_LAYER_VISIBILITY, value);
         break;
@@ -531,6 +545,12 @@ void PreferenceManager::set(SETTING option, bool value)
         break;
     case SETTING::NEW_UNDO_REDO_SYSTEM_ON:
         settings.setValue(SETTING_NEW_UNDO_REDO_ON, value);
+        break;
+    case SETTING::MCP_ENABLED:
+        settings.setValue(SETTING_MCP_ENABLED, value);
+        break;
+    case SETTING::MCP_AUTOSTART:
+        settings.setValue(SETTING_MCP_AUTOSTART, value);
         break;
     default:
         Q_ASSERT(false);

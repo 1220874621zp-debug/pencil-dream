@@ -264,6 +264,10 @@ const static int MaxFramesBound = 9999;
 #define SETTING_LOAD_DEFAULT_PRESET "LoadDefaultPreset"
 #define SETTING_DEFAULT_PRESET      "DefaultPreset"
 #define SETTING_FFMPEG_PATH         "FfmpegPath"
+#define SETTING_MCP_ENABLED         "McpEnabled"
+#define SETTING_MCP_AUTOSTART       "McpAutostart"
+#define SETTING_MCP_PORT            "McpPort"
+#define SETTING_MCP_TOKEN           "McpToken"
 
 #define SETTING_INVERT_DRAG_ZOOM_DIRECTION   "InvertDragZoomDirection"
 #define SETTING_INVERT_SCROLL_ZOOM_DIRECTION "InvertScrollZoomDirection"

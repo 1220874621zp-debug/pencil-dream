@@ -313,6 +313,26 @@ QAction* UndoRedoManager::createUndoAction(QObject* parent, const QIcon& icon)
     return undoAction;
 }
 
+void UndoRedoManager::undo()
+{
+    if (mNewBackupSystemEnabled) {
+        mUndoStack.undo();
+    } else {
+        legacyUndo();
+    }
+    emit didUpdateUndoStack();
+}
+
+void UndoRedoManager::redo()
+{
+    if (mNewBackupSystemEnabled) {
+        mUndoStack.redo();
+    } else {
+        legacyRedo();
+    }
+    emit didUpdateUndoStack();
+}
+
 QAction* UndoRedoManager::createRedoAction(QObject* parent, const QIcon& icon)
 {
     QAction* redoAction = nullptr;
