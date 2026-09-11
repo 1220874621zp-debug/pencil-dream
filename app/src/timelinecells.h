@@ -189,6 +189,9 @@ private:
     int  hitVideoProps(int layerNumber, const QPoint& pos) const;
     void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const;
     void setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v);
+    // 不透明度拖动防抖:拖动中只记值,80ms 停顿/松手才落板画布
+    void scheduleOpacityApply(int layerNumber, qreal value);
+    void flushPendingOpacity(int layerNumber);
     void toggleVideoPropsExpanded(int layerNumber);
     void openVideoPropsEditor(int layerNumber, int field);
     QRect videoPropsFieldRect(int layerNumber, int field) const;
@@ -289,6 +292,12 @@ private:
 
     int mFramePosMoveX = 0;
     int mLayerPosMoveY = 0;
+
+    // 不透明度拖动防抖(Krita LayerBox 同款 KisSignalCompressor 模式):
+    // move 只记值+行重绘(手柄跟手),画布应用延迟到拖动停顿,松手立即落地
+    QTimer* mOpacityApplyTimer = nullptr;
+    int mPendingOpacityLayer = -1;
+    qreal mPendingOpacity = 1.0;
 
     // 视频层属性展开态(层id;会话级UI态,不存盘)
     QSet<int> mExpandedVideoIds;

@@ -1893,6 +1893,36 @@ void TimeLineCells::toggleVideoPropsExpanded(int layerNumber)
     mTimeLine->updateContent();
 }
 
+void TimeLineCells::scheduleOpacityApply(int layerNumber, qreal value)
+{
+    mPendingOpacityLayer = layerNumber;
+    mPendingOpacity = value;
+    if (mOpacityApplyTimer == nullptr)
+    {
+        mOpacityApplyTimer = new QTimer(this);
+        mOpacityApplyTimer->setSingleShot(true);
+        mOpacityApplyTimer->setInterval(80);
+        connect(mOpacityApplyTimer, &QTimer::timeout, this, [this]()
+        {
+            flushPendingOpacity(mPendingOpacityLayer);
+        });
+    }
+    // 拖动事件每次重启计时 = 拖动中静默,停顿 80ms 才出一帧画布预览
+    mOpacityApplyTimer->start();
+}
+
+void TimeLineCells::flushPendingOpacity(int layerNumber)
+{
+    if (mOpacityApplyTimer) { mOpacityApplyTimer->stop(); }
+    if (layerNumber < 0 || mPendingOpacityLayer != layerNumber) { return; }
+    Layer* layer = mEditor->object()->getLayer(layerNumber);
+    mPendingOpacityLayer = -1;
+    if (layer == nullptr) { return; }
+    layer->setOpacity(mPendingOpacity);
+    mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
+    update(QRect(0, getLayerY(layerNumber), width(), rowHeightOf(layerNumber)));
+}
+
 void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v)
 {
     if (field == 1 || field == 2)
@@ -2534,8 +2564,9 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 {
                     mOpacityDragLayer = layerNumber;
                     const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
-                    hitLayer->setOpacity(value);
-                    mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
+                    // Krita 模式:按下先记值,经防抖统一落板(拖动中画面不被
+                    // 高频重画卡住,手柄永远跟手)
+                    scheduleOpacityApply(layerNumber, value);
                     update(QRect(0, getLayerY(layerNumber), width(), rowHeightOf(layerNumber)));
                     break;
                 }
@@ -2921,10 +2952,10 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
             {
                 const QRect slider = opacitySliderRect(width());
                 const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
-                layer->setOpacity(value);
-                // 单侧缓存失效:非当前层拖动也有实时预览(原先贴旧缓存无变化)
-                mEditor->getScribbleArea()->onLayerDisplayChanged(mOpacityDragLayer);
-                // 只重绘被拖行的窄条:全量 update 会把所有图层行重画一遍,拖不动
+                // 只记值+行重绘(手柄跟手);画布应用经 80ms 防抖(Krita LayerBox
+                // 同款 KisSignalCompressor 模式),被拖层在当前层下方时那块
+                // "全部下层位图重画"不再被 125Hz 的 move 轰炸
+                scheduleOpacityApply(mOpacityDragLayer, value);
                 update(QRect(0, getLayerY(mOpacityDragLayer), width(), rowHeightOf(mOpacityDragLayer)));
             }
             QWidget::mouseMoveEvent(event);
@@ -3395,9 +3426,11 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
     {
         if (mOpacityDragLayer != -1)
         {
-            // 拖动中已单侧失效+行内局部重绘实时反映;opacity 不改帧内容,
-            // 轨道块/缩略图无变化——松手不再走 frameModified→updateContent 全量链
+            // 松手:待落板的值立即应用(不等防抖);opacity 不改帧内容,
+            // 轨道块/缩略图无变化——不走 frameModified→updateContent 全量链
+            const int layer = mOpacityDragLayer;
             mOpacityDragLayer = -1;
+            flushPendingOpacity(layer);
         }
         emit mouseMovedY(0);
     }
