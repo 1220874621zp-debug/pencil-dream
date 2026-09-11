@@ -1899,6 +1899,12 @@ bool MainWindow2::event(QEvent* event)
     if(event->type() == QEvent::WindowActivate) {
         emit windowActivated();
     }
+    // 悬停带 statusTip 的菜单项会让状态栏切消息模式：隐藏非永久件（工具说明
+    // 等）触发底部行重排跳动（缩放滑杆闪/居中）。全程序无主动 showMessage
+    // 用途，直接拦掉状态栏提示事件
+    if (event->type() == QEvent::StatusTip) {
+        return true;
+    }
     return QMainWindow::event(event);
 }
 
