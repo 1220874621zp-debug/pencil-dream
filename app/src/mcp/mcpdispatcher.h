@@ -78,6 +78,9 @@ private:
     ToolResult toolSetColorizeOptions(const QJsonObject& args);
     ToolResult toolRequestColorizeUpdate(const QJsonObject& args);
 
+    // —— 自动画中割 ——
+    ToolResult toolGenerateInbetweens(const QJsonObject& args);
+
     // —— 项目 / 播放 / 撤销 ——
     ToolResult toolOpenProject(const QJsonObject& args);
     ToolResult toolSaveProject(const QJsonObject& args);

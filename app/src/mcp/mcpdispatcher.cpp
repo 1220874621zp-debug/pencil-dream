@@ -30,6 +30,7 @@ GNU General Public License for more details.
 #include "colorizeupdatemanager.h"
 #include "editor.h"
 #include "filemanager.h"
+#include "inbetween.h"
 #include "layer.h"
 #include "layerbitmap.h"
 #include "layercolorize.h"
@@ -242,6 +243,22 @@ QJsonArray McpDispatcher::toolsSchema() const
             props, {"layer"}));
     }
 
+    // —— 自动画中割 ——
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("位图线稿图层")));
+        props.insert("frame_a", prop("number", QStringLiteral("原画A帧号（取该帧显示的关键帧）")));
+        props.insert("frame_b", prop("number", QStringLiteral("原画B帧号（须大于frame_a）")));
+        props.insert("count", prop("number", QStringLiteral("中间帧数量（默认1，最大24）")));
+        props.insert("epsilon", prop("number", QStringLiteral("线条半宽（默认1.2；越大线越粗）")));
+        props.insert("blur_passes", prop("number", QStringLiteral("距离场平滑次数（默认1）")));
+        props.insert("denoise_area", prop("number", QStringLiteral("孤立碎点面积阈值（默认6，0=不去噪）")));
+        props.insert("stroke_color", prop("string", QStringLiteral("线条颜色（默认黑色 #000000）")));
+        tools.append(makeTool("generate_inbetweens",
+            QStringLiteral("在两张原画之间自动生成中间帧（距离场插值，确定性算法；适合平移/小幅形变，大幅旋转会收缩）。生成的帧一次性入撤销（单步可撤销）。建议先 get_frame_image 看两张原画再生成，完成后逐帧查看微调。"),
+            props, {"layer", "frame_a", "frame_b"}));
+    }
+
     // —— 项目 / 播放 / 撤销 ——
     {
         QJsonObject props;
@@ -290,6 +307,7 @@ McpDispatcher::ToolResult McpDispatcher::dispatch(const QString& tool, const QJs
     if (tool == "clear_frame")             return toolClearFrame(args);
     if (tool == "set_colorize_options")    return toolSetColorizeOptions(args);
     if (tool == "request_colorize_update") return toolRequestColorizeUpdate(args);
+    if (tool == "generate_inbetweens")     return toolGenerateInbetweens(args);
     if (tool == "open_project")            return toolOpenProject(args);
     if (tool == "save_project")            return toolSaveProject(args);
     if (tool == "export_frame")            return toolExportFrame(args);
@@ -842,6 +860,106 @@ McpDispatcher::ToolResult McpDispatcher::toolRequestColorizeUpdate(const QJsonOb
     data.insert("frame", frame);
     data.insert("width", image.width());
     data.insert("height", image.height());
+    return okWithImage(data, image);
+}
+
+// -------------------------------------------------------------- 自动画中割 ---
+
+McpDispatcher::ToolResult McpDispatcher::toolGenerateInbetweens(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+
+    LayerBitmap* bitmapLayer = dynamic_cast<LayerBitmap*>(layer);
+    if (bitmapLayer == nullptr)
+        return fail(tr("中割只能在位图族图层上生成（当前类型: %1）").arg(layerTypeName(layer)));
+
+    const int frameA = qMax(1, args.value("frame_a").toInt());
+    const int frameB = args.value("frame_b").toInt();
+    if (frameB - frameA < 2)
+        return fail(tr("frame_b 必须比 frame_a 至少大 2（中间才有空位放中割帧）"));
+
+    const int count = qBound(1, args.contains("count") ? args.value("count").toInt() : 1, 24);
+
+    BitmapImage* keyA = bitmapLayer->getLastBitmapImageAtFrame(frameA);
+    BitmapImage* keyB = bitmapLayer->getLastBitmapImageAtFrame(frameB);
+    if (keyA == nullptr || keyB == nullptr)
+        return fail(tr("帧 %1 或 %2 上没有原画内容").arg(frameA).arg(frameB));
+    keyA->loadFile();
+    keyB->loadFile();
+
+    // 目标位置：等分 A、B 区间；与已有关键帧冲突时整体报错（agent 可换 count 或先清帧）
+    QList<int> positions;
+    for (int k = 1; k <= count; ++k)
+        positions.append(frameA + qRound(k * static_cast<qreal>(frameB - frameA) / (count + 1)));
+    QStringList conflicts;
+    for (int pos : positions)
+        if (layer->keyExists(pos))
+            conflicts.append(QString::number(pos));
+    if (!conflicts.isEmpty())
+        return fail(tr("目标位置上已有关键帧: %1；请先删除或换个 count").arg(conflicts.join(QStringLiteral("、"))));
+
+    // 两张原画对齐到共同世界区域
+    const QRect world = keyA->bounds().united(keyB->bounds());
+    auto extract = [world](BitmapImage* key) -> QImage
+    {
+        QImage img(world.size(), QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter painter(&img);
+        painter.drawImage(key->bounds().topLeft() - world.topLeft(), *key->image());
+        painter.end();
+        return img;
+    };
+    const QImage imgA = extract(keyA);
+    const QImage imgB = extract(keyB);
+
+    Inbetween::Options options;
+    if (args.contains("epsilon"))
+        options.epsilon = qBound(0.5, args.value("epsilon").toDouble(), 8.0);
+    if (args.contains("blur_passes"))
+        options.blurPasses = qBound(0, args.value("blur_passes").toInt(), 4);
+    if (args.contains("denoise_area"))
+        options.denoiseArea = qBound(0, args.value("denoise_area").toInt(), 100);
+    if (args.contains("stroke_color"))
+    {
+        const QColor color = parseColor(args.value("stroke_color"), 1.0, &err);
+        if (!color.isValid())
+            return fail(err);
+        options.strokeColor = color;
+    }
+
+    mEditor->beginLayerLayoutEdit(layer);
+    QImage preview;
+    for (int k = 1; k <= count; ++k)
+    {
+        const qreal t = k / static_cast<qreal>(count + 1);
+        const QImage mid = Inbetween::interpolate(imgA, imgB, t, options);
+        layer->addKeyFrame(positions[k - 1], new BitmapImage(world.topLeft(), mid));
+        if (k == 1)
+            preview = mid;
+    }
+    mEditor->endLayerLayoutEdit(tr("MCP：生成中割"));
+
+    // 预览图贴回画布坐标
+    const QSize canvas = canvasSize();
+    QImage image(canvas, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QPainter painter(&image);
+    painter.translate(canvas.width() / 2.0, canvas.height() / 2.0);
+    painter.drawImage(world.topLeft(), preview);
+    painter.end();
+    image = image.scaled(1024, 1024, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    QJsonArray framesCreated;
+    for (int pos : positions)
+        framesCreated.append(pos);
+    data.insert("frames_created", framesCreated);
+    data.insert("preview_frame", positions.first());
+    data.insert("note", QStringLiteral("距离场插值算法：平移/小形变效果稳定，大幅旋转会收缩；不满意的帧可用 delete_frame 后重画"));
     return okWithImage(data, image);
 }
 

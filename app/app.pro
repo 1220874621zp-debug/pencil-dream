@@ -95,6 +95,7 @@ HEADERS += \
     src/mcppage.h \
     src/mcp/mcpserver.h \
     src/mcp/mcpdispatcher.h \
+    src/mcp/inbetween.h \
     src/strokeoptionswidget.h \
     src/timelinepage.h \
     src/toolboxwidget.h \
@@ -156,6 +157,7 @@ SOURCES += \
     src/mcppage.cpp \
     src/mcp/mcpserver.cpp \
     src/mcp/mcpdispatcher.cpp \
+    src/mcp/inbetween.cpp \
     src/strokeoptionswidget.cpp \
     src/timelinepage.cpp \
     src/toolboxwidget.cpp \
