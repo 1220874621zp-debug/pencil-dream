@@ -67,6 +67,8 @@ class LayerOrderCommand : public UndoRedoCommand
 public:
     struct GroupSnapshot
     {
+        GroupSnapshot(); // 默认实参在类内引用本类临时量，GCC 要求默认构造在类外定义
+
         bool valid = false;
         QHash<int, int> layerGroupId; // layerId -> groupId（-1 = 无组）
         QList<LayerGroupInfo> groups;

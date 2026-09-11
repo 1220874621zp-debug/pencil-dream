@@ -102,6 +102,8 @@ void LayerLayoutCommand::redo()
     editor()->layers()->notifyAnimationLengthChanged();
 }
 
+LayerOrderCommand::GroupSnapshot::GroupSnapshot() = default;
+
 LayerOrderCommand::GroupSnapshot LayerOrderCommand::captureGroups(Object* obj)
 {
     GroupSnapshot snap;
