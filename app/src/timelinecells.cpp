@@ -770,11 +770,13 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
 
     paintFrames(painter, col, layer, y, height, selected, frameSize);
 
-    // 相机轨道开头图标：与折叠组轨道同款写法（DPR 栅格化+按尺寸缓存）
+    // 相机轨道开头图标（左上角小徽标）：关键帧圆点与连线在行中心一线，
+    // 图标贴顶纵向错开（0.24*行高 ≥ 圆点半径+2 在 26..110 全行高区间成立），
+    // 任意帧宽下都不与关键帧重叠
     if (layer->type() == Layer::CAMERA)
     {
         const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
-        const int iconH = qMax(12, qRound(height * 0.55));
+        const int iconH = qBound(8, qRound(height * 0.26), 13);
         const QString iconKey = QStringLiteral("camera-track:%1@%2").arg(iconH).arg(dpr);
         const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
             QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/camera-track.svg"))
@@ -804,10 +806,10 @@ int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
 
 qreal TimeLineCells::cameraKeyDotDiameter(int recHeight) const
 {
-    // ~62% of the row (reference proportions), shrunk when frames are narrow
-    qreal d = qMin(recHeight * 0.62, 22.0);
+    // ~31% of the row (half of the original 62%), shrunk when frames are narrow
+    qreal d = qMin(recHeight * 0.31, 11.0);
     d = qMin(d, mFrameSize - 4.0);
-    return qMax(d, 5.0);
+    return qMax(d, 3.0);
 }
 
 int TimeLineCells::hitTestPlusHandle(const QPoint& pos) const
@@ -2445,6 +2447,15 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             showCameraMenu(event->pos());
                         }
 
+                        // 相机键：按住未选中的键直接进入拖动改位（免二次点击）；
+                        // 从空白格起拖仍是框选
+                        if (event->button() == Qt::LeftButton
+                            && currentLayer->type() == Layer::CAMERA
+                            && currentLayer->keyExists(frameNumber))
+                        {
+                            mCanMoveFrame = true;
+                            mCanBoxSelect = false;
+                        }
                     }
                     else
                     {
@@ -2832,6 +2843,29 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 mEditor->endLayerLayoutEdit(tr("移动帧"));
                 mEditor->layers()->notifyAnimationLengthChanged();
                 emit mEditor->framesModified();
+            }
+            else if (offset != 0 && !currentLayer->locked() && currentLayer->type() == Layer::CAMERA)
+            {
+                // 相机键自由落点：目标位被其他键占用时直接覆盖，占用者移入
+                // 同一布局事务（单步撤销可完整还原），不再整体拒收弹回
+                const QList<int> sel = currentLayer->selectedKeyFramesPositions();
+                if (!sel.isEmpty() && sel.first() + offset >= 1)
+                {
+                    const QSet<int> selected(sel.cbegin(), sel.cend());
+                    mEditor->beginLayerLayoutEdit(currentLayer);
+                    for (int p : sel)
+                    {
+                        const int np = p + offset;
+                        if (currentLayer->keyExists(np) && !selected.contains(np))
+                        {
+                            mEditor->takeLayerKeyFrame(currentLayer, np);
+                        }
+                    }
+                    currentLayer->moveSelectedFrames(offset);
+                    mEditor->endLayerLayoutEdit(tr("移动相机关键帧"));
+                    mEditor->layers()->notifyAnimationLengthChanged();
+                    emit mEditor->framesModified();
+                }
             }
             updateContent();
         }
