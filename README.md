@@ -99,6 +99,11 @@ ninja
 
 或直接使用 `build-qt6.bat`（自动配置 vcvars + Qt 路径）。测试基线：**6547 断言 / 104 用例**全绿（含填色引擎/渲染管线/撤销事务/打组回归）。
 
+## CI / 发布
+
+- **持续集成**（`.github/workflows/development.yml`）：每次推送自动在 Windows + Linux 双平台编译、跑全部测试、打包产物
+- **自动发布**（`release.yml`）：推送 `v*` 标签自动构建并发布 Release，附带 **InnoSetup 中文安装包**（含运行所需依赖）
+
 ---
 
 基于 [Pencil2D](https://github.com/pencil2d/pencil)（GPL-2.0）改造，遵循同一许可证。感谢 Pencil2D 的开发者们；时间轴交互参考了 TVPaint 与 [Friction](https://github.com/friction2d/friction) 的设计，智能填色与油漆桶算法移植自 [Krita](https://invent.kde.org/office/krita)。
