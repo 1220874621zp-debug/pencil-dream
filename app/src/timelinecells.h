@@ -187,7 +187,9 @@ private:
     static constexpr int kVideoPropsH = 66;   // 三行 × 22
     // 命中字段:0=无 1=缩放滑杆 2=缩放数值 3=位移X数值 4=位移Y数值
     int  hitVideoProps(int layerNumber, const QPoint& pos) const;
-    void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const;
+    void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop,
+                         double scalePctOverride = -1.0,
+                         QPointF offsetOverride = QPointF(0.0, -12345.0)) const;
     void setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v);
     // 不透明度拖动防抖:拖动中只记值,80ms 停顿/松手才落板画布
     void scheduleOpacityApply(int layerNumber, qreal value);
@@ -294,10 +296,20 @@ private:
     int mLayerPosMoveY = 0;
 
     // 不透明度拖动防抖(Krita LayerBox 同款 KisSignalCompressor 模式):
-    // move 只记值+行重绘(手柄跟手),画布应用延迟到拖动停顿,松手立即落地
+    // move 只记值+直画手柄(缓存贴图之上),停顿 80ms/松手才全量落定
     QTimer* mOpacityApplyTimer = nullptr;
     int mPendingOpacityLayer = -1;
     qreal mPendingOpacity = 1.0;
+    void paintOpacitySliderOverlay(QPainter& painter, int layerNumber, qreal value) const;
+
+    // 视频属性区拖动同款防抖+直画(cells 是整张 mCache 架构,行矩形 update
+    // 不重画内容,必须直画 overlay 或全量 drawContent)
+    QTimer* mVideoPropsApplyTimer = nullptr;
+    int mVideoPropsPendingLayer = -1;
+    int mVideoPropsPendingField = 0;
+    double mVideoPropsPendingValue = 0.0;
+    void scheduleVideoPropsApply(int layerNumber, int field, double v);
+    void flushPendingVideoProps();
 
     // 视频层属性展开态(层id;会话级UI态,不存盘)
     QSet<int> mExpandedVideoIds;

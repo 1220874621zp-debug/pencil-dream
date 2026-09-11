@@ -1787,7 +1787,41 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     }
 }
 
-void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const
+void TimeLineCells::paintOpacitySliderOverlay(QPainter& painter, int layerNumber, qreal value) const
+{
+    // 直画不透明度滑杆段(自包含:垫行底色→百分比→轨道→手柄),盖掉缓存里的旧迹
+    const int height = rowHeightOf(layerNumber);
+    if (height < 40) { return; }
+    const int y = getLayerY(layerNumber);
+    const int sliderY = y + qRound(height * 0.72);
+    const QRect slider = opacitySliderRect(width());
+    const bool selected = (mEditor->layers()->currentLayerIndex() == layerNumber);
+
+    painter.save();
+    // 行卡片底色垫住旧文字/旧手柄
+    QColor base = QApplication::palette().color(QPalette::Base);
+    if (selected) { base = Theme::TimelineRowAlternate; }
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(base);
+    painter.drawRect(QRect(slider.x() - 2, sliderY - 10, slider.width() + 44, 20));
+
+    painter.setPen(selected ? Theme::AccentHover : QColor(0x8A, 0x8A, 0x90));
+    painter.drawText(QRect(slider.right() + 4, sliderY - 9, 34, 18),
+                     Qt::AlignRight | Qt::AlignVCenter,
+                     QString("%1%").arg(qRound(value * 100)));
+
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x3A, 0x3A, 0x40));
+    painter.drawRoundedRect(QRectF(slider.x(), sliderY - 2.5, slider.width(), 5.0), 2.5, 2.5);
+    const qreal knobX = slider.x() + value * (slider.width() - 10) + 5.0;
+    painter.setBrush(value > 0.0 ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
+    painter.drawEllipse(QPointF(knobX, sliderY), 5.0, 5.0);
+    painter.restore();
+}
+
+void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop,
+                                     double scalePctOverride, QPointF offsetOverride) const
 {
     painter.save();
 
@@ -1822,9 +1856,9 @@ void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, 
         painter.drawPath(arrows);
     };
 
-    // 行0:缩放 标签+滑杆(轨道 x+56..x+150)+数值
+    // 行0:缩放 标签+滑杆(轨道 x+56..x+150)+数值(拖动中用 pending 值覆盖)
     label(0, tr("缩放"));
-    const double pct = layer->videoScale() * 100.0;
+    const double pct = (scalePctOverride >= 0.0) ? scalePctOverride : layer->videoScale() * 100.0;
     const int trackY = yTop + 11;
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0x33, 0x33, 0x3A));
@@ -1834,11 +1868,12 @@ void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, 
     painter.drawRoundedRect(QRectF(x + 56.0 + t * 94.0 - 4.0, trackY - 7.0, 8.0, 14.0), 2.0, 2.0);
     valueField(0, x + 156, pct, " %"); // 滑杆右侧,不与轨道重叠
 
-    // 行1/2:位移 X/Y
+    // 行1/2:位移 X/Y(拖动中用 pending 值覆盖)
+    const QPointF off = (offsetOverride.y() > -12344.0) ? offsetOverride : layer->videoOffset();
     label(1, tr("位移 X"));
-    valueField(1, x + 58, layer->videoOffset().x(), QString());
+    valueField(1, x + 58, off.x(), QString());
     label(2, tr("位移 Y"));
-    valueField(2, x + 58, layer->videoOffset().y(), QString());
+    valueField(2, x + 58, off.y(), QString());
 
     painter.restore();
 }
@@ -1893,6 +1928,35 @@ void TimeLineCells::toggleVideoPropsExpanded(int layerNumber)
     mTimeLine->updateContent();
 }
 
+void TimeLineCells::scheduleVideoPropsApply(int layerNumber, int field, double v)
+{
+    mVideoPropsPendingLayer = layerNumber;
+    mVideoPropsPendingField = field;
+    mVideoPropsPendingValue = v;
+    if (mVideoPropsApplyTimer == nullptr)
+    {
+        mVideoPropsApplyTimer = new QTimer(this);
+        mVideoPropsApplyTimer->setSingleShot(true);
+        mVideoPropsApplyTimer->setInterval(80);
+        connect(mVideoPropsApplyTimer, &QTimer::timeout, this, &TimeLineCells::flushPendingVideoProps);
+    }
+    mVideoPropsApplyTimer->start();
+}
+
+void TimeLineCells::flushPendingVideoProps()
+{
+    if (mVideoPropsApplyTimer) { mVideoPropsApplyTimer->stop(); }
+    const int layerNumber = mVideoPropsPendingLayer;
+    const int field = mVideoPropsPendingField;
+    const double v = mVideoPropsPendingValue;
+    mVideoPropsPendingField = 0;
+    mVideoPropsPendingLayer = -1;
+    if (field <= 0 || layerNumber < 0) { return; }
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    if (l == nullptr || l->type() != Layer::MOVIE) { return; }
+    setVideoPropsValue(static_cast<LayerVideo*>(l), layerNumber, field, v);
+}
+
 void TimeLineCells::scheduleOpacityApply(int layerNumber, qreal value)
 {
     mPendingOpacityLayer = layerNumber;
@@ -1920,7 +1984,7 @@ void TimeLineCells::flushPendingOpacity(int layerNumber)
     if (layer == nullptr) { return; }
     layer->setOpacity(mPendingOpacity);
     mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
-    update(QRect(0, getLayerY(layerNumber), width(), rowHeightOf(layerNumber)));
+    updateContent(); // 全量落定一次(手柄/百分比进缓存)
 }
 
 void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v)
@@ -1935,10 +1999,10 @@ void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int layerNumber, int f
         if (field == 3) { off.setX(v); } else { off.setY(v); }
         layer->setVideoOffset(off);
     }
-    // 帧内容没变:只失效该层一侧渲染缓存+局部重绘属性区。
-    // 走 onFramesModified 会全量失效(洋葱皮开时连下层位图全重画)=拖动卡顿
+    // 帧内容没变:只失效该层一侧渲染缓存;视觉落定走 updateContent
+    // (cells 整张缓存架构,行矩形 update 不重画内容)
     mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
-    update(QRect(0, getLayerY(layerNumber) + mLayerHeight, width(), kVideoPropsH));
+    updateContent();
 }
 
 void TimeLineCells::openVideoPropsEditor(int layerNumber, int field)
@@ -2268,6 +2332,29 @@ void TimeLineCells::paintEvent(QPaintEvent*)
         painter.drawPixmap(QPoint(0, 0), *mCache);
     }
 
+    // 拖动中的行内控件直画覆盖在缓存贴图之上(cells 是整张内容缓存架构,
+    // 行矩形 update 不触发内容重画;手柄跟手=overlay 直画,停顿才全量落定)
+    if (mType == TIMELINE_CELL_TYPE::Layers && mPendingOpacityLayer >= 0)
+    {
+        paintOpacitySliderOverlay(painter, mPendingOpacityLayer, mPendingOpacity);
+    }
+    if (mType == TIMELINE_CELL_TYPE::Layers && mVideoPropsPendingField > 0 && mVideoPropsPendingLayer >= 0)
+    {
+        Layer* vl = mEditor->object()->getLayer(mVideoPropsPendingLayer);
+        if (vl != nullptr && vl->type() == Layer::MOVIE)
+        {
+            const double scalePct = (mVideoPropsPendingField == 1 || mVideoPropsPendingField == 2)
+                ? mVideoPropsPendingValue
+                : static_cast<const LayerVideo*>(vl)->videoScale() * 100.0;
+            QPointF off = static_cast<const LayerVideo*>(vl)->videoOffset();
+            if (mVideoPropsPendingField == 3) { off.setX(mVideoPropsPendingValue); }
+            else if (mVideoPropsPendingField == 4) { off.setY(mVideoPropsPendingValue); }
+            paintVideoProps(painter, static_cast<const LayerVideo*>(vl), 0,
+                            getLayerY(mVideoPropsPendingLayer) + mLayerHeight,
+                            scalePct, off);
+        }
+    }
+
     if (mType == TIMELINE_CELL_TYPE::Tracks)
     {
         // selected frames highlighted on the ruler (TVP-style)
@@ -2587,7 +2674,8 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
                         mVideoPropsPressVal = 5.0 + t * (800.0 - 5.0);
                         mVideoPropsPressPos.setX(56 + qRound(t * 94.0));
-                        setVideoPropsValue(video, layerNumber, field, mVideoPropsPressVal);
+                        scheduleVideoPropsApply(layerNumber, field, mVideoPropsPressVal);
+                        update(QRect(0, getLayerY(layerNumber) + mLayerHeight, width(), kVideoPropsH));
                     }
                     else if (field == 2) { mVideoPropsPressVal = video->videoScale() * 100.0; }
                     else if (field == 3) { mVideoPropsPressVal = video->videoOffset().x(); }
@@ -2873,17 +2961,21 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                     if (mVideoPropsDragging)
                     {
                         // 滑杆按位置映射;数值按像素步进(Shift 加速×10)
+                        double v = 0.0;
                         if (mVideoPropsDragField == 1)
                         {
                             const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
-                            setVideoPropsValue(video, layerNumber, 1, 5.0 + t * (800.0 - 5.0));
+                            v = 5.0 + t * (800.0 - 5.0);
                         }
                         else
                         {
                             const bool fast = event->modifiers() & Qt::ShiftModifier;
                             const double step = (mVideoPropsDragField == 2 ? 0.5 : 1.0) * (fast ? 10.0 : 1.0);
-                            setVideoPropsValue(video, layerNumber, mVideoPropsDragField, mVideoPropsPressVal + dx * step);
+                            v = mVideoPropsPressVal + dx * step;
                         }
+                        // 记 pending+直画属性区(手柄/数值跟手),80ms 停顿落定
+                        scheduleVideoPropsApply(layerNumber, mVideoPropsDragField, v);
+                        update(QRect(0, getLayerY(layerNumber) + mLayerHeight, width(), kVideoPropsH));
                     }
                     event->accept();
                     return;
@@ -2952,11 +3044,11 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
             {
                 const QRect slider = opacitySliderRect(width());
                 const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
-                // 只记值+行重绘(手柄跟手);画布应用经 80ms 防抖(Krita LayerBox
-                // 同款 KisSignalCompressor 模式),被拖层在当前层下方时那块
-                // "全部下层位图重画"不再被 125Hz 的 move 轰炸
+                // 只记值+直画手柄区(缓存贴图之上,手柄跟手);画布与内容缓存
+                // 经 80ms 防抖停顿/松手才落定(Krita LayerBox 压缩器同款)
                 scheduleOpacityApply(mOpacityDragLayer, value);
-                update(QRect(0, getLayerY(mOpacityDragLayer), width(), rowHeightOf(mOpacityDragLayer)));
+                update(QRect(50, getLayerY(mOpacityDragLayer) + qRound(rowHeightOf(mOpacityDragLayer) * 0.72) - 11,
+                             76, 22));
             }
             QWidget::mouseMoveEvent(event);
             return;
@@ -3087,6 +3179,11 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
 void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (mVideoPropsDragField > 0)
+    {
+        // 松手:待落板值立即应用(不等防抖)
+        flushPendingVideoProps();
+    }
     mVideoPropsDragField = 0;
     mVideoPropsDragging = false;
 
