@@ -174,6 +174,9 @@ private:
     void paintCollapsedTrack(QPainter& painter, const Layer* layer, int x, int y, int width) const;
     void drawCollapseTriangle(QPainter& painter, const Layer* layer, int x, int y, int width, int height) const;
     void paintFrames(QPainter& painter, QColor trackCol, const Layer* layer, int y, int height, bool selected, int frameSize) const;
+    /** Camera key dots + connector line (shared by paintFrames and the
+     *  hover-reveal over the track-start camera icon). */
+    void paintCameraKeys(QPainter& painter, const Layer* layer, int y, int height) const;
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintVideoBand(QPainter& painter, const Layer* layer, int recLeft, int recTop, int recWidth, int recHeight) const;
@@ -277,6 +280,7 @@ private:
 
     int mMouseMoveX = 0;
     int mMousePressX = 0;
+    QPoint mMousePos = QPoint(-1000, -1000); // 当前悬停位置（离开部件后置回屏外）
 
     const static int mOffsetX = 0;
     const static int mOffsetY = 28;
