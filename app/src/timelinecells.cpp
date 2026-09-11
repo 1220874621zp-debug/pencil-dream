@@ -770,6 +770,21 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
 
     paintFrames(painter, col, layer, y, height, selected, frameSize);
 
+    // 相机轨道开头图标：与折叠组轨道同款写法（DPR 栅格化+按尺寸缓存）
+    if (layer->type() == Layer::CAMERA)
+    {
+        const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
+        const int iconH = qMax(12, qRound(height * 0.55));
+        const QString iconKey = QStringLiteral("camera-track:%1@%2").arg(iconH).arg(dpr);
+        const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
+            QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/camera-track.svg"))
+                                 .scaledToHeight(qMax(1, qRound(iconH * dpr)), Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
+            return scaled;
+        });
+        painter.drawPixmap(QPoint(x + 6, y + (height - iconH) / 2), icon);
+    }
+
     painter.restore();
 }
 
