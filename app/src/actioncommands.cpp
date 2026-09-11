@@ -899,7 +899,10 @@ void ActionCommands::duplicateKey()
     KeyFrame* dupKey = key->clone();
 
     int nextEmptyFrame = mEditor->currentFrame() + 1;
-    while (layer->keyExistsWhichCovers(nextEmptyFrame))
+    // 空位看"该格有无 key 起点"而非覆盖：auto 块覆盖查询是开放延伸（末块
+    // cover=INT_MAX），当覆盖当占用会无限找下去（复制帧必卡死）；在 auto
+    // 覆盖区插入 key 是合法操作，块会被下一 key 自然截断。
+    while (layer->keyExists(nextEmptyFrame))
     {
         nextEmptyFrame += 1;
     }
