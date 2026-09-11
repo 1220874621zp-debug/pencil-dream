@@ -216,6 +216,14 @@ void ScribbleArea::onLayerDisplayChanged(int layerIndex)
     {
         mCanvasPainter.resetPostLayerCache();
     }
+    // 还须清帧级画布缓存:paintEvent 工具非活跃时贴 QPixmapCache 按帧缓存
+    // 的整张图,层显示参数影响每一帧的画面,不清=改属性后各帧都贴旧图,
+    // 只有跳到无缓存的帧才看到新效果
+    for (auto it = mPixmapCacheKeys.begin(); it != mPixmapCacheKeys.end(); )
+    {
+        QPixmapCache::remove(it.value());
+        it = mPixmapCacheKeys.erase(it);
+    }
     update();
 }
 

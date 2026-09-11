@@ -1626,7 +1626,10 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     // --- TVP inline row controls: opacity slider, percentage, lock toggle ---
-    // rendered on their own line under the name; skipped on very short rows
+    // rendered on their own line under the name; skipped on very short rows.
+    // 展开属性区的视频层隐藏整段(避免与属性区误触;行高膨胀后 0.72 处
+    // 已落进属性区,显示也是错位的)
+    if (layer->type() == Layer::MOVIE && mExpandedVideoIds.contains(layer->id())) { return; }
     if (!rowHasInlineControls(width) || height < 40) { return; }
 
     const int sliderY = y + qRound(height * 0.72);
@@ -2336,7 +2339,13 @@ void TimeLineCells::paintEvent(QPaintEvent*)
     // 行矩形 update 不触发内容重画;手柄跟手=overlay 直画,停顿才全量落定)
     if (mType == TIMELINE_CELL_TYPE::Layers && mPendingOpacityLayer >= 0)
     {
-        paintOpacitySliderOverlay(painter, mPendingOpacityLayer, mPendingOpacity);
+        Layer* pl = mEditor->object()->getLayer(mPendingOpacityLayer);
+        const bool plVideoExpanded = (pl != nullptr && pl->type() == Layer::MOVIE
+                                      && mExpandedVideoIds.contains(pl->id()));
+        if (!plVideoExpanded)
+        {
+            paintOpacitySliderOverlay(painter, mPendingOpacityLayer, mPendingOpacity);
+        }
     }
     if (mType == TIMELINE_CELL_TYPE::Layers && mVideoPropsPendingField > 0 && mVideoPropsPendingLayer >= 0)
     {
@@ -2621,8 +2630,11 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             const int rowH = rowHeightOf(layerNumber);
             const bool expandedRow = rowH > 20;
 
-            // TVP inline controls: lock toggle and opacity slider (own line under the name)
-            if (expandedRow && rowH >= 40 && rowHasInlineControls(width()))
+            // TVP inline controls: lock toggle and opacity slider (own line under the name).
+            // 展开属性区的视频层隐藏整段行内控件(绘制+命中同步),避免误操作
+            const bool videoPropsExpandedRow =
+                (hitLayer->type() == Layer::MOVIE && mExpandedVideoIds.contains(hitLayer->id()));
+            if (expandedRow && rowH >= 40 && rowHasInlineControls(width()) && !videoPropsExpandedRow)
             {
                 const int ctrlY = rowY + qRound(rowH * 0.72);
                 const QRect lock = lockIconRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
