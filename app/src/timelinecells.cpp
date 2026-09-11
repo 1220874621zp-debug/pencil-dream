@@ -3108,6 +3108,17 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         dissolveAction = menu.addAction(tr("解散所在组"));
     }
 
+    // 向下合并：当前层与其正下方（栈序-1）都是位图层才提供
+    QAction* mergeDownAction = nullptr;
+    if (layer->type() == Layer::BITMAP && layerIndex > 0)
+    {
+        Layer* below = mEditor->object()->getLayer(layerIndex - 1);
+        if (below != nullptr && below->type() == Layer::BITMAP && !below->locked())
+        {
+            mergeDownAction = menu.addAction(tr("向下合并图层 (Ctrl+E)"));
+        }
+    }
+
     menu.addSeparator();
     QAction* deleteLayerAction = menu.addAction(tr("删除图层…"));
 
@@ -3146,6 +3157,14 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         // 取帧方式变化影响整段显示与渲染缓存
         mEditor->getScribbleArea()->onLayerChanged();
         updateContent();
+        return;
+    }
+
+    if (chosen == mergeDownAction && mergeDownAction != nullptr)
+    {
+        // 与删除同链：先置为当前层，统一走 ActionCommands 的守卫与确认
+        mEditor->layers()->setCurrentLayer(layerIndex);
+        Q_EMIT mergeDownRequested(layerIndex);
         return;
     }
 

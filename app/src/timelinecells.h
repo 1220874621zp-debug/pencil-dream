@@ -81,6 +81,7 @@ signals:
     void mouseMovedY(int);
     /** 图层行右键菜单请求删除指定层（走 TimeLine::deleteCurrentLayerClick 确认链） */
     void deleteLayerRequested(int layerIndex);
+    void mergeDownRequested(int layerIndex);
     void lengthChanged(int);
     void offsetChanged(int);
     void selectionChanged();

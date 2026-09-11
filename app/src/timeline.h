@@ -69,6 +69,7 @@ signals:
     void modification();
 
     void deleteCurrentLayerClick();
+    void mergeLayerDownClick();
 
     void insertKeyClick();
     void removeKeyClick();

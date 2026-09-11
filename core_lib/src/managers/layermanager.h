@@ -52,6 +52,11 @@ public:
 
     bool canDeleteLayer(int index) const;
     Status deleteLayer(int index);
+
+    /** 向下合并：把 upperIndex 位图图层的内容并入其下方（栈序-1）位图图层，
+     *  按上层曝光分段拆分下层 key 后逐段贴画，视觉逐帧等价；随后删除上层。
+     *  仅接受 BITMAP 类型，前置校验由调用方负责 */
+    Status mergeBitmapLayerDown(int upperIndex);
     Status renameLayer(Layer*, const QString& newName);
     void notifyLayerChanged(Layer*);
 

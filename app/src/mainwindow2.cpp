@@ -1796,6 +1796,13 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     connect(pTimeline, &TimeLine::newCameraLayer, mCommands, &ActionCommands::addNewCameraLayer);
     connect(mTimeLine, &TimeLine::playButtonTriggered, mCommands, &ActionCommands::PlayStop);
     connect(pTimeline, &TimeLine::deleteCurrentLayerClick, mCommands, &ActionCommands::deleteCurrentLayer);
+    connect(pTimeline, &TimeLine::mergeLayerDownClick, mCommands, &ActionCommands::mergeLayerDown);
+
+    // 向下合并图层：菜单入口 + Ctrl+E（位图层专用，守卫在 ActionCommands）
+    QAction* mergeLayerDownAct = new QAction(tr("向下合并图层"), this);
+    mergeLayerDownAct->setShortcut(Qt::CTRL | Qt::Key_E);
+    connect(mergeLayerDownAct, &QAction::triggered, mCommands, &ActionCommands::mergeLayerDown);
+    ui->menuLayer->addAction(mergeLayerDownAct);
 
     // Clipboard state handling
     connect(QApplication::clipboard(), &QClipboard::dataChanged, mEditor, &Editor::clipboardChanged);

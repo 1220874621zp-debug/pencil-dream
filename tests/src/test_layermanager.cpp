@@ -19,6 +19,8 @@ GNU General Public License for more details.
 #include "editor.h"
 #include "layermanager.h"
 #include "pencilerror.h"
+#include "layerbitmap.h"
+#include "bitmapimage.h"
 
 
 TEST_CASE("LayerManager::init()")
@@ -121,6 +123,56 @@ TEST_CASE("Layer::setCurrentLayer(index)") {
         REQUIRE(layerMgr->getLayer(0)->selectedKeyFrameCount() == 0);
         REQUIRE(layerMgr->getLayer(1)->selectedKeyFrameCount() == 0);
 
+    }
+    delete editor;
+}
+
+TEST_CASE("LayerManager::mergeBitmapLayerDown()")
+{
+    Object* object = new Object;
+    Editor* editor = new Editor;
+    editor->setObject(object);
+
+    SECTION("merge splits lower keys at upper exposure boundaries")
+    {
+        LayerManager* layerMgr = new LayerManager(editor);
+        layerMgr->init();
+
+        object->init();
+        layerMgr->createCameraLayer("Camera");
+        LayerBitmap* lower = layerMgr->createBitmapLayer("Lower");
+        LayerBitmap* upper = layerMgr->createBitmapLayer("Upper");
+        REQUIRE(layerMgr->count() == 3);
+
+        // 下层：帧1红（自动曝光），帧10绿
+        delete lower->takeKeyFrame(1); // new layers carry an empty auto key@1
+        lower->addKeyFrame(1, new BitmapImage(QRect(0, 0, 4, 4), Qt::red));
+        lower->addKeyFrame(10, new BitmapImage(QRect(0, 0, 4, 4), Qt::green));
+
+        // 上层：帧5蓝，显式曝光 3 帧（5..7）
+        BitmapImage* upperKey = new BitmapImage(QRect(0, 0, 4, 4), Qt::blue);
+        upperKey->setLength(3);
+        upperKey->setLengthExplicit(true);
+        upper->addKeyFrame(5, upperKey);
+
+        REQUIRE(layerMgr->mergeBitmapLayerDown(2).ok());
+
+        // 上层被删除，当前层切到合并后的下层
+        REQUIRE(layerMgr->count() == 2);
+        REQUIRE(layerMgr->currentLayerIndex() == 1);
+        REQUIRE(layerMgr->getLayer(1) == lower);
+
+        // 下层按上层曝光边界拆出 1/5/8/10 四个 key
+        REQUIRE(lower->keyExists(1));
+        REQUIRE(lower->keyExists(5));
+        REQUIRE(lower->keyExists(8));
+        REQUIRE(lower->keyExists(10));
+
+        // 逐段像素：1=红 5=红+蓝(蓝盖) 8=红(上层结束还原) 10=绿
+        REQUIRE(lower->getBitmapImageAtFrame(1)->image()->pixel(1, 1) == QColor(Qt::red).rgba());
+        REQUIRE(lower->getBitmapImageAtFrame(5)->image()->pixel(1, 1) == QColor(Qt::blue).rgba());
+        REQUIRE(lower->getBitmapImageAtFrame(8)->image()->pixel(1, 1) == QColor(Qt::red).rgba());
+        REQUIRE(lower->getBitmapImageAtFrame(10)->image()->pixel(1, 1) == QColor(Qt::green).rgba());
     }
     delete editor;
 }

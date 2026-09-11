@@ -31,6 +31,7 @@ GNU General Public License for more details.
 #include "object.h"
 #include "viewmanager.h"
 #include "layermanager.h"
+#include "undoredomanager.h"
 #include "scribblearea.h"
 #include "toolmanager.h"
 #include "soundmanager.h"
@@ -1025,6 +1026,63 @@ Status ActionCommands::deleteCurrentLayer()
                                      tr("Please keep at least one camera layer in project", "text when failed to delete camera layer"));
         }
     }
+    return Status::OK;
+}
+
+Status ActionCommands::mergeLayerDown()
+{
+    LayerManager* layerMgr = mEditor->layers();
+    Layer* upper = layerMgr->currentLayer();
+    if (upper == nullptr)
+    {
+        return Status::FAIL;
+    }
+
+    const QString tipTitle = tr("向下合并图层");
+    if (upper->type() != Layer::BITMAP)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("只有位图图层可以向下合并。"));
+        return Status::CANCELED;
+    }
+    const int upperIndex = layerMgr->currentLayerIndex();
+    if (upperIndex <= 0)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("当前图层下方没有可合并的图层。"));
+        return Status::CANCELED;
+    }
+    Layer* lower = layerMgr->getLayer(upperIndex - 1);
+    if (lower == nullptr || lower->type() != Layer::BITMAP)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("下方图层不是位图图层，无法合并。"));
+        return Status::CANCELED;
+    }
+    if (lower->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("下方图层已锁定，无法合并。"));
+        return Status::CANCELED;
+    }
+
+    const QMessageBox::StandardButton choice = QMessageBox::warning(
+        mParent, tipTitle,
+        tr("将把“%1”并入下方“%2”，并删除“%1”。\n此操作不可撤销，是否继续？").arg(upper->name(), lower->name()),
+        QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (choice != QMessageBox::Ok)
+    {
+        return Status::CANCELED;
+    }
+
+    // 合并会改动下层像素并删除上层，撤销栈里的旧状态会引用已删层的帧 → 清栈保安全
+    mEditor->undoRedo()->clearStack();
+
+    const Status st = layerMgr->mergeBitmapLayerDown(upperIndex);
+    if (!st.ok())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("合并失败。"));
+        return st;
+    }
+
+    mEditor->getScribbleArea()->onLayerChanged();
+    emit mEditor->framesModified();
     return Status::OK;
 }
 

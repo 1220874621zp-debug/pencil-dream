@@ -17,6 +17,10 @@ GNU General Public License for more details.
 
 #include "layermanager.h"
 
+#include <algorithm>
+
+#include <QPainter>
+
 #include "object.h"
 #include "editor.h"
 #include "scribblearea.h"
@@ -325,6 +329,92 @@ int LayerManager::count()
 bool LayerManager::canDeleteLayer(int index) const
 {
     return object()->canDeleteLayer(index);
+}
+
+Status LayerManager::mergeBitmapLayerDown(int upperIndex)
+{
+    Object* obj = object();
+    if (upperIndex <= 0 || upperIndex >= obj->getLayerCount())
+    {
+        return Status::FAIL;
+    }
+    Layer* upperLayer = obj->getLayer(upperIndex);
+    Layer* lowerLayer = obj->getLayer(upperIndex - 1);
+    if (upperLayer == nullptr || lowerLayer == nullptr
+        || upperLayer->type() != Layer::BITMAP || lowerLayer->type() != Layer::BITMAP)
+    {
+        return Status::FAIL;
+    }
+    auto* upper = static_cast<LayerBitmap*>(upperLayer);
+    auto* lower = static_cast<LayerBitmap*>(lowerLayer);
+
+    // 上层曝光分段（key 起/止），升序；开放尾块按单格计
+    struct Seg { int pos; int end; BitmapImage* img; };
+    QList<Seg> segs;
+    upper->foreachKeyFrame([&](KeyFrame* key)
+    {
+        int end = upper->getBlockEnd(key);
+        if (end < 0) { end = key->pos() + 1; }
+        segs.append({ key->pos(), end, static_cast<BitmapImage*>(key) });
+    });
+    std::sort(segs.begin(), segs.end(), [](const Seg& a, const Seg& b) { return a.pos < b.pos; });
+
+    // 在上层分段边界处拆分下层：新 key 克隆该帧下层的显示内容（无显示=空白帧），
+    // 使下层在两层的所有显示边界上都有显式 key，逐段内容恒定
+    auto ensureLowerKeyAt = [lower](int frame) -> void
+    {
+        if (lower->keyExists(frame)) { return; }
+        BitmapImage* displayed = lower->getLastBitmapImageAtFrame(frame);
+        BitmapImage* fresh = nullptr;
+        if (displayed != nullptr)
+        {
+            fresh = displayed->clone();
+        }
+        else
+        {
+            QImage blank(1, 1, QImage::Format_ARGB32_Premultiplied);
+            blank.fill(Qt::transparent);
+            fresh = new BitmapImage(QPoint(0, 0), blank);
+        }
+        lower->addKeyFrame(frame, fresh);
+    };
+    for (const Seg& seg : segs)
+    {
+        ensureLowerKeyAt(seg.pos);
+        ensureLowerKeyAt(seg.end);
+    }
+
+    // 上层内容（含层不透明度）贴到下层对应 key
+    const qreal upperOpacity = upper->opacity();
+    for (const Seg& seg : segs)
+    {
+        BitmapImage* target = static_cast<BitmapImage*>(lower->getKeyFrameAt(seg.pos));
+        if (target == nullptr) { continue; }
+        if (upperOpacity >= 1.0)
+        {
+            target->paste(seg.img);
+        }
+        else
+        {
+            // 半透明层：以层不透明度重绘到透明底再贴，保持位置
+            const QImage src = *seg.img->image();
+            QImage overlay(src.size(), QImage::Format_ARGB32_Premultiplied);
+            overlay.fill(Qt::transparent);
+            QPainter overlayPainter(&overlay);
+            overlayPainter.setOpacity(upperOpacity);
+            overlayPainter.drawImage(0, 0, src);
+            overlayPainter.end();
+            BitmapImage temp(seg.img->bounds().topLeft(), overlay);
+            target->paste(&temp);
+        }
+    }
+
+    // 删除上层，选中合并后的下层
+    const int lowerIndex = upperIndex - 1;
+    const Status st = deleteLayer(upperIndex);
+    if (!st.ok()) { return st; }
+    setCurrentLayer(lowerIndex);
+    return Status::OK;
 }
 
 Status LayerManager::deleteLayer(int index)
