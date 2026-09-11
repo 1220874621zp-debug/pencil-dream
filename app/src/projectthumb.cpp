@@ -135,9 +135,11 @@ namespace ProjectThumb
         }
 
         // 解包整个工程到临时目录抽帧（缓存命中时不走这条，重生成仅发生在源变更后）
+        // 注意：uncompressFolder 的解压基准=QFileInfo(destPath).absolutePath()，
+        // destPath 必须带尾斜杠才会解进目录内，否则解到父目录
         QTemporaryDir temp;
         QImage src;
-        if (temp.isValid() && MiniZ::uncompressFolder(info.absoluteFilePath(), temp.path()).ok())
+        if (temp.isValid() && MiniZ::uncompressFolder(info.absoluteFilePath(), temp.path() + QLatin1Char('/')).ok())
         {
             const QString rel = firstBitmapFrameSrc(temp.path());
             if (!rel.isEmpty() && QFileInfo(rel).isRelative())
