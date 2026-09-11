@@ -19,15 +19,20 @@ GNU General Public License for more details.
 
 #include <QBuffer>
 #include <QDir>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QPainter>
+#include <QTimer>
 
 #include "bitmapimage.h"
+#include "colorizeimage.h"
+#include "colorizeupdatemanager.h"
 #include "editor.h"
 #include "filemanager.h"
 #include "layer.h"
 #include "layerbitmap.h"
+#include "layercolorize.h"
 #include "layermanager.h"
 #include "playbackmanager.h"
 #include "preferencemanager.h"
@@ -181,6 +186,62 @@ QJsonArray McpDispatcher::toolsSchema() const
         tools.append(makeTool("scrub_to", QStringLiteral("把播放头跳到指定帧。"), props, {"frame"}));
     }
 
+    // —— 绘制原语 ——
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("目标图层（位图或填色层；默认当前图层）")));
+        props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧；无关键帧时自动创建）")));
+        props.insert("points", prop("array", QStringLiteral("画布坐标点列表 [[x,y],...]；左上角为(0,0)，x向右y向下")));
+        props.insert("color", prop("string", QStringLiteral("颜色，如 \"#336699\"；支持 #AARRGGBB 带透明")));
+        props.insert("size", prop("number", QStringLiteral("笔宽像素（默认4）")));
+        props.insert("opacity", prop("number", QStringLiteral("不透明度0-1（默认1）")));
+        tools.append(makeTool("draw_stroke",
+            QStringLiteral("在指定位图/填色图层指定帧上画笔画（圆头折线；单点=圆点）。可撤销。智能填色时用它点彩色种子。"),
+            props, {"points", "color"}));
+    }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("目标图层（默认当前图层）")));
+        props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧）")));
+        props.insert("polygon", prop("array", QStringLiteral("多边形顶点画布坐标 [[x,y],...]（至少3个）")));
+        props.insert("color", prop("string", QStringLiteral("填充颜色，如 \"#ffcc00\"")));
+        props.insert("opacity", prop("number", QStringLiteral("不透明度0-1（默认1）")));
+        tools.append(makeTool("fill_region",
+            QStringLiteral("用纯色填充多边形区域（可撤销）。适合大面积上色；细节填色优先用智能填色流程。"),
+            props, {"polygon", "color"}));
+    }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("目标图层")));
+        props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧）")));
+        tools.append(makeTool("clear_frame",
+            QStringLiteral("清空指定帧的图像内容（关键帧保留为空白，可撤销）。"),
+            props, {}));
+    }
+
+    // —— 智能填色 ——
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("填色图层（colorize 类型）")));
+        props.insert("use_edge_detection", prop("boolean", QStringLiteral("LoG边缘检测加固线稿（默认false）")));
+        props.insert("edge_detection_size", prop("number", QStringLiteral("边缘检测核尺寸1-20（默认4）")));
+        props.insert("fuzzy_radius", prop("number", QStringLiteral("高斯闭缝半径0-10（默认0）")));
+        props.insert("clean_up_amount", prop("number", QStringLiteral("清理强度0-1（默认0.7）")));
+        props.insert("transparent_color", prop("string", QStringLiteral("透明标记色（线稿中该色区域保持透明）；传空字符串清除标记")));
+        tools.append(makeTool("set_colorize_options",
+            QStringLiteral("设置智能填色算法参数（对整层生效）。改动后需重新 request_colorize_update。"),
+            props, {"layer"}));
+    }
+    {
+        QJsonObject props;
+        props.insert("layer", prop("any", QStringLiteral("填色图层（colorize 类型）")));
+        props.insert("frame", prop("number", QStringLiteral("帧号（默认当前帧）")));
+        props.insert("max_size", prop("number", QStringLiteral("返回图最长边像素数（默认1024）")));
+        tools.append(makeTool("request_colorize_update",
+            QStringLiteral("触发指定帧的智能填色计算（线稿来自上方最近位图层），等待完成后返回填色结果图。自动填色流程：create_layer(type=colorize) → draw_stroke 点种子 → 本工具 → 看图复查。"),
+            props, {"layer"}));
+    }
+
     // —— 项目 / 播放 / 撤销 ——
     {
         QJsonObject props;
@@ -224,6 +285,11 @@ McpDispatcher::ToolResult McpDispatcher::dispatch(const QString& tool, const QJs
     if (tool == "duplicate_frame")         return toolDuplicateFrame(args);
     if (tool == "delete_frame")            return toolDeleteFrame(args);
     if (tool == "scrub_to")                return toolScrubTo(args);
+    if (tool == "draw_stroke")             return toolDrawStroke(args);
+    if (tool == "fill_region")             return toolFillRegion(args);
+    if (tool == "clear_frame")             return toolClearFrame(args);
+    if (tool == "set_colorize_options")    return toolSetColorizeOptions(args);
+    if (tool == "request_colorize_update") return toolRequestColorizeUpdate(args);
     if (tool == "open_project")            return toolOpenProject(args);
     if (tool == "save_project")            return toolSaveProject(args);
     if (tool == "export_frame")            return toolExportFrame(args);
@@ -507,6 +573,278 @@ McpDispatcher::ToolResult McpDispatcher::toolScrubTo(const QJsonObject& args)
     return ok(data);
 }
 
+// -------------------------------------------------------------- 绘制原语 ---
+
+McpDispatcher::ToolResult McpDispatcher::toolDrawStroke(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+    if (!layer->isBitmapKind())
+        return fail(tr("只能在位图/填色图层上绘制（当前类型: %1）").arg(layerTypeName(layer)));
+    if (layer->locked())
+        return fail(tr("图层 %1 已锁定，无法绘制").arg(layer->name()));
+    if (!layer->visible())
+        return fail(tr("图层 %1 当前隐藏，请先 set_layer_visibility 显示它").arg(layer->name()));
+
+    const int frame = args.contains("frame") ? qMax(1, args.value("frame").toInt()) : mEditor->currentFrame();
+    const qreal size = args.contains("size") ? qMax(1.0, args.value("size").toDouble()) : 4.0;
+    const qreal opacity = args.contains("opacity") ? qBound(0.0, args.value("opacity").toDouble(), 1.0) : 1.0;
+    const QColor color = parseColor(args.value("color"), opacity, &err);
+    if (!color.isValid())
+        return fail(err);
+
+    const QJsonArray pointsJson = args.value("points").toArray();
+    if (pointsJson.size() < 1)
+        return fail(tr("points 至少要有一个 [x,y] 点"));
+
+    BitmapImage* bitmap = ensureBitmapAtFrame(layer, frame, &err);
+    if (bitmap == nullptr)
+        return fail(err);
+
+    QVector<QPointF> points;
+    for (const QJsonValue& v : pointsJson)
+    {
+        const QJsonArray pair = v.toArray();
+        if (pair.size() < 2)
+            return fail(tr("points 中存在非 [x,y] 形式的项"));
+        points.append(canvasToWorld(QPointF(pair[0].toDouble(), pair[1].toDouble())));
+    }
+
+    QPen pen(color, size, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    const SAVESTATE_ID undoState = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+
+    if (points.size() == 1)
+    {
+        const QPointF& p = points.first();
+        bitmap->drawEllipse(QRectF(p.x() - size / 2, p.y() - size / 2, size, size),
+                            QPen(Qt::NoPen), QBrush(color), QPainter::CompositionMode_SourceOver, true);
+    }
+    else
+    {
+        QPainterPath path;
+        path.moveTo(points.first());
+        for (int i = 1; i < points.size(); ++i)
+            path.lineTo(points[i]);
+        if (args.value("closed").toBool(false))
+            path.closeSubpath();
+        bitmap->drawPath(path, pen, QBrush(Qt::NoBrush), QPainter::CompositionMode_SourceOver, true);
+    }
+
+    mEditor->undoRedo()->record(undoState, tr("MCP：绘制笔画"));
+    mEditor->setModified(mEditor->object()->getIndex(layer), frame);
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("frame", frame);
+    data.insert("points_drawn", points.size());
+    return ok(data);
+}
+
+McpDispatcher::ToolResult McpDispatcher::toolFillRegion(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+    if (!layer->isBitmapKind())
+        return fail(tr("只能在位图/填色图层上填充（当前类型: %1）").arg(layerTypeName(layer)));
+    if (layer->locked())
+        return fail(tr("图层 %1 已锁定，无法绘制").arg(layer->name()));
+    if (!layer->visible())
+        return fail(tr("图层 %1 当前隐藏，请先 set_layer_visibility 显示它").arg(layer->name()));
+
+    const int frame = args.contains("frame") ? qMax(1, args.value("frame").toInt()) : mEditor->currentFrame();
+    const qreal opacity = args.contains("opacity") ? qBound(0.0, args.value("opacity").toDouble(), 1.0) : 1.0;
+    const QColor color = parseColor(args.value("color"), opacity, &err);
+    if (!color.isValid())
+        return fail(err);
+
+    const QJsonArray polygonJson = args.value("polygon").toArray();
+    if (polygonJson.size() < 3)
+        return fail(tr("polygon 至少要三个顶点"));
+
+    BitmapImage* bitmap = ensureBitmapAtFrame(layer, frame, &err);
+    if (bitmap == nullptr)
+        return fail(err);
+
+    QPainterPath path;
+    bool first = true;
+    for (const QJsonValue& v : polygonJson)
+    {
+        const QJsonArray pair = v.toArray();
+        if (pair.size() < 2)
+            return fail(tr("polygon 中存在非 [x,y] 形式的项"));
+        const QPointF p = canvasToWorld(QPointF(pair[0].toDouble(), pair[1].toDouble()));
+        if (first)
+        {
+            path.moveTo(p);
+            first = false;
+        }
+        else
+        {
+            path.lineTo(p);
+        }
+    }
+    path.closeSubpath();
+
+    const SAVESTATE_ID undoState = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    bitmap->drawPath(path, QPen(Qt::NoPen), QBrush(color), QPainter::CompositionMode_SourceOver, true);
+    mEditor->undoRedo()->record(undoState, tr("MCP：填充区域"));
+    mEditor->setModified(mEditor->object()->getIndex(layer), frame);
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("frame", frame);
+    return ok(data);
+}
+
+McpDispatcher::ToolResult McpDispatcher::toolClearFrame(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+    if (!layer->isBitmapKind())
+        return fail(tr("只能在位图/填色图层上清空帧（当前类型: %1）").arg(layerTypeName(layer)));
+
+    const int frame = args.contains("frame") ? qMax(1, args.value("frame").toInt()) : mEditor->currentFrame();
+    LayerBitmap* bitmapLayer = dynamic_cast<LayerBitmap*>(layer);
+    BitmapImage* bitmap = bitmapLayer ? bitmapLayer->getBitmapImageAtFrame(frame) : nullptr;
+    if (bitmap == nullptr)
+        return fail(tr("帧 %1 上没有关键帧，无需清空").arg(frame));
+
+    const SAVESTATE_ID undoState = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    bitmap->clear();
+    mEditor->undoRedo()->record(undoState, tr("MCP：清空帧"));
+    mEditor->setModified(mEditor->object()->getIndex(layer), frame);
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("cleared_frame", frame);
+    return ok(data);
+}
+
+// -------------------------------------------------------------- 智能填色 ---
+
+McpDispatcher::ToolResult McpDispatcher::toolSetColorizeOptions(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+
+    LayerColorize* colorizeLayer = dynamic_cast<LayerColorize*>(layer);
+    if (colorizeLayer == nullptr)
+        return fail(tr("图层 %1 不是智能填色层（type=colorize）。当前图层：%2")
+                        .arg(layer->name()).arg(layerListHint()));
+
+    if (args.contains("use_edge_detection"))
+        colorizeLayer->setUseEdgeDetection(args.value("use_edge_detection").toBool());
+    if (args.contains("edge_detection_size"))
+        colorizeLayer->setEdgeDetectionSize(qBound(1.0, args.value("edge_detection_size").toDouble(), 20.0));
+    if (args.contains("fuzzy_radius"))
+        colorizeLayer->setFuzzyRadius(qBound(0.0, args.value("fuzzy_radius").toDouble(), 10.0));
+    if (args.contains("clean_up_amount"))
+        colorizeLayer->setCleanUpAmount(qBound(0.0, args.value("clean_up_amount").toDouble(), 1.0));
+    if (args.contains("transparent_color"))
+    {
+        const QString value = args.value("transparent_color").toString();
+        if (value.isEmpty())
+        {
+            colorizeLayer->clearTransparentColor();
+        }
+        else
+        {
+            const QColor color(value);
+            if (!color.isValid())
+                return fail(tr("transparent_color 不是合法颜色: %1").arg(value));
+            colorizeLayer->setTransparentColor(color.rgba());
+        }
+    }
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("note", QStringLiteral("参数已更新；需要重新 request_colorize_update 才会生效"));
+    return ok(data);
+}
+
+McpDispatcher::ToolResult McpDispatcher::toolRequestColorizeUpdate(const QJsonObject& args)
+{
+    QString err;
+    Layer* layer = resolveLayer(args, &err);
+    if (layer == nullptr)
+        return fail(err);
+
+    LayerColorize* colorizeLayer = dynamic_cast<LayerColorize*>(layer);
+    if (colorizeLayer == nullptr)
+        return fail(tr("图层 %1 不是智能填色层（type=colorize）。当前图层：%2")
+                        .arg(layer->name()).arg(layerListHint()));
+
+    const int frame = args.contains("frame") ? qMax(1, args.value("frame").toInt()) : mEditor->currentFrame();
+    const int maxSize = args.contains("max_size") ? args.value("max_size").toInt() : 1024;
+
+    // 填色源按当前帧解析：先把播放头对准目标帧
+    mEditor->scrubTo(frame);
+
+    const int layerIndex = mEditor->object()->getIndex(layer);
+    if (mEditor->object()->getColorizeSourceLayer(layerIndex, frame) == nullptr)
+        return fail(tr("找不到线稿源：填色层上/下方没有当前帧非空的位图图层。当前图层：%1").arg(layerListHint()));
+
+    BitmapImage* keyBitmap = ensureBitmapAtFrame(layer, frame, &err);
+    if (keyBitmap == nullptr)
+        return fail(tr("填色层在帧 %1 上没有关键帧，请先 draw_stroke 落一颗种子").arg(frame));
+
+    // requestUpdate 在后台线程池计算，完成后 frameUpdated 信号回主线程；
+    // 受控等待（工具调用串行，mDispatching 已挡并发）
+    QEventLoop loop;
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+    bool finished = false;
+    connect(&timeoutTimer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    connect(mEditor->colorizeUpdates(), &ColorizeUpdateManager::frameUpdated,
+            &loop, [&](int layerId, int)
+    {
+        if (layerId == colorizeLayer->id())
+        {
+            finished = true;
+            loop.quit();
+        }
+    });
+
+    mEditor->colorizeUpdates()->requestUpdate(colorizeLayer, frame);
+    timeoutTimer.start(30000);
+    loop.exec();
+    timeoutTimer.stop();
+
+    if (!finished)
+        return fail(tr("填色计算超时（30秒）；工程太大或算法参数过重"));
+
+    ColorizeImage* colorizeKey = dynamic_cast<ColorizeImage*>(keyBitmap);
+    if (colorizeKey == nullptr || colorizeKey->coloringImage().isNull())
+        return fail(tr("填色结果为空：检查种子笔画是否落在封闭区域内"));
+
+    // 把填色结果贴回画布坐标系输出
+    const QSize size = canvasSize();
+    QImage image(size, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter painter(&image);
+    painter.translate(size.width() / 2.0, size.height() / 2.0);
+    painter.drawImage(colorizeKey->coloringBounds().topLeft(), colorizeKey->coloringImage());
+    painter.end();
+
+    if (maxSize > 0 && (image.width() > maxSize || image.height() > maxSize))
+        image = image.scaled(maxSize, maxSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    QJsonObject data;
+    data.insert("layer", layerSummary(layer, mEditor->object()->getIndex(layer) + 1));
+    data.insert("frame", frame);
+    data.insert("width", image.width());
+    data.insert("height", image.height());
+    return okWithImage(data, image);
+}
+
 // ------------------------------------------------------ 项目 / 播放 / 撤销 ---
 
 McpDispatcher::ToolResult McpDispatcher::toolOpenProject(const QJsonObject& args)
@@ -722,6 +1060,56 @@ QSize McpDispatcher::canvasSize() const
     const int w = mEditor->preference()->getInt(SETTING::FIELD_W);
     const int h = mEditor->preference()->getInt(SETTING::FIELD_H);
     return QSize(w > 0 ? w : 1920, h > 0 ? h : 1080);
+}
+
+QPointF McpDispatcher::canvasToWorld(const QPointF& canvasPoint) const
+{
+    const QSize size = canvasSize();
+    return QPointF(canvasPoint.x() - size.width() / 2.0, canvasPoint.y() - size.height() / 2.0);
+}
+
+BitmapImage* McpDispatcher::ensureBitmapAtFrame(Layer* layer, int frame, QString* err)
+{
+    LayerBitmap* bitmapLayer = dynamic_cast<LayerBitmap*>(layer);
+    if (bitmapLayer == nullptr)
+    {
+        *err = tr("图层不是位图族类型");
+        return nullptr;
+    }
+
+    if (!layer->keyExists(frame))
+    {
+        mEditor->beginLayerLayoutEdit(layer);
+        const bool added = layer->addNewKeyFrameAt(frame);
+        mEditor->endLayerLayoutEdit(tr("MCP：新增关键帧"));
+        if (!added)
+        {
+            *err = tr("在帧 %1 上创建关键帧失败").arg(frame);
+            return nullptr;
+        }
+    }
+
+    BitmapImage* bitmap = bitmapLayer->getBitmapImageAtFrame(frame);
+    if (bitmap == nullptr)
+    {
+        *err = tr("帧 %1 上取不到位图关键帧").arg(frame);
+        return nullptr;
+    }
+    bitmap->loadFile();
+    return bitmap;
+}
+
+QColor McpDispatcher::parseColor(const QJsonValue& value, qreal opacity, QString* err) const
+{
+    const QString text = value.toString().trimmed();
+    QColor color(text);
+    if (!color.isValid())
+    {
+        *err = tr("颜色格式不合法: 「%1」（应为 #RRGGBB 或 #AARRGGBB）").arg(text);
+        return QColor();
+    }
+    color.setAlphaF(color.alphaF() * qBound(0.0, opacity, 1.0));
+    return color;
 }
 
 McpDispatcher::ToolResult McpDispatcher::ok(QJsonObject data)

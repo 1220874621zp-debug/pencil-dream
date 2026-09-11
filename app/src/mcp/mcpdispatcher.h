@@ -69,6 +69,15 @@ private:
     ToolResult toolDeleteFrame(const QJsonObject& args);
     ToolResult toolScrubTo(const QJsonObject& args);
 
+    // —— 绘制原语 ——
+    ToolResult toolDrawStroke(const QJsonObject& args);
+    ToolResult toolFillRegion(const QJsonObject& args);
+    ToolResult toolClearFrame(const QJsonObject& args);
+
+    // —— 智能填色 ——
+    ToolResult toolSetColorizeOptions(const QJsonObject& args);
+    ToolResult toolRequestColorizeUpdate(const QJsonObject& args);
+
     // —— 项目 / 播放 / 撤销 ——
     ToolResult toolOpenProject(const QJsonObject& args);
     ToolResult toolSaveProject(const QJsonObject& args);
@@ -84,6 +93,10 @@ private:
     QString layerListHint() const;
     QImage renderFrame(int frame, Layer* singleLayer, bool background) const;
     QSize canvasSize() const;
+    QPointF canvasToWorld(const QPointF& canvasPoint) const;
+    /** 取位图族图层在指定帧的位图；无关键帧时先建空关键帧（布局事务） */
+    class BitmapImage* ensureBitmapAtFrame(Layer* layer, int frame, QString* err);
+    QColor parseColor(const QJsonValue& value, qreal opacity, QString* err) const;
     static ToolResult ok(QJsonObject data);
     static ToolResult okWithImage(QJsonObject data, const QImage& image);
     static ToolResult fail(const QString& message);
