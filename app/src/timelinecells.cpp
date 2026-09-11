@@ -1802,10 +1802,10 @@ void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, 
         painter.setPen(QColor(0xC8, 0xC8, 0xCE));
         painter.drawText(QRect(x + 10, yTop + row * 22, 44, 22), Qt::AlignVCenter | Qt::AlignLeft, text);
     };
-    auto valueField = [&painter, x, yTop](int row, double val, const QString& suffix)
+    auto valueField = [&painter, yTop](int row, int vx, double val, const QString& suffix)
     {
         // AE 式数值段:淡蓝数字+左下细线+右缘拖动箭头
-        const QRect vr(x + 58, yTop + row * 22 + 2, 78, 18);
+        const QRect vr(vx, yTop + row * 22 + 2, 78, 18);
         painter.setPen(QColor(0x8F, 0xC5, 0xFF));
         painter.drawText(vr, Qt::AlignVCenter | Qt::AlignLeft,
                          QString::number(val, 'f', 1) + suffix);
@@ -1832,13 +1832,13 @@ void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, 
     const double t = qBound(0.0, (pct - 5.0) / (800.0 - 5.0), 1.0);
     painter.setBrush(QColor(0xE8, 0xE8, 0xEA));
     painter.drawRoundedRect(QRectF(x + 56.0 + t * 94.0 - 4.0, trackY - 7.0, 8.0, 14.0), 2.0, 2.0);
-    valueField(0, pct, " %");
+    valueField(0, x + 156, pct, " %"); // 滑杆右侧,不与轨道重叠
 
     // 行1/2:位移 X/Y
     label(1, tr("位移 X"));
-    valueField(1, layer->videoOffset().x(), QString());
+    valueField(1, x + 58, layer->videoOffset().x(), QString());
     label(2, tr("位移 Y"));
-    valueField(2, layer->videoOffset().y(), QString());
+    valueField(2, x + 58, layer->videoOffset().y(), QString());
 
     painter.restore();
 }
@@ -1858,7 +1858,7 @@ int TimeLineCells::hitVideoProps(int layerNumber, const QPoint& pos) const
     if (row == 0)
     {
         if (xx >= 56 && xx < 150) { return 1; }          // 滑杆轨道
-        if (xx >= 58 && xx < 58 + 78) { return 2; }      // 缩放数值
+        if (xx >= 156 && xx < 156 + 78) { return 2; }    // 缩放数值(滑杆右侧)
     }
     else if (row == 1)
     {
@@ -1877,7 +1877,7 @@ QRect TimeLineCells::videoPropsFieldRect(int layerNumber, int field) const
     if (field < 2 || field > 4) { return QRect(); }
     const int row = field - 2;
     const int top = getLayerY(layerNumber) + mLayerHeight + row * 22 + 2;
-    return QRect(58, top, 78, 18);
+    return QRect(field == 2 ? 156 : 58, top, 78, 18);
 }
 
 void TimeLineCells::toggleVideoPropsExpanded(int layerNumber)
