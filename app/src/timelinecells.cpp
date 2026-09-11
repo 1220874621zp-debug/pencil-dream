@@ -1626,75 +1626,79 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     // --- TVP inline row controls: opacity slider, percentage, lock toggle ---
-    // rendered on their own line under the name; skipped on very short rows.
-    // 展开属性区的视频层隐藏整段(避免与属性区误触;行高膨胀后 0.72 处
-    // 已落进属性区,显示也是错位的)
-    if (layer->type() == Layer::MOVIE && mExpandedVideoIds.contains(layer->id())) { return; }
-    if (!rowHasInlineControls(width) || height < 40) { return; }
-
+    // 展开属性区的视频层隐藏行内控件(避免与属性区误触;行高膨胀后 0.72 处
+    // 已落进属性区,显示也是错位的);不能用 return——函数尾部还有属性区绘制
+    const bool videoPropsExpandedRow = (layer->type() == Layer::MOVIE && mExpandedVideoIds.contains(layer->id()));
+    // sliderY/clipR 提升到块外:loop 角标段(isBitmapKind)也要用
     const int sliderY = y + qRound(height * 0.72);
-    const QRect slider = opacitySliderRect(width);
-
-    // percentage label right-aligned before the slider
-    painter.setPen(selected ? Theme::AccentHover : QColor(0x8A, 0x8A, 0x90));
-    painter.drawText(QRect(slider.right() + 4, sliderY - 9, 34, 18),
-                     Qt::AlignRight | Qt::AlignVCenter,
-                     QString("%1%").arg(qRound(layer->opacity() * 100)));
-
-    // rounded track + knob
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0x3A, 0x3A, 0x40));
-    painter.drawRoundedRect(QRectF(slider.x(), sliderY - 2.5, slider.width(), 5.0), 2.5, 2.5);
-    const qreal knobX = slider.x() + layer->opacity() * (slider.width() - 10) + 5.0;
-    painter.setBrush(layer->opacity() > 0.0 ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
-    painter.drawEllipse(QPointF(knobX, sliderY), 5.0, 5.0);
-
-    // padlock toggle (closed = locked)
-    const QRect lock = lockIconRect(width);
-    const QPointF lockC(lock.x() + 7.5, sliderY);
-    QColor lockColor = layer->locked() ? QColor(0xE8, 0xB4, 0x30) : QColor(0x66, 0x66, 0x6E);
-    painter.setBrush(lockColor);
-    painter.drawRect(QRectF(lockC.x() - 6.0, lockC.y() - 1.0, 12.0, 8.0));
-    painter.setPen(QPen(lockColor, 1.6));
-    painter.setBrush(Qt::NoBrush);
-    if (layer->locked())
-    {
-        painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 8.0), 180 * 16, -180 * 16);
-    }
-    else
-    {
-        painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 9.0), 180 * 16, -160 * 16);
-    }
-
-    // clipping-mask toggle: Krita inherit-alpha glyph (swoosh, strike = off), tinted by state
     const QRect clipR = clipIconRect(width);
-    const bool clipActive = layer->clipMask() && layer->type() == Layer::BITMAP;
-    QColor clipColor = clipActive ? Theme::Accent : QColor(0x66, 0x66, 0x6E);
-    if (layer->type() != Layer::BITMAP)
+
+    if (!videoPropsExpandedRow)
     {
-        // bitmap-only feature: keep the control visible but inert
-        clipColor = QColor(0x3A, 0x3A, 0x40);
-    }
-    // 染色结果按 状态+颜色 缓存（原来每行每次重绘都建 QPixmap+QPainter 现染）
-    const bool clipOn = layer->clipMask();
-    const QString clipKey = QStringLiteral("clip:%1:%2").arg(clipOn).arg(clipColor.rgba());
-    const QPixmap clipTinted = cachedRowIcon(clipKey, [clipOn, clipColor]() {
-        QPixmap clipPix(clipOn ? ":/icons/themes/playful/timeline/clip-on.svg"
-                               : ":/icons/themes/playful/timeline/clip-off.svg");
-        if (clipPix.isNull()) { return QPixmap(); }
-        QPixmap tinted(clipPix.size());
-        tinted.fill(Qt::transparent);
-        QPainter tp(&tinted);
-        tp.drawPixmap(0, 0, clipPix);
-        tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        tp.fillRect(tinted.rect(), clipColor);
-        tp.end();
-        return tinted;
-    });
-    if (!clipTinted.isNull())
-    {
-        painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
+      if (!rowHasInlineControls(width) || height < 40) { return; }
+
+      const QRect slider = opacitySliderRect(width);
+
+      // percentage label right-aligned before the slider
+      painter.setPen(selected ? Theme::AccentHover : QColor(0x8A, 0x8A, 0x90));
+      painter.drawText(QRect(slider.right() + 4, sliderY - 9, 34, 18),
+                       Qt::AlignRight | Qt::AlignVCenter,
+                       QString("%1%").arg(qRound(layer->opacity() * 100)));
+
+      // rounded track + knob
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(QColor(0x3A, 0x3A, 0x40));
+      painter.drawRoundedRect(QRectF(slider.x(), sliderY - 2.5, slider.width(), 5.0), 2.5, 2.5);
+      const qreal knobX = slider.x() + layer->opacity() * (slider.width() - 10) + 5.0;
+      painter.setBrush(layer->opacity() > 0.0 ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
+      painter.drawEllipse(QPointF(knobX, sliderY), 5.0, 5.0);
+
+      // padlock toggle (closed = locked)
+      const QRect lock = lockIconRect(width);
+      const QPointF lockC(lock.x() + 7.5, sliderY);
+      QColor lockColor = layer->locked() ? QColor(0xE8, 0xB4, 0x30) : QColor(0x66, 0x66, 0x6E);
+      painter.setBrush(lockColor);
+      painter.drawRect(QRectF(lockC.x() - 6.0, lockC.y() - 1.0, 12.0, 8.0));
+      painter.setPen(QPen(lockColor, 1.6));
+      painter.setBrush(Qt::NoBrush);
+      if (layer->locked())
+      {
+          painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 8.0), 180 * 16, -180 * 16);
+      }
+      else
+      {
+          painter.drawArc(QRectF(lockC.x() - 4.0, lockC.y() - 7.0, 8.0, 9.0), 180 * 16, -160 * 16);
+      }
+
+      // clipping-mask toggle: Krita inherit-alpha glyph (swoosh, strike = off), tinted by state
+      const bool clipActive = layer->clipMask() && layer->type() == Layer::BITMAP;
+      QColor clipColor = clipActive ? Theme::Accent : QColor(0x66, 0x66, 0x6E);
+      if (layer->type() != Layer::BITMAP)
+      {
+          // bitmap-only feature: keep the control visible but inert
+          clipColor = QColor(0x3A, 0x3A, 0x40);
+      }
+      // 染色结果按 状态+颜色 缓存（原来每行每次重绘都建 QPixmap+QPainter 现染）
+      const bool clipOn = layer->clipMask();
+      const QString clipKey = QStringLiteral("clip:%1:%2").arg(clipOn).arg(clipColor.rgba());
+      const QPixmap clipTinted = cachedRowIcon(clipKey, [clipOn, clipColor]() {
+          QPixmap clipPix(clipOn ? ":/icons/themes/playful/timeline/clip-on.svg"
+                                 : ":/icons/themes/playful/timeline/clip-off.svg");
+          if (clipPix.isNull()) { return QPixmap(); }
+          QPixmap tinted(clipPix.size());
+          tinted.fill(Qt::transparent);
+          QPainter tp(&tinted);
+          tp.drawPixmap(0, 0, clipPix);
+          tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+          tp.fillRect(tinted.rect(), clipColor);
+          tp.end();
+          return tinted;
+      });
+      if (!clipTinted.isNull())
+      {
+          painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
+      }
     }
 
     // loop-mode badge: only drawn when the layer is set to Cycle/PingPong
