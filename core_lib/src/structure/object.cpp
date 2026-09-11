@@ -252,7 +252,7 @@ LayerVideo* Object::addNewVideoLayer()
     return layerVideo;
 }
 
-void Object::syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget)
+void Object::syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget, bool playing)
 {
     for (Layer* layer : mLayers)
     {
@@ -263,7 +263,7 @@ void Object::syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTar
             {
                 videoLayer->attachRepaintTarget(repaintTarget);
             }
-            videoLayer->syncToFrame(frame, projectFps);
+            videoLayer->syncToFrame(frame, projectFps, playing);
         }
     }
 }

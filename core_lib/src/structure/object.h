@@ -114,7 +114,7 @@ public:
     LayerVideo* addNewVideoLayer();
 
     /** 参考视频层跟随时间轴(播放/scrub 统一出口驱动);repaintTarget 收异步出帧通知 */
-    void syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget = nullptr);
+    void syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget = nullptr, bool playing = true);
     LayerCamera* addNewCameraLayer();
     LayerBitmap* addNewColorizeLayer();
 

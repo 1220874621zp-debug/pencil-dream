@@ -21,6 +21,7 @@ GNU General Public License for more details.
 #include "keyframe.h"
 #include "layer.h"
 
+class QAudioOutput;
 class QMediaPlayer;
 class QVideoSink;
 class QWidget;
@@ -75,7 +76,9 @@ public:
     // 时间轴同步(pull 模式,Editor::scrubTo 每帧驱动):
     // 区间外暂停;区间内首次起步/失步超阈值才 setPosition——
     // 播放中让解码器自由前进,不逐帧 seek。
-    void syncToFrame(int frameNumber, double projectFps);
+    // playing=工程播放态:停止(false)时暂停并复位起步标记,
+    // 否则工程停止后参考视频(含声音)会继续自己播。
+    void syncToFrame(int frameNumber, double projectFps, bool playing);
 
     // 画布取当前帧:sink 最近一帧,startTime 未变时直接回缓存(省转换)。
     QImage currentFrameImage() const;
@@ -91,6 +94,7 @@ private:
     double mVideoFps = 24.0;
     QMediaPlayer* mPlayer = nullptr;
     QVideoSink* mSink = nullptr;
+    QAudioOutput* mAudioOutput = nullptr;
     mutable QImage mLastFrame;
     mutable qint64 mLastFrameStartTime = -1;
     bool mSyncStarted = false;

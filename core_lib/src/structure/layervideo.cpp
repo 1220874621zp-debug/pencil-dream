@@ -18,6 +18,7 @@ GNU General Public License for more details.
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QAudioOutput>
 #include <QMediaPlayer>
 #include <QObject>
 #include <QVideoFrame>
@@ -31,8 +32,10 @@ LayerVideo::LayerVideo(int id) : Layer(id, Layer::MOVIE)
 
 LayerVideo::~LayerVideo()
 {
-    delete mPlayer; // sink 归 player 管(无父对象时手动)
+    // sink/audioOutput 均不挂父对象,统一手动释放
+    delete mPlayer;
     delete mSink;
+    delete mAudioOutput;
 }
 
 void LayerVideo::setVideoSource(const QString& absoluteFilePath, double videoFps, int durationFrames, int inFrame)
@@ -48,6 +51,8 @@ void LayerVideo::setVideoSource(const QString& absoluteFilePath, double videoFps
         mPlayer = nullptr;
         delete mSink;
         mSink = nullptr;
+        delete mAudioOutput;
+        mAudioOutput = nullptr;
     }
 
     // 替换/删除旧的占位 clip,新建于入点(调用方随后可能再 setPos 挪入点)。
@@ -86,8 +91,11 @@ void LayerVideo::ensurePlayer()
     }
     // Layer 非 QObject,player/sink 不能挂父对象;由本层析构负责释放。
     mPlayer = new QMediaPlayer;
-    mPlayer->setAudioOutput(nullptr); // 参考用途:静音
-    mSink = new QVideoSink(mPlayer);
+    // 参考视频出声:音画同步由 QMediaPlayer 内部保证;
+    // 音量跟随系统,想静音就用系统/层可见性
+    mAudioOutput = new QAudioOutput;
+    mPlayer->setAudioOutput(mAudioOutput);
+    mSink = new QVideoSink; // 不挂父:换源时 player 重建,子对象会被连带删除造成双重释放
     mPlayer->setVideoSink(mSink);
     mPlayer->setSource(QUrl::fromLocalFile(mFilePath));
 }
@@ -97,9 +105,20 @@ bool LayerVideo::isFileMissing() const
     return mFilePath.isEmpty() || !QFileInfo::exists(mFilePath);
 }
 
-void LayerVideo::syncToFrame(int frameNumber, double projectFps)
+void LayerVideo::syncToFrame(int frameNumber, double projectFps, bool playing)
 {
     if (mPlayer == nullptr) { return; }
+
+    // 工程停止播放:立即暂停并复位起步标记,下次播放从准确位置起步
+    if (!playing)
+    {
+        if (mPlayer->playbackState() == QMediaPlayer::PlayingState)
+        {
+            mPlayer->pause();
+        }
+        mSyncStarted = false;
+        return;
+    }
 
     VideoClip* clip = (keyFrameCount() > 0)
         ? static_cast<VideoClip*>(getKeyFrameAt(firstKeyFramePosition()))

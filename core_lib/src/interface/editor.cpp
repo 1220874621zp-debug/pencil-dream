@@ -818,7 +818,8 @@ void Editor::scrubTo(int frame)
     mObject->updateActiveFrames(frame);
     // 参考视频层跟随帧(拉模式:player 防抖纠偏,不逐帧 seek);
     // 传入画布作重画目标:解码器异步出帧后自动触发 update
-    mObject->syncVideoLayersTo(frame, mPlaybackManager ? mPlaybackManager->fps() : 12.0, getScribbleArea());
+    mObject->syncVideoLayersTo(frame, mPlaybackManager ? mPlaybackManager->fps() : 12.0, getScribbleArea(),
+                                mPlaybackManager && mPlaybackManager->isPlaying());
     emit scrubbed(frame);
 }
 

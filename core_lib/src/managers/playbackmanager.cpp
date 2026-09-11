@@ -133,6 +133,11 @@ void PlaybackManager::stop()
     qDebug() << "[ui] playback stop";
     mTimer->stop();
     stopSounds();
+    // 参考视频层跟随停止(否则画布上的视频连同声音会继续自己播)
+    if (editor() && editor()->object())
+    {
+        editor()->object()->syncVideoLayersTo(editor()->currentFrame(), fps(), nullptr, false);
+    }
     emit playStateChanged(false);
 }
 
