@@ -2126,6 +2126,11 @@ void MainWindow2::createToolbars()
     ui->actionImport_ReferenceVideo->setToolTip(tr("导入参考视频..."));
     mMainToolbar->addAction(ui->actionImport_ReferenceVideo);
 
+    // 导出电影：动作复用菜单项 actionExport_Movie
+    ui->actionExport_Movie->setIcon(QIcon(":/icons/themes/playful/misc/export-movie.svg"));
+    ui->actionExport_Movie->setToolTip(tr("导出电影..."));
+    mMainToolbar->addAction(ui->actionExport_Movie);
+
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");
     mViewToolbar->addAction(ui->actionCut);
