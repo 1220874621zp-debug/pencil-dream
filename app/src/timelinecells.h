@@ -188,7 +188,7 @@ private:
     // 命中字段:0=无 1=缩放滑杆 2=缩放数值 3=位移X数值 4=位移Y数值
     int  hitVideoProps(int layerNumber, const QPoint& pos) const;
     void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const;
-    void setVideoPropsValue(LayerVideo* layer, int field, double v);
+    void setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v);
     void toggleVideoPropsExpanded(int layerNumber);
     void openVideoPropsEditor(int layerNumber, int field);
     QRect videoPropsFieldRect(int layerNumber, int field) const;

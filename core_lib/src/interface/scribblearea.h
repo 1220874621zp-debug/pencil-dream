@@ -93,6 +93,10 @@ public:
      * calls update() behind the scene and update cache if necessary */
     void updateFrame();
 
+    /** 层显示参数变化(参考视频缩放/位移等,帧内容不变):
+     *  只失效该层所在侧的渲染缓存块,避免"帧修改"级全量失效 */
+    void onLayerDisplayChanged(int layerIndex);
+
     /** Frame scrubbed, invalidate relevant cache */
     void onScrubbed(int frameNumber);
 

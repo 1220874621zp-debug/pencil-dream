@@ -105,6 +105,10 @@ public:
     void paint(const QRect& blitRect);
     void paintCached(const QRect& blitRect);
     void resetLayerCache();
+    /** 单侧失效:层显示参数(如参考视频缩放/位移)变化时,
+     *  只重画该层所在的缓存块,避免波及另一侧全部层 */
+    void resetPreLayerCache() { mPreLayersPixmapCacheValid = false; }
+    void resetPostLayerCache() { mPostLayersPixmapCacheValid = false; }
 
 private:
 

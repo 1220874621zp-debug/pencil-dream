@@ -203,6 +203,22 @@ void ScribbleArea::onTileCreated(TiledBuffer* tiledBuffer, Tile* tile)
     update(mappedRect.toAlignedRect());
 }
 
+void ScribbleArea::onLayerDisplayChanged(int layerIndex)
+{
+    // 帧内容没变,只是层显示参数变了:按层位置只失效一侧缓存块,
+    // 当前层走即时路径连失效都不用——滑杆拖动才丝滑
+    const int cur = mEditor->layers()->currentLayerIndex();
+    if (layerIndex < cur)
+    {
+        mCanvasPainter.resetPreLayerCache();
+    }
+    else if (layerIndex > cur)
+    {
+        mCanvasPainter.resetPostLayerCache();
+    }
+    update();
+}
+
 void ScribbleArea::updateFrame()
 {
     if (currentTool()->isActive() && currentTool()->isDrawingTool()) {

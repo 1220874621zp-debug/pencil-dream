@@ -1893,7 +1893,7 @@ void TimeLineCells::toggleVideoPropsExpanded(int layerNumber)
     mTimeLine->updateContent();
 }
 
-void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int field, double v)
+void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int layerNumber, int field, double v)
 {
     if (field == 1 || field == 2)
     {
@@ -1905,9 +1905,10 @@ void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int field, double v)
         if (field == 3) { off.setX(v); } else { off.setY(v); }
         layer->setVideoOffset(off);
     }
-    // 缩放/位移改变层渲染结果:走帧缓存失效路径,只 update 会继续贴旧缓存
-    mEditor->getScribbleArea()->onFramesModified();
-    update();
+    // 帧内容没变:只失效该层一侧渲染缓存+局部重绘属性区。
+    // 走 onFramesModified 会全量失效(洋葱皮开时连下层位图全重画)=拖动卡顿
+    mEditor->getScribbleArea()->onLayerDisplayChanged(layerNumber);
+    update(QRect(0, getLayerY(layerNumber) + mLayerHeight, width(), kVideoPropsH));
 }
 
 void TimeLineCells::openVideoPropsEditor(int layerNumber, int field)
@@ -1935,11 +1936,11 @@ void TimeLineCells::openVideoPropsEditor(int layerNumber, int field)
     mVideoPropsEditor->show();
     mVideoPropsEditor->setFocus();
     mVideoPropsEditor->selectAll();
-    connect(mVideoPropsEditor, &QLineEdit::editingFinished, this, [this, video, field]()
+    connect(mVideoPropsEditor, &QLineEdit::editingFinished, this, [this, video, layerNumber, field]()
     {
         if (mVideoPropsEditor == nullptr) { return; }
         const double v = mVideoPropsEditor->text().toDouble();
-        setVideoPropsValue(video, field, v);
+        setVideoPropsValue(video, layerNumber, field, v);
         mVideoPropsEditor->hide();
         mVideoPropsEditor->deleteLater();
         mVideoPropsEditor = nullptr;
@@ -2535,7 +2536,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
                     hitLayer->setOpacity(value);
                     mEditor->getScribbleArea()->update();
-                    updateContent();
+                    update(QRect(0, getLayerY(layerNumber), width(), rowHeightOf(layerNumber)));
                     break;
                 }
             }
@@ -2555,7 +2556,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
                         mVideoPropsPressVal = 5.0 + t * (800.0 - 5.0);
                         mVideoPropsPressPos.setX(56 + qRound(t * 94.0));
-                        setVideoPropsValue(video, field, mVideoPropsPressVal);
+                        setVideoPropsValue(video, layerNumber, field, mVideoPropsPressVal);
                     }
                     else if (field == 2) { mVideoPropsPressVal = video->videoScale() * 100.0; }
                     else if (field == 3) { mVideoPropsPressVal = video->videoOffset().x(); }
@@ -2844,13 +2845,13 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                         if (mVideoPropsDragField == 1)
                         {
                             const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
-                            setVideoPropsValue(video, 1, 5.0 + t * (800.0 - 5.0));
+                            setVideoPropsValue(video, layerNumber, 1, 5.0 + t * (800.0 - 5.0));
                         }
                         else
                         {
                             const bool fast = event->modifiers() & Qt::ShiftModifier;
                             const double step = (mVideoPropsDragField == 2 ? 0.5 : 1.0) * (fast ? 10.0 : 1.0);
-                            setVideoPropsValue(video, mVideoPropsDragField, mVideoPropsPressVal + dx * step);
+                            setVideoPropsValue(video, layerNumber, mVideoPropsDragField, mVideoPropsPressVal + dx * step);
                         }
                     }
                     event->accept();
@@ -2922,7 +2923,8 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                 const qreal value = qBound(0.0, static_cast<qreal>(event->pos().x() - slider.x()) / slider.width(), 1.0);
                 layer->setOpacity(value);
                 mEditor->getScribbleArea()->update();
-                update();
+                // 只重绘被拖行的窄条:全量 update 会把所有图层行重画一遍,拖不动
+                update(QRect(0, getLayerY(mOpacityDragLayer), width(), rowHeightOf(mOpacityDragLayer)));
             }
             QWidget::mouseMoveEvent(event);
             return;
