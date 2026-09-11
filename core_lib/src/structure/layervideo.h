@@ -77,6 +77,10 @@ public:
     qreal videoScale() const { return mScale; }
     void setVideoScale(qreal scale) { mScale = qBound(0.05, scale, 8.0); }
 
+    /** 显示位移(画布世界坐标,0=居中);静态属性不参与关键帧 */
+    QPointF videoOffset() const { return mOffset; }
+    void setVideoOffset(const QPointF& offset) { mOffset = offset; }
+
     // 时间轴同步(pull 模式,Editor::scrubTo 每帧驱动):
     // 区间外暂停;区间内首次起步/失步超阈值才 setPosition——
     // 播放中让解码器自由前进,不逐帧 seek。
@@ -97,6 +101,7 @@ private:
     QString mFilePath;
     double mVideoFps = 24.0;
     qreal mScale = 1.0;
+    QPointF mOffset;
     QMediaPlayer* mPlayer = nullptr;
     QVideoSink* mSink = nullptr;
     QAudioOutput* mAudioOutput = nullptr;

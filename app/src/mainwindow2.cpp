@@ -77,6 +77,7 @@ GNU General Public License for more details.
 #include "timeline.h"
 #include "toolbox.h"
 #include "onionskinwidget.h"
+#include "videolayerpanel.h"
 #include "pegbaralignmentdialog.h"
 #include "addtransparencytopaperdialog.h"
 #include "repositionframesdialog.h"
@@ -240,6 +241,7 @@ void MainWindow2::createDockWidgets()
     mBrushPresetPanel->setObjectName("BrushPresets");
 
     mOnionSkinWidget = new OnionSkinWidget(this);
+    mVideoLayerPanel = new VideoLayerPanel(this);
     mOnionSkinWidget->setObjectName("Onion Skin");
 
     mToolOptions = new ToolOptionWidget(this);
@@ -255,6 +257,7 @@ void MainWindow2::createDockWidgets()
         << mColorPalette
         << mBrushPresetPanel
         << mOnionSkinWidget
+        << mVideoLayerPanel
         << mToolOptions
         << mToolBox;
 
@@ -285,6 +288,7 @@ void MainWindow2::createDockWidgets()
     tabifyDockWidget(mColorPalette, mColorInspector);
     tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
+    tabifyDockWidget(mOnionSkinWidget, mVideoLayerPanel);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     setDockNestingEnabled(true);
     // give the timeline a generous share of the window height

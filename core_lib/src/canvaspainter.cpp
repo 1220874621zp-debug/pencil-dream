@@ -630,16 +630,17 @@ void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)
         }
         return;
     }
-    // 显示缩放(双击层行修改):围绕画布原点(=内容中心)等比缩放
+    // 属性栏的显示缩放/位移:围绕画布原点(=内容中心)等比缩放后平移
+    const QPointF off = videoLayer->videoOffset();
     const qreal s = videoLayer->videoScale();
     if (qAbs(s - 1.0) < 0.001)
     {
-        painter.drawImage(QPointF(-img.width() / 2.0, -img.height() / 2.0), img);
+        painter.drawImage(QPointF(-img.width() / 2.0 + off.x(), -img.height() / 2.0 + off.y()), img);
     }
     else
     {
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        painter.drawImage(QRectF(-img.width() * s / 2.0, -img.height() * s / 2.0,
+        painter.drawImage(QRectF(-img.width() * s / 2.0 + off.x(), -img.height() * s / 2.0 + off.y(),
                                  img.width() * s, img.height() * s), img);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
     }
