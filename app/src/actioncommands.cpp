@@ -169,6 +169,12 @@ Status ActionCommands::importReferenceVideo()
 
     double duration = 0.0;
     double videoFps = 0.0;
+    if (!QFileInfo::exists(ffprobeLocation()))
+    {
+        QMessageBox::information(mParent, tr("导入参考视频"),
+            tr("未找到 ffprobe，将用 ffmpeg 解析视频时长。\n"
+               "如需更快更准的探测，可把 ffprobe.exe 放到 ffmpeg 同目录（plugins 文件夹或首选项所设路径）。"));
+    }
     QProcess probe(this);
     // 注意 -show_entries 只认最后一次(选项覆盖),多 section 用冒号合并
     probe.start(ffprobeLocation(), { "-v", "error", "-select_streams", "v:0",
