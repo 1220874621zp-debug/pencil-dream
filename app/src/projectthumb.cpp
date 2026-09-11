@@ -59,7 +59,13 @@ namespace
         QDomDocument doc;
         if (!doc.setContent(&mainXml)) { return QString(); }
 
-        const QDomElement root = doc.documentElement();
+        QDomElement root = doc.documentElement();
+        // 现行格式 layer 挂 <object> 下；旧格式（<=0.4.3）直接挂根节点
+        if (root.tagName() == QLatin1String("document"))
+        {
+            root = root.firstChildElement(QLatin1String("object"));
+            if (root.isNull()) { return QString(); }
+        }
         for (QDomNode ln = root.firstChild(); !ln.isNull(); ln = ln.nextSibling())
         {
             const QDomElement layerTag = ln.toElement();
