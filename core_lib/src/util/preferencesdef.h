@@ -23,6 +23,7 @@ enum class SETTING
     ANTIALIAS,
     GRID,
     SHADOW,
+    TRANSPARENCY_GRID,
     PREV_ONION,
     NEXT_ONION,
     ONION_BLUE,

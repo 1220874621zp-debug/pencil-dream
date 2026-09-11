@@ -276,6 +276,7 @@ const static int MaxFramesBound = 9999;
 #define SETTING_SHOW_GRID        "ShowGrid"
 #define SETTING_COUNT            "Count"
 #define SETTING_SHADOW           "Shadow"
+#define SETTING_TRANSPARENCY_GRID "TransparencyGrid"
 #define SETTING_PREV_ONION       "PrevOnion"
 #define SETTING_NEXT_ONION       "NextOnion"
 #define SETTING_MULTILAYER_ONION "MultilayerOnion"

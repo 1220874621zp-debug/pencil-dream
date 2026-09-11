@@ -74,6 +74,7 @@ void PreferenceManager::loadPrefs()
     set(SETTING::CANVAS_CURSOR,            settings.value(SETTING_CANVAS_CURSOR,          true).toBool());
     set(SETTING::HIGH_RESOLUTION,          settings.value(SETTING_HIGH_RESOLUTION,        true).toBool());
     set(SETTING::SHADOW,                   settings.value(SETTING_SHADOW,                 false).toBool());
+    set(SETTING::TRANSPARENCY_GRID,        settings.value(SETTING_TRANSPARENCY_GRID,      false).toBool());
     set(SETTING::QUICK_SIZING,             settings.value(SETTING_QUICK_SIZING,           true).toBool());
     set(SETTING::SHOW_SELECTION_INFO,      settings.value(SETTING_SHOW_SELECTION_INFO,    false).toBool());
 
@@ -479,6 +480,9 @@ void PreferenceManager::set(SETTING option, bool value)
         break;
     case SETTING::SHADOW:
         settings.setValue(SETTING_SHADOW, value);
+        break;
+    case SETTING::TRANSPARENCY_GRID:
+        settings.setValue(SETTING_TRANSPARENCY_GRID, value);
         break;
     case SETTING::PREV_ONION:
         settings.setValue(SETTING_PREV_ONION, value);

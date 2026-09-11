@@ -47,6 +47,7 @@ private slots:
 private:
 
     void drawShadow(QPainter& painter);
+    void drawCanvasBase(QPainter& painter);
     void loadBackgroundStyle();
 
     PreferenceManager* mPrefs = nullptr;
@@ -54,6 +55,7 @@ private:
 
     QString mStyle;
     bool mHasShadow = false;
+    bool mTransparencyGrid = false;
 
 };
 

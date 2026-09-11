@@ -47,6 +47,7 @@ void BackgroundWidget::init(PreferenceManager *prefs)
 
     loadBackgroundStyle();
     mHasShadow = mPrefs->isOn(SETTING::SHADOW);
+    mTransparencyGrid = mPrefs->isOn(SETTING::TRANSPARENCY_GRID);
 
     update();
 }
@@ -64,6 +65,12 @@ void BackgroundWidget::settingUpdated(SETTING setting)
     case SETTING::SHADOW:
 
         mHasShadow = mPrefs->isOn(SETTING::SHADOW);
+        update();
+        break;
+
+    case SETTING::TRANSPARENCY_GRID:
+
+        mTransparencyGrid = mPrefs->isOn(SETTING::TRANSPARENCY_GRID);
         update();
         break;
 
@@ -99,43 +106,68 @@ void BackgroundWidget::paintEvent(QPaintEvent* event)
     // and centered on it (the camera border sits inside the white base);
     // same mapping as the camera border line, so it follows zoom/pan and
     // camera animation exactly
-    if (mEditor != nullptr && mEditor->layers() != nullptr)
-    {
-        LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
-        if (cam != nullptr)
-        {
-            const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
-            const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
-            const QPointF center = camPoly.boundingRect().center();
-
-            constexpr qreal baseScale = 1.5;
-            QPolygonF basePoly;
-            // QPolygonF(QRectF) appends a closing 5th point — use only the
-            // four real corners, otherwise the axis-aligned check below
-            // never passes and the rounded corners are never drawn
-            for (int i = 0; i < 4 && i < camPoly.size(); ++i)
-                basePoly << mEditor->view()->mapCanvasToScreen(center + baseScale * (camPoly.at(i) - center));
-
-            const QRectF b = basePoly.boundingRect();
-            const bool axisAligned = basePoly.size() == 4
-                && qFuzzyCompare(basePoly.at(0).x(), b.left()) && qFuzzyCompare(basePoly.at(0).y(), b.top())
-                && qFuzzyCompare(basePoly.at(1).x(), b.right()) && qFuzzyCompare(basePoly.at(1).y(), b.top())
-                && qFuzzyCompare(basePoly.at(2).x(), b.right()) && qFuzzyCompare(basePoly.at(2).y(), b.bottom())
-                && qFuzzyCompare(basePoly.at(3).x(), b.left()) && qFuzzyCompare(basePoly.at(3).y(), b.bottom());
-
-            painter.setRenderHint(QPainter::Antialiasing, true);
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
-            if (axisAligned)
-                painter.drawRoundedRect(b, 12.0, 12.0);
-            else
-                painter.drawPolygon(basePoly);
-            painter.setRenderHint(QPainter::Antialiasing, false);
-        }
-    }
+    drawCanvasBase(painter);
 
     if (mHasShadow)
         drawShadow(painter);
+}
+
+void BackgroundWidget::drawCanvasBase(QPainter& painter)
+{
+    if (mEditor == nullptr || mEditor->layers() == nullptr)
+    {
+        return;
+    }
+    LayerCamera* cam = mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex());
+    if (cam == nullptr)
+    {
+        return;
+    }
+
+    const QTransform camT = cam->getViewAtFrame(mEditor->currentFrame()).inverted();
+    const QPolygonF camPoly = camT.map(QPolygonF(QRectF(cam->getViewRect())));
+    const QPointF center = camPoly.boundingRect().center();
+
+    constexpr qreal baseScale = 1.5;
+    QPolygonF basePoly;
+    // QPolygonF(QRectF) appends a closing 5th point — use only the
+    // four real corners, otherwise the axis-aligned check below
+    // never passes and the rounded corners are never drawn
+    for (int i = 0; i < 4 && i < camPoly.size(); ++i)
+        basePoly << mEditor->view()->mapCanvasToScreen(center + baseScale * (camPoly.at(i) - center));
+
+    const QRectF b = basePoly.boundingRect();
+    const bool axisAligned = basePoly.size() == 4
+        && qFuzzyCompare(basePoly.at(0).x(), b.left()) && qFuzzyCompare(basePoly.at(0).y(), b.top())
+        && qFuzzyCompare(basePoly.at(1).x(), b.right()) && qFuzzyCompare(basePoly.at(1).y(), b.top())
+        && qFuzzyCompare(basePoly.at(2).x(), b.right()) && qFuzzyCompare(basePoly.at(2).y(), b.bottom())
+        && qFuzzyCompare(basePoly.at(3).x(), b.left()) && qFuzzyCompare(basePoly.at(3).y(), b.bottom());
+
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    if (mTransparencyGrid)
+    {
+        // AE-style transparency grid: the white paper is replaced by a
+        // checkerboard so transparent canvas areas read as transparent.
+        // The tile lives in screen space and follows the paper geometry.
+        const int checkSize = 8;
+        QPixmap tile(2 * checkSize, 2 * checkSize);
+        QPainter tilePainter(&tile);
+        tilePainter.fillRect(tile.rect(), QColor(0xFF, 0xFF, 0xFF));
+        tilePainter.fillRect(0, 0, checkSize, checkSize, QColor(0xA0, 0xA0, 0xA0));
+        tilePainter.fillRect(checkSize, checkSize, checkSize, checkSize, QColor(0xA0, 0xA0, 0xA0));
+        tilePainter.end();
+        painter.setBrush(QBrush(tile));
+    }
+    else
+    {
+        painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
+    }
+    if (axisAligned)
+        painter.drawRoundedRect(b, 12.0, 12.0);
+    else
+        painter.drawPolygon(basePoly);
+    painter.setRenderHint(QPainter::Antialiasing, false);
 }
 
 void BackgroundWidget::loadBackgroundStyle()

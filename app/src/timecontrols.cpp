@@ -145,6 +145,8 @@ void TimeControls::initUI()
     mPlayButton->setIconSize(QSize(22,22));
     mLoopButton = new QPushButton(this);
     mLoopButton->setIconSize(QSize(22,22));
+    mTransparencyGridButton = new QPushButton(this);
+    mTransparencyGridButton->setIconSize(QSize(22,22));
     mSoundButton = new QPushButton(this);
     mSoundButton->setIconSize(QSize(22,22));
     mSoundScrubButton = new QPushButton(this);
@@ -163,6 +165,7 @@ void TimeControls::initUI()
     mStopIcon = QIcon(":icons/themes/playful/controls/control-stop.svg");
     mPlayButton->setIcon(mStartIcon);
     mLoopButton->setIcon(mLoopIcon);
+    mTransparencyGridButton->setIcon(QIcon(":icons/themes/playful/controls/transparency-grid.svg"));
     mSoundButton->setIcon(mSoundIcon);
     mSoundScrubButton->setIcon(mSoundScrubIcon);
     mJumpToEndButton->setIcon(mJumpToEndIcon);
@@ -170,12 +173,15 @@ void TimeControls::initUI()
 
     mPlayButton->setToolTip(tr("Play"));
     mLoopButton->setToolTip(tr("Loop"));
+    mTransparencyGridButton->setToolTip(tr("透明网格（把画布白色纸面换成透明棋盘格）"));
     mSoundButton->setToolTip(tr("声音开/关"));
     mSoundScrubButton->setToolTip(tr("擦洗时间轴时播放声音"));
     mJumpToEndButton->setToolTip(tr("Jump to the End", "Tooltip of the jump to end button"));
     mJumpToStartButton->setToolTip(tr("Jump to the Start", "Tooltip of the jump to start button"));
 
     mLoopButton->setCheckable(true);
+    mTransparencyGridButton->setCheckable(true);
+    mTransparencyGridButton->setChecked(mEditor->preference()->isOn(SETTING::TRANSPARENCY_GRID));
     mSoundButton->setCheckable(true);
     mSoundButton->setChecked(true);
     mSoundScrubButton->setCheckable(true);
@@ -191,6 +197,7 @@ void TimeControls::initUI()
     transportLayout->addWidget(mPlayButton);
     transportLayout->addWidget(mJumpToEndButton);
     transportLayout->addWidget(mLoopButton);
+    transportLayout->addWidget(mTransparencyGridButton);
 
     // fps / speed cluster: right end of the timeline toolbar
     mFpsBar = new QWidget(this);
@@ -274,6 +281,13 @@ void TimeControls::makeConnections()
     connect(mJumpToEndButton, &QPushButton::clicked, this, &TimeControls::jumpToEndButtonClicked);
     connect(mJumpToStartButton, &QPushButton::clicked, this, &TimeControls::jumpToStartButtonClicked);
     connect(mLoopButton, &QPushButton::clicked, this, &TimeControls::loopButtonClicked);
+
+    // 透明网格：写偏好，BackgroundWidget 监听同一设置换棋盘格纸面
+    connect(mTransparencyGridButton, &QPushButton::toggled, this, [this](bool checked)
+    {
+        mEditor->preference()->set(SETTING::TRANSPARENCY_GRID, checked);
+    });
+
     connect(mPlaybackRangeCheckBox, &QCheckBox::clicked, this, &TimeControls::playbackRangeClicked);
 
     auto spinBoxValueChanged = static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged);
