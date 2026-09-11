@@ -49,6 +49,7 @@ class AddTransparencyToPaperDialog;
 class RepositionFramesDialog;
 class StatusBar;
 class AutosaverByTime;
+class McpServer;
 enum class SETTING;
 
 
@@ -170,6 +171,11 @@ private:
     QMenu* mWorkspaceMenu = nullptr;
 
     void changePlayState(bool isPlaying);
+
+    // MCP 智能体服务器（首选项控制启停，设置变化热重启）
+    void setupMcpServer();
+    void applyMcpServerState(bool honorAutostart);
+    McpServer* mMcpServer = nullptr;
 
     void makeConnections(Editor*);
     void makeConnections(Editor*, ColorBox* colorBox);

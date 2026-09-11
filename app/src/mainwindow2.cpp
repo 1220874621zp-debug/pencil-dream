@@ -46,6 +46,7 @@ GNU General Public License for more details.
 #include "object.h"
 #include "editor.h"
 #include "colorizeupdatemanager.h"
+#include "mcp/mcpserver.h"
 
 #include "filemanager.h"
 #include "colormanager.h"
@@ -173,7 +174,38 @@ MainWindow2::MainWindow2(QWidget* parent) :
                 << "->" << (newW ? newW->metaObject()->className() : "null");
     });
 
+    setupMcpServer();
+
     setWindowTitle(getWindowTitle());
+}
+
+void MainWindow2::setupMcpServer()
+{
+    mMcpServer = new McpServer(mEditor, this);
+
+    connect(mEditor->preference(), &PreferenceManager::optionChanged, this, [this](SETTING setting)
+    {
+        if (setting == SETTING::MCP_ENABLED || setting == SETTING::MCP_PORT)
+            applyMcpServerState(false);
+    });
+
+    applyMcpServerState(true);
+}
+
+void MainWindow2::applyMcpServerState(bool honorAutostart)
+{
+    PreferenceManager* pref = mEditor->preference();
+    if (!pref->isOn(SETTING::MCP_ENABLED))
+    {
+        mMcpServer->stop();
+        return;
+    }
+    if (honorAutostart && !pref->isOn(SETTING::MCP_AUTOSTART))
+        return;
+
+    const quint16 port = static_cast<quint16>(pref->getInt(SETTING::MCP_PORT));
+    if (!mMcpServer->start(port))
+        qWarning() << "[mcp]" << mMcpServer->lastError();
 }
 
 void MainWindow2::autoSaveTimeout()

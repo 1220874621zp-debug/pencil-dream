@@ -56,6 +56,9 @@ void PreferencesDialog::init(PreferenceManager* m)
 
     ui->shortcuts->setManager(mPrefManager);
 
+    ui->mcpPage->setManager(mPrefManager);
+    ui->mcpPage->updateValues();
+
     connect(ui->general, &GeneralPage::windowOpacityChange, this, &PreferencesDialog::windowOpacityChange);
     connect(ui->timeline, &TimelinePage::soundScrubChanged, this, &PreferencesDialog::soundScrubChanged);
     connect(ui->timeline, &TimelinePage::soundScrubMsecChanged, this, &PreferencesDialog::soundScrubMsecChanged);

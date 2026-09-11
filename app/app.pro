@@ -92,6 +92,9 @@ HEADERS += \
     src/filespage.h \
     src/generalpage.h \
     src/shortcutspage.h \
+    src/mcppage.h \
+    src/mcp/mcpserver.h \
+    src/mcp/mcpdispatcher.h \
     src/strokeoptionswidget.h \
     src/timelinepage.h \
     src/toolboxwidget.h \
@@ -150,6 +153,9 @@ SOURCES += \
     src/filespage.cpp \
     src/generalpage.cpp \
     src/shortcutspage.cpp \
+    src/mcppage.cpp \
+    src/mcp/mcpserver.cpp \
+    src/mcp/mcpdispatcher.cpp \
     src/strokeoptionswidget.cpp \
     src/timelinepage.cpp \
     src/toolboxwidget.cpp \
@@ -205,6 +211,7 @@ FORMS += \
     ui/pegbaralignmentdialog.ui \
     ui/repositionframesdialog.ui \
     ui/shortcutspage.ui \
+    ui/mcppage.ui \
     ui/colorinspector.ui \
     ui/colorpalette.ui \
     ui/errordialog.ui \

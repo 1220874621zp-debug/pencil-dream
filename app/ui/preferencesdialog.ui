@@ -144,6 +144,21 @@
          <set>ItemIsSelectable|ItemIsEnabled</set>
         </property>
        </item>
+       <item>
+        <property name="text">
+         <string>MCP</string>
+        </property>
+        <property name="textAlignment">
+         <set>AlignCenter</set>
+        </property>
+        <property name="icon">
+         <iconset resource="../data/app.qrc">
+          <normaloff>:/icons/themes/playful/preferences/preferences-mcp.svg</normaloff>:/icons/themes/playful/preferences/preferences-mcp.svg</iconset>
+        </property>
+        <property name="flags">
+         <set>ItemIsSelectable|ItemIsEnabled</set>
+        </property>
+       </item>
       </widget>
      </item>
      <item>
@@ -159,6 +174,7 @@
        <widget class="TimelinePage" name="timeline"/>
        <widget class="ToolsPage" name="tools"/>
        <widget class="ShortcutsPage" name="shortcuts"/>
+       <widget class="McpPage" name="mcpPage"/>
       </widget>
      </item>
     </layout>
@@ -204,6 +220,12 @@
    <class>ShortcutsPage</class>
    <extends>QWidget</extends>
    <header>shortcutspage.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>McpPage</class>
+   <extends>QWidget</extends>
+   <header>mcppage.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
