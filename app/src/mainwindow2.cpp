@@ -2121,6 +2121,11 @@ void MainWindow2::createToolbars()
         }
     }
 
+    // 导入视频参考：图标直接复用时间轴视频轨道图标，动作复用菜单项 actionImport_ReferenceVideo
+    ui->actionImport_ReferenceVideo->setIcon(QIcon(":/icons/themes/playful/timeline/video-track.svg"));
+    ui->actionImport_ReferenceVideo->setToolTip(tr("导入参考视频..."));
+    mMainToolbar->addAction(ui->actionImport_ReferenceVideo);
+
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");
     mViewToolbar->addAction(ui->actionCut);
