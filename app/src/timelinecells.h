@@ -29,6 +29,8 @@ GNU General Public License for more details.
 #include "object.h"
 
 class Layer;
+class LayerVideo;
+class QLineEdit;
 enum class LayerVisibility;
 class SoundClip;
 class TimeLine;
@@ -180,6 +182,16 @@ private:
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintVideoBand(QPainter& painter, const Layer* layer, int recLeft, int recTop, int recWidth, int recHeight) const;
+
+    // ---- 参考视频层属性展开区(friction 式:行内展开,自绘控件) ----
+    static constexpr int kVideoPropsH = 66;   // 三行 × 22
+    // 命中字段:0=无 1=缩放滑杆 2=缩放数值 3=位移X数值 4=位移Y数值
+    int  hitVideoProps(int layerNumber, const QPoint& pos) const;
+    void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const;
+    void setVideoPropsValue(LayerVideo* layer, int field, double v);
+    void toggleVideoPropsExpanded(int layerNumber);
+    void openVideoPropsEditor(int layerNumber, int field);
+    QRect videoPropsFieldRect(int layerNumber, int field) const;
     void paintSelectedFrames(QPainter& painter, const Layer* layer, const int layerIndex) const;
     void paintLabel(QPainter& painter, const Layer* layer, int x, int y, int width, int height, bool selected, LayerVisibility layerVisibility) const;
     void paintSelection(QPainter& painter, int x, int y, int width, int height) const;
@@ -277,6 +289,15 @@ private:
 
     int mFramePosMoveX = 0;
     int mLayerPosMoveY = 0;
+
+    // 视频层属性展开态(层id;会话级UI态,不存盘)
+    QSet<int> mExpandedVideoIds;
+    // 属性区拖动/编辑状态
+    int mVideoPropsDragField = 0;
+    QPoint mVideoPropsPressPos;
+    double mVideoPropsPressVal = 0.0;
+    bool mVideoPropsDragging = false;
+    QLineEdit* mVideoPropsEditor = nullptr;
 
     int mMouseMoveX = 0;
     int mMousePressX = 0;

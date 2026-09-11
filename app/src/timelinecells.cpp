@@ -20,6 +20,8 @@ GNU General Public License for more details.
 #include <QApplication>
 #include <QResizeEvent>
 #include <QInputDialog>
+#include <QLineEdit>
+#include <QPainterPath>
 #include <QMenu>
 #include <QPainter>
 #include <QRegularExpression>
@@ -33,7 +35,6 @@ GNU General Public License for more details.
 #include <QRunnable>
 #include "layerbitmap.h"
 #include "layervideo.h"
-#include "videolayerpropspopup.h"
 #include "colorizeimage.h"
 #include "bitmapimage.h"
 
@@ -217,7 +218,15 @@ int TimeLineCells::rowHeightAt(int rowIndex) const
         // 组头行与普通图层同高（收起组就是一条全高轨道，仅显示帧范围带）
         return mLayerHeight;
     }
-    return mCollapsedLayerIds.contains(r.layer->id()) ? 18 : mLayerHeight;
+    if (mCollapsedLayerIds.contains(r.layer->id()))
+    {
+        return 18;
+    }
+    if (r.layer->type() == Layer::MOVIE && mExpandedVideoIds.contains(r.layer->id()))
+    {
+        return mLayerHeight + kVideoPropsH;
+    }
+    return mLayerHeight;
 }
 
 int TimeLineCells::rowYAt(int rowIndex) const
@@ -1522,20 +1531,6 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     }
     drawCollapseTriangle(painter, layer, x, y, width, height);
 
-    // 参考视频层:属性面板下拉小三角(紧挨行尾折叠三角左侧)
-    if (layer->type() == Layer::MOVIE)
-    {
-        painter.save();
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(0x8A, 0x8A, 0x90));
-        const QPointF c(x + width - 33.0, y + height / 2.0);
-        QPolygonF tri;
-        tri << QPointF(c.x() - 3.0, c.y() - 4.0) << QPointF(c.x() + 4.0, c.y()) << QPointF(c.x() - 3.0, c.y() + 4.0);
-        painter.drawPolygon(tri);
-        painter.restore();
-    }
-
     // Row background: rounded card, selected rows get a subtle raised tone
     painter.setRenderHint(QPainter::Antialiasing, true);
     if (selected)
@@ -1760,7 +1755,195 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
             painter.drawPolygon(headLeft);
         }
     }
+
+    // 参考视频层:行尾属性展开三角(画在背景之后确保可见;展开朝下/收起朝右)。
+    // 位置与普通层的折叠三角一致——视频层行尾三角语义=展开属性而非折叠。
+    if (layer->type() == Layer::MOVIE)
+    {
+        const bool expanded = mExpandedVideoIds.contains(layer->id());
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x8A, 0x8A, 0x90));
+        const QPointF c(x + width - 13.0, y + mLayerHeight / 2.0);
+        QPolygonF tri;
+        if (expanded)
+        {
+            tri << QPointF(c.x() - 4.0, c.y() - 3.0) << QPointF(c.x() + 4.0, c.y() - 3.0) << QPointF(c.x(), c.y() + 4.0);
+        }
+        else
+        {
+            tri << QPointF(c.x() - 3.0, c.y() - 4.0) << QPointF(c.x() + 4.0, c.y()) << QPointF(c.x() - 3.0, c.y() + 4.0);
+        }
+        painter.drawPolygon(tri);
+        painter.setRenderHint(QPainter::Antialiasing, false);
+    }
+
     painter.setRenderHint(QPainter::Antialiasing, false);
+
+    // 展开态:正常行下方画属性区(缩放滑杆+可拖数值)
+    if (layer->type() == Layer::MOVIE && height > mLayerHeight)
+    {
+        paintVideoProps(painter, static_cast<const LayerVideo*>(layer), x, y + mLayerHeight);
+    }
+}
+
+void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop) const
+{
+    painter.save();
+
+    // 区背景:比行卡片更深,与上半内容行区分
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x14, 0x14, 0x18));
+    painter.drawRoundedRect(QRectF(x + 2.0, yTop + 1.0, width() - 6.0, kVideoPropsH - 3.0), 5.0, 5.0);
+
+    auto label = [&painter, x, yTop](int row, const QString& text)
+    {
+        painter.setPen(QColor(0xC8, 0xC8, 0xCE));
+        painter.drawText(QRect(x + 10, yTop + row * 22, 44, 22), Qt::AlignVCenter | Qt::AlignLeft, text);
+    };
+    auto valueField = [&painter, x, yTop](int row, double val, const QString& suffix)
+    {
+        // AE 式数值段:淡蓝数字+左下细线+右缘拖动箭头
+        const QRect vr(x + 58, yTop + row * 22 + 2, 78, 18);
+        painter.setPen(QColor(0x8F, 0xC5, 0xFF));
+        painter.drawText(vr, Qt::AlignVCenter | Qt::AlignLeft,
+                         QString::number(val, 'f', 1) + suffix);
+        painter.setPen(QPen(QColor(0x3A, 0x3A, 0x42), 1));
+        painter.drawLine(vr.left(), vr.bottom() + 1, vr.right() - 14, vr.bottom() + 1);
+        painter.setPen(QColor(0x6A, 0x6A, 0x74));
+        QPainterPath arrows;
+        arrows.moveTo(vr.right() - 9, vr.center().y() - 3);
+        arrows.lineTo(vr.right() - 13, vr.center().y());
+        arrows.lineTo(vr.right() - 9, vr.center().y() + 3);
+        arrows.moveTo(vr.right() - 5, vr.center().y() - 3);
+        arrows.lineTo(vr.right() - 1, vr.center().y());
+        arrows.lineTo(vr.right() - 5, vr.center().y() + 3);
+        painter.drawPath(arrows);
+    };
+
+    // 行0:缩放 标签+滑杆(轨道 x+56..x+150)+数值
+    label(0, tr("缩放"));
+    const double pct = layer->videoScale() * 100.0;
+    const int trackY = yTop + 11;
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x33, 0x33, 0x3A));
+    painter.drawRoundedRect(QRectF(x + 56.0, trackY - 2.0, 94.0, 4.0), 2.0, 2.0);
+    const double t = qBound(0.0, (pct - 5.0) / (800.0 - 5.0), 1.0);
+    painter.setBrush(QColor(0xE8, 0xE8, 0xEA));
+    painter.drawRoundedRect(QRectF(x + 56.0 + t * 94.0 - 4.0, trackY - 7.0, 8.0, 14.0), 2.0, 2.0);
+    valueField(0, pct, " %");
+
+    // 行1/2:位移 X/Y
+    label(1, tr("位移 X"));
+    valueField(1, layer->videoOffset().x(), QString());
+    label(2, tr("位移 Y"));
+    valueField(2, layer->videoOffset().y(), QString());
+
+    painter.restore();
+}
+
+int TimeLineCells::hitVideoProps(int layerNumber, const QPoint& pos) const
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    if (l == nullptr || l->type() != Layer::MOVIE || !mExpandedVideoIds.contains(l->id()))
+    {
+        return 0;
+    }
+    const int top = getLayerY(layerNumber) + mLayerHeight;
+    const int rel = pos.y() - top;
+    if (rel < 0 || rel >= kVideoPropsH) { return 0; }
+    const int row = rel / 22;
+    const int xx = pos.x();
+    if (row == 0)
+    {
+        if (xx >= 56 && xx < 150) { return 1; }          // 滑杆轨道
+        if (xx >= 58 && xx < 58 + 78) { return 2; }      // 缩放数值
+    }
+    else if (row == 1)
+    {
+        if (xx >= 58 && xx < 58 + 78) { return 3; }      // 位移X数值
+    }
+    else if (row == 2)
+    {
+        if (xx >= 58 && xx < 58 + 78) { return 4; }      // 位移Y数值
+    }
+    return 0;
+}
+
+QRect TimeLineCells::videoPropsFieldRect(int layerNumber, int field) const
+{
+    // field 2/3/4 → 各数值行的矩形(双击行内编辑定位用);滑杆(1)无编辑器
+    if (field < 2 || field > 4) { return QRect(); }
+    const int row = field - 2;
+    const int top = getLayerY(layerNumber) + mLayerHeight + row * 22 + 2;
+    return QRect(58, top, 78, 18);
+}
+
+void TimeLineCells::toggleVideoPropsExpanded(int layerNumber)
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    if (l == nullptr || l->type() != Layer::MOVIE) { return; }
+    const int id = l->id();
+    if (mExpandedVideoIds.contains(id)) { mExpandedVideoIds.remove(id); }
+    else { mExpandedVideoIds.insert(id); }
+    // 行集不变但行高变了:前缀高缓存须手动失效(rowYAt 才会重算)
+    mRowPrefixHeights.clear();
+    update();
+    mTimeLine->updateContent();
+}
+
+void TimeLineCells::setVideoPropsValue(LayerVideo* layer, int field, double v)
+{
+    if (field == 1 || field == 2)
+    {
+        layer->setVideoScale(v / 100.0);
+    }
+    else
+    {
+        QPointF off = layer->videoOffset();
+        if (field == 3) { off.setX(v); } else { off.setY(v); }
+        layer->setVideoOffset(off);
+    }
+    // 缩放/位移改变层渲染结果:走帧缓存失效路径,只 update 会继续贴旧缓存
+    mEditor->getScribbleArea()->onFramesModified();
+    update();
+}
+
+void TimeLineCells::openVideoPropsEditor(int layerNumber, int field)
+{
+    Layer* l = mEditor->object()->getLayer(layerNumber);
+    auto* video = static_cast<LayerVideo*>(l);
+    const QRect r = videoPropsFieldRect(layerNumber, field);
+    if (!r.isValid()) { return; }
+    double cur = 0.0;
+    if (field == 2) { cur = video->videoScale() * 100.0; }
+    else if (field == 3) { cur = video->videoOffset().x(); }
+    else if (field == 4) { cur = video->videoOffset().y(); }
+
+    if (mVideoPropsEditor)
+    {
+        mVideoPropsEditor->hide();
+        mVideoPropsEditor->deleteLater();
+    }
+    mVideoPropsEditor = new QLineEdit(this);
+    mVideoPropsEditor->setGeometry(r);
+    mVideoPropsEditor->setText(QString::number(cur, 'f', 1));
+    mVideoPropsEditor->setFrame(false);
+    mVideoPropsEditor->setAlignment(Qt::AlignLeft);
+    mVideoPropsEditor->setStyleSheet("background:#101014; color:#E8E8EA; selection-background-color:#3D6EB4;");
+    mVideoPropsEditor->show();
+    mVideoPropsEditor->setFocus();
+    mVideoPropsEditor->selectAll();
+    connect(mVideoPropsEditor, &QLineEdit::editingFinished, this, [this, video, field]()
+    {
+        if (mVideoPropsEditor == nullptr) { return; }
+        const double v = mVideoPropsEditor->text().toDouble();
+        setVideoPropsValue(video, field, v);
+        mVideoPropsEditor->hide();
+        mVideoPropsEditor->deleteLater();
+        mVideoPropsEditor = nullptr;
+    });
 }
 
 void TimeLineCells::paintSelection(QPainter& painter, int x, int y, int width, int height) const
@@ -2357,6 +2540,30 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 }
             }
 
+            // 参考视频层属性展开区:命中即接管(优先于选层/可见性等行内逻辑)
+            {
+                const int field = hitVideoProps(layerNumber, event->pos());
+                if (field > 0)
+                {
+                    auto* video = static_cast<LayerVideo*>(mEditor->object()->getLayer(layerNumber));
+                    mVideoPropsDragField = field;
+                    mVideoPropsPressPos = event->pos();
+                    mVideoPropsDragging = false;
+                    if (field == 1)
+                    {
+                        // 滑杆:按下即跳到点击处并以此为拖动基点
+                        const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
+                        mVideoPropsPressVal = 5.0 + t * (800.0 - 5.0);
+                        mVideoPropsPressPos.setX(56 + qRound(t * 94.0));
+                        setVideoPropsValue(video, field, mVideoPropsPressVal);
+                    }
+                    else if (field == 2) { mVideoPropsPressVal = video->videoScale() * 100.0; }
+                    else if (field == 3) { mVideoPropsPressVal = video->videoOffset().x(); }
+                    else if (field == 4) { mVideoPropsPressVal = video->videoOffset().y(); }
+                    return;
+                }
+            }
+
             if (event->pos().x() < 9)
             {
                 // cycle the 8-color label: -1 -> 0 -> ... -> 7 -> -1
@@ -2365,17 +2572,18 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 qDebug() << "[ui] layer" << layerNumber << "label color ->" << labelLayer->colorIndex();
                 mTimeLine->updateContent(); // both the layer list and the track tint
             }
-            else if (layerNumber < mEditor->object()->getLayerCount()
-                     && mEditor->object()->getLayer(layerNumber)->type() == Layer::MOVIE
-                     && event->pos().x() > width() - 46 && event->pos().x() <= width() - 24)
-            {
-                VideoLayerPropsPopup::showPopup(
-                    static_cast<LayerVideo*>(mEditor->object()->getLayer(layerNumber)),
-                    mEditor, mapToGlobal(event->pos()), this);
-            }
             else if (event->pos().x() > width() - 24)
             {
-                toggleLayerCollapsed(layerNumber);
+                if (layerNumber < mEditor->object()->getLayerCount()
+                    && mEditor->object()->getLayer(layerNumber)->type() == Layer::MOVIE)
+                {
+                    // 视频层行尾三角=属性展开/收起(friction 语义),不是折叠
+                    toggleVideoPropsExpanded(layerNumber);
+                }
+                else
+                {
+                    toggleLayerCollapsed(layerNumber);
+                }
             }
             else if (event->pos().x() < 30)
             {
@@ -2615,6 +2823,53 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
     mMouseMoveX = event->pos().x();
     mMousePos = event->pos();
 
+    // 参考视频层属性区:拖动改值(超2px阈值才生效,与双击编辑共存)或hover光标
+    if (mType == TIMELINE_CELL_TYPE::Layers)
+    {
+        if (mVideoPropsDragField > 0 && (event->buttons() & Qt::LeftButton))
+        {
+            const int layerNumber = getLayerNumber(event->pos().y());
+            if (layerNumber >= 0 && layerNumber < mEditor->object()->getLayerCount())
+            {
+                auto* video = static_cast<LayerVideo*>(
+                    mEditor->object()->getLayer(layerNumber)->type() == Layer::MOVIE
+                        ? mEditor->object()->getLayer(layerNumber) : nullptr);
+                if (video != nullptr)
+                {
+                    const int dx = event->pos().x() - mVideoPropsPressPos.x();
+                    if (!mVideoPropsDragging && qAbs(dx) > 2) { mVideoPropsDragging = true; }
+                    if (mVideoPropsDragging)
+                    {
+                        // 滑杆按位置映射;数值按像素步进(Shift 加速×10)
+                        if (mVideoPropsDragField == 1)
+                        {
+                            const double t = qBound(0.0, static_cast<qreal>(event->pos().x() - 56) / 94.0, 1.0);
+                            setVideoPropsValue(video, 1, 5.0 + t * (800.0 - 5.0));
+                        }
+                        else
+                        {
+                            const bool fast = event->modifiers() & Qt::ShiftModifier;
+                            const double step = (mVideoPropsDragField == 2 ? 0.5 : 1.0) * (fast ? 10.0 : 1.0);
+                            setVideoPropsValue(video, mVideoPropsDragField, mVideoPropsPressVal + dx * step);
+                        }
+                    }
+                    event->accept();
+                    return;
+                }
+            }
+            mVideoPropsDragField = 0;
+        }
+        else if (event->buttons() == Qt::NoButton)
+        {
+            const int layerNumber = getLayerNumber(event->pos().y());
+            if (layerNumber >= 0 && layerNumber < mEditor->object()->getLayerCount())
+            {
+                const int field = hitVideoProps(layerNumber, event->pos());
+                setCursor(field > 0 ? Qt::SizeHorCursor : Qt::ArrowCursor);
+            }
+        }
+    }
+
     if (mPlusCreating && mType == TIMELINE_CELL_TYPE::Tracks)
     {
         Layer* layer = mEditor->object()->getLayer(mCurrentLayerNumber);
@@ -2798,6 +3053,9 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
 void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
 {
+    mVideoPropsDragField = 0;
+    mVideoPropsDragging = false;
+
     if (event->button() != primaryButton) return;
 
     int frameNumber = getFrameNumber(event->pos().x());
@@ -3160,6 +3418,18 @@ void TimeLineCells::mouseDoubleClickEvent(QMouseEvent* event)
     if (event->pos().y() < mOffsetY && (mType != TIMELINE_CELL_TYPE::Layers || event->pos().x() >= 15))
     {
         mPrefs->set(SETTING::SHORT_SCRUB, !mbShortScrub);
+    }
+
+    // 参考视频层属性区数值:双击进入行内精确编辑
+    if (mType == TIMELINE_CELL_TYPE::Layers)
+    {
+        const int field = hitVideoProps(layerNumber, event->pos());
+        if (field >= 2)
+        {
+            openVideoPropsEditor(layerNumber, field);
+            QWidget::mouseDoubleClickEvent(event);
+            return;
+        }
     }
 
     // -- 组头双击：重命名组 --
