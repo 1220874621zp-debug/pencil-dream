@@ -52,6 +52,9 @@ GNU General Public License for more details.
 #include "importimageseqdialog.h"
 #include "importpositiondialog.h"
 #include "movieimporter.h"
+#include "layervideo.h"
+#include <QProcess>
+#include <QRegularExpression>
 #include "movieexporter.h"
 #include "filedialog.h"
 #include "exportmoviedialog.h"
@@ -149,8 +152,10 @@ Status ActionCommands::importAnimatedImage()
     return Status::OK;
 }
 
-Status ActionCommands::importMovieVideo()
+Status ActionCommands::importReferenceVideo()
 {
+    // 参考视频:链接式导入,进程内解码跟随时间轴预览,不拆帧、不进导出。
+    // ffprobe 只在导入时探测一次时长/帧率。
     if (!ensureFFmpegAvailable())
     {
         return Status::SAFE;
@@ -162,48 +167,44 @@ Status ActionCommands::importMovieVideo()
         return Status::FAIL;
     }
 
-    // Show a progress dialog, as this can take a while if you have lots of images.
-    QProgressDialog progressDialog(tr("Importing movie..."), tr("Abort"), 0, 100, mParent);
-    hideQuestionMark(progressDialog);
-    progressDialog.setWindowModality(Qt::WindowModal);
-    progressDialog.setMinimumWidth(250);
-    progressDialog.show();
-
-    QMessageBox information(mParent);
-    information.setIcon(QMessageBox::Warning);
-    information.setText(tr("You are importing a lot of frames, beware this could take some time. Are you sure you want to proceed?"));
-    information.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-    information.setDefaultButton(QMessageBox::Yes);
-
-    MovieImporter importer(this);
-    importer.setCore(mEditor);
-
-    connect(&progressDialog, &QProgressDialog::canceled, &importer, &MovieImporter::cancel);
-
-    Status st = importer.run(filePath, mEditor->playback()->fps(), FileType::MOVIE, [&progressDialog](int prog) {
-        progressDialog.setValue(prog);
-        QApplication::processEvents();
-    }, [&progressDialog](QString progMessage) {
-        progressDialog.setLabelText(progMessage);
-    }, [&information]() {
-
-        int ret = information.exec();
-        return ret == QMessageBox::Yes;
-    });
-
-    if (!st.ok() && st != Status::CANCELED)
+    double duration = 0.0;
+    double videoFps = 0.0;
+    QProcess probe(this);
+    probe.start(ffprobeLocation(), { "-v", "error", "-select_streams", "v:0",
+                                     "-show_entries", "stream=r_frame_rate,duration",
+                                     "-show_entries", "format=duration",
+                                     "-of", "default=noprint_wrappers=1", filePath });
+    if (probe.waitForStarted(3000) && probe.waitForFinished(10000))
     {
-        ErrorDialog errorDialog(st.title(), st.description(), st.details().html(), mParent);
-        errorDialog.exec();
-        return Status::SAFE;
+        const QString out = probe.readAllStandardOutput();
+        QRegularExpression durRx("duration=([0-9.]+)");
+        auto it = durRx.globalMatch(out);
+        while (it.hasNext())
+        {
+            const double v = it.next().captured(1).toDouble();
+            if (v > 0.0 && (duration <= 0.0 || v < duration)) { duration = v; }
+        }
+        QRegularExpression fpsRx("r_frame_rate=(\d+)/(\d+)");
+        const auto fpsMatch = fpsRx.match(out);
+        if (fpsMatch.hasMatch() && fpsMatch.captured(2).toInt() > 0)
+        {
+            videoFps = fpsMatch.captured(1).toDouble() / fpsMatch.captured(2).toDouble();
+        }
     }
+    if (duration <= 0.0)
+    {
+        QMessageBox::warning(mParent, tr("导入参考视频"), tr("无法解析视频时长,请确认文件完好。"));
+        return Status::FAIL;
+    }
+    if (videoFps <= 0.0) { videoFps = mEditor->playback()->fps(); }
+
+    const int frames = qMax(1, qRound(duration * videoFps));
+    const QFileInfo info(filePath);
+    LayerVideo* layer = mEditor->layers()->createVideoLayer(info.completeBaseName());
+    layer->setVideoSource(info.absoluteFilePath(), videoFps, frames, mEditor->currentFrame());
 
     mEditor->layers()->notifyAnimationLengthChanged();
-    emit mEditor->framesModified();
-
-    progressDialog.setValue(100);
-    progressDialog.close();
-
+    mEditor->getScribbleArea()->update();
     return Status::OK;
 }
 
@@ -862,6 +863,7 @@ void ActionCommands::duplicateLayer()
 {
     LayerManager* layerMgr = mEditor->layers();
     Layer* fromLayer = layerMgr->currentLayer();
+    if (fromLayer->type() == Layer::MOVIE) { return; } // 参考视频层不参与复制
     int currFrame = mEditor->currentFrame();
 
     Layer* toLayer = layerMgr->createLayer(fromLayer->type(), tr("%1 (copy)", "Default duplicate layer name").arg(fromLayer->name()));
@@ -883,6 +885,7 @@ void ActionCommands::duplicateKey()
 {
     Layer* layer = mEditor->layers()->currentLayer();
     if (layer == nullptr || layer->locked()) return;
+    if (layer->type() == Layer::MOVIE) return; // 参考视频层无帧复制
     if (!layer->visible())
     {
         mEditor->getScribbleArea()->showLayerNotVisibleWarning();

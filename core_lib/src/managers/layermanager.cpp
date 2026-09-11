@@ -28,6 +28,7 @@ GNU General Public License for more details.
 #include "undoredomanager.h"
 
 #include "layersound.h"
+#include "layervideo.h"
 #include "layerbitmap.h"
 #include "layercamera.h"
 
@@ -203,6 +204,9 @@ Layer* LayerManager::createLayer(Layer::LAYER_TYPE type, const QString& strLayer
     case Layer::SOUND:
         layer = object()->addNewSoundLayer();
         break;
+    case Layer::MOVIE:
+        layer = object()->addNewVideoLayer();
+        break;
     case Layer::CAMERA:
         layer = object()->addNewCameraLayer();
         break;
@@ -250,6 +254,17 @@ LayerBitmap* LayerManager::createColorizeLayer(const QString& strLayerName)
 LayerCamera* LayerManager::createCameraLayer(const QString& strLayerName)
 {
     LayerCamera* layer = object()->addNewCameraLayer();
+    layer->setName(strLayerName);
+
+    emit layerCountChanged(count());
+    setCurrentLayer(getLastLayerIndex());
+
+    return layer;
+}
+
+LayerVideo* LayerManager::createVideoLayer(const QString& strLayerName)
+{
+    LayerVideo* layer = object()->addNewVideoLayer();
     layer->setName(strLayerName);
 
     emit layerCountChanged(count());

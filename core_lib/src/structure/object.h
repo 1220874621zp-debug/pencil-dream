@@ -30,6 +30,8 @@ GNU General Public License for more details.
 
 class QProgressDialog;
 class QFile;
+class LayerVideo;
+class QWidget;
 class LayerBitmap;
 class LayerCamera;
 class LayerSound;
@@ -109,6 +111,10 @@ public:
 
     LayerBitmap* addNewBitmapLayer();
     LayerSound* addNewSoundLayer();
+    LayerVideo* addNewVideoLayer();
+
+    /** 参考视频层跟随时间轴(播放/scrub 统一出口驱动);repaintTarget 收异步出帧通知 */
+    void syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget = nullptr);
     LayerCamera* addNewCameraLayer();
     LayerBitmap* addNewColorizeLayer();
 

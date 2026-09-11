@@ -135,6 +135,7 @@ private:
 
     /** 智能填色层：着色缓存 + 笔画（含当前层实时笔画缓冲） */
     void paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer);
+    void paintVideoFrame(QPainter& painter, Layer* layer);
 
     // --- clipping-mask compositing ----------------------------------------
     /** (Re)creates the accumulated-below image to match the canvas geometry. */

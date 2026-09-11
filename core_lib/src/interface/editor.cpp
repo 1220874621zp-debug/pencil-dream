@@ -816,6 +816,9 @@ void Editor::scrubTo(int frame)
         emit updateTimeLineCached(); // needs to update the timeline to update onion skin positions
     }
     mObject->updateActiveFrames(frame);
+    // 参考视频层跟随帧(拉模式:player 防抖纠偏,不逐帧 seek);
+    // 传入画布作重画目标:解码器异步出帧后自动触发 update
+    mObject->syncVideoLayersTo(frame, mPlaybackManager ? mPlaybackManager->fps() : 12.0, getScribbleArea());
     emit scrubbed(frame);
 }
 
@@ -877,6 +880,12 @@ KeyFrame* Editor::addKeyFrame(const int layerNumber, int frameIndex)
         }
     }
 
+    if (layer->type() == Layer::MOVIE)
+    {
+        // 参考视频层只有一个媒体占位 clip,不接受加帧
+        return nullptr;
+    }
+
     const bool ok = layer->addNewKeyFrameAt(frameIndex);
     Q_ASSERT(ok); // We already ensured that there is no keyframe at frameIndex, so this should always succeed
     scrubTo(frameIndex); // currentFrameChanged() emit inside.
@@ -895,6 +904,12 @@ void Editor::removeKey()
 {
     Layer* layer = layers()->currentLayer();
     Q_ASSERT(layer != nullptr);
+
+    if (layer->type() == Layer::MOVIE)
+    {
+        // 参考视频层删 clip 无意义(要移除请删层);防止误删媒体占位
+        return;
+    }
 
     if (!layer->visible())
     {
@@ -998,6 +1013,8 @@ bool Editor::canCopy() const
     case Layer::SOUND:
     case Layer::CAMERA:
         return canCopyFrames(layer);
+    case Layer::MOVIE:
+        return false; // 参考视频层不可复制
     case Layer::BITMAP:
         return canCopyBitmapImage(static_cast<BitmapImage*>(keyframe)) || canCopyFrames(layer);
     default:

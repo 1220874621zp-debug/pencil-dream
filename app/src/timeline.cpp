@@ -603,7 +603,7 @@ void TimeLine::applyHoldLength(int n)
     if (n < 1) { return; }
 
     Layer* layer = editor()->layers()->currentLayer();
-    if (layer == nullptr || layer->type() == Layer::SOUND) { return; }
+    if (layer == nullptr || layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE) { return; }
 
     QList<int> all;
     layer->foreachKeyFrame([&all](KeyFrame* key) { all.append(key->pos()); });
@@ -754,7 +754,7 @@ void TimeLine::duplicateLayerCleared()
 void TimeLine::cloneLoopFrames()
 {
     Layer* layer = editor()->layers()->currentLayer();
-    if (layer == nullptr || layer->type() == Layer::SOUND || layer->locked()) { return; }
+    if (layer == nullptr || layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE || layer->locked()) { return; }
 
     const int loops = mLoopCloneSpin ? mLoopCloneSpin->value() : 3;
     if (loops < 1) { return; }

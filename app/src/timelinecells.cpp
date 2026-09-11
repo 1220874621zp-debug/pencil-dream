@@ -25,12 +25,14 @@ GNU General Public License for more details.
 #include <QRegularExpression>
 #include <QSettings>
 #include <QDebug>
+#include <QFileInfo>
 #include <QWheelEvent>
 #include <QTimer>
 #include <algorithm>
 #include <QThreadPool>
 #include <QRunnable>
 #include "layerbitmap.h"
+#include "layervideo.h"
 #include "colorizeimage.h"
 #include "bitmapimage.h"
 
@@ -689,7 +691,7 @@ void TimeLineCells::paintCollapsedTrack(QPainter& painter, const Layer* layer, i
     QColor col;
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
     if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
-    if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
+    if (layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
     painter.setPen(Qt::NoPen);
     painter.setBrush(col);
@@ -720,7 +722,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     // itself stays dark (TVP) so the label color reads clearly
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
     if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
-    if (layer->type() == Layer::SOUND) col = Theme::LayerSound;
+    if (layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
 
     painter.save();
@@ -784,7 +786,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
             scaled.setDevicePixelRatio(dpr);
             return scaled;
         });
-        painter.drawPixmap(QPoint(x + 6, y + (height - iconH) / 2), icon);
+        painter.drawPixmap(QPoint(x + 4, y + 1), icon);
     }
 
     painter.restore();
@@ -1063,6 +1065,13 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         int recWidth = standardWidth + (blockLen - 1) * frameSize;
         if (recLeft >= viewW || recLeft + recWidth < 0) { return; } // 视口外
 
+        // 参考视频带:深色胶囊+胶片孔纹(纯参考,无缩略图/帧交互)
+        if (layer->type() == Layer::MOVIE)
+        {
+            paintVideoBand(painter, layer, recLeft, recTop, recWidth, recHeight);
+            return;
+        }
+
         // 声音块走独立外观（参考图：深灰胶囊+波形），无缩略图/图纸号/"+"
         if (layer->type() == Layer::SOUND)
         {
@@ -1173,6 +1182,41 @@ void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int 
 }
 
 // 声音块：黑色圆角底（与位图块同款），顶部音频名称，下方白色细柱波形
+void TimeLineCells::paintVideoBand(QPainter& painter, const Layer* layer, int recLeft, int recTop, int recWidth, int recHeight) const
+{
+    painter.save();
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Theme::TimelineFrameFill);
+    painter.drawRoundedRect(QRectF(recLeft + 1.0, recTop + 1.0, recWidth - 2.0, recHeight - 2.0), 6.0, 6.0);
+
+    // 文件名:左上一行,过长中段省略
+    const auto* videoLayer = static_cast<const LayerVideo*>(layer);
+    const QString clipName = QFileInfo(videoLayer->videoPath()).fileName();
+    if (!clipName.isEmpty())
+    {
+        const QRectF nameRect(recLeft + 8.0, recTop + 3.0, recWidth - 16.0, 13.0);
+        const QString shown = QFontMetrics(painter.font()).elidedText(clipName, Qt::ElideMiddle, qMax<qreal>(20.0, nameRect.width()));
+        painter.setPen(QColor(0xE8, 0xE8, 0xEA));
+        painter.drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter, shown);
+    }
+
+    // 胶片孔纹:名称下方,上下两排小矩形,间距随帧宽呼吸
+    const qreal bandTop = recTop + 18.0;
+    const qreal bandBottom = recTop + recHeight - 4.0;
+    const qreal centerY = (bandTop + bandBottom) / 2.0;
+    const qreal holeH = qMax(2.0, (bandBottom - bandTop) / 2.0 - 3.0);
+    const int holeStep = 7; // 4px 孔 + 3px 隙
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0x70, 0x8A, 0xFF, 140));
+    for (int x = 0; recWidth > 16 && x + 4 <= static_cast<int>(recWidth) - 8; x += holeStep)
+    {
+        const qreal hx = recLeft + 6.0 + x;
+        painter.drawRect(QRectF(hx, centerY - holeH - 1.5, 4.0, holeH));
+        painter.drawRect(QRectF(hx, centerY + 1.5, 4.0, holeH));
+    }
+    painter.restore();
+}
+
 void TimeLineCells::paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const
 {
     painter.save();
@@ -1507,6 +1551,7 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     const char* typeIconRes = nullptr;
     if (layer->type() == Layer::BITMAP || layer->type() == Layer::COLORIZE) typeIconRes = ":icons/themes/playful/timeline/cell-bitmap.svg";
     else if (layer->type() == Layer::SOUND) typeIconRes = ":icons/themes/playful/timeline/cell-sound.svg";
+    else if (layer->type() == Layer::MOVIE) typeIconRes = ":icons/themes/playful/timeline/cell-video.svg";
     else if (layer->type() == Layer::CAMERA) typeIconRes = ":icons/themes/playful/timeline/cell-camera.svg";
     if (typeIconRes != nullptr)
     {

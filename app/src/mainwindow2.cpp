@@ -341,7 +341,7 @@ void MainWindow2::createMenus()
     connect(ui->actionImport_ImageSeq, &QAction::triggered, this, &MainWindow2::importImageSequence);
     connect(ui->actionImport_ImageSeqNum, &QAction::triggered, this, &MainWindow2::importPredefinedImageSet);
     connect(ui->actionImportLayers_from_pclx, &QAction::triggered, this, &MainWindow2::importLayers);
-    connect(ui->actionImport_MovieVideo, &QAction::triggered, this, &MainWindow2::importMovieVideo);
+    connect(ui->actionImport_ReferenceVideo, &QAction::triggered, this, &MainWindow2::importReferenceVideo);
     connect(ui->actionImport_AnimatedImage, &QAction::triggered, this, &MainWindow2::importAnimatedImage);
 
     connect(ui->actionImport_Sound, &QAction::triggered, [=] { mCommands->importSound(FileType::SOUND); });
@@ -1571,7 +1571,7 @@ void MainWindow2::setupKeyboardShortcuts()
     ui->actionImport_Image->setShortcut(cmdKeySeq(CMD_IMPORT_IMAGE));
     ui->actionImport_ImageSeq->setShortcut(cmdKeySeq(CMD_IMPORT_IMAGE_SEQ));
     ui->actionImport_ImageSeqNum->setShortcut(cmdKeySeq(CMD_IMPORT_IMAGE_PREDEFINED_SET));
-    ui->actionImport_MovieVideo->setShortcut(cmdKeySeq(CMD_IMPORT_MOVIE_VIDEO));
+    ui->actionImport_ReferenceVideo->setShortcut(cmdKeySeq(CMD_IMPORT_REFERENCE_VIDEO));
     ui->actionImport_AnimatedImage->setShortcut(cmdKeySeq(CMD_IMPORT_ANIMATED_IMAGE));
     ui->actionImportLayers_from_pclx->setShortcut(cmdKeySeq(CMD_IMPORT_LAYERS));
     ui->actionImport_Sound->setShortcut(cmdKeySeq(CMD_IMPORT_SOUND));
@@ -1916,14 +1916,9 @@ void MainWindow2::changePlayState(bool isPlaying)
     update();
 }
 
-void MainWindow2::importMovieVideo()
+void MainWindow2::importReferenceVideo()
 {
-    // Flag this so we don't prompt the user about auto-save in the middle of the import.
-    mSuppressAutoSaveDialog = true;
-
-    mCommands->importMovieVideo();
-
-    mSuppressAutoSaveDialog = false;
+    mCommands->importReferenceVideo();
 }
 
 bool MainWindow2::event(QEvent* event)

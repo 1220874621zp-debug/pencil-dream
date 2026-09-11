@@ -60,6 +60,7 @@ QString layerTypeName(Layer* layer)
     case Layer::COLORIZE: return QStringLiteral("colorize");
     case Layer::VECTOR:   return QStringLiteral("vector");
     case Layer::SOUND:    return QStringLiteral("sound");
+    case Layer::MOVIE:    return QStringLiteral("reference_video");
     case Layer::CAMERA:   return QStringLiteral("camera");
     default:              return QStringLiteral("undefined");
     }
@@ -71,6 +72,7 @@ Layer::LAYER_TYPE layerTypeFromName(const QString& name)
     if (name == "colorize") return Layer::COLORIZE;
     if (name == "camera") return Layer::CAMERA;
     if (name == "sound") return Layer::SOUND;
+    if (name == "reference_video") return Layer::MOVIE;
     if (name == "vector") return Layer::VECTOR;
     return Layer::UNDEFINED;
 }
@@ -476,6 +478,7 @@ McpDispatcher::ToolResult McpDispatcher::toolCreateLayer(const QJsonObject& args
         case Layer::COLORIZE: name = tr("填色层"); break;
         case Layer::CAMERA:   name = tr("相机层"); break;
         case Layer::SOUND:    name = tr("声音层"); break;
+        case Layer::MOVIE:    name = tr("参考视频层"); break;
         default:              name = tr("位图层"); break;
         }
         name = mEditor->layers()->nameSuggestLayer(name);

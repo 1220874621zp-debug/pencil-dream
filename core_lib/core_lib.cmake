@@ -66,6 +66,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/colorizeimage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layervideo.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/object.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.h
@@ -177,6 +178,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/colorizeimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layervideo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/object.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.cpp

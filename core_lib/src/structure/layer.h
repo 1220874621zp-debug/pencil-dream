@@ -58,7 +58,7 @@ public:
         UNDEFINED = 0,
         BITMAP = 1,
         VECTOR = 2,
-        MOVIE = 3, // not supported yet
+        MOVIE = 3, // 参考视频层（链接式，跟随时间轴预览播放，不进编辑/导出管线）
         SOUND = 4,
         CAMERA = 5,
         COLORIZE = 6, // 智能填色图层（继承位图行为）

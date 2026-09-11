@@ -338,7 +338,7 @@ static QString getHumanReadableShortcutName(const QString& cmdName)
         {CMD_IMPORT_IMAGE, ShortcutsPage::tr("Import Image", "Shortcut")},
         {CMD_IMPORT_IMAGE_SEQ, ShortcutsPage::tr("Import Image Sequence", "Shortcut")},
         {CMD_IMPORT_IMAGE_PREDEFINED_SET, ShortcutsPage::tr("Import Image Predefined Set", "Shortcut")},
-        {CMD_IMPORT_MOVIE_VIDEO, ShortcutsPage::tr("Import Movie Video", "Shortcut")},
+        {CMD_IMPORT_REFERENCE_VIDEO, ShortcutsPage::tr("Import Reference Video", "Shortcut")},
         {CMD_IMPORT_MOVIE_AUDIO, ShortcutsPage::tr("Import Movie Audio", "Shortcut")},
         {CMD_IMPORT_ANIMATED_IMAGE, ShortcutsPage::tr("Import Animated Image", "Shortcut")},
         {CMD_IMPORT_LAYERS, ShortcutsPage::tr("Import Layers from project file", "Shortcut")},

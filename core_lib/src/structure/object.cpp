@@ -35,6 +35,7 @@ GNU General Public License for more details.
 #include "layercolorize.h"
 #include "colorizeimage.h"
 #include "layersound.h"
+#include "layervideo.h"
 #include "layercamera.h"
 
 #include "util.h"
@@ -123,6 +124,9 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
             continue;
         case Layer::SOUND:
             newLayer = new LayerSound(getUniqueLayerID());
+            break;
+        case Layer::MOVIE:
+            newLayer = new LayerVideo(getUniqueLayerID());
             break;
         case Layer::CAMERA:
             newLayer = new LayerCamera(getUniqueLayerID());
@@ -236,6 +240,32 @@ LayerSound* Object::addNewSoundLayer()
     // No default keyFrame at position 1 for Sound layer.
 
     return layerSound;
+}
+
+LayerVideo* Object::addNewVideoLayer()
+{
+    LayerVideo* layerVideo = new LayerVideo(getUniqueLayerID());
+    mLayers.append(layerVideo);
+
+    ++mLayerStructureGeneration;
+
+    return layerVideo;
+}
+
+void Object::syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget)
+{
+    for (Layer* layer : mLayers)
+    {
+        if (layer->type() == Layer::MOVIE)
+        {
+            LayerVideo* videoLayer = static_cast<LayerVideo*>(layer);
+            if (repaintTarget)
+            {
+                videoLayer->attachRepaintTarget(repaintTarget);
+            }
+            videoLayer->syncToFrame(frame, projectFps);
+        }
+    }
 }
 
 LayerCamera* Object::addNewCameraLayer()

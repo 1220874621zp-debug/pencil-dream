@@ -1073,6 +1073,8 @@ QString FileManager::recoverLayerName(Layer::LAYER_TYPE type, int index)
         return tr("Bitmap Layer %1").arg(index);
     case Layer::SOUND:
         return tr("Sound Layer %1").arg(index);
+    case Layer::MOVIE:
+        return tr("参考视频 %1").arg(index);
     default:
         Q_ASSERT(false);
     }

@@ -24,6 +24,7 @@ GNU General Public License for more details.
 class LayerBitmap;
 class LayerCamera;
 class LayerSound;
+class LayerVideo;
 
 
 class LayerManager : public BaseManager
@@ -69,6 +70,7 @@ public:
     LayerBitmap* createColorizeLayer(const QString& strLayerName);
     LayerCamera* createCameraLayer(const QString& strLayerName);
     LayerSound*  createSoundLayer(const QString& strLayerName);
+    LayerVideo*  createVideoLayer(const QString& strLayerName);
 
     // KeyFrame Management
     int lastFrameAtFrame(int frameIndex);

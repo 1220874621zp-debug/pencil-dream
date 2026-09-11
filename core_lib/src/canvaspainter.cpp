@@ -15,6 +15,8 @@ GNU General Public License for more details.
 */
 
 #include "canvaspainter.h"
+#include "layervideo.h"
+#include <QFileInfo>
 
 #include <QtMath>
 #include <QPainterPath>
@@ -599,9 +601,36 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
             paintCurrentColorizeFrame(painter, blitRect, layer, i, isCurrentLayer);
             break;
         }
+        case Layer::MOVIE: {
+            paintVideoFrame(painter, layer);
+            break;
+        }
         default: break;
         }
     }
+}
+
+void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)
+{
+    // 参考视频:pull 模式取解码器最近帧,原尺寸居中(缩放交给画布视图);
+    // 直接用传入 painter,世界变换与位图层同源,跟随视图/相机。
+    LayerVideo* videoLayer = static_cast<LayerVideo*>(layer);
+    const QImage img = videoLayer->currentFrameImage();
+    if (img.isNull())
+    {
+        if (videoLayer->isFileMissing())
+        {
+            // 断链占位:虚线框提示
+            painter.setPen(QPen(QColor(255, 80, 80, 200), 2, Qt::DashLine));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawRect(QRectF(-320, -180, 640, 360));
+            painter.setPen(QPen(QColor(255, 120, 120, 220), 1));
+            painter.drawText(QRectF(-320, -12, 640, 24), Qt::AlignCenter,
+                             tr("参考视频文件缺失:%1").arg(QFileInfo(videoLayer->videoPath()).fileName()));
+        }
+        return;
+    }
+    painter.drawImage(QPointF(-img.width() / 2.0, -img.height() / 2.0), img);
 }
 
 void CanvasPainter::paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer)

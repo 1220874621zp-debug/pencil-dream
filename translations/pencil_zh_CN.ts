@@ -3843,6 +3843,10 @@
         <source>Sound Layer %1</source>
         <translation>声音层 %1</translation>
     </message>
+    <message>
+        <source>Reference Video %1</source>
+        <translation>参考视频 %1</translation>
+    </message>
 </context>
 <context>
     <name>FilesPage</name>
@@ -5594,6 +5598,10 @@ Read the instructions and try again</source>
         <translation>电影音频...</translation>
     </message>
     <message>
+        <source>Reference Video...</source>
+        <translation>导入参考视频...</translation>
+    </message>
+    <message>
         <location filename="../app/ui/mainwindow2.ui" line="1021"/>
         <source>Append to Palette...</source>
         <translation>附加到调色板...</translation>
@@ -7048,6 +7056,10 @@ or cancel</source>
         <source>Import Movie Audio</source>
         <comment>Shortcut</comment>
         <translation>导入影片音频</translation>
+    </message>
+    <message>
+        <source>Import Reference Video</source>
+        <translation>导入参考视频</translation>
     </message>
     <message>
         <location filename="../app/src/shortcutspage.cpp" line="343"/>

@@ -94,7 +94,7 @@ public:
     void importImageSequence();
     void importPredefinedImageSet();
     void importLayers();
-    void importMovieVideo();
+    void importReferenceVideo();
     void importAnimatedImage();
 
     void lockWidgets(bool shouldLock);
