@@ -1,0 +1,161 @@
+name: Development Build
+
+on:
+  push:
+    branches: [ "main", "master", "develop", "development", "remove-vector" ]
+  pull_request:
+    branches: [ "main", "master", "develop", "development" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ----------------- Windows 构建（x64 便携包 + 安装包） -----------------
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Determine version
+        shell: bash
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BASE=$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -1)
+          echo "APP_VERSION=${BASE:-0.7.0}.${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+          echo "PKG_SUFFIX=dev-b${GITHUB_RUN_NUMBER}-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Configure build
+        shell: pwsh
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" "-DAPP_VERSION=$env:APP_VERSION"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        shell: bash
+        run: QT_QPA_PLATFORM=offscreen ./build/pencil2d_tests.exe
+
+      - name: Install InnoSetup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Prepare portable files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\PencilDream | Out-Null
+          Copy-Item build\pencil2d.exe dist\PencilDream\
+          windeployqt --release --compiler-runtime dist\PencilDream\pencil2d.exe
+          # ffmpeg：视频导出/音频导入依赖，Pencil2D 固定在 plugins/ 下寻找
+          curl.exe -fsSL -o ffmpeg-win64.zip https://github.com/pencil2d/pencil2d-deps/releases/download/ffmpge-v4.1.1/ffmpeg-win64.zip
+          tar -xf ffmpeg-win64.zip
+          New-Item -ItemType Directory -Force -Path dist\PencilDream\plugins | Out-Null
+          Move-Item ffmpeg.exe dist\PencilDream\plugins\
+          Remove-Item ffmpeg-win64.zip
+          Copy-Item LICENSE.TXT dist\PencilDream\
+          Copy-Item app\data\pencil2d_quick_guide.pdf dist\PencilDream\
+
+      - name: Create portable zip
+        shell: bash
+        run: |
+          cd dist
+          7z a "pencil-dream-win64-${PKG_SUFFIX}.zip" PencilDream
+
+      - name: Create installer
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ".github\packaging\pencil-dream.iss" "/DVersion=$env:APP_VERSION" "/DPkgSuffix=$env:PKG_SUFFIX"'
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pencil-dream-Windows-x64
+          path: |
+            dist/*.zip
+            dist/*.exe
+          if-no-files-found: error
+
+  # ----------------- Linux AppImage 构建 -----------------
+  build-linux-appimage:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libfuse2 \
+            libgl1 libegl1 \
+            libxkbcommon0 libxkbcommon-x11-0 libx11-xcb1 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 \
+            libxcb-cursor0 libxcb-sync1 \
+            libdbus-1-3 libfontconfig1 libglib2.0-0 \
+            ffmpeg file
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          modules: 'qtmultimedia'
+          cache: true
+
+      - name: Determine version
+        shell: bash
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BASE=$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -1)
+          echo "APP_VERSION=${BASE:-0.7.0}.${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+          echo "PKG_SUFFIX=dev-b${GITHUB_RUN_NUMBER}-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Configure build
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DAPP_VERSION="$APP_VERSION"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        run: QT_QPA_PLATFORM=offscreen ./build/pencil2d_tests
+
+      - name: Create AppImage
+        run: |
+          cmake --install build --prefix "$PWD/AppDir/usr"
+          # 品牌化桌面项
+          sed -i 's/^Name=Pencil2D/Name=Pencil Dream/; s/^Name\[zh_CN\]=Pencil2D/Name[zh_CN]=Pencil Dream/' \
+            AppDir/usr/share/applications/org.pencil2d.Pencil2D.desktop
+          # ffmpeg：视频导出/音频导入依赖
+          install -Dm755 /usr/bin/ffmpeg AppDir/usr/plugins/ffmpeg
+          # linuxdeploy 工具链
+          curl -fsSL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -fsSL -o linuxdeploy-plugin-qt https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          curl -fsSL -o linuxdeploy-plugin-appimage https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod 755 linuxdeploy linuxdeploy-plugin-qt linuxdeploy-plugin-appimage
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          export OUTPUT="pencil-dream-linux-amd64-${PKG_SUFFIX}.AppImage"
+          ./linuxdeploy --appdir AppDir --plugin qt --output appimage --executable AppDir/usr/plugins/ffmpeg
+          mkdir -p ci-artifacts
+          mv "$OUTPUT" ci-artifacts/
+
+      - name: Upload Linux AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pencil-dream-Linux-AppImage
+          path: ci-artifacts/*.AppImage
+          if-no-files-found: error
