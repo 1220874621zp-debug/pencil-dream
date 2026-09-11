@@ -186,7 +186,7 @@ void ProjectManagerDialog::buildCards()
         auto* nameLabel = new QLabel(info.completeBaseName(), card);
         nameLabel->setToolTip(QDir::toNativeSeparators(info.absoluteFilePath()));
         auto* deleteButton = new QToolButton(card);
-        deleteButton->setIcon(QIcon(QStringLiteral(":/icons/themes/playful/timeline/frame-remove.svg")));
+        deleteButton->setIcon(QIcon(QStringLiteral(":/icons/themes/playful/menubar/clear-canvas.svg")));
         deleteButton->setToolTip(tr("删除工程（移入回收站）"));
         nameRow->addWidget(nameLabel, 1);
         nameRow->addWidget(deleteButton, 0);
