@@ -179,6 +179,10 @@ private:
     /** Camera key dots + connector line (shared by paintFrames and the
      *  hover-reveal over the track-start camera icon). */
     void paintCameraKeys(QPainter& painter, const Layer* layer, int y, int height) const;
+    /** 相机轨道开头图标的悬停热区（与 paintTrack 绘制同几何）；非相机层/折叠行返回空 */
+    QRectF cameraIconHoverRect(const Layer* layer, int x, int y, int height) const;
+    /** 相机图标悬停揭示状态：揭示画在内容缓存里，进出翻转时必须全量重画 */
+    bool mHoverRevealActive = false;
     void paintCurrentFrameBorder(QPainter& painter, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintSoundWaveform(QPainter& painter, SoundClip* clip, int recLeft, int recTop, int recWidth, int recHeight) const;
     void paintVideoBand(QPainter& painter, const Layer* layer, int recLeft, int recTop, int recWidth, int recHeight) const;

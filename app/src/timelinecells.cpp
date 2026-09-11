@@ -799,11 +799,11 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
         const int iconY = y + (height - iconH) / 2;
         painter.drawPixmap(QPoint(x + 6, iconY), icon);
 
-        const QRectF iconRect(x + 6.0, iconY, icon.width(), static_cast<qreal>(iconH));
-        if (iconRect.adjusted(-6.0, -4.0, 10.0, 4.0).contains(mMousePos))
+        const QRectF hoverRect = cameraIconHoverRect(layer, x, y, height);
+        if (hoverRect.contains(mMousePos))
         {
             painter.save();
-            painter.setClipRect(iconRect.adjusted(-3.0, -3.0, 3.0, 3.0));
+            painter.setClipRect(hoverRect.adjusted(3.0, 1.0, -7.0, -1.0));
             paintCameraKeys(painter, layer, y, height);
             painter.restore();
         }
@@ -825,6 +825,28 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     }
 
     painter.restore();
+}
+
+QRectF TimeLineCells::cameraIconHoverRect(const Layer* layer, int x, int y, int height) const
+{
+    // 与 paintTrack 的相机图标绘制同几何（含相同的 adjusted 外扩），
+    // 悬停命中与揭示绘制共用一份公式，改一处另一处自动跟随
+    if (layer == nullptr || layer->type() != Layer::CAMERA || height <= 20)
+    {
+        return QRectF();
+    }
+    const qreal dpr = devicePixelRatioF();
+    const int iconH = qMax(12, qRound(height * 0.55));
+    const QString iconKey = QStringLiteral("camera-track:%1@%2").arg(iconH).arg(dpr);
+    const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
+        QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/camera-track.svg"))
+                             .scaledToHeight(qMax(1, qRound(iconH * dpr)), Qt::SmoothTransformation);
+        scaled.setDevicePixelRatio(dpr);
+        return scaled;
+    });
+    const int iconY = y + (height - iconH) / 2;
+    return QRectF(x + 6.0, iconY, icon.width(), static_cast<qreal>(iconH))
+            .adjusted(-6.0, -4.0, 10.0, 4.0);
 }
 
 int TimeLineCells::blockLengthFor(const Layer* layer, const KeyFrame* key) const
@@ -3129,8 +3151,8 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                             }
 
                             // If it is the case, we move the selected frames in the layer
+                            if (!mMovingFrames) { qDebug() << "[ui] frames drag begin"; } // 只记首次，勿逐 move 刷屏
                             mMovingFrames = true;
-                            qDebug() << "[ui] frames drag begin";;
 
                             // Vertical drag onto another row of the same type = cross-layer move
                             mDropTargetLayer = -1;
@@ -3149,14 +3171,23 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                                     const int posUnderCursor = getFrameNumber(mMousePressX);
                                     const int dx = mFramePosMoveX - posUnderCursor;
                                     int shift = 0;
-                                    auto collides = [&sel, tgtLayer, dx](int s) {
-                                        for (int p : sel) {
-                                            int np = p + dx + s;
-                                            if (np < 1 || tgtLayer->keyExists(np)) { return true; }
-                                        }
-                                        return false;
-                                    };
-                                    while (collides(shift) && shift < mFrameLength) { shift++; }
+                                    if (!sel.isEmpty())
+                                    {
+                                        // 冲突只可能发生在目标层已有键的跨度内：
+                                        // shift 超过 maxOcc - minQ + 1 后所有落点必空，
+                                        // 扫到 mFrameLength 是白白放大每次 mousemove 的开销
+                                        const int minQ = sel.first() + dx; // sel 按位置升序
+                                        const int maxOcc = tgtLayer->getMaxKeyFramePosition();
+                                        const int shiftCap = qMax(0, maxOcc - minQ + 1);
+                                        auto collides = [&sel, tgtLayer, dx](int s) {
+                                            for (int p : sel) {
+                                                int np = p + dx + s;
+                                                if (np < 1 || tgtLayer->keyExists(np)) { return true; }
+                                            }
+                                            return false;
+                                        };
+                                        while (collides(shift) && shift < shiftCap) { shift++; }
+                                    }
                                     mDropShiftFrames = shift;
                                 }
                             }
@@ -3185,6 +3216,27 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                     else
                     {
                         setCursor(Qt::ArrowCursor);
+                    }
+
+                    // 相机图标悬停揭示画在内容缓存里（paintTrack 读 mMousePos），
+                    // 进出热区翻转时必须全量重画缓存，否则揭示不出现/残留
+                    bool revealNow = false;
+                    const int hoverLayer = getLayerNumber(event->pos().y());
+                    if (hoverLayer >= 0 && hoverLayer < mEditor->object()->getLayerCount())
+                    {
+                        Layer* hl = mEditor->object()->getLayer(hoverLayer);
+                        if (hl != nullptr)
+                        {
+                            revealNow = cameraIconHoverRect(hl, mOffsetX,
+                                                            getLayerY(hoverLayer),
+                                                            rowHeightOf(hoverLayer))
+                                            .contains(event->pos());
+                        }
+                    }
+                    if (revealNow != mHoverRevealActive)
+                    {
+                        mHoverRevealActive = revealNow;
+                        updateContent();
                     }
                 }
                 update();
@@ -3979,6 +4031,7 @@ void TimeLineCells::vScrollChange(int x)
 {
     mLayerOffset = x;
     mScrollingVertically = true;
+    mHoverRevealActive = false; // 行随滚动移位，悬停揭示等下次 mousemove 重判
     updateContent();
 }
 
@@ -4027,5 +4080,10 @@ void TimeLineCells::onDidLeaveWidget()
     // Reset last known frame pos to avoid wrong UI states when leaving the widget
     mFramePosMoveX = 0;
     mMousePos = QPoint(-1000, -1000); // 悬停揭示（相机图标下的关键帧）随之复位
+    if (mHoverRevealActive)
+    {
+        mHoverRevealActive = false;
+        updateContent(); // 揭示画在缓存里，离开时必须重画消除残留
+    }
     update();
 }
