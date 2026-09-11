@@ -772,13 +772,13 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
 
     paintFrames(painter, col, layer, y, height, selected, frameSize);
 
-    // 相机轨道开头图标（左上角小徽标）：关键帧圆点与连线在行中心一线，
-    // 图标贴顶纵向错开（0.24*行高 ≥ 圆点半径+2 在 26..110 全行高区间成立），
-    // 任意帧宽下都不与关键帧重叠
+    // 相机轨道开头图标：与折叠组轨道同款（行高55%居中）。被图标盖住的
+    // 关键帧圆点默认藏于其下；鼠标悬停到图标区时以图标矩形为裁剪区把
+    // 圆点/连线重画到图标之上，移开即恢复隐藏
     if (layer->type() == Layer::CAMERA)
     {
         const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
-        const int iconH = qBound(8, qRound(height * 0.26), 13);
+        const int iconH = qMax(12, qRound(height * 0.55));
         const QString iconKey = QStringLiteral("camera-track:%1@%2").arg(iconH).arg(dpr);
         const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
             QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/camera-track.svg"))
@@ -786,7 +786,32 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
             scaled.setDevicePixelRatio(dpr);
             return scaled;
         });
-        painter.drawPixmap(QPoint(x + 4, y + 1), icon);
+        const int iconY = y + (height - iconH) / 2;
+        painter.drawPixmap(QPoint(x + 6, iconY), icon);
+
+        const QRectF iconRect(x + 6.0, iconY, icon.width(), static_cast<qreal>(iconH));
+        if (iconRect.adjusted(-6.0, -4.0, 10.0, 4.0).contains(mMousePos))
+        {
+            painter.save();
+            painter.setClipRect(iconRect.adjusted(-3.0, -3.0, 3.0, 3.0));
+            paintCameraKeys(painter, layer, y, height);
+            painter.restore();
+        }
+    }
+
+    // 视频层轨道开头图标:与折叠组/相机同款写法(行高55%居中+DPR缓存),灰色
+    if (layer->type() == Layer::MOVIE)
+    {
+        const qreal dpr = painter.device() ? painter.device()->devicePixelRatioF() : 1.0;
+        const int iconH = qMax(12, qRound(height * 0.55));
+        const QString iconKey = QStringLiteral("video-track:%1@%2").arg(iconH).arg(dpr);
+        const QPixmap icon = cachedRowIcon(iconKey, [iconH, dpr]() {
+            QPixmap scaled = QPixmap(QStringLiteral(":/icons/themes/playful/timeline/video-track.svg"))
+                                 .scaledToHeight(qMax(1, qRound(iconH * dpr)), Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
+            return scaled;
+        });
+        painter.drawPixmap(QPoint(x + 6, y + (height - iconH) / 2), icon);
     }
 
     painter.restore();
@@ -971,54 +996,7 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
 
     if (layer->type() == Layer::CAMERA)
     {
-        // Camera keys are interpolated values, not exposures: friction-style
-        // solid accent dots centered on the frame cell, joined by a thin line.
-        // Carried keys hide at their original spot (the ghost in
-        // paintSelectedFrames follows the drag), and line segments touching a
-        // carried key drop out so no stub points at a vacated position.
-        QList<int> keyPos;
-        keyPos.reserve(layer->keyFrameCount());
-        layer->foreachKeyFrame([&](KeyFrame* key) { keyPos.append(key->pos()); });
-        std::sort(keyPos.begin(), keyPos.end()); // mKeyFrames 迭代为降序
-
-        const int viewW = width();
-        const qreal centerY = recTop + recHeight / 2.0;
-        const qreal dotRadius = cameraKeyDotDiameter(recHeight) / 2.0;
-        auto keyCenterX = [&](int framePos)
-        {
-            return getFrameX(framePos) - mFrameSize / 2.0;
-        };
-        auto carried = [&](int framePos)
-        {
-            return mMovingFrames && selectedFrames.contains(framePos);
-        };
-
-        painter.save();
-        painter.setRenderHint(QPainter::Antialiasing, true);
-
-        painter.setPen(QPen(Theme::Accent, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        for (int i = 0; i + 1 < keyPos.count(); ++i)
-        {
-            if (carried(keyPos[i]) || carried(keyPos[i + 1])) { continue; }
-            const qreal x1 = keyCenterX(keyPos[i]);
-            const qreal x2 = keyCenterX(keyPos[i + 1]);
-            if (x2 < 0.0) { continue; }         // 整段在视口左
-            if (x1 >= viewW) { break; }         // 升序：之后全在视口右
-            painter.drawLine(QPointF(x1, centerY), QPointF(x2, centerY));
-        }
-
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(Theme::Accent);
-        for (int framePos : keyPos)
-        {
-            if (carried(framePos)) { continue; }
-            const qreal cx = keyCenterX(framePos);
-            if (cx + dotRadius < 0.0 || cx - dotRadius >= viewW) { continue; } // 视口外
-            painter.drawEllipse(QPointF(cx, centerY), dotRadius, dotRadius);
-        }
-
-        painter.restore();
+        paintCameraKeys(painter, layer, y, height);
         return;
     }
 
@@ -1170,6 +1148,63 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
         KeyFrame* trimKey = layer->getKeyFrameAt(mTrimKeyPos);
         if (trimKey != nullptr) { paintOneBlock(trimKey); }
     }
+}
+
+// 相机关键帧圆点+连线：paintFrames 常规绘制与图标悬停揭示共用同一份几何，
+// 两处画出的关键帧完全重合，不会出现错位的双重边缘
+void TimeLineCells::paintCameraKeys(QPainter& painter, const Layer* layer, int y, int height) const
+{
+    // Camera keys are interpolated values, not exposures: friction-style
+    // solid accent dots centered on the frame cell, joined by a thin line.
+    // Carried keys hide at their original spot (the ghost in
+    // paintSelectedFrames follows the drag), and line segments touching a
+    // carried key drop out so no stub points at a vacated position.
+    const QList<int> selectedFrames = layer->getSelectedFramesByPos();
+    QList<int> keyPos;
+    keyPos.reserve(layer->keyFrameCount());
+    layer->foreachKeyFrame([&](KeyFrame* key) { keyPos.append(key->pos()); });
+    std::sort(keyPos.begin(), keyPos.end()); // mKeyFrames 迭代为降序
+
+    const int recTop = y + 1;
+    const int recHeight = height - 4;
+    const int viewW = width();
+    const qreal centerY = recTop + recHeight / 2.0;
+    const qreal dotRadius = cameraKeyDotDiameter(recHeight) / 2.0;
+    auto keyCenterX = [&](int framePos)
+    {
+        return getFrameX(framePos) - mFrameSize / 2.0;
+    };
+    auto carried = [&](int framePos)
+    {
+        return mMovingFrames && selectedFrames.contains(framePos);
+    };
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    painter.setPen(QPen(Theme::Accent, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    for (int i = 0; i + 1 < keyPos.count(); ++i)
+    {
+        if (carried(keyPos[i]) || carried(keyPos[i + 1])) { continue; }
+        const qreal x1 = keyCenterX(keyPos[i]);
+        const qreal x2 = keyCenterX(keyPos[i + 1]);
+        if (x2 < 0.0) { continue; }         // 整段在视口左
+        if (x1 >= viewW) { break; }         // 升序：之后全在视口右
+        painter.drawLine(QPointF(x1, centerY), QPointF(x2, centerY));
+    }
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(Theme::Accent);
+    for (int framePos : keyPos)
+    {
+        if (carried(framePos)) { continue; }
+        const qreal cx = keyCenterX(framePos);
+        if (cx + dotRadius < 0.0 || cx - dotRadius >= viewW) { continue; } // 视口外
+        painter.drawEllipse(QPointF(cx, centerY), dotRadius, dotRadius);
+    }
+
+    painter.restore();
 }
 
 void TimeLineCells::paintCurrentFrameBorder(QPainter &painter, int recLeft, int recTop, int recWidth, int recHeight) const
@@ -2555,6 +2590,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 {
     mMouseMoveX = event->pos().x();
+    mMousePos = event->pos();
 
     if (mPlusCreating && mType == TIMELINE_CELL_TYPE::Tracks)
     {
@@ -3549,5 +3585,6 @@ void TimeLineCells::onDidLeaveWidget()
 {
     // Reset last known frame pos to avoid wrong UI states when leaving the widget
     mFramePosMoveX = 0;
+    mMousePos = QPoint(-1000, -1000); // 悬停揭示（相机图标下的关键帧）随之复位
     update();
 }
