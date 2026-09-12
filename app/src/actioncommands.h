@@ -18,6 +18,7 @@ GNU General Public License for more details.
 #define COMMANDCENTER_H
 
 #include <QObject>
+#include <QImage>
 #include "pencilerror.h"
 #include "filetype.h"
 
@@ -86,7 +87,9 @@ public:
     Status addNewSoundLayer();
     Status deleteCurrentLayer();
     Status mergeLayerDown();
-    /** 镂空检测：一键检测并填充当前帧线稿的封闭镂空/细缝（各像素取最近不透明像素的颜色） */
+    /** 镂空检测：一键检测并填充当前帧线稿的封闭镂空/细缝。
+     *  连续点击循环切换填充方向：自动最近邻 → 方向一（左/上侧）→ 方向二（右/下侧），
+     *  每次都先还原到循环前快照再重填；中途画过画/撤销过/换帧换层则自动开新一轮。 */
     Status fillHolesOnCurrentFrame();
     void changeKeyframeLineColor();
     void changeallKeyframeLineColor();
@@ -104,6 +107,10 @@ public:
     void openTemporaryDirectory();
     void about();
 
+signals:
+    /** 镂空检测循环状态变化（含下一击行为说明），用于按钮 tooltip 实时反馈 */
+    void holeFillStatusChanged(const QString& tip);
+
 private:
     void showSoundClipWarningIfNeeded();
 
@@ -119,6 +126,14 @@ private:
     QWidget* mParent = nullptr;
 
     bool mSuppressSoundWarning = false;
+
+    // 镂空检测循环：同层同帧且画面仍是上轮结果 → 连点换方向重填
+    bool mHoleCycleActive = false;
+    int mHoleCycleMode = 0;
+    int mHoleCycleLayerId = -1;
+    int mHoleCycleFramePos = -1;
+    QImage mHoleCycleBefore;      // 循环前快照（每轮"改前"状态）
+    QImage mHoleCycleLastResult;  // 上轮填充结果（点击时比对判定循环是否延续）
 };
 
 #endif // COMMANDCENTER_H

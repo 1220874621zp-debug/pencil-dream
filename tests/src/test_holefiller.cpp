@@ -167,6 +167,68 @@ TEST_CASE("holefiller open gap wider than the closing kernel stays open")
     REQUIRE(qAlpha(img.pixel(49, 32)) == 0);
 }
 
+TEST_CASE("holefiller directional modes take whole-side color on vertical crack")
+{
+    QImage img = makeImage(64, 64);
+    fillRect(img, 20, 0, 30, 63, RED);
+    fillRect(img, 36, 0, 46, 63, BLUE);          // 5px 竖缝贯通上下
+
+    QImage imgA = img;
+    REQUIRE(HoleFiller::fillHoles(imgA, HoleFiller::SideA) > 0);
+    // 方向一 = 竖缝左侧：整条缝取红
+    for (int y = 10; y <= 54; ++y)
+        for (int x = 31; x <= 35; ++x)
+            REQUIRE(imgA.pixel(x, y) == RED);
+
+    QImage imgB = img;
+    REQUIRE(HoleFiller::fillHoles(imgB, HoleFiller::SideB) > 0);
+    // 方向二 = 竖缝右侧：整条缝取蓝
+    for (int y = 10; y <= 54; ++y)
+        for (int x = 31; x <= 35; ++x)
+            REQUIRE(imgB.pixel(x, y) == BLUE);
+
+    // 自动模式保持中线分界（左红右蓝）不受方向模式影响
+    QImage imgAuto = img;
+    REQUIRE(HoleFiller::fillHoles(imgAuto, HoleFiller::NearestFill) > 0);
+    REQUIRE(imgAuto.pixel(31, 32) == RED);
+    REQUIRE(imgAuto.pixel(35, 32) == BLUE);
+}
+
+TEST_CASE("holefiller directional modes use up and down sides for horizontal cracks")
+{
+    QImage img = makeImage(64, 64);
+    const QRgb GREEN = qRgb(20, 180, 90);
+    const QRgb ORANGE = qRgb(240, 140, 30);
+    fillRect(img, 0, 8, 63, 20, GREEN);
+    fillRect(img, 0, 28, 63, 40, ORANGE);        // 7px 横缝贯通左右
+
+    QImage imgA = img;
+    REQUIRE(HoleFiller::fillHoles(imgA, HoleFiller::SideA) > 0);
+    // 方向一 = 横缝上侧：整条缝取绿
+    for (int y = 22; y <= 26; ++y)
+        for (int x = 8; x <= 55; ++x)
+            REQUIRE(imgA.pixel(x, y) == GREEN);
+
+    QImage imgB = img;
+    REQUIRE(HoleFiller::fillHoles(imgB, HoleFiller::SideB) > 0);
+    // 方向二 = 横缝下侧：整条缝取橙
+    for (int y = 22; y <= 26; ++y)
+        for (int x = 8; x <= 55; ++x)
+            REQUIRE(imgB.pixel(x, y) == ORANGE);
+}
+
+TEST_CASE("holefiller directional fill falls back on directionless components")
+{
+    QImage img = makeImage(32, 32);
+    fillRect(img, 4, 4, 27, 27, RED);
+    fillRect(img, 15, 15, 15, 15, 0);            // 单像素封闭镂空：无方向可言
+
+    const int filled = HoleFiller::fillHoles(img, HoleFiller::SideA);
+    REQUIRE(filled > 0);
+    // 回退最近邻颜色（红），方向模式不崩不漏
+    REQUIRE(img.pixel(15, 15) == RED);
+}
+
 TEST_CASE("holefiller degenerate inputs return zero")
 {
     QImage opaque = makeImage(32, 32);

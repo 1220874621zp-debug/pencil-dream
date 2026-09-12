@@ -20,7 +20,9 @@ GNU General Public License for more details.
 #include <QRgb>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace
@@ -119,9 +121,51 @@ void boxMin(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst,
     }
 }
 
+// 沿单位方向 (dx,dy) 从 (x,y) 像素中心步进（Amanatides-Woo 体素遍历），
+// 返回第一碰到的种子像素索引；走出画面仍未命中返回 -1（扫空，调用方回退）
+int marchSeed(const int x, const int y, const double dx, const double dy,
+              const std::vector<uint8_t>& seedMask, const int w, const int h)
+{
+    const double px = x + 0.5;
+    const double py = y + 0.5;
+    const int stepX = dx > 0.0 ? 1 : (dx < 0.0 ? -1 : 0);
+    const int stepY = dy > 0.0 ? 1 : (dy < 0.0 ? -1 : 0);
+    const double inf = std::numeric_limits<double>::max();
+    // 除以带符号的 d：分子与 d 同号，保证步进时间为正
+    double tMaxX = stepX != 0
+        ? ((stepX > 0 ? x + 1.0 : static_cast<double>(x)) - px) / dx : inf;
+    double tMaxY = stepY != 0
+        ? ((stepY > 0 ? y + 1.0 : static_cast<double>(y)) - py) / dy : inf;
+    const double tDX = stepX != 0 ? 1.0 / std::abs(dx) : inf;
+    const double tDY = stepY != 0 ? 1.0 / std::abs(dy) : inf;
+
+    int X = x;
+    int Y = y;
+    while (true)
+    {
+        if (tMaxX < tMaxY)
+        {
+            X += stepX;
+            if (X < 0 || X >= w)
+                return -1;
+            tMaxX += tDX;
+        }
+        else
+        {
+            Y += stepY;
+            if (Y < 0 || Y >= h)
+                return -1;
+            tMaxY += tDY;
+        }
+        const size_t idx = static_cast<size_t>(Y) * w + X;
+        if (seedMask[idx] != 0)
+            return static_cast<int>(idx);
+    }
+}
+
 } // namespace
 
-int HoleFiller::fillHoles(QImage& img)
+int HoleFiller::fillHoles(QImage& img, const int mode)
 {
     if (img.format() != QImage::Format_ARGB32_Premultiplied || img.isNull())
         return 0;
@@ -247,6 +291,7 @@ int HoleFiller::fillHoles(QImage& img)
 
     // ---- 4. 多源 BFS：每个待填像素取最近有效像素的颜色（方向自适应）----
     std::vector<uint32_t> color(n, 0); // 直通 RGB，随波前继承
+    std::vector<uint8_t> seedMask(n, 0); // 有效参考色像素（方向模式的射线命中判定用）
     std::vector<int32_t> queue;
     for (int y = 0; y < h; ++y)
     {
@@ -257,6 +302,7 @@ int HoleFiller::fillHoles(QImage& img)
             if (fillMask[i] != 0 || alpha[i] <= ALPHA_TRANSPARENT_MAX)
                 continue;
             dist[i] = 0;
+            seedMask[i] = 1;
             color[i] = unpremultiplyRgb(alpha[i], line[x]);
             bool nextToMask = false;
             for (int dy = -1; dy <= 1 && !nextToMask; ++dy)
@@ -303,6 +349,116 @@ int HoleFiller::fillHoles(QImage& img)
                     color[ni] = color[cur];
                     queue.push_back(static_cast<int32_t>(ni));
                 }
+            }
+        }
+    }
+
+    // ---- 4b. 方向模式：每个掩码连通域求主轴，沿垂直主轴的指定一侧整体取色 ----
+    if (mode == SideA || mode == SideB)
+    {
+        std::vector<int32_t> mcomp(n, 0);
+        std::vector<int32_t> cstack;
+        std::vector<std::vector<int32_t>> compPixels;
+        for (int sy = 0; sy < h; ++sy)
+        {
+            for (int sx = 0; sx < w; ++sx)
+            {
+                const size_t s = static_cast<size_t>(sy) * w + sx;
+                if (fillMask[s] == 0 || mcomp[s] != 0)
+                    continue;
+                const int32_t id = static_cast<int32_t>(compPixels.size()) + 1;
+                compPixels.emplace_back();
+                std::vector<int32_t>& pixels = compPixels.back();
+                mcomp[s] = id;
+                cstack.clear();
+                cstack.push_back(static_cast<int32_t>(s));
+                while (!cstack.empty())
+                {
+                    const int32_t cur = cstack.back();
+                    cstack.pop_back();
+                    pixels.push_back(cur);
+                    const int cy = cur / w;
+                    const int cx = cur % w;
+                    for (int dy = -1; dy <= 1; ++dy)
+                    {
+                        const int ny = cy + dy;
+                        if (ny < 0 || ny >= h)
+                            continue;
+                        for (int dx = -1; dx <= 1; ++dx)
+                        {
+                            const int nx = cx + dx;
+                            if (nx < 0 || nx >= w)
+                                continue;
+                            const size_t ni = static_cast<size_t>(ny) * w + nx;
+                            if (fillMask[ni] != 0 && mcomp[ni] == 0)
+                            {
+                                mcomp[ni] = id;
+                                cstack.push_back(static_cast<int32_t>(ni));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const std::vector<int32_t>& pixels : compPixels)
+        {
+            // 太小的域没有方向可言（孤立点/两点），整域保留 BFS 最近色回退
+            if (pixels.size() < 3)
+                continue;
+
+            // 主轴 = 坐标协方差矩阵的最大特征向量（PCA）
+            double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0, sumYY = 0.0;
+            for (const int32_t idx : pixels)
+            {
+                const double fx = idx % w;
+                const double fy = idx / w; // 整除即行号
+                sumX += fx; sumY += fy;
+                sumXX += fx * fx; sumXY += fx * fy; sumYY += fy * fy;
+            }
+            const double cnt = static_cast<double>(pixels.size());
+            const double mx = sumX / cnt, my = sumY / cnt;
+            const double cxx = sumXX / cnt - mx * mx;
+            const double cyy = sumYY / cnt - my * my;
+            const double cxy = sumXY / cnt - mx * my;
+
+            // 主轴 = 协方差最大特征向量；协方差近似对角（含 cxy 浮点残差）时
+            // (cxy, λ-cxx) 数值退化，回退到方差大的坐标轴方向
+            const double lambda = (cxx + cyy + std::sqrt((cxx - cyy) * (cxx - cyy) + 4.0 * cxy * cxy)) / 2.0;
+            double ux = cxy;
+            double uy = lambda - cxx;
+            const double un = std::hypot(ux, uy);
+            if (un < 1e-6 * std::max(std::max(cxx, cyy), 1.0))
+            {
+                ux = cxx >= cyy ? 1.0 : 0.0;
+                uy = cxx >= cyy ? 0.0 : 1.0;
+            }
+            else
+            {
+                ux /= un;
+                uy /= un;
+            }
+
+            // 垂直主轴方向规范成"左/上"：按主导分量定符号——
+            // 水平分量主导取 px<0（竖缝左右分），垂直分量主导取 py<0（横缝上下分）
+            double px = -uy, py = ux;
+            const bool flip = std::abs(px) > std::abs(py) ? px > 0.0 : py > 0.0;
+            if (flip)
+            {
+                px = -px;
+                py = -py;
+            }
+            if (mode == SideB)
+            {
+                px = -px;
+                py = -py;
+            }
+
+            for (const int32_t idx : pixels)
+            {
+                const int hit = marchSeed(idx % w, idx / w, px, py, seedMask, w, h);
+                if (hit >= 0)
+                    color[idx] = color[hit]; // 扫空则保留 BFS 最近色（回退）
             }
         }
     }
