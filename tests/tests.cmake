@@ -24,6 +24,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_mlswarp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_deformtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_bitmapbucket.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_clearframe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_propertyinfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_qminiz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_toolsettings.cpp

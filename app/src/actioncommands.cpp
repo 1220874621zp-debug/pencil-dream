@@ -1206,7 +1206,12 @@ Status ActionCommands::clearCurrentLayerCanvas()
     mEditor->undoRedo()->pushUndoCommand(
         new BitmapReplaceCommand(&undoSnapshot, &redoSnapshot, layer->id(),
                                  tr("清除帧", "Undo step text"), mEditor));
-    mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
+    // 数据失效：传实际关键帧 pos（Layer::setModified 按帧号精确找关键帧，
+    // auto 块中部传 currentFrame 找不到 → dirty 不标记）
+    mEditor->setModified(mEditor->layers()->currentLayerIndex(), bitmap->pos());
+    // 显示缓存失效：按画布所见帧作废并重绘（endStroke 同款；auto 块中部 pos≠currentFrame，
+    // 不作废显示帧缓存 → 画布贴旧像素 → "清不掉/内容错位"）
+    mEditor->getScribbleArea()->onFrameModified(mEditor->currentFrame());
     return Status::OK;
 }
 
