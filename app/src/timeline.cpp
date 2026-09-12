@@ -123,11 +123,10 @@ void TimeLine::initUI()
     // TVP satellite tools dropdown: right beside the lock toggle
     QToolButton* toolsButton = new QToolButton(this);
     toolsButton->setText(tr("工具"));
-    toolsButton->setToolTip(tr("口型同步 / 调色板提取 / 视频抽帧"));
+    toolsButton->setToolTip(tr("口型同步 / 视频抽帧"));
     toolsButton->setMinimumSize(QSize(38, 34));
     QMenu* toolsMenu = new QMenu(this);
     QAction* lipsyncAct = toolsMenu->addAction(tr("口型同步切换器"));
-    QAction* paletteAct = toolsMenu->addAction(tr("调色板提取"));
     QAction* videoAct = toolsMenu->addAction(tr("视频抽帧中割"));
     toolsButton->setMenu(toolsMenu);
     toolsButton->setPopupMode(QToolButton::InstantPopup);
@@ -330,7 +329,6 @@ void TimeLine::initUI()
     connect(loopCloneButton, &QToolButton::clicked, this, &TimeLine::cloneLoopFrames);
     connect(copyClearButton, &QToolButton::clicked, this, &TimeLine::duplicateLayerCleared);
     connect(lipsyncAct, &QAction::triggered, this, &TimeLine::showLipsyncDialog);
-    connect(paletteAct, &QAction::triggered, this, &TimeLine::showPaletteExtractDialog);
     connect(videoAct, &QAction::triggered, this, &TimeLine::showVideoExtractDialog);
 
     // TVP global toggles: unanimous state flips, mixed state resolves to "all on"
@@ -412,14 +410,6 @@ void TimeLine::showLipsyncDialog()
     mLipsyncDialog->show();
     mLipsyncDialog->raise();
     mLipsyncDialog->activateWindow();
-}
-
-void TimeLine::showPaletteExtractDialog()
-{
-    if (mPaletteDialog == nullptr) { mPaletteDialog = new PaletteExtractDialog(editor(), this); }
-    mPaletteDialog->show();
-    mPaletteDialog->raise();
-    mPaletteDialog->activateWindow();
 }
 
 void TimeLine::showVideoExtractDialog()

@@ -51,26 +51,6 @@ private:
     QWidget* mPhonemeGrid = nullptr;
 };
 
-/** 调色板提取：从图片量化主色 → 生成色块图层 */
-class PaletteExtractDialog : public QDialog
-{
-    Q_OBJECT
-public:
-    explicit PaletteExtractDialog(Editor* editor, QWidget* parent = nullptr);
-
-    /** TVP式量化取主色（设定卡片面板共用）：5-bit分桶→按数量取前N桶→桶内最常见原色 */
-    static QList<QRgb> extractColors(const QImage& image, int wanted);
-
-private slots:
-    void pickImageAndExtract();
-
-private:
-    Editor* mEditor = nullptr;
-    QSpinBox* mCountSpin = nullptr;
-    QLabel* mPreviewLabel = nullptr;
-    QList<QRgb> mLastColors;
-};
-
 /** 视频抽帧中割：ffmpeg 从视频抽帧预览并导入为时间轴图层 */
 class VideoExtractDialog : public QDialog
 {
