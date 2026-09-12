@@ -1377,25 +1377,19 @@ void Object::paintImage(QPainter& painter,int frameNumber,
 
     // Clipping-mask compositing: each layer is rasterized through the caller's
     // combined transform into a device-space buffer, masked by the alpha of
-    // the accumulated layers below (CanvasPainter semantics), then blitted.
+    // the NEAREST non-clip bitmap layer below (friction preserve-alpha /
+    // CanvasPainter semantics), then blitted. Clipped layers never feed the
+    // accumulator; a non-clip bitmap layer replaces it (= new clip base).
     const QTransform deviceTransform = painter.combinedTransform();
     const QRect deviceRect(0, 0, painter.device()->width(), painter.device()->height());
     QImage accum(deviceRect.size(), QImage::Format_ARGB32_Premultiplied);
     accum.fill(Qt::transparent);
-    QImage groupMask;
-    bool groupValid = false;
 
     for (Layer* layer : mLayers)
     {
         if (!isLayerRenderable(layer) || layer->type() != Layer::BITMAP)
         {
             continue;
-        }
-
-        // a non-clipped layer terminates the clipped run above it
-        if (!layer->clipMask())
-        {
-            groupValid = false;
         }
 
         LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
@@ -1419,14 +1413,14 @@ void Object::paintImage(QPainter& painter,int frameNumber,
 
         if (layer->clipMask())
         {
-            if (!groupValid)
-            {
-                groupMask = accum.copy();
-                groupValid = true;
-            }
             QPainter maskPainter(&layerBuffer);
             maskPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-            maskPainter.drawImage(QPoint(0, 0), groupMask);
+            maskPainter.drawImage(QPoint(0, 0), accum);
+        }
+        else
+        {
+            // 非剪贴位图层=新底形,整体替换(空层在上面已 continue 跳过)
+            accum.fill(Qt::transparent);
         }
 
         painter.save();
@@ -1435,9 +1429,12 @@ void Object::paintImage(QPainter& painter,int frameNumber,
         painter.drawImage(painter.viewport(), layerBuffer, deviceRect);
         painter.restore();
 
-        QPainter accumPainter(&accum);
-        accumPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        accumPainter.drawImage(QPoint(0, 0), layerBuffer);
+        if (!layer->clipMask())
+        {
+            QPainter accumPainter(&accum);
+            accumPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            accumPainter.drawImage(QPoint(0, 0), layerBuffer);
+        }
     }
 }
 

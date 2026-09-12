@@ -167,7 +167,7 @@ private:
     /** 穿透模式：当前位图层全部关键帧幽灵（叠加显示，激活时取代洋葱皮） */
     void paintXrayFrames(QPainter& painter, const QRect& blitRect, Layer* layer);
 
-    void paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
+    bool paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask = nullptr);
 
     /** 智能填色层：着色缓存 + 笔画（含当前层实时笔画缓冲） */
     void paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer);
@@ -219,14 +219,14 @@ private:
 
     // --- clipping-mask compositing state ----------------------------------
     // Only active when at least one bitmap layer has clipMask enabled; the
-    // pre/current/post pixmap split above spans layer ranges, so the alpha
-    // of "everything below" is tracked in a dedicated image.
+    // pre/current/post pixmap split above spans layer ranges, so the clip
+    // base is tracked in a dedicated image (friction preserve-alpha
+    // semantics: the NEAREST non-clip bitmap layer below, replaced each
+    // time such a layer renders; clipped layers never write into it).
     bool mAnyClipMask = false;             // fast-path switch, from setPaintSettings
-    QImage mClipAccum;                     // accumulated content of layers below (device space)
+    QImage mClipAccum;                     // clip base content (device space)
     QImage mClipAccumAfterPre;             // snapshot taken when the pre phase finishes
     bool mClipAfterPreValid = false;
-    QImage mClipGroupMask;                 // base alpha shared by a run of clipped layers
-    bool mClipGroupValid = false;
 
     // There's a considerable amount of overhead in simply allocating a QPointF on the fly.
     // Since we just need to draw it at 0,0, we might as well make a const value for that purpose

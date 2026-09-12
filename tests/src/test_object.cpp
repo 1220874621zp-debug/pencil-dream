@@ -23,12 +23,14 @@ GNU General Public License for more details.
 #include <QTemporaryDir>
 #include <QPainter>
 #include <QImage>
+#include <QPixmap>
 #include "filemanager.h"
 #include "layercamera.h"
 #include "object.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
 #include "layersound.h"
+#include "canvaspainter.h"
 
 
 TEST_CASE("Object::addXXXLayer()")
@@ -296,4 +298,117 @@ TEST_CASE("Object::paintImage renders loop-mode wrapped frames", "[Object]")
         REQUIRE(paintAt(5).red() > 200);
         REQUIRE(paintAt(6).blue() > 200);
     }
+}
+
+TEST_CASE("Object::paintImage clip mask uses nearest non-clip base (friction semantics)", "[Object]")
+{
+    // 栈(底→顶): farBelow 左半大块 | base 右半块 | top 全画布红(剪贴)
+    // friction 保持透明度语义:蒙版=正下方最近非剪贴位图层(base),
+    // 更下方 farBelow 的 alpha 不并入 → 红只出现在右半
+    Object obj;
+    auto addShapeLayer = [&obj](const QColor& c, int x0, int x1)
+    {
+        LayerBitmap* l = obj.addNewBitmapLayer();
+        delete l->takeKeyFrame(1);
+        QImage img(64, 64, QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter p(&img);
+        p.fillRect(QRect(x0, 0, x1 - x0, 64), c);
+        p.end();
+        l->addKeyFrame(1, new BitmapImage(QPoint(0, 0), img));
+        return l;
+    };
+
+    addShapeLayer(QColor(0, 0, 255, 255), 0, 64);   // farBelow: 蓝全幅
+    addShapeLayer(QColor(0, 255, 0, 255), 32, 64);  // base: 绿右半
+    LayerBitmap* top = obj.addNewBitmapLayer();
+    delete top->takeKeyFrame(1);
+    QImage red(64, 64, QImage::Format_ARGB32_Premultiplied);
+    red.fill(QColor(255, 0, 0, 255));
+    top->addKeyFrame(1, new BitmapImage(QPoint(0, 0), red));
+    top->setClipMask(true);
+
+    QImage out(64, 64, QImage::Format_ARGB32_Premultiplied);
+    out.fill(Qt::transparent);
+    QPainter painter(&out);
+    obj.paintImage(painter, 1, false, true);
+    painter.end();
+
+    SECTION("clipped layer limited to adjacent base, not the union below")
+    {
+        // 左半: base 外(只有 farBelow)→ 剪贴层不可见,蓝显示
+        const QColor left = out.pixelColor(10, 32);
+        REQUIRE(left.blue() > 200);
+        REQUIRE(left.red() < 60);
+        // 右半: base 内 → 红(盖住绿)
+        const QColor right = out.pixelColor(50, 32);
+        REQUIRE(right.red() > 200);
+        REQUIRE(right.green() < 60);
+    }
+
+    SECTION("run of clipped layers shares the base; no base below hides all")
+    {
+        // 再叠一层剪贴蓝,同样只应出现在右半(共享 base)
+        LayerBitmap* top2 = obj.addNewBitmapLayer();
+        delete top2->takeKeyFrame(1);
+        QImage blue(64, 64, QImage::Format_ARGB32_Premultiplied);
+        blue.fill(QColor(0, 0, 255, 255));
+        top2->addKeyFrame(1, new BitmapImage(QPoint(0, 0), blue));
+        top2->setClipMask(true);
+
+        QImage out2(64, 64, QImage::Format_ARGB32_Premultiplied);
+        out2.fill(Qt::transparent);
+        QPainter p2(&out2);
+        obj.paintImage(p2, 1, false, true);
+        p2.end();
+
+        const QColor left = out2.pixelColor(10, 32);
+        REQUIRE(left.red() < 60);   // 左半无剪贴红
+        const QColor right = out2.pixelColor(50, 32);
+        REQUIRE(right.blue() > 200); // 顶层蓝盖红
+    }
+}
+
+TEST_CASE("CanvasPainter applies layer opacity once (clip base edge coverage)", "[Object]")
+{
+    // o² 双重应用回归:底形 50% + 剪贴不透明红,圆心合成 alpha
+    // 单次语义 SrcOver(0.5 over 0.5)=0.75(≈192);o² 旧bug≈112
+    Object obj;
+    LayerBitmap* base = obj.addNewBitmapLayer();
+    delete base->takeKeyFrame(1);
+    QImage baseImg(64, 64, QImage::Format_ARGB32_Premultiplied);
+    baseImg.fill(Qt::transparent);
+    {
+        QPainter p(&baseImg);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 255));
+        p.drawEllipse(QRect(12, 12, 40, 40));
+    }
+    base->addKeyFrame(1, new BitmapImage(QPoint(0, 0), baseImg));
+    base->setOpacity(0.5);
+
+    LayerBitmap* top = obj.addNewBitmapLayer();
+    delete top->takeKeyFrame(1);
+    QImage red(64, 64, QImage::Format_ARGB32_Premultiplied);
+    red.fill(QColor(255, 0, 0, 255));
+    top->addKeyFrame(1, new BitmapImage(QPoint(0, 0), red));
+    top->setClipMask(true);
+
+    CanvasPainterOptions opts;
+    opts.eLayerVisibility = LayerVisibility::ALL;
+
+    QPixmap canvas(64, 64);
+    canvas.fill(Qt::transparent);
+    {
+        CanvasPainter cp(canvas);
+        cp.setOptions(opts);
+        cp.setViewTransform(QTransform(), QTransform());
+        cp.setPaintSettings(&obj, 1, 1, nullptr);
+        cp.paint(canvas.rect());
+    }
+    const QColor c = canvas.toImage().pixelColor(32, 32);
+    REQUIRE(c.alpha() >= 185);
+    REQUIRE(c.alpha() <= 200);
+    REQUIRE(c.red() > 100);
 }

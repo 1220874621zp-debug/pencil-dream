@@ -111,7 +111,6 @@ void CanvasPainter::paintCached(const QRect& blitRect)
         {
             ensureClipAccum();
             clearClipAccum(blitRect);
-            mClipGroupValid = false;
         }
         QPainter preLayerPainter;
         initializePainter(preLayerPainter, mPreLayersPixmap, blitRect);
@@ -134,7 +133,6 @@ void CanvasPainter::paintCached(const QRect& blitRect)
             // restore the after-pre state; QImage assignment is copy-on-write
             mClipAccum = mClipAccumAfterPre;
         }
-        mClipGroupValid = false;
     }
 
     QPainter mainPainter;
@@ -244,7 +242,6 @@ void CanvasPainter::paint(const QRect& blitRect)
     {
         ensureClipAccum();
         clearClipAccum(blitRect);
-        mClipGroupValid = false;
     }
 
     initializePainter(mainPainter, mCanvas, blitRect);
@@ -467,7 +464,7 @@ void CanvasPainter::paintXrayFrames(QPainter& painter, const QRect& blitRect, La
     painter.setOpacity(1.0);
 }
 
-void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask)
+bool CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer, QImage* clipMask)
 {
     LayerBitmap* bitmapLayer = static_cast<LayerBitmap*>(layer);
     // Block semantics: auto-length frames hold until the next keyframe, trimmed gaps render nothing.
@@ -475,7 +472,7 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
     BitmapImage* paintedImage = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameWhichCovers(
         bitmapLayer->displayFrameFor(mFrameNumber)));
 
-    if (paintedImage == nullptr) { return; }
+    if (paintedImage == nullptr) { return false; }
     paintedImage->loadFile(); // Critical! force the BitmapImage to load the image
 
     const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
@@ -520,7 +517,13 @@ void CanvasPainter::paintCurrentBitmapFrame(QPainter& painter, const QRect& blit
         maskPainter.drawImage(mPointZero, *clipMask);
     }
 
+    // 层/帧不透明度已在上面的 setOpacity 公式里烘进 pixmap(单次应用);
+    // 若带着 painter.opacity() 再画一次会乘成 o²——层整体偏淡,且由同源
+    // 累积出的剪贴蒙版会在底形边缘欠覆盖(露出底形边缘像素)。
+    // 导出路径(Object::paintImage)历来单次应用,两路必须一致
+    painter.setOpacity(1.0);
     painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
+    return true;
 }
 
 void CanvasPainter::ensureClipAccum()
@@ -532,7 +535,6 @@ void CanvasPainter::ensureClipAccum()
         mClipAccum = QImage(mCanvas.size(), QImage::Format_ARGB32_Premultiplied);
         mClipAccum.setDevicePixelRatio(dpr);
         mClipAccum.fill(Qt::transparent);
-        mClipGroupValid = false;
         mClipAfterPreValid = false;
     }
 }
@@ -660,24 +662,20 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         case Layer::BITMAP: {
             if (mAnyClipMask)
             {
-                QImage* clip = nullptr;
-                if (layer->clipMask())
+                // friction 保持透明度语义:蒙版=正下方最近的非剪贴位图层。
+                // 剪贴层不写累积器 → 累积器在整个连续剪贴 run 期间恒为
+                // 底形(剪贴层互不为底,PS 连续剪贴链同款),run 快照机制
+                // 不再需要;更下方其它位图层的 alpha 不再并入蒙版
+                QImage* clip = layer->clipMask() ? &mClipAccum : nullptr;
+                const bool rendered = paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer, clip);
+                if (!layer->clipMask() && rendered)
                 {
-                    // a run of clipped layers shares one base snapshot
-                    if (!mClipGroupValid)
-                    {
-                        mClipGroupMask = mClipAccum.copy();
-                        mClipGroupMask.setDevicePixelRatio(mClipAccum.devicePixelRatio());
-                        mClipGroupValid = true;
-                    }
-                    clip = &mClipGroupMask;
+                    // 非剪贴位图层:整体替换累积器内容(=成为新的剪贴底形)。
+                    // 空层(本帧无覆盖内容)跳过——不挡住更下方的寻源,
+                    // 与 friction preserveBelowSourceFor 的可见性判定一致
+                    clearClipAccum(blitRect);
+                    clipAccumulate(mCurrentLayerPixmap, 1.0);
                 }
-                else
-                {
-                    mClipGroupValid = false;
-                }
-                paintCurrentBitmapFrame(painter, blitRect, layer, isCurrentLayer, clip);
-                clipAccumulate(mCurrentLayerPixmap, painter.opacity());
             }
             else
             {
