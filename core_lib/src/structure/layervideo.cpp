@@ -18,12 +18,26 @@ GNU General Public License for more details.
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QUrl>
 #include <QAudioOutput>
 #include <QMediaPlayer>
-#include <QObject>
-#include <QVideoFrame>
-#include <QVideoSink>
+#include <QThread>
 #include <QWidget>
+
+#include "util/avruntime.h"
+#include "videodecodeworker.h"
+
+namespace
+{
+    // 播放预取窗口(帧):顺序软解远快于实时消费,约 1.5 秒前瞻足够吸收抖动
+    constexpr int PLAY_PREFETCH = 36;
+    // scrub 前瞻(帧):拖动方向不确定,小窗足够
+    constexpr int SCRUB_PREFETCH = 8;
+    // 当前帧身后保留(帧):循环/小幅回拖免重解
+    constexpr int KEEP_BEHIND = 12;
+    // 帧缓存字节上限(1080p ≈ 8.3MB/帧 → 约 46 帧;超限 LRU 逐出,重解廉价)
+    constexpr qint64 CACHE_CAP_BYTES = 384LL * 1024 * 1024;
+}
 
 LayerVideo::LayerVideo(int id) : Layer(id, Layer::MOVIE)
 {
@@ -32,9 +46,18 @@ LayerVideo::LayerVideo(int id) : Layer(id, Layer::MOVIE)
 
 LayerVideo::~LayerVideo()
 {
-    // sink/audioOutput 均不挂父对象,统一手动释放
+    // 顺序敏感:先拆信号桥(投递中的队列回调随桥作废),再停线程,最后释资源
+    delete mBridge;
+    mBridge = nullptr;
+    if (mWorker) { mWorker->requestAbort(); }
+    if (mWorkerThread)
+    {
+        mWorkerThread->quit();
+        mWorkerThread->wait(3000);
+    }
+    delete mWorker;
+    delete mWorkerThread;
     delete mPlayer;
-    delete mSink;
     delete mAudioOutput;
 }
 
@@ -43,14 +66,15 @@ void LayerVideo::setVideoSource(const QString& absoluteFilePath, double videoFps
     mFilePath = absoluteFilePath;
     mVideoFps = (videoFps > 0.0) ? videoFps : 24.0;
     mSyncStarted = false;
-    mLastFrameStartTime = -1;
+    mCurVideoIdx = 0;
+    mFrameCount = qMax(1, durationFrames);
+
+    teardownDecoder();
 
     if (mPlayer)
     {
         delete mPlayer;
         mPlayer = nullptr;
-        delete mSink;
-        mSink = nullptr;
         delete mAudioOutput;
         mAudioOutput = nullptr;
     }
@@ -68,42 +92,190 @@ void LayerVideo::setVideoSource(const QString& absoluteFilePath, double videoFps
     clip->setLengthExplicit(true);
     loadKey(clip);
 
-    ensurePlayer();
+    ensureAudioPlayer();
+    ensureDecoder();
 }
 
-void LayerVideo::attachRepaintTarget(QWidget* target)
-{
-    if (mSink == nullptr || mRepaintHooked || target == nullptr) { return; }
-    // 出帧即请求重画(异步解码延迟一帧内可见);sink/目标任一销毁自动断连
-    // QWidget::update 有多个重载,取成员指针有歧义,用 lambda 调无参版
-    QObject::connect(mSink, &QVideoSink::videoFrameChanged, target, [target](const QVideoFrame&)
-    {
-        target->update();
-    });
-    mRepaintHooked = true;
-}
-
-void LayerVideo::ensurePlayer()
+void LayerVideo::ensureAudioPlayer()
 {
     if (mPlayer || mFilePath.isEmpty() || !QFileInfo::exists(mFilePath))
     {
         return;
     }
-    // Layer 非 QObject,player/sink 不能挂父对象;由本层析构负责释放。
+    // Layer 非 QObject,player 不能挂父对象;由本层析构负责释放。
+    // 帧画面不再走播放器(专用解码线程),只留纯音频输出
     mPlayer = new QMediaPlayer;
-    // 参考视频出声:音画同步由 QMediaPlayer 内部保证;
-    // 层级静音开关在建播放器时与每次切换时下发到音频输出
     mAudioOutput = new QAudioOutput;
     mAudioOutput->setMuted(mVideoMuted);
     mPlayer->setAudioOutput(mAudioOutput);
-    mSink = new QVideoSink; // 不挂父:换源时 player 重建,子对象会被连带删除造成双重释放
-    mPlayer->setVideoSink(mSink);
     mPlayer->setSource(QUrl::fromLocalFile(mFilePath));
+}
+
+void LayerVideo::ensureDecoder()
+{
+    if (mWorker || mFilePath.isEmpty() || !QFileInfo::exists(mFilePath))
+    {
+        return;
+    }
+    if (!avRuntime().ok)
+    {
+        mDecoderError = avRuntime().errorMessage;
+        return;
+    }
+    mDecoderError.clear();
+    mDecoderReady = false;
+    mFrameCache.clear();
+    mFrameLru.clear();
+    mPending.clear();
+    mCacheBytes = 0;
+
+    mBridge = new QObject; // GUI 线程裸对象;接收 worker 队列信号,本层析构先行删除
+    mWorkerThread = new QThread;
+    mWorkerThread->setObjectName(QStringLiteral("video-decode"));
+    mWorker = new VideoDecodeWorker(mFilePath, mVideoFps);
+    mWorker->moveToThread(mWorkerThread);
+    QObject::connect(mWorker, &VideoDecodeWorker::frameDecoded, mBridge,
+                     [this](int frame, const QImage& image) { onFrameDecoded(frame, image); });
+    QObject::connect(mWorker, &VideoDecodeWorker::openFinished, mBridge,
+                     [this](bool ok, const QString& error, int frameCount, double streamFps, int width, int height)
+    {
+        onDecoderOpened(ok, error, frameCount, streamFps, width, height);
+    });
+    mWorkerThread->start();
+    QMetaObject::invokeMethod(mWorker, "open", Qt::QueuedConnection);
+}
+
+void LayerVideo::teardownDecoder()
+{
+    delete mBridge;
+    mBridge = nullptr;
+    if (mWorker) { mWorker->requestAbort(); }
+    if (mWorkerThread)
+    {
+        mWorkerThread->quit();
+        mWorkerThread->wait(3000);
+    }
+    delete mWorker;
+    mWorker = nullptr;
+    delete mWorkerThread;
+    mWorkerThread = nullptr;
+    mDecoderReady = false;
+    mFrameCache.clear();
+    mFrameLru.clear();
+    mPending.clear();
+    mCacheBytes = 0;
+    mCurVideoIdx = 0;
+}
+
+void LayerVideo::onDecoderOpened(bool ok, const QString& error, int frameCount,
+                                 double streamFps, int width, int height)
+{
+    Q_UNUSED(width)
+    Q_UNUSED(height)
+    if (!ok)
+    {
+        mDecoderReady = false;
+        mDecoderError = error;
+        return;
+    }
+    mDecoderReady = true;
+    mDecoderError.clear();
+    mFrameCount = qMax(1, frameCount);
+    if (streamFps > 0.0)
+    {
+        mVideoFps = streamFps;
+    }
+    // 预热入点画面
+    requestWindow(mCurVideoIdx, false);
+}
+
+void LayerVideo::onFrameDecoded(int frameIndex, const QImage& image)
+{
+    mPending.remove(frameIndex);
+    if (image.isNull()) { return; }
+
+    if (!mFrameCache.contains(frameIndex))
+    {
+        mCacheBytes += image.sizeInBytes();
+    }
+    mFrameCache.insert(frameIndex, image);
+    mFrameLru.removeAll(frameIndex);
+    mFrameLru.append(frameIndex);
+    trimCache();
+
+    // 画布帧级缓存(QPixmapCache)可能已合入旧视频帧,必须作废才会显示新帧;
+    // ScribbleArea::invalidateCanvasCache 是 public slot,按名调用,
+    // 其他目标回退 update()
+    if (mRepaintTarget)
+    {
+        if (!QMetaObject::invokeMethod(mRepaintTarget, "invalidateCanvasCache"))
+        {
+            mRepaintTarget->update();
+        }
+    }
+}
+
+void LayerVideo::trimCache()
+{
+    while (mCacheBytes > CACHE_CAP_BYTES && mFrameLru.count() > 1)
+    {
+        const int victim = mFrameLru.takeFirst();
+        const auto it = mFrameCache.find(victim);
+        if (it != mFrameCache.end())
+        {
+            mCacheBytes -= it.value().sizeInBytes();
+            mFrameCache.erase(it);
+        }
+    }
+}
+
+void LayerVideo::requestWindow(int centerIdx, bool playing)
+{
+    if (!mDecoderReady || mFrameCount <= 0) { return; }
+    const int fwd = playing ? PLAY_PREFETCH : SCRUB_PREFETCH;
+    const int from = qMax(0, centerIdx - KEEP_BEHIND);
+    const int to = qMin(mFrameCount - 1, centerIdx + fwd);
+    // scrub 跳变:队列里存在明显不属于新窗口的帧 → 整队重置重排
+    bool reset = false;
+    for (int f : mPending)
+    {
+        if (f < from - 8 || f > to + 8) { reset = true; break; }
+    }
+    if (reset) { mPending.clear(); }
+
+    QList<int> wanted;
+    for (int f = from; f <= to; ++f)
+    {
+        if (!mFrameCache.contains(f) && !mPending.contains(f))
+        {
+            wanted.append(f);
+        }
+    }
+    if (wanted.isEmpty()) { return; }
+    const int centerPos = wanted.indexOf(centerIdx);
+    if (centerPos > 0) { wanted.move(centerPos, 0); }
+    mPending.unite(QSet<int>(wanted.cbegin(), wanted.cend()));
+
+    QMetaObject::invokeMethod(mWorker, [worker = mWorker, wanted, reset]()
+    {
+        worker->requestFrames(wanted, reset);
+    }, Qt::QueuedConnection);
 }
 
 bool LayerVideo::isFileMissing() const
 {
     return mFilePath.isEmpty() || !QFileInfo::exists(mFilePath);
+}
+
+bool LayerVideo::isDecoderAvailable() const
+{
+    return avRuntime().ok;
+}
+
+QString LayerVideo::decoderHint() const
+{
+    if (!avRuntime().ok) { return avRuntime().errorMessage; }
+    return mDecoderError;
 }
 
 void LayerVideo::setVideoMuted(bool muted)
@@ -112,70 +284,77 @@ void LayerVideo::setVideoMuted(bool muted)
     if (mAudioOutput) { mAudioOutput->setMuted(muted); }
 }
 
+int LayerVideo::videoFrameIndexForRel(int rel, double videoFps, double projectFps)
+{
+    if (projectFps <= 0.0 || videoFps <= 0.0)
+    {
+        return rel;
+    }
+    return qRound(rel * videoFps / projectFps);
+}
+
 void LayerVideo::syncToFrame(int frameNumber, double projectFps, bool playing)
 {
-    if (mPlayer == nullptr) { return; }
-
-    // 工程停止播放:立即暂停并复位起步标记,下次播放从准确位置起步
-    if (!playing)
-    {
-        if (mPlayer->playbackState() == QMediaPlayer::PlayingState)
-        {
-            mPlayer->pause();
-        }
-        mSyncStarted = false;
-        return;
-    }
-
     VideoClip* clip = (keyFrameCount() > 0)
-        ? static_cast<VideoClip*>(getKeyFrameAt(firstKeyFramePosition()))
-        : nullptr;
+                      ? static_cast<VideoClip*>(getKeyFrameAt(firstKeyFramePosition()))
+                      : nullptr;
     if (clip == nullptr) { return; }
 
     const qint64 rel = frameNumber - clip->pos();
-    if (rel < 0 || rel >= clip->length())
+    const bool inRange = rel >= 0 && rel < clip->length();
+
+    // —— 音频:区间内起播,失步超阈值才纠偏;区间外/工程停止即暂停
+    if (mPlayer)
     {
-        // 时间轴出了视频区间:停住等回来,画面保留最后一帧
-        if (mPlayer->playbackState() != QMediaPlayer::PausedState)
+        if (playing && inRange)
+        {
+            const double pf = projectFps > 0.0 ? projectFps : mVideoFps;
+            const qint64 targetMs = qRound(rel * 1000.0 / pf);
+            if (!mSyncStarted)
+            {
+                mPlayer->setPosition(targetMs);
+                mPlayer->play();
+                mPlayer->setPlaybackRate(1.0); // 帧号映射已吸收 fps 差,音频原速
+                mSyncStarted = true;
+            }
+            else if (qAbs(targetMs - mPlayer->position()) > 300)
+            {
+                mPlayer->setPosition(targetMs);
+            }
+        }
+        else if (mPlayer->playbackState() == QMediaPlayer::PlayingState)
         {
             mPlayer->pause();
             mSyncStarted = false;
         }
-        return;
     }
 
-    const qint64 targetMs = qRound(rel * 1000.0 / mVideoFps);
-    if (!mSyncStarted)
+    // —— 帧画面:以当前视频帧号为中心开窗(播放大窗/scrub 小窗,停止也跟手)
+    if (mDecoderReady && inRange)
     {
-        mPlayer->setPosition(targetMs);
-        mPlayer->play();
-        // 帧率失配(视频 29.97 vs 工程 24)时校准播放速率,否则缓慢漂移
-        if (projectFps > 0.0 && mVideoFps > 0.0)
-        {
-            mPlayer->setPlaybackRate(qBound(0.1, projectFps / mVideoFps, 10.0));
-        }
-        mSyncStarted = true;
-        return;
-    }
-
-    // 自由播放中只纠明显失步(比如视频比工程 fps 更快累积的漂移)
-    if (qAbs(targetMs - mPlayer->position()) > 300)
-    {
-        mPlayer->setPosition(targetMs);
+        mCurVideoIdx = qBound(0, videoFrameIndexForRel(int(rel), mVideoFps,
+                                                        projectFps > 0.0 ? projectFps : mVideoFps),
+                              qMax(0, mFrameCount - 1));
+        requestWindow(mCurVideoIdx, playing);
     }
 }
 
 QImage LayerVideo::currentFrameImage() const
 {
-    if (mSink == nullptr) { return QImage(); }
-    const QVideoFrame frame = mSink->videoFrame();
-    if (!frame.isValid()) { return mLastFrame; }
-    if (frame.startTime() != mLastFrameStartTime)
-    {
-        mLastFrame = frame.toImage();
-        mLastFrameStartTime = frame.startTime();
-    }
-    return mLastFrame;
+    if (mFrameCache.isEmpty()) { return QImage(); }
+    const auto exact = mFrameCache.constFind(mCurVideoIdx);
+    if (exact != mFrameCache.constEnd()) { return exact.value(); }
+
+    // 未命中:回最近的在前帧(解码异步追上后会刷新),全在后面则取最近后帧
+    auto it = mFrameCache.lowerBound(mCurVideoIdx);
+    if (it != mFrameCache.constEnd() && it.key() == mCurVideoIdx) { return it.value(); }
+    if (it != mFrameCache.constBegin()) { --it; }
+    return it.value();
+}
+
+void LayerVideo::attachRepaintTarget(QWidget* target)
+{
+    if (target != nullptr) { mRepaintTarget = target; }
 }
 
 QDomElement LayerVideo::createDomElement(QDomDocument& doc) const
@@ -230,8 +409,10 @@ void LayerVideo::loadDomElement(const QDomElement& element, QString dataDirPath,
                       element.attribute("offsetY", "0").toDouble());
     mVideoMuted = (element.attribute("muted", "0") == "1");
     mSyncStarted = false;
-    mLastFrameStartTime = -1;
-    ensurePlayer();
+    mFrameCount = qMax(1, duration);
+    mCurVideoIdx = 0;
+    ensureAudioPlayer();
+    ensureDecoder();
 
     if (progressStep) { progressStep(); }
 }

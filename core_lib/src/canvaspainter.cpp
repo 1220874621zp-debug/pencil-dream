@@ -698,7 +698,7 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
 
 void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)
 {
-    // 参考视频:pull 模式取解码器最近帧,原尺寸居中(缩放交给画布视图);
+    // 参考视频:pull 模式取解码缓存最近帧,原尺寸居中(缩放交给画布视图);
     // 直接用传入 painter,世界变换与位图层同源,跟随视图/相机。
     LayerVideo* videoLayer = static_cast<LayerVideo*>(layer);
     const QImage img = videoLayer->currentFrameImage();
@@ -713,6 +713,20 @@ void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)
             painter.setPen(QPen(QColor(255, 120, 120, 220), 1));
             painter.drawText(QRectF(-320, -12, 640, 24), Qt::AlignCenter,
                              tr("参考视频文件缺失:%1").arg(QFileInfo(videoLayer->videoPath()).fileName()));
+        }
+        else if (!videoLayer->isDecoderAvailable() || !videoLayer->decoderHint().isEmpty())
+        {
+            // 解码组件缺失/打开失败占位(打开中或解码中留白,帧到达自动刷新)
+            const QString hint = videoLayer->decoderHint();
+            if (!hint.isEmpty())
+            {
+                painter.setPen(QPen(QColor(255, 80, 80, 200), 2, Qt::DashLine));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(QRectF(-320, -180, 640, 360));
+                painter.setPen(QPen(QColor(255, 120, 120, 220), 1));
+                painter.drawText(QRectF(-320, -24, 640, 48), Qt::AlignCenter | Qt::TextWordWrap,
+                                 tr("参考视频不可用:%1").arg(hint));
+            }
         }
         return;
     }

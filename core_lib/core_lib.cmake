@@ -71,6 +71,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/soundclip.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/videodecodeworker.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/basetool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/brushtool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/buckettool.h
@@ -93,6 +94,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/toolproperties.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/transformtool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/autosaverbytime.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/avruntime.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/blitrect.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/cameraeasingtype.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/camerafieldoption.h
@@ -183,6 +185,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/objectdata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/pegbaraligner.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/soundclip.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/videodecodeworker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/basetool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/brushtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/buckettool.cpp
@@ -204,6 +207,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/stroketool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/transformtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/autosaverbytime.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/avruntime.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/blitrect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/cameraeasingtype.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/util/fileformat.cpp
@@ -240,6 +244,8 @@ set(CORE_LIB_RESOURCES
 set(CORE_LIB_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/external
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/external/libav
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector
