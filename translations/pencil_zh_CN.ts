@@ -6831,6 +6831,21 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <source>Min opacity</source>
         <translation>最小不透明度</translation>
     </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="141"/>
+        <source>Off</source>
+        <translation>关</translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="142"/>
+        <source>Show this frame as an extra onion skin ghost, 0 = off</source>
+        <translation>把该帧额外显示为洋葱皮幽灵，0 为关闭</translation>
+    </message>
+    <message>
+        <location filename="../app/src/onionskinwidget.cpp" line="149"/>
+        <source>Jump frame：</source>
+        <translation>跳帧显示：</translation>
+    </message>
 </context>
 <context>
     <name>OverlayPainter</name>

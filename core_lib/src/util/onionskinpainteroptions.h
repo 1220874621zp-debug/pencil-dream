@@ -29,5 +29,8 @@ struct OnionSkinPainterOptions {
     int framesToSkinPrev = 0;
     int framesToSkinNext = 0;
     bool isAbsolute = false;
+    // 跳帧显示:把指定时间轴帧号(0=关闭)额外叠为洋葱皮幽灵,
+    // 与前后帧幽灵同规则着色(前=红/后=蓝)
+    int customFrame = 0;
 };
 #endif // ONIONSKINPAINTEROPTIONS_H

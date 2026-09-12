@@ -118,6 +118,7 @@ void ScribbleArea::settingUpdated(SETTING setting)
         break;
     case SETTING::ONION_PREV_FRAMES_NUM:
     case SETTING::ONION_NEXT_FRAMES_NUM:
+    case SETTING::ONION_CUSTOM_FRAME:
     case SETTING::ONION_MIN_OPACITY:
     case SETTING::ONION_MAX_OPACITY:
         invalidateAllCache();
@@ -1198,6 +1199,7 @@ void ScribbleArea::prepCameraPainter(int frame)
     onionSkinOptions.framesToSkinNext = mPrefs->getInt(SETTING::ONION_NEXT_FRAMES_NUM);
     onionSkinOptions.maxOpacity = mPrefs->getInt(SETTING::ONION_MAX_OPACITY);
     onionSkinOptions.minOpacity = mPrefs->getInt(SETTING::ONION_MIN_OPACITY);
+    onionSkinOptions.customFrame = mPrefs->getInt(SETTING::ONION_CUSTOM_FRAME);
 
     mCameraPainter.setOnionSkinPainterOptions(onionSkinOptions);
 }
@@ -1226,6 +1228,7 @@ void ScribbleArea::prepCanvas(int frame)
     onionSkinOptions.framesToSkinNext = mPrefs->getInt(SETTING::ONION_NEXT_FRAMES_NUM);
     onionSkinOptions.maxOpacity = mPrefs->getInt(SETTING::ONION_MAX_OPACITY);
     onionSkinOptions.minOpacity = mPrefs->getInt(SETTING::ONION_MIN_OPACITY);
+    onionSkinOptions.customFrame = mPrefs->getInt(SETTING::ONION_CUSTOM_FRAME);
 
     // 对位工具依赖红/蓝区分前后幽灵，激活期间强制着色显示（不回写偏好设置）
     if (mEditor->tools()->currentTool()->type() == ToolType::ONION_ALIGN)

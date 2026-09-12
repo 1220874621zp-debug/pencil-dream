@@ -49,6 +49,7 @@ private slots:
     void onionMinOpacityChange(int);
     void onionPrevFramesNumChange(int);
     void onionNextFramesNumChange(int);
+    void onionCustomFrameChange(int);
     void onionSkinModeChange(int);
     void onionSkinMultipleLayersEnabled(bool value);
     void onionToggleClicked(bool);
@@ -71,6 +72,9 @@ private:
     QDoubleSpinBox* mMaxOpacitySpin = nullptr;
     QSlider* mMinOpacitySlider = nullptr;
     QDoubleSpinBox* mMinOpacitySpin = nullptr;
+
+    // 跳帧显示：把指定帧号额外叠为洋葱皮幽灵（0=关闭，无滑杆）
+    QDoubleSpinBox* mCustomFrameSpin = nullptr;
 
     QToolButton* mOnionRedButton = nullptr;
     QToolButton* mOnionBlueButton = nullptr;

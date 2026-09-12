@@ -51,6 +51,7 @@ void OnionSkinWidget::initUI()
     clearFocusOnFinished(mNextFramesSpin);
     clearFocusOnFinished(mMaxOpacitySpin);
     clearFocusOnFinished(mMinOpacitySpin);
+    clearFocusOnFinished(mCustomFrameSpin);
 }
 
 void OnionSkinWidget::buildParamRows()
@@ -136,6 +137,27 @@ void OnionSkinWidget::buildParamRows()
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Next frames"), mNextFramesSlider, mNextFramesSpin, 0, 60, QString()); // 0=关闭该方向
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Max opacity"), mMaxOpacitySlider, mMaxOpacitySpin, 0, 100, tr(" %"));
     addParamRow(QT_TRANSLATE_NOOP("OnionSkinWidget", "Min opacity"), mMinOpacitySlider, mMinOpacitySpin, 0, 100, tr(" %"));
+
+    // --- 跳帧显示：输入帧号额外叠为洋葱皮幽灵（0=关闭；帧号无自然滑杆范围，仅输入框） ---
+    mCustomFrameSpin = new QDoubleSpinBox(this);
+    mCustomFrameSpin->setRange(0, 9999);
+    mCustomFrameSpin->setDecimals(0);
+    mCustomFrameSpin->setFixedWidth(96);  // 与四行参数输入框统一宽
+    mCustomFrameSpin->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+    mCustomFrameSpin->setSpecialValueText(tr("Off")); // 0 显示为"关"
+    mCustomFrameSpin->setToolTip(tr("Show this frame as an extra onion skin ghost, 0 = off"));
+    {
+        auto* grid = new QGridLayout;
+        grid->setHorizontalSpacing(8);
+        grid->setVerticalSpacing(2);
+        grid->setContentsMargins(0, 0, 0, 0);
+        auto* labelWidget = new QLabel(tr("Jump frame："), this);
+        labelWidget->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        grid->addWidget(labelWidget, 0, 0, 1, 2);
+        grid->addWidget(mCustomFrameSpin, 1, 1, Qt::AlignRight);
+        grid->setColumnStretch(0, 1);
+        rows->addLayout(grid);
+    }
 }
 
 void OnionSkinWidget::makeConnections()
@@ -145,6 +167,7 @@ void OnionSkinWidget::makeConnections()
     connect(mNextFramesSpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionNextFramesNumChange(qRound(v)); });
     connect(mMaxOpacitySpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionMaxOpacityChange(qRound(v)); });
     connect(mMinOpacitySpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionMinOpacityChange(qRound(v)); });
+    connect(mCustomFrameSpin, &QDoubleSpinBox::valueChanged, this, [this](double v) { onionCustomFrameChange(qRound(v)); });
 
     connect(mOnionToggleButton, &QToolButton::clicked, this, &OnionSkinWidget::onionToggleClicked);
     connect(mOnionBlueButton, &QToolButton::clicked, this, &OnionSkinWidget::onionBlueButtonClicked);
@@ -175,6 +198,7 @@ void OnionSkinWidget::updateUI()
     mNextFramesSpin->setValue(prefs->getInt(SETTING::ONION_NEXT_FRAMES_NUM));
     mMaxOpacitySpin->setValue(prefs->getInt(SETTING::ONION_MAX_OPACITY));
     mMinOpacitySpin->setValue(prefs->getInt(SETTING::ONION_MIN_OPACITY));
+    mCustomFrameSpin->setValue(prefs->getInt(SETTING::ONION_CUSTOM_FRAME));
     // 滑杆手动对齐（updateUI 的 setValue 不经信号链时）
     mPrevFramesSlider->setValue(qRound(mPrevFramesSpin->value()));
     mNextFramesSlider->setValue(qRound(mNextFramesSpin->value()));
@@ -232,6 +256,12 @@ void OnionSkinWidget::onionNextFramesNumChange(int value)
 {
     PreferenceManager* prefs = editor()->preference();
     prefs->set(SETTING::ONION_NEXT_FRAMES_NUM, value);
+}
+
+void OnionSkinWidget::onionCustomFrameChange(int value)
+{
+    PreferenceManager* prefs = editor()->preference();
+    prefs->set(SETTING::ONION_CUSTOM_FRAME, value);
 }
 
 void OnionSkinWidget::onionSkinModeChange(int value)
