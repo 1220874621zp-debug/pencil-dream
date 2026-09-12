@@ -2,6 +2,7 @@
 #include "layervideo.h"
 
 #include <QCoreApplication>
+#include <iostream>
 #include <QDebug>
 #include <QDomDocument>
 #include <QtMath>
@@ -85,15 +86,19 @@ TEST_CASE("LayerVideo decode pipeline end to end", "[LayerVideo][video]")
     // 注意不直接包含 avruntime.h:ffmpeg 公共头与 catch.hpp 同单元冲突(启动期 fail-fast),
     // 一律经 LayerVideo 的封装接口探测。
     LayerVideo probe(2);
+    // 环境依赖只在本机/分发包存在(CI 无 plugins/ffmpeg.exe):真跳过而非失败
     if (!probe.isDecoderAvailable())
     {
-        FAIL(("skip: ffmpeg DLLs unavailable: " + probe.decoderHint()).toStdString());
+        std::cout << "[LayerVideo] skip: ffmpeg DLLs unavailable: "
+                  << probe.decoderHint().toStdString() << std::endl;
+        SUCCEED("skipped: decoder unavailable");
         return;
     }
     const QString ffmpeg = QCoreApplication::applicationDirPath() + "/plugins/ffmpeg.exe";
     if (!QFileInfo::exists(ffmpeg))
     {
-        FAIL("skip: plugins/ffmpeg.exe not available");
+        std::cout << "[LayerVideo] skip: plugins/ffmpeg.exe not available" << std::endl;
+        SUCCEED("skipped: plugins/ffmpeg.exe not available");
         return;
     }
 
