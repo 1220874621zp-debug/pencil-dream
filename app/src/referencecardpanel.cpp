@@ -860,11 +860,20 @@ void ReferenceCardCanvas::showContextMenu(const QPointF& pos, const QPoint& glob
         return;
     }
 
+    QAction* newSwatchAction = nullptr;
+    if (!mImage.isNull())
+    {
+        newSwatchAction = menu.addAction(tr("新建色块"));
+    }
     QAction* importAction = menu.addAction(tr("导入图片"));
     menu.addSeparator();
     QAction* fitAction = menu.addAction(tr("适应窗口"));
     QAction* chosen = menu.exec(globalPos);
-    if (chosen == importAction)
+    if (newSwatchAction != nullptr && chosen == newSwatchAction)
+    {
+        createSwatchAt(pos);
+    }
+    else if (chosen == importAction)
     {
         emit requestImport();
     }
@@ -872,6 +881,19 @@ void ReferenceCardCanvas::showContextMenu(const QPointF& pos, const QPoint& glob
     {
         fitToWindow();
     }
+}
+
+void ReferenceCardCanvas::createSwatchAt(const QPointF& widgetPos)
+{
+    RefColorSwatch s;
+    s.color = (mEditor != nullptr) ? mEditor->color()->frontColor() : QColor(Qt::white);
+    s.name = tr("色块%1").arg(mSwatches.size() + 1);
+    // 光标作为色块中心（块尺寸是屏幕像素，折回图坐标）
+    s.pos = widgetToImage(widgetPos)
+            - QPointF(SWATCH_W / (2.0 * mScale), SWATCH_H / (2.0 * mScale));
+    mSwatches.append(s);
+    saveSidecar();
+    update();
 }
 
 // --------------------------------------------------------------- 面板 ---+

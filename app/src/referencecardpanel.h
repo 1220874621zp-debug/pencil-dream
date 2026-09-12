@@ -86,6 +86,7 @@ private:
     QRectF labelRect(int index) const;
     int    hitSwatch(const QPointF& widgetPos) const;   // 顶层优先，-1 = 未命中
     int    hitLine(const QPointF& widgetPos) const;     // 距折线 < 6px，-1 = 未命中
+    void   createSwatchAt(const QPointF& widgetPos);    // 右键新建：当前笔色，光标为中心
     void   deleteSelected();
     void   showContextMenu(const QPointF& pos, const QPoint& globalPos);
     void   confirmDraft();
