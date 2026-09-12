@@ -32,8 +32,6 @@ namespace
 constexpr uint8_t ALPHA_TRANSPARENT_MAX = 7;
 // 闭运算方形核半径：宽度 < 2*半径+1（11px）的缝会被抓住
 constexpr int CLOSE_RADIUS = 5;
-// 填充范围向非完全不透明像素膨胀的像素数（吸收抗锯齿毛边）
-constexpr int FRINGE_GROW = 2;
 
 // 预乘像素 → 直通 RGB（种子颜色须反预乘，否则半透明源会整体偏暗）
 uint32_t unpremultiplyRgb(const uint8_t alpha, const QRgb premul)
@@ -317,30 +315,9 @@ int HoleFiller::fillHoles(QImage& img, const int mode)
     }
     std::vector<int32_t> dist(n, -1);
 
-    // ---- 3. 毛边吸收：掩码向非完全不透明像素膨胀 2px（绝不碰全不透明笔画）----
-    for (int iter = 0; iter < FRINGE_GROW; ++iter)
-    {
-        std::vector<uint8_t> grown(fillMask);
-        for (int y = 0; y < h; ++y)
-        {
-            for (int x = 0; x < w; ++x)
-            {
-                const size_t i = static_cast<size_t>(y) * w + x;
-                if (fillMask[i] != 0 || alpha[i] == 255)
-                    continue;
-                const bool nextToMask =
-                    (x > 0 && fillMask[i - 1] != 0) ||
-                    (x < w - 1 && fillMask[i + 1] != 0) ||
-                    (y > 0 && fillMask[i - w] != 0) ||
-                    (y < h - 1 && fillMask[i + w] != 0);
-                if (nextToMask)
-                    grown[i] = 1;
-            }
-        }
-        fillMask.swap(grown);
-    }
-
-    // ---- 4. 多源 BFS：每个待填像素取最近有效像素的颜色（方向自适应）----
+    // ---- 3. 多源 BFS：每个待填像素取最近有效像素的颜色（方向自适应）----
+    // 填充范围 = 检测出的透明像素本身，绝不向半透明边缘膨胀：
+    // 0 < alpha < 255 的抗锯齿边缘像素不进掩码、不被改写（防外溢）
     std::vector<uint32_t> color(n, 0); // 直通 RGB，随波前继承
     std::vector<uint8_t> seedMask(n, 0); // 有效参考色像素（方向模式的射线命中判定用）
     std::vector<int32_t> queue;

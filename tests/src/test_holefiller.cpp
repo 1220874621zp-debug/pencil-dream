@@ -141,7 +141,7 @@ TEST_CASE("holefiller each side of a crack takes its own nearest color")
     REQUIRE(filled > 0);
 
     // 缝全部填实
-    for (int y = 10; y <= 54; ++y)
+    for (int y = 12; y <= 51; ++y)
         for (int x = 31; x <= 35; ++x)
             REQUIRE(qAlpha(img.pixel(x, y)) == 255);
 
@@ -151,14 +151,14 @@ TEST_CASE("holefiller each side of a crack takes its own nearest color")
     REQUIRE(qBlue(img.pixel(35, 32)) == 220);
 }
 
-TEST_CASE("holefiller anti-aliased fringe around hole is absorbed")
+TEST_CASE("holefiller leaves anti-aliased edges untouched")
 {
     QImage img = makeImage(40, 40);
     fillRect(img, 4, 4, 35, 35, RED);
     fillRect(img, 14, 14, 25, 25, 0);            // 封闭镂空
 
-    // 贴着镂空的一圈半透明（预乘红，alpha=128）
-    const QRgb fringe = qRgba(200 * 128 / 255, 30 * 128 / 255, 30 * 128 / 255, 128);
+    // 贴着镂空的一圈半透明（预乘红，alpha=51 整除可无损往返：40*255/51=200）
+    const QRgb fringe = qRgba(200 * 51 / 255, 30 * 51 / 255, 30 * 51 / 255, 51);
     fillRect(img, 13, 13, 26, 13, fringe);
     fillRect(img, 13, 26, 26, 26, fringe);
     fillRect(img, 13, 14, 13, 25, fringe);
@@ -167,14 +167,17 @@ TEST_CASE("holefiller anti-aliased fringe around hole is absorbed")
     const int filled = HoleFiller::fillHoles(img);
     REQUIRE(filled > 0);
 
-    // 镂空 + 毛边圈全部变不透明红（无透底毛边）
+    // 镂空（alpha=0）整体填成不透明红
     for (int y = 14; y <= 25; ++y)
         for (int x = 14; x <= 25; ++x)
-            REQUIRE(qAlpha(img.pixel(x, y)) == 255);
-    REQUIRE(qAlpha(img.pixel(13, 20)) == 255);
-    REQUIRE(qAlpha(img.pixel(26, 20)) == 255);
-    REQUIRE(qAlpha(img.pixel(20, 13)) == 255);
-    REQUIRE(qAlpha(img.pixel(20, 26)) == 255);
+            REQUIRE(img.pixel(x, y) == RED);
+
+    // 半透明边缘一律不碰：原样保留（不外溢、不变胖）
+    REQUIRE(img.pixel(13, 20) == fringe);
+    REQUIRE(img.pixel(26, 20) == fringe);
+    REQUIRE(img.pixel(20, 13) == fringe);
+    REQUIRE(img.pixel(20, 26) == fringe);
+    REQUIRE(img.pixel(13, 13) == fringe);
 
     // 深处笔画不变
     REQUIRE(img.pixel(6, 6) == RED);
@@ -203,14 +206,14 @@ TEST_CASE("holefiller directional fill takes whole-side color on vertical crack"
     QImage imgL = img;
     REQUIRE(HoleFiller::fillHoles(imgL, HoleFiller::TakeLeft) > 0);
     // 左取色：整条缝取红
-    for (int y = 10; y <= 54; ++y)
+    for (int y = 12; y <= 51; ++y)
         for (int x = 31; x <= 35; ++x)
             REQUIRE(imgL.pixel(x, y) == RED);
 
     QImage imgR = img;
     REQUIRE(HoleFiller::fillHoles(imgR, HoleFiller::TakeRight) > 0);
     // 右取色：整条缝取蓝
-    for (int y = 10; y <= 54; ++y)
+    for (int y = 12; y <= 51; ++y)
         for (int x = 31; x <= 35; ++x)
             REQUIRE(imgR.pixel(x, y) == BLUE);
 }
@@ -247,7 +250,7 @@ TEST_CASE("holefiller directional fill falls back to nearest when the ray escape
     QImage imgU = img;
     REQUIRE(HoleFiller::fillHoles(imgU, HoleFiller::TakeUp) > 0);
     // 全部回退最近邻：缝填实、中线分界（左红右蓝）
-    for (int y = 10; y <= 54; ++y)
+    for (int y = 12; y <= 51; ++y)
         for (int x = 31; x <= 35; ++x)
             REQUIRE(qAlpha(imgU.pixel(x, y)) == 255);
     REQUIRE(imgU.pixel(31, 32) == RED);
