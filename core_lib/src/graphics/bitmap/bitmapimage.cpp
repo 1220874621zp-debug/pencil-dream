@@ -882,6 +882,9 @@ void BitmapImage::clear()
     mImage = QImage(); // null image
     mBounds = QRect(0, 0, 0, 0);
     mMinBound = true;
+    // 清空=内容已变更：断开旧文件，否则渲染层 loadFile() 会把旧图从磁盘加载回来
+    // （复活旧像素，且 mBounds 只重设 size 不重设 topLeft → 内容整体偏移到画布中心）
+    setFileName("");
     modification();
 }
 

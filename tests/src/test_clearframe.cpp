@@ -10,6 +10,8 @@
 #include "undoredomanager.h"
 
 #include <QPen>
+#include <QDir>
+#include <QFile>
 
 // 与 ActionCommands::clearCurrentLayerCanvas 同核心：双快照 + clear + BitmapReplaceCommand
 static void clearCurrentLayerCanvasCore(Editor* editor)
@@ -87,6 +89,27 @@ TEST_CASE("ClearFrame double-snapshot undo roundtrip")
         // redo：再次清空
         editor->undoRedo()->redo();
         REQUIRE(frame->bounds().isEmpty());
+    }
+
+    SECTION("cleared frame must not resurrect from stale file on render loadFile")
+    {
+        // 复现真实工程：保存过的帧挂有 PNG 文件名（惰性加载源）。
+        // 清空后渲染层会调 loadFile()——若文件名未断开，旧图被加载回来
+        //（像素复活 + topLeft 重置到画布中心 = 内容偏移）。
+        const QString pngPath = QDir::temp().filePath("pencil_clearframe_stale.png");
+        QImage stale(beforeBounds.size(), QImage::Format_ARGB32_Premultiplied);
+        stale.fill(QColor(255, 0, 0, 255));
+        REQUIRE(stale.save(pngPath));
+        frame->setFileName(pngPath);
+
+        clearCurrentLayerCanvasCore(editor);
+
+        // 渲染路径的 loadFile：不得复活
+        frame->loadFile();
+        REQUIRE(frame->bounds().isEmpty());
+        REQUIRE(frame->image()->isNull());
+
+        QFile::remove(pngPath);
     }
 
     SECTION("stroke after clear lands at correct canvas position")
