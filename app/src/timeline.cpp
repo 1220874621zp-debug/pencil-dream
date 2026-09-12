@@ -180,8 +180,8 @@ void TimeLine::initUI()
     addKeyButton->setMinimumSize(QSize(34, 34));
 
     QToolButton* removeKeyButton = new QToolButton(this);
-    removeKeyButton->setIcon(QIcon(":icons/themes/playful/menubar/clear-canvas.svg"));
-    removeKeyButton->setToolTip(tr("清除帧：清除当前图层画布的全部像素（不删除帧）"));
+    removeKeyButton->setIcon(QIcon(":icons/themes/playful/timeline/frame-remove.svg"));
+    removeKeyButton->setToolTip(tr("Remove Frame"));
     removeKeyButton->setIconSize(QSize(26, 26));
     removeKeyButton->setMinimumSize(QSize(34, 34));
 

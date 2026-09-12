@@ -1848,9 +1848,7 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     ui->menuLayer->addMenu(tvpToolsMenu);
 
     connect(pTimeline, &TimeLine::insertKeyClick, mCommands, &ActionCommands::insertKeyFrameAtCurrentPosition);
-    // 垃圾桶「清除帧」按钮：清除当前选中图层画布上的全部像素（保留帧结构，可撤销）；
-    // 删除关键帧仍走菜单 编辑→Remove Frame 与快捷键
-    connect(pTimeline, &TimeLine::removeKeyClick, mEditor, &Editor::clearCurrentFrame);
+    connect(pTimeline, &TimeLine::removeKeyClick, mCommands, &ActionCommands::removeKey);
 
     connect(pTimeline, &TimeLine::newBitmapLayer, mCommands, &ActionCommands::addNewBitmapLayer);
     connect(pTimeline, &TimeLine::newColorizeLayer, mCommands, &ActionCommands::addNewColorizeLayer);
