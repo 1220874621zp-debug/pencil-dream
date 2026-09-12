@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <!-- 镂空检测：放大镜下的镂空圆环，中心点表示被填充 -->
+  <circle cx="440" cy="440" r="300" fill="none" stroke="#ffffff" stroke-width="80"/>
+  <line x1="652" y1="652" x2="900" y2="900" stroke="#ffffff" stroke-width="100" stroke-linecap="round"/>
+  <circle cx="440" cy="440" r="150" fill="none" stroke="#ffffff" stroke-width="60"/>
+  <circle cx="440" cy="440" r="45" fill="#ffffff"/>
+</svg>

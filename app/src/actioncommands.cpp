@@ -46,6 +46,7 @@ GNU General Public License for more details.
 #include "layersound.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
+#include "holefiller.h"
 #include "soundclip.h"
 #include "camera.h"
 
@@ -1115,6 +1116,53 @@ Status ActionCommands::mergeLayerDown()
 
     mEditor->getScribbleArea()->onLayerChanged();
     emit mEditor->framesModified();
+    return Status::OK;
+}
+
+Status ActionCommands::fillHolesOnCurrentFrame()
+{
+    const QString tipTitle = tr("镂空检测");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (!layer->isBitmapKind())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("镂空检测只能在位图族图层（位图/填色）上使用。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法填充。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    // 与画布落笔同源：循环层编辑的是显示帧背后的关键帧（所见即所编辑）
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+    BitmapImage* bitmap = static_cast<BitmapImage*>(
+        bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+    if (bitmap == nullptr)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("当前帧没有可处理的位图内容。"));
+        return Status::CANCELED;
+    }
+
+    QImage* img = bitmap->image();
+    Q_CHECK_PTR(img);
+
+    const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    const int filled = HoleFiller::fillHoles(*img);
+    if (filled == 0)
+    {
+        // 无变化不进撤销栈
+        QMessageBox::information(mParent, tipTitle, tr("未检测到封闭镂空。"));
+        return Status::OK;
+    }
+
+    mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
+    mEditor->undoRedo()->record(saveStateId, tr("镂空检测填充", "Undo step text"));
     return Status::OK;
 }
 

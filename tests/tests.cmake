@@ -32,6 +32,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_flowlayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_onionalign.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_holefiller.cpp
 )
 
 set(TEST_RESOURCES

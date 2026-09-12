@@ -86,6 +86,8 @@ public:
     Status addNewSoundLayer();
     Status deleteCurrentLayer();
     Status mergeLayerDown();
+    /** 镂空检测：一键检测并填充当前帧线稿的封闭镂空/细缝（各像素取最近不透明像素的颜色） */
+    Status fillHolesOnCurrentFrame();
     void changeKeyframeLineColor();
     void changeallKeyframeLineColor();
 
