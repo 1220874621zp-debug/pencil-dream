@@ -105,6 +105,7 @@ public:
 
     void openStartupFile(const QString& filename);
     void openFile(const QString& filename);
+    void openProjectManager();
 
     void displayMessageBox(const QString& title, const QString& body);
     void displayMessageBoxNoTitle(const QString& body);

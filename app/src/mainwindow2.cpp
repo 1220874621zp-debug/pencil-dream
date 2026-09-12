@@ -559,6 +559,13 @@ void MainWindow2::createMenus()
         winMenu->insertAction(ui->menuToolbars->menuAction(), action);
     }
     winMenu->insertSeparator(ui->menuToolbars->menuAction());
+
+    // 工程管理面板：随时可打开（启动时自动弹出的同款面板），支持打开/删除最近工程或新建
+    QAction* projectManagerAction = new QAction(tr("工程管理面板"), this);
+    connect(projectManagerAction, &QAction::triggered, this, &MainWindow2::openProjectManager);
+    winMenu->insertAction(ui->menuToolbars->menuAction(), projectManagerAction);
+    winMenu->insertSeparator(ui->menuToolbars->menuAction());
+
     connect(ui->actionResetWindows, &QAction::triggered, this, &MainWindow2::resetAndDockAllSubWidgets);
     connect(ui->actionLockWindows, &QAction::toggled, this, &MainWindow2::lockWidgets);
     bindPreferenceSetting(ui->actionLockWindows, prefs, SETTING::LAYOUT_LOCK);
@@ -821,6 +828,20 @@ void MainWindow2::openFile(const QString& filename)
     if (maybeSave())
     {
         openObject(filename);
+    }
+}
+
+void MainWindow2::openProjectManager()
+{
+    ProjectManagerDialog manager(this);
+    const int result = manager.exec();
+    if (result == ProjectManagerDialog::OpenProject)
+    {
+        openFile(manager.selectedProject());
+    }
+    else if (result == ProjectManagerDialog::NewProject)
+    {
+        newDocument();
     }
 }
 

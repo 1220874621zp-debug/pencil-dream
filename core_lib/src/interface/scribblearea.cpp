@@ -31,6 +31,7 @@ GNU General Public License for more details.
 #include "object.h"
 #include "editor.h"
 #include "undoredomanager.h"
+#include "undoredocommand.h"
 #include "layerbitmap.h"
 #include "layercolorize.h"
 #include "colorizeupdatemanager.h"
@@ -1698,22 +1699,26 @@ void ScribbleArea::deleteSelection()
 void ScribbleArea::clearImage()
 {
     Layer* layer = mEditor->layers()->currentLayer();
-    if (layer == nullptr) { return; }
+    if (layer == nullptr || !layer->isBitmapKind()) { return; }
 
-    if (layer->type() == Layer::BITMAP)
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+    // 循环层清除目标 = 显示帧（所见即所编辑）
+    BitmapImage* bitmapImage = static_cast<BitmapImage*>(
+        bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+    if (bitmapImage == nullptr || bitmapImage->bounds().isEmpty())
     {
-        SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+        return; // 当前显示帧无关键帧或无像素：不产生空撤销步骤
+    }
 
-        BitmapImage* bitmapImage = currentBitmapImage(layer);
-        if (bitmapImage == nullptr) return;
-        bitmapImage->clear();
-        mEditor->undoRedo()->record(saveStateId, tr("Clear Image", "Undo step text"));
-    }
-    else
-    {
-        return; // skip updates when nothing changes
-    }
-    mEditor->setModified(mEditor->layers()->currentLayerIndex(), mEditor->currentFrame());
+    const int modifiedPos = bitmapImage->pos();
+    // 撤销：显式双快照，针对实际修改的关键帧（不经"当前帧"快照链，循环层/任意帧安全）
+    BitmapImage undoSnapshot = *bitmapImage;
+    bitmapImage->clear();
+    BitmapImage redoSnapshot = *bitmapImage;
+    mEditor->undoRedo()->pushUndoCommand(
+        new BitmapReplaceCommand(&undoSnapshot, &redoSnapshot, layer->id(),
+                                 tr("清除帧", "Undo step text"), mEditor));
+    mEditor->setModified(mEditor->layers()->currentLayerIndex(), modifiedPos);
 }
 
 void ScribbleArea::paletteColorChanged(QColor color)
