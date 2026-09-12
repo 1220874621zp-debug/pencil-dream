@@ -485,32 +485,28 @@ int LayerManager::animationLength(bool includeSounds)
 {
     int maxFrame = -1;
 
+    // TVP 块模型:关键帧位置≠块时长——视频 clip / trim 过的显式块把真实
+    // 时长挂在 key length 上,只看末 key 位置会把"单 key + 长 block"的
+    // 工程算成 1 帧(播放第一拍即到尾自动停)。auto 块 length 恒 1,
+    // 退化为纯位置,与旧行为一致。声音层历来如此(见原实现)。
+    auto extendToKeyEnd = [&maxFrame](KeyFrame* keyFrame)
+    {
+        int endPosition = keyFrame->pos() + (keyFrame->length() - 1);
+        if (endPosition > maxFrame)
+        {
+            maxFrame = endPosition;
+        }
+    };
+
     Object* o = object();
     for (int i = 0; i < o->getLayerCount(); i++)
     {
-        if (o->getLayer(i)->type() == Layer::SOUND)
+        Layer* layer = o->getLayer(i);
+        if (layer->type() == Layer::SOUND && !includeSounds)
         {
-            if (!includeSounds)
-                continue;
-
-            Layer* soundLayer = o->getLayer(i);
-            soundLayer->foreachKeyFrame([&maxFrame](KeyFrame* keyFrame)
-            {
-                int endPosition = keyFrame->pos() + (keyFrame->length() - 1);
-                if (endPosition > maxFrame)
-                {
-                    maxFrame = endPosition;
-                }
-            });
+            continue;
         }
-        else
-        {
-            int lastFramePos = o->getLayer(i)->getMaxKeyFramePosition();
-            if (lastFramePos > maxFrame)
-            {
-                maxFrame = lastFramePos;
-            }
-        }
+        layer->foreachKeyFrame(extendToKeyEnd);
     }
     return maxFrame;
 }

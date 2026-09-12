@@ -21,7 +21,44 @@ GNU General Public License for more details.
 #include "pencilerror.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
+#include "layervideo.h"
 
+TEST_CASE("LayerManager::animationLength() counts key block lengths")
+{
+    Object* object = new Object;
+    Editor* editor = new Editor;
+    editor->setObject(object);
+    LayerManager* layerMgr = new LayerManager(editor);
+    layerMgr->init();
+    object->init();
+
+    SECTION("single key + explicit trailing block")
+    {
+        LayerBitmap* layer = object->addNewBitmapLayer();
+        delete layer->takeKeyFrame(1);
+        BitmapImage* img = new BitmapImage(QRect(0, 0, 4, 4), QColor(255, 0, 0));
+        layer->addKeyFrame(1, img);
+
+        // 单 key@1(auto len=1):退化为旧行为,长度=1
+        REQUIRE(layerMgr->animationLength() == 1);
+
+        // trim 末块拖长(setLength+setLengthExplicit):显式块时长须计入
+        img->setLength(20);
+        img->setLengthExplicit(true);
+        REQUIRE(layerMgr->animationLength() == 20);
+    }
+
+    SECTION("video clip duration counts")
+    {
+        // 参考视频层:单 clip@1,真实时长挂在 length 上(文件缺失=占位层,
+        // clip 照建)。播放范围必须覆盖视频时长,否则第一拍即停。
+        LayerVideo* video = object->addNewVideoLayer();
+        video->setVideoSource("C:/__pencil_test_missing__.mp4", 24.0, 96);
+        REQUIRE(layerMgr->animationLength() == 96);
+    }
+
+    delete editor;
+}
 
 TEST_CASE("LayerManager::init()")
 {
