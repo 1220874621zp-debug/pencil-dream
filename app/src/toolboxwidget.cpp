@@ -236,9 +236,9 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->brushButton);
     buttonGroup->addButton(ui->smudgeButton);
 
-    // 工具组（PS 式）：套索按钮 = 套索/矩形选择；变形按钮 = 变形/移动
+    // 工具组（PS 式）：套索按钮 = 套索/矩形选择；变换按钮 = 移动(默认直显)/变形(长按菜单)
     setupVariantGroup(mSelectionGroup, ui->lassoButton, LASSO, { LASSO, SELECT });
-    setupVariantGroup(mTransformGroup, ui->deformButton, DEFORM, { DEFORM, MOVE });
+    setupVariantGroup(mTransformGroup, ui->deformButton, MOVE, { MOVE, DEFORM });
 }
 
 int ToolBoxWidget::getMinHeightForWidth(int width) const
