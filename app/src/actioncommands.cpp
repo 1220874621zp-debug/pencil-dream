@@ -1153,17 +1153,18 @@ Status ActionCommands::fillHolesOnCurrentFrame()
     Q_CHECK_PTR(img);
 
     // 循环判定：同层同关键帧且画面仍是上轮结果（没画过画/没撤销过）→
-    // 还原到循环前快照、换下一方向重填；否则从"自动最近邻"开新一轮
+    // 还原到循环前快照、换下一方向重填；否则从"左取色"开新一轮。
+    // 交互式试错：方向由用户点击决定（左→右→上→下循环），算法不替用户选
     const bool cycleContinues = mHoleCycleActive
         && mHoleCycleLayerId == layer->id()
         && mHoleCycleFramePos == bitmap->pos()
         && mHoleCycleLastResult == *img;
 
-    int mode = HoleFiller::NearestFill;
+    int mode = HoleFiller::TakeLeft;
     if (cycleContinues)
     {
         *img = mHoleCycleBefore.copy();
-        mode = (mHoleCycleMode + 1) % 3;
+        mode = (mHoleCycleMode + 1) % 4;
     }
     else
     {
@@ -1190,17 +1191,21 @@ Status ActionCommands::fillHolesOnCurrentFrame()
     QString statusTip;
     switch (mode)
     {
-    case HoleFiller::SideA:
-        undoText = tr("镂空检测填充（方向一·左/上侧）", "Undo step text");
-        statusTip = tr("镂空检测：已按方向一（竖缝取左侧、横缝取上侧）整体填色。再点＝方向二（右/下侧）");
+    case HoleFiller::TakeRight:
+        undoText = tr("镂空检测填充（右取色）", "Undo step text");
+        statusTip = tr("镂空检测：已按「右取色」填充。再点＝上取色");
         break;
-    case HoleFiller::SideB:
-        undoText = tr("镂空检测填充（方向二·右/下侧）", "Undo step text");
-        statusTip = tr("镂空检测：已按方向二（竖缝取右侧、横缝取下侧）整体填色。再点＝回到自动最近邻");
+    case HoleFiller::TakeUp:
+        undoText = tr("镂空检测填充（上取色）", "Undo step text");
+        statusTip = tr("镂空检测：已按「上取色」填充。再点＝下取色");
+        break;
+    case HoleFiller::TakeDown:
+        undoText = tr("镂空检测填充（下取色）", "Undo step text");
+        statusTip = tr("镂空检测：已按「下取色」填充。再点＝回到左取色");
         break;
     default:
-        undoText = tr("镂空检测填充（最近邻）", "Undo step text");
-        statusTip = tr("镂空检测：已按最近参考色填充（细缝两侧各取各的）。再点＝方向一（竖缝左侧/横缝上侧整体取色）");
+        undoText = tr("镂空检测填充（左取色）", "Undo step text");
+        statusTip = tr("镂空检测：已按「左取色」填充。再点＝右取色（左→右→上→下循环，直到满意为止）");
         break;
     }
 

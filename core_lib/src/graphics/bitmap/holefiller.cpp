@@ -353,112 +353,27 @@ int HoleFiller::fillHoles(QImage& img, const int mode)
         }
     }
 
-    // ---- 4b. 方向模式：每个掩码连通域求主轴，沿垂直主轴的指定一侧整体取色 ----
-    if (mode == SideA || mode == SideB)
+    // ---- 4b. 方向取色：所有待填像素沿用户指定方向（左/右/上/下）步进取第一参考色 ----
+    if (mode == TakeLeft || mode == TakeRight || mode == TakeUp || mode == TakeDown)
     {
-        std::vector<int32_t> mcomp(n, 0);
-        std::vector<int32_t> cstack;
-        std::vector<std::vector<int32_t>> compPixels;
-        for (int sy = 0; sy < h; ++sy)
+        double dx = 0.0, dy = 0.0;
+        switch (mode)
         {
-            for (int sx = 0; sx < w; ++sx)
-            {
-                const size_t s = static_cast<size_t>(sy) * w + sx;
-                if (fillMask[s] == 0 || mcomp[s] != 0)
-                    continue;
-                const int32_t id = static_cast<int32_t>(compPixels.size()) + 1;
-                compPixels.emplace_back();
-                std::vector<int32_t>& pixels = compPixels.back();
-                mcomp[s] = id;
-                cstack.clear();
-                cstack.push_back(static_cast<int32_t>(s));
-                while (!cstack.empty())
-                {
-                    const int32_t cur = cstack.back();
-                    cstack.pop_back();
-                    pixels.push_back(cur);
-                    const int cy = cur / w;
-                    const int cx = cur % w;
-                    for (int dy = -1; dy <= 1; ++dy)
-                    {
-                        const int ny = cy + dy;
-                        if (ny < 0 || ny >= h)
-                            continue;
-                        for (int dx = -1; dx <= 1; ++dx)
-                        {
-                            const int nx = cx + dx;
-                            if (nx < 0 || nx >= w)
-                                continue;
-                            const size_t ni = static_cast<size_t>(ny) * w + nx;
-                            if (fillMask[ni] != 0 && mcomp[ni] == 0)
-                            {
-                                mcomp[ni] = id;
-                                cstack.push_back(static_cast<int32_t>(ni));
-                            }
-                        }
-                    }
-                }
-            }
+        case TakeLeft:  dx = -1.0; break;
+        case TakeRight: dx = 1.0; break;
+        case TakeUp:    dy = -1.0; break;
+        case TakeDown:  dy = 1.0; break;
         }
-
-        for (const std::vector<int32_t>& pixels : compPixels)
+        for (int y = 0; y < h; ++y)
         {
-            // 太小的域没有方向可言（孤立点/两点），整域保留 BFS 最近色回退
-            if (pixels.size() < 3)
-                continue;
-
-            // 主轴 = 坐标协方差矩阵的最大特征向量（PCA）
-            double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0, sumYY = 0.0;
-            for (const int32_t idx : pixels)
+            for (int x = 0; x < w; ++x)
             {
-                const double fx = idx % w;
-                const double fy = idx / w; // 整除即行号
-                sumX += fx; sumY += fy;
-                sumXX += fx * fx; sumXY += fx * fy; sumYY += fy * fy;
-            }
-            const double cnt = static_cast<double>(pixels.size());
-            const double mx = sumX / cnt, my = sumY / cnt;
-            const double cxx = sumXX / cnt - mx * mx;
-            const double cyy = sumYY / cnt - my * my;
-            const double cxy = sumXY / cnt - mx * my;
-
-            // 主轴 = 协方差最大特征向量；协方差近似对角（含 cxy 浮点残差）时
-            // (cxy, λ-cxx) 数值退化，回退到方差大的坐标轴方向
-            const double lambda = (cxx + cyy + std::sqrt((cxx - cyy) * (cxx - cyy) + 4.0 * cxy * cxy)) / 2.0;
-            double ux = cxy;
-            double uy = lambda - cxx;
-            const double un = std::hypot(ux, uy);
-            if (un < 1e-6 * std::max(std::max(cxx, cyy), 1.0))
-            {
-                ux = cxx >= cyy ? 1.0 : 0.0;
-                uy = cxx >= cyy ? 0.0 : 1.0;
-            }
-            else
-            {
-                ux /= un;
-                uy /= un;
-            }
-
-            // 垂直主轴方向规范成"左/上"：按主导分量定符号——
-            // 水平分量主导取 px<0（竖缝左右分），垂直分量主导取 py<0（横缝上下分）
-            double px = -uy, py = ux;
-            const bool flip = std::abs(px) > std::abs(py) ? px > 0.0 : py > 0.0;
-            if (flip)
-            {
-                px = -px;
-                py = -py;
-            }
-            if (mode == SideB)
-            {
-                px = -px;
-                py = -py;
-            }
-
-            for (const int32_t idx : pixels)
-            {
-                const int hit = marchSeed(idx % w, idx / w, px, py, seedMask, w, h);
+                const size_t i = static_cast<size_t>(y) * w + x;
+                if (fillMask[i] == 0 || dist[i] <= 0)
+                    continue;
+                const int hit = marchSeed(x, y, dx, dy, seedMask, w, h);
                 if (hit >= 0)
-                    color[idx] = color[hit]; // 扫空则保留 BFS 最近色（回退）
+                    color[i] = color[hit]; // 射线扫空（逃逸出画面）保留 BFS 最近色回退
             }
         }
     }
