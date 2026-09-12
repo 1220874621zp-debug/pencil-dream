@@ -339,3 +339,13 @@ elseif(WIN32)
     # Windows installation
     install(TARGETS pencil2d DESTINATION .)
 endif()
+
+# Windows: deploy Qt runtime next to the executable after each build so the
+# build tree is a self-contained, distributable folder (windeployqt skips
+# files that are already up to date, keeping incremental builds fast)
+if(WIN32 AND TARGET Qt6::windeployqt)
+    add_custom_command(TARGET pencil2d POST_BUILD
+        COMMAND Qt6::windeployqt "$<TARGET_FILE:pencil2d>"
+        COMMENT "Deploying Qt runtime next to pencil2d.exe"
+    )
+endif()
