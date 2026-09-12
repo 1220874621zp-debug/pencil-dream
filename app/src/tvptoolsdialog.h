@@ -58,6 +58,9 @@ class PaletteExtractDialog : public QDialog
 public:
     explicit PaletteExtractDialog(Editor* editor, QWidget* parent = nullptr);
 
+    /** TVP式量化取主色（设定卡片面板共用）：5-bit分桶→按数量取前N桶→桶内最常见原色 */
+    static QList<QRgb> extractColors(const QImage& image, int wanted);
+
 private slots:
     void pickImageAndExtract();
 

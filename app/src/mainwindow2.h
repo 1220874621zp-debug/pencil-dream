@@ -39,6 +39,7 @@ class PreviewWidget;
 class ColorBox;
 class ColorInspector;
 class BrushPresetPanel;
+class ReferenceCardPanel;
 class RecentFileMenu;
 class ActionCommands;
 class ImportImageSeqDialog;
@@ -203,6 +204,7 @@ private:
     ColorInspector*       mColorInspector = nullptr;
     BrushPresetPanel*     mBrushPresetPanel = nullptr;
     OnionSkinWidget*      mOnionSkinWidget = nullptr;
+    ReferenceCardPanel*   mReferenceCardPanel = nullptr;
     QToolBar*             mMainToolbar = nullptr;
     QToolBar*             mViewToolbar = nullptr;
     QToolBar*             mOverlayToolbar = nullptr;

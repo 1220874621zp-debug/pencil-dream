@@ -111,6 +111,7 @@ HEADERS += \
     src/cameracontextmenu.h \
     src/camerapropertiesdialog.h \
     src/filedialog.h \
+    src/referencecardpanel.h \
     src/pencil2d.h \
     src/exportmoviedialog.h \
     src/app_util.h \
@@ -162,6 +163,7 @@ SOURCES += \
     src/toolspage.cpp \
     src/titlebarwidget.cpp \
     src/basedockwidget.cpp \
+    src/referencecardpanel.cpp \
     src/colorbox.cpp \
     src/colorinspector.cpp \
     src/colorpalettewidget.cpp \

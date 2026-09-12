@@ -69,6 +69,7 @@ GNU General Public License for more details.
 #include "colorinspector.h"
 #include "colorpalettewidget.h"
 #include "brushpresetpanel.h"
+#include "referencecardpanel.h"
 #include "tooloptionwidget.h"
 #include "preferencesdialog.h"
 #include "ocaexportdialog.h"
@@ -242,6 +243,9 @@ void MainWindow2::createDockWidgets()
     mOnionSkinWidget = new OnionSkinWidget(this);
     mOnionSkinWidget->setObjectName("Onion Skin");
 
+    mReferenceCardPanel = new ReferenceCardPanel(this);
+    mReferenceCardPanel->setObjectName("ReferenceCard");
+
     mToolOptions = new ToolOptionWidget(this);
     mToolOptions->setObjectName("ToolOption");
 
@@ -255,6 +259,7 @@ void MainWindow2::createDockWidgets()
         << mColorPalette
         << mBrushPresetPanel
         << mOnionSkinWidget
+        << mReferenceCardPanel
         << mToolOptions
         << mToolBox;
 
@@ -286,6 +291,9 @@ void MainWindow2::createDockWidgets()
     tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
+    // 设定卡片：独立浮动窗口（窗口菜单可开合）
+    addDockWidget(Qt::RightDockWidgetArea, mReferenceCardPanel);
+    mReferenceCardPanel->setFloating(true);
     setDockNestingEnabled(true);
     // give the timeline a generous share of the window height
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
@@ -540,7 +548,8 @@ void MainWindow2::createMenus()
         mColorPalette->toggleViewAction(),
         mTimeLine->toggleViewAction(),
         mColorInspector->toggleViewAction(),
-        mOnionSkinWidget->toggleViewAction()
+        mOnionSkinWidget->toggleViewAction(),
+        mReferenceCardPanel->toggleViewAction()
     };
 
     for (QAction* action : actions)
@@ -1180,6 +1189,7 @@ void MainWindow2::resetAndDockAllSubWidgets()
     tabifyDockWidget(mColorPalette, mColorInspector);
     tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
+    addDockWidget(Qt::RightDockWidgetArea, mReferenceCardPanel);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
     mColorPalette->raise();
@@ -1278,6 +1288,7 @@ void MainWindow2::applyDefaultWorkspace()
     tabifyDockWidget(mColorPalette, mColorInspector);
     tabifyDockWidget(mColorPalette, mBrushPresetPanel);
     addDockWidget(Qt::RightDockWidgetArea, mOnionSkinWidget);
+    addDockWidget(Qt::RightDockWidgetArea, mReferenceCardPanel);
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
     mColorPalette->raise();

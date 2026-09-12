@@ -265,27 +265,13 @@ PaletteExtractDialog::PaletteExtractDialog(Editor* editor, QWidget* parent)
     connect(pickButton, &QPushButton::clicked, this, &PaletteExtractDialog::pickImageAndExtract);
 }
 
-void PaletteExtractDialog::pickImageAndExtract()
+// TVP-style quantization: 5-bit bins, top-N bins by population,
+// the most common original color inside each bin wins
+QList<QRgb> PaletteExtractDialog::extractColors(const QImage& image, int wanted)
 {
-    QSettings settings("Pencil", "Pencil");
-    const QString lastDir = settings.value("paletteExtractLastDir").toString();
-    const QString path = QFileDialog::getOpenFileName(this, tr("选择图片"), lastDir);
-    if (path.isEmpty()) { return; }
-    settings.setValue("paletteExtractLastDir", QFileInfo(path).absolutePath());
-
-    QImageReader reader(path);
-    reader.setAutoTransform(true);
-    const QImage image = reader.read();
-    if (image.isNull())
-    {
-        QMessageBox::warning(this, tr("调色板提取"), tr("无法读取图片：%1").arg(reader.errorString()));
-        return;
-    }
+    QList<QRgb> result;
     const QImage src = image.convertToFormat(QImage::Format_ARGB32);
 
-    // TVP-style quantization: 5-bit bins, top-N bins by population,
-    // the most common original color inside each bin wins
-    const int wanted = mCountSpin->value();
     QHash<int, int> binTotal;
     QHash<int, QHash<QRgb, int>> binColors;
     const int step = qMax(1, static_cast<int>(qLn(src.width() * src.height()) - 6.0));
@@ -305,8 +291,6 @@ void PaletteExtractDialog::pickImageAndExtract()
     std::sort(bins.begin(), bins.end(), [&binTotal](int a, int b) { return binTotal[a] > binTotal[b]; });
     bins = bins.mid(0, wanted);
 
-    mLastColors.clear();
-    QStringList hexList;
     for (int bin : bins)
     {
         const QHash<QRgb, int>& colors = binColors[bin];
@@ -320,13 +304,38 @@ void PaletteExtractDialog::pickImageAndExtract()
                 best = it.key();
             }
         }
-        mLastColors.append(best);
+        result.append(best);
+    }
+    return result;
+}
+
+void PaletteExtractDialog::pickImageAndExtract()
+{
+    QSettings settings("Pencil", "Pencil");
+    const QString lastDir = settings.value("paletteExtractLastDir").toString();
+    const QString path = QFileDialog::getOpenFileName(this, tr("选择图片"), lastDir);
+    if (path.isEmpty()) { return; }
+    settings.setValue("paletteExtractLastDir", QFileInfo(path).absolutePath());
+
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+    if (image.isNull())
+    {
+        QMessageBox::warning(this, tr("调色板提取"), tr("无法读取图片：%1").arg(reader.errorString()));
+        return;
+    }
+    mLastColors = extractColors(image, mCountSpin->value());
+    if (mLastColors.isEmpty()) { return; }
+
+    QStringList hexList;
+    for (QRgb best : mLastColors)
+    {
         hexList << QString("#%1%2%3")
                        .arg(qRed(best), 2, 16, QChar('0'))
                        .arg(qGreen(best), 2, 16, QChar('0'))
                        .arg(qBlue(best), 2, 16, QChar('0')).toUpper();
     }
-    if (mLastColors.isEmpty()) { return; }
 
     QApplication::clipboard()->setText(hexList.join(" "));
 
