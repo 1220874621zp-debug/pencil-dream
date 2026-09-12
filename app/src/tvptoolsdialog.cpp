@@ -16,6 +16,9 @@ GNU General Public License for more details.
 */
 #include "tvptoolsdialog.h"
 
+#include <algorithm>
+#include <limits>
+
 #include <QApplication>
 #include <QClipboard>
 #include <QFileDialog>
@@ -265,34 +268,48 @@ PaletteExtractDialog::PaletteExtractDialog(Editor* editor, QWidget* parent)
     connect(pickButton, &QPushButton::clicked, this, &PaletteExtractDialog::pickImageAndExtract);
 }
 
-// TVP-style quantization: 5-bit bins, top-N bins by population,
-// the most common original color inside each bin wins
+// 量化主色：粗分桶取众数作初始中心（确定性播种），k-means(Lloyd) 迭代收敛，
+// 簇均值即代表色。相比按桶人口直取，能聚合被细桶打散的相近色、
+// 避免抗锯齿混色与背景灰阶霸占前排。
 QList<QRgb> PaletteExtractDialog::extractColors(const QImage& image, int wanted)
 {
     QList<QRgb> result;
+    if (image.isNull() || wanted <= 0) { return result; }
     const QImage src = image.convertToFormat(QImage::Format_ARGB32);
 
+    // 步进采样，样本量级控制在 ~4 万
+    const int step = qMax(1, static_cast<int>(qSqrt(src.width() * src.height() / 40000.0)));
+
+    QVector<QRgb> samples;
     QHash<int, int> binTotal;
     QHash<int, QHash<QRgb, int>> binColors;
-    const int step = qMax(1, static_cast<int>(qLn(src.width() * src.height()) - 6.0));
     for (int y = 0; y < src.height(); y += step)
     {
         for (int x = 0; x < src.width(); x += step)
         {
             const QRgb rgb = src.pixel(x, y);
             if (qAlpha(rgb) < 16) { continue; }
+            samples.append(rgb);
             const int bin = ((qRed(rgb) >> 3) << 10) | ((qGreen(rgb) >> 3) << 5) | (qBlue(rgb) >> 3);
             binTotal[bin] += 1;
             binColors[bin][rgb] += 1;
         }
     }
+    if (samples.isEmpty()) { return result; }
 
+    struct Center
+    {
+        double r = 0.0, g = 0.0, b = 0.0;
+    };
+
+    // 初始中心：按桶人口降序取桶众数；与已选中心过近的跳过，保证互不相同
     QList<int> bins = binTotal.keys();
     std::sort(bins.begin(), bins.end(), [&binTotal](int a, int b) { return binTotal[a] > binTotal[b]; });
-    bins = bins.mid(0, wanted);
-
-    for (int bin : bins)
+    QVector<Center> centers;
+    const double seedDistSq = 60.0 * 60.0;
+    for (int bin : std::as_const(bins))
     {
+        if (centers.size() >= wanted) { break; }
         const QHash<QRgb, int>& colors = binColors[bin];
         QRgb best = 0;
         int bestCount = -1;
@@ -304,7 +321,89 @@ QList<QRgb> PaletteExtractDialog::extractColors(const QImage& image, int wanted)
                 best = it.key();
             }
         }
-        result.append(best);
+        const Center candidate { static_cast<double>(qRed(best)),
+                                 static_cast<double>(qGreen(best)),
+                                 static_cast<double>(qBlue(best)) };
+        bool tooClose = false;
+        for (const Center& c : centers)
+        {
+            const double dr = candidate.r - c.r;
+            const double dg = candidate.g - c.g;
+            const double db = candidate.b - c.b;
+            if (dr * dr + dg * dg + db * db < seedDistSq) { tooClose = true; break; }
+        }
+        if (!tooClose) { centers.append(candidate); }
+    }
+    if (centers.isEmpty()) { return result; }
+
+    // Lloyd 迭代：样本归入最近中心，中心取簇均值
+    const int k = centers.size();
+    QVector<double> sumR(k), sumG(k), sumB(k);
+    QVector<int> count(k);
+    for (int iter = 0; iter < 24; ++iter)
+    {
+        std::fill(sumR.begin(), sumR.end(), 0.0);
+        std::fill(sumG.begin(), sumG.end(), 0.0);
+        std::fill(sumB.begin(), sumB.end(), 0.0);
+        std::fill(count.begin(), count.end(), 0);
+
+        for (const QRgb rgb : std::as_const(samples))
+        {
+            const double r = qRed(rgb), g = qGreen(rgb), b = qBlue(rgb);
+            int best = 0;
+            double bestDist = std::numeric_limits<double>::max();
+            for (int c = 0; c < k; ++c)
+            {
+                const double dr = r - centers[c].r;
+                const double dg = g - centers[c].g;
+                const double db = b - centers[c].b;
+                const double dist = dr * dr + dg * dg + db * db;
+                if (dist < bestDist) { bestDist = dist; best = c; }
+            }
+            sumR[best] += r;
+            sumG[best] += g;
+            sumB[best] += b;
+            count[best] += 1;
+        }
+
+        double maxMove = 0.0;
+        for (int c = 0; c < k; ++c)
+        {
+            if (count[c] == 0) { continue; }   // 空簇保留原中心，输出时剔除
+            const Center mean { sumR[c] / count[c], sumG[c] / count[c], sumB[c] / count[c] };
+            const double dr = mean.r - centers[c].r;
+            const double dg = mean.g - centers[c].g;
+            const double db = mean.b - centers[c].b;
+            maxMove = qMax(maxMove, dr * dr + dg * dg + db * db);
+            centers[c] = mean;
+        }
+        if (maxMove < 0.25) { break; }   // 已收敛
+    }
+
+    // 输出：按簇人口降序，近距离去重（防止近似色重复占位）
+    QVector<QPair<int, QRgb>> ranked;
+    for (int c = 0; c < k; ++c)
+    {
+        if (count[c] == 0) { continue; }
+        ranked.append(qMakePair(count[c],
+                                qRgb(qRound(centers[c].r), qRound(centers[c].g), qRound(centers[c].b))));
+    }
+    std::sort(ranked.begin(), ranked.end(),
+              [](const QPair<int, QRgb>& a, const QPair<int, QRgb>& b) { return a.first > b.first; });
+
+    const double dedupeDistSq = 40.0 * 40.0;
+    for (const auto& entry : std::as_const(ranked))
+    {
+        const double r = qRed(entry.second), g = qGreen(entry.second), b = qBlue(entry.second);
+        bool duplicate = false;
+        for (const QRgb rgb : std::as_const(result))
+        {
+            const double dr = r - qRed(rgb);
+            const double dg = g - qGreen(rgb);
+            const double db = b - qBlue(rgb);
+            if (dr * dr + dg * dg + db * db < dedupeDistSq) { duplicate = true; break; }
+        }
+        if (!duplicate) { result.append(entry.second); }
     }
     return result;
 }
