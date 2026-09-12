@@ -104,6 +104,33 @@ TEST_CASE("holefiller crack reaching the border is caught by closing")
     REQUIRE(img.pixel(35, 32) == RED);
 }
 
+TEST_CASE("holefiller interior miss behind a narrow channel is filled together")
+{
+    // 用户场景：色块中间的镂空通过笔触缺口（细通道）与外界连通——
+    // 老"连到边界即背景"的判定会把镂空留下；开运算抹掉通道后
+    // 镂空与边界断开，通道+镂空应整片填掉
+    QImage img = makeImage(64, 64);
+    fillRect(img, 4, 12, 59, 59, RED);           // 红色块，上缘留 12px 透明边距（≥11px 保持背景）
+    fillRect(img, 20, 32, 39, 51, 0);            // 色块中央 20x20 镂空
+    fillRect(img, 29, 0, 32, 31, 0);             // 4px 细通道：从画面上边穿过边距直插镂空
+
+    const int filled = HoleFiller::fillHoles(img);
+    REQUIRE(filled > 0);
+
+    // 镂空整体填成红色
+    for (int y = 36; y <= 47; ++y)
+        for (int x = 24; x <= 35; ++x)
+            REQUIRE(img.pixel(x, y) == RED);
+
+    // 色块内的通道段（越过贴边保守区/背景膨胀环）也填掉
+    REQUIRE(img.pixel(30, 22) == RED);
+    REQUIRE(img.pixel(30, 28) == RED);
+
+    // 边距仍保持透明（宽边距不是镂空），通道贴边段开放
+    REQUIRE(qAlpha(img.pixel(10, 5)) == 0);
+    REQUIRE(qAlpha(img.pixel(30, 8)) == 0);
+}
+
 TEST_CASE("holefiller each side of a crack takes its own nearest color")
 {
     QImage img = makeImage(64, 64);
@@ -198,16 +225,16 @@ TEST_CASE("holefiller directional fill uses up and down sides for horizontal cra
 
     QImage imgU = img;
     REQUIRE(HoleFiller::fillHoles(imgU, HoleFiller::TakeUp) > 0);
-    // 上取色：整条缝取绿
+    // 上取色：整条缝取绿（缝口 ~8px 开放带不断言）
     for (int y = 22; y <= 26; ++y)
-        for (int x = 8; x <= 55; ++x)
+        for (int x = 12; x <= 51; ++x)
             REQUIRE(imgU.pixel(x, y) == GREEN);
 
     QImage imgD = img;
     REQUIRE(HoleFiller::fillHoles(imgD, HoleFiller::TakeDown) > 0);
     // 下取色：整条缝取橙
     for (int y = 22; y <= 26; ++y)
-        for (int x = 8; x <= 55; ++x)
+        for (int x = 12; x <= 51; ++x)
             REQUIRE(imgD.pixel(x, y) == ORANGE);
 }
 
