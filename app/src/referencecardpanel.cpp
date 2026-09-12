@@ -40,6 +40,7 @@ GNU General Public License for more details.
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -91,10 +92,20 @@ void ReferenceCardCanvas::setMarkerMode(bool marker)
 void ReferenceCardCanvas::fitToWindow()
 {
     if (mImage.isNull()) { return; }
-    const qreal sx = width() / static_cast<qreal>(mImage.width());
-    const qreal sy = height() / static_cast<qreal>(mImage.height());
-    mScale = qBound(0.02, qMin(sx, sy) * 0.95, 16.0);
-    mPan = QPointF((width() - mImage.width() * mScale) / 2.0,
+    if (width() < 20 || height() < 20)
+    {
+        // 面板刚打开画布尺寸未就绪，等布局完成后再适配
+        QTimer::singleShot(0, this, &ReferenceCardCanvas::fitToWindow);
+        return;
+    }
+    // 右侧为色块列预留一列宽度，"图+色块列"整体在画布内居中
+    const qreal columnW = SWATCH_W + 24.0;
+    const qreal availW = qMax(80.0, width() - columnW);
+    mScale = qBound(0.02,
+                    0.95 * qMin(availW / static_cast<qreal>(mImage.width()),
+                                height() / static_cast<qreal>(mImage.height())),
+                    16.0);
+    mPan = QPointF((width() - mImage.width() * mScale - columnW) / 2.0,
                    (height() - mImage.height() * mScale) / 2.0);
     update();
 }
@@ -164,7 +175,7 @@ void ReferenceCardCanvas::saveSidecar()
     file.write(QJsonDocument(root).toJson());
 }
 
-bool ReferenceCardCanvas::loadSidecarData(const QString& jsonPath, bool restoreView)
+bool ReferenceCardCanvas::loadSidecarData(const QString& jsonPath)
 {
     QFile file(jsonPath);
     if (!file.open(QIODevice::ReadOnly)) { return false; }
@@ -209,20 +220,7 @@ bool ReferenceCardCanvas::loadSidecarData(const QString& jsonPath, bool restoreV
         }
         if (line.points.size() >= 2) { mLines.append(line); }
     }
-
-    if (restoreView)
-    {
-        const QJsonObject view = root["view"].toObject();
-        if (view.contains("scale"))
-        {
-            mScale = qBound(0.02, view["scale"].toDouble(1.0), 16.0);
-            mPan = QPointF(view["panX"].toDouble(0.0), view["panY"].toDouble(0.0));
-        }
-        else
-        {
-            fitToWindow();
-        }
-    }
+    // 视图不恢复：载入后按当前窗口重新适配，保证图片大小与色块列排版合理
     return true;
 }
 
@@ -245,14 +243,14 @@ bool ReferenceCardCanvas::loadImage(const QString& path, int extractCount)
     mDraftPoints.clear();
     mSelected.clear();
 
-    if (QFile::exists(sidecarPath()) && loadSidecarData(sidecarPath(), true))
+    if (QFile::exists(sidecarPath()) && loadSidecarData(sidecarPath()))
     {
-        // 旁路文件恢复成功，保留其色块/标记线/视图
+        // 旁路文件恢复色块/标记线，视图按当前窗口重新适配
+        fitToWindow();
     }
     else
     {
-        fitToWindow();
-        extractSwatches(extractCount);   // 首次导入自动提取
+        extractSwatches(extractCount);   // 内部含 fitToWindow
     }
     emit imageChanged(true);
     update();
@@ -310,12 +308,12 @@ bool ReferenceCardCanvas::importPreset(const QString& jsonPath)
     mImagePath = QFileInfo(resolved).absoluteFilePath();
     mDraftPoints.clear();
     mSelected.clear();
-    if (!loadSidecarData(jsonPath, true))
+    if (!loadSidecarData(jsonPath))
     {
         mSwatches.clear();
         mLines.clear();
-        fitToWindow();
     }
+    fitToWindow();
     emit imageChanged(true);
     update();
     return true;
@@ -330,15 +328,18 @@ void ReferenceCardCanvas::extractSwatches(int count)
 
     mSwatches.clear();
     mSelected.clear();
-    // 初始排在图片右侧一列，间距按当前缩放折算成图像坐标
-    const qreal colX = mImage.width() + 24.0 / mScale;
-    const qreal stepYImage = (SWATCH_H + LABEL_H + 12.0) / mScale;
-    for (int i = 0; i < colors.size(); ++i)
+    fitToWindow();
+
+    // 初始列贴图片右缘、纵向等分图高：任何缩放下都与图片等比、保持紧凑
+    const qreal colX = mImage.width() + 12.0 / mScale;
+    const int n = colors.size();
+    for (int i = 0; i < n; ++i)
     {
         RefColorSwatch s;
         s.color = QColor::fromRgb(colors[i]);
         s.name = tr("颜色%1").arg(i + 1);
-        s.pos = QPointF(colX, (16.0 + i * stepYImage) / mScale);
+        // 锚点是色块左上角：等分中心减半个块高（块高为屏幕像素，折回图坐标）
+        s.pos = QPointF(colX, mImage.height() * (i + 0.5) / n - SWATCH_H / (2.0 * mScale));
         mSwatches.append(s);
     }
     saveSidecar();

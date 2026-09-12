@@ -93,7 +93,7 @@ private:
 
     QString sidecarPath() const;
     void    saveSidecar();
-    bool    loadSidecarData(const QString& jsonPath, bool restoreView);
+    bool    loadSidecarData(const QString& jsonPath);
 
     void ensureScaledCache();
 
