@@ -67,6 +67,9 @@ public:
     QString mainXMLFile() const { return mMainXMLFile; }
     void    setMainXMLFile(const QString& file) { mMainXMLFile = file; }
 
+    QString referenceCardImage() const { return mReferenceCardImage; }
+    void    setReferenceCardImage(const QString& path) { mReferenceCardImage = path; }
+
     QDomElement saveXML(QDomDocument& doc) const;
     bool loadXML(const QDomElement& element, ProgressCallback progressForward);
 
@@ -254,6 +257,7 @@ private:
     QString mWorkingDirPath; //< the folder that pclx will uncompress to.
     QString mDataDirPath;    //< the folder which contains all bitmap image & sound files.
     QString mMainXMLFile;    //< the location of main.xml
+    QString mReferenceCardImage; //< 设定卡片当前设定图绝对路径（色块/标记线数据在图片旁 .setcard.json）
 
     QList<Layer*> mLayers;
     quint32 mLayerStructureGeneration = 0;

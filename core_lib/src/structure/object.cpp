@@ -93,6 +93,13 @@ QDomElement Object::saveXML(QDomDocument& doc) const
         }
         objectTag.appendChild(groupsTag);
     }
+
+    if (!mReferenceCardImage.isEmpty())
+    {
+        QDomElement refTag = doc.createElement("referenceCard");
+        refTag.setAttribute("image", QDir::toNativeSeparators(mReferenceCardImage));
+        objectTag.appendChild(refTag);
+    }
     return objectTag;
 }
 
@@ -108,6 +115,11 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
     for (QDomNode node = docElem.firstChild(); !node.isNull(); node = node.nextSibling())
     {
         QDomElement element = node.toElement(); // try to convert the node to an element.
+        if (element.tagName() == "referenceCard")
+        {
+            mReferenceCardImage = element.attribute("image");
+            continue;
+        }
         if (element.tagName() != "layer")
         {
             continue;

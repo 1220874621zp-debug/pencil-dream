@@ -47,6 +47,7 @@ GNU General Public License for more details.
 #include "colormanager.h"
 #include "editor.h"
 #include "filedialog.h"
+#include "object.h"
 #include "tvptoolsdialog.h"
 
 namespace
@@ -896,6 +897,26 @@ void ReferenceCardCanvas::createSwatchAt(const QPointF& widgetPos)
     update();
 }
 
+void ReferenceCardCanvas::clearAll()
+{
+    mImage = QImage();
+    mImagePath.clear();
+    mSwatches.clear();
+    mLines.clear();
+    mDraftPoints.clear();
+    mSelected.clear();
+    mPressIndex = -1;
+    mDragging = false;
+    mRubberActive = false;
+    mPanning = false;
+    mScale = 1.0;
+    mPan = QPointF(0.0, 0.0);
+    mScaledCache = QPixmap();
+    mCacheScale = -1.0;
+    update();
+    emit imageChanged(false);
+}
+
 // --------------------------------------------------------------- 面板 ---+
 
 ReferenceCardPanel::ReferenceCardPanel(QWidget* parent)
@@ -960,6 +981,34 @@ void ReferenceCardPanel::initUI()
     });
     connect(mCanvas, &ReferenceCardCanvas::requestImport, this, &ReferenceCardPanel::importImage);
     connect(mCanvas, &ReferenceCardCanvas::imageChanged, mExtractButton, &QPushButton::setEnabled);
+
+    // 工程打开/切换：按工程记录的设定图自动恢复；换图则写回工程并标记已修改
+    connect(editor(), &Editor::objectLoaded, this, &ReferenceCardPanel::syncFromObject);
+    connect(mCanvas, &ReferenceCardCanvas::imageChanged, this, [this](bool hasImage)
+    {
+        if (!hasImage) { return; }
+        Object* obj = editor()->object();
+        if (obj != nullptr && obj->referenceCardImage() != mCanvas->imagePath())
+        {
+            obj->setReferenceCardImage(mCanvas->imagePath());
+            obj->modification();   // 进入"已修改"状态，保存时写入 main.xml
+        }
+    });
+}
+
+void ReferenceCardPanel::syncFromObject()
+{
+    Object* obj = editor()->object();
+    const QString path = (obj != nullptr) ? obj->referenceCardImage() : QString();
+    if (path.isEmpty() || !QFile::exists(path))
+    {
+        mCanvas->clearAll();
+        return;
+    }
+    if (path != mCanvas->imagePath())
+    {
+        mCanvas->loadImage(path);
+    }
 }
 
 void ReferenceCardPanel::importImage()

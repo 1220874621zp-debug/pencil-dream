@@ -64,6 +64,8 @@ public:
     static QString sidecarPathFor(const QString& imagePath);
 
     bool hasImage() const { return !mImage.isNull(); }
+    QString imagePath() const { return mImagePath; }
+    void clearAll();   // 清空图片/色块/标记线（工程切换）
 
 signals:
     void requestImport();               // 空白菜布右键「导入图片」
@@ -151,6 +153,7 @@ private:
     void importImage();
     void importPreset();
     void reextractSwatches();
+    void syncFromObject();   // 工程打开/切换：按工程记录的设定图自动恢复或清空
 
     ReferenceCardCanvas* mCanvas = nullptr;
     QPushButton* mImportButton = nullptr;
