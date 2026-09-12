@@ -365,7 +365,7 @@ void MainWindow2::createMenus()
     connect(ui->actionCopy, &QAction::triggered, mEditor, &Editor::copy);
     connect(ui->actionPaste_Previous, &QAction::triggered, mEditor, &Editor::pasteFromPreviousFrame);
     connect(ui->actionPaste, &QAction::triggered, mEditor, &Editor::paste);
-    connect(ui->actionClearFrame, &QAction::triggered, mEditor, &Editor::clearCurrentFrame);
+    connect(ui->actionClearFrame, &QAction::triggered, mCommands, &ActionCommands::clearCurrentLayerCanvas);
     connect(mEditor->select(), &SelectionManager::selectionChanged, this, &MainWindow2::selectionChanged);
     connect(ui->actionFlip_X, &QAction::triggered, mCommands, &ActionCommands::flipSelectionX);
     connect(ui->actionFlip_Y, &QAction::triggered, mCommands, &ActionCommands::flipSelectionY);

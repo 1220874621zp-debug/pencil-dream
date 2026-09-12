@@ -999,11 +999,6 @@ void Editor::prepareSave()
     }
 }
 
-void Editor::clearCurrentFrame()
-{
-    mScribbleArea->clearImage();
-}
-
 bool Editor::canCopy() const
 {
     Layer* layer = layers()->currentLayer();

@@ -172,8 +172,6 @@ public: //slots
 
     void setModified(int layerNumber, int frameNumber);
 
-    void clearCurrentFrame();
-
     Status importImage(const QString& filePath, ImportImageConfig importConfig);
     Status importAnimatedImage(const QString& filePath, int frameSpacing, const std::function<void (int)>& progressChanged, const std::function<bool ()>& wasCanceled);
 

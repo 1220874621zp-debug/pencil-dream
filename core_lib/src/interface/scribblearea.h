@@ -156,7 +156,6 @@ signals:
     void requestFocus(QWidget* widget);
 
 public slots:
-    void clearImage();
     void setCurveSmoothing(int);
     void increaseLayerVisibilityIndex();
     void decreaseLayerVisibilityIndex();

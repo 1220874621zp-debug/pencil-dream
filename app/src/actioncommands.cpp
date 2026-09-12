@@ -32,6 +32,9 @@ GNU General Public License for more details.
 #include "viewmanager.h"
 #include "layermanager.h"
 #include "undoredomanager.h"
+#include "undoredocommand.h"
+#include "layerbitmap.h"
+#include "bitmapimage.h"
 #include "scribblearea.h"
 #include "toolmanager.h"
 #include "soundmanager.h"
@@ -1163,6 +1166,47 @@ Status ActionCommands::fillHolesOnCurrentFrame()
 
     mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
     mEditor->undoRedo()->record(saveStateId, tr("镂空检测填充", "Undo step text"));
+    return Status::OK;
+}
+
+Status ActionCommands::clearCurrentLayerCanvas()
+{
+    const QString tipTitle = tr("清除帧");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (!layer->isBitmapKind())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("清除帧只能在位图族图层（位图/填色）上使用。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法清除。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    // 与画布落笔同源：循环层清除的是显示帧背后的关键帧（所见即所编辑）
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+    BitmapImage* bitmap = static_cast<BitmapImage*>(
+        bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+    if (bitmap == nullptr || bitmap->bounds().isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("当前帧没有可清除的画布内容。"));
+        return Status::CANCELED;
+    }
+
+    // 撤销：显式双快照，针对实际修改的关键帧（循环层/任意帧安全，不经"当前帧"快照链）
+    BitmapImage undoSnapshot = *bitmap;
+    bitmap->clear();
+    BitmapImage redoSnapshot = *bitmap;
+    mEditor->undoRedo()->pushUndoCommand(
+        new BitmapReplaceCommand(&undoSnapshot, &redoSnapshot, layer->id(),
+                                 tr("清除帧", "Undo step text"), mEditor));
+    mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
     return Status::OK;
 }
 
