@@ -92,8 +92,9 @@ void LayerVideo::ensurePlayer()
     // Layer 非 QObject,player/sink 不能挂父对象;由本层析构负责释放。
     mPlayer = new QMediaPlayer;
     // 参考视频出声:音画同步由 QMediaPlayer 内部保证;
-    // 音量跟随系统,想静音就用系统/层可见性
+    // 层级静音开关在建播放器时与每次切换时下发到音频输出
     mAudioOutput = new QAudioOutput;
+    mAudioOutput->setMuted(mVideoMuted);
     mPlayer->setAudioOutput(mAudioOutput);
     mSink = new QVideoSink; // 不挂父:换源时 player 重建,子对象会被连带删除造成双重释放
     mPlayer->setVideoSink(mSink);
@@ -103,6 +104,12 @@ void LayerVideo::ensurePlayer()
 bool LayerVideo::isFileMissing() const
 {
     return mFilePath.isEmpty() || !QFileInfo::exists(mFilePath);
+}
+
+void LayerVideo::setVideoMuted(bool muted)
+{
+    mVideoMuted = muted;
+    if (mAudioOutput) { mAudioOutput->setMuted(muted); }
 }
 
 void LayerVideo::syncToFrame(int frameNumber, double projectFps, bool playing)
@@ -179,6 +186,7 @@ QDomElement LayerVideo::createDomElement(QDomDocument& doc) const
     layerElem.setAttribute("scale", QString::number(mScale, 'f', 4));
     layerElem.setAttribute("offsetX", QString::number(mOffset.x(), 'f', 2));
     layerElem.setAttribute("offsetY", QString::number(mOffset.y(), 'f', 2));
+    layerElem.setAttribute("muted", mVideoMuted ? "1" : "0");
 
     foreachKeyFrame([&doc, &layerElem](KeyFrame* keyFrame)
     {
@@ -220,6 +228,7 @@ void LayerVideo::loadDomElement(const QDomElement& element, QString dataDirPath,
     if (mScale <= 0.0) { mScale = 1.0; }
     mOffset = QPointF(element.attribute("offsetX", "0").toDouble(),
                       element.attribute("offsetY", "0").toDouble());
+    mVideoMuted = (element.attribute("muted", "0") == "1");
     mSyncStarted = false;
     mLastFrameStartTime = -1;
     ensurePlayer();

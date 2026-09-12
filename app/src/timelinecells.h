@@ -188,8 +188,8 @@ private:
     void paintVideoBand(QPainter& painter, const Layer* layer, int recLeft, int recTop, int recWidth, int recHeight) const;
 
     // ---- 参考视频层属性展开区(friction 式:行内展开,自绘控件) ----
-    static constexpr int kVideoPropsH = 66;   // 三行 × 22
-    // 命中字段:0=无 1=缩放滑杆 2=缩放数值 3=位移X数值 4=位移Y数值
+    static constexpr int kVideoPropsH = 88;   // 四行 × 22
+    // 命中字段:0=无 1=缩放滑杆 2=缩放数值 3=位移X数值 4=位移Y数值 5=声音开关
     int  hitVideoProps(int layerNumber, const QPoint& pos) const;
     void paintVideoProps(QPainter& painter, const LayerVideo* layer, int x, int yTop,
                          double scalePctOverride = -1.0,

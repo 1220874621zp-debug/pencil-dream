@@ -1904,6 +1904,38 @@ void TimeLineCells::paintVideoProps(QPainter& painter, const LayerVideo* layer, 
     label(2, tr("位移 Y"));
     valueField(2, x + 58, off.y(), QString());
 
+    // 行3:声音开关(点击喇叭图标切换静音;开=白喇叭+蓝声波,关=灰喇叭+红叉)
+    label(3, tr("声音"));
+    {
+        const double cy = yTop + 3 * 22 + 11.0;
+        const double bx = x + 56.0;
+        const bool on = !layer->videoMuted();
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(on ? QColor(0xE8, 0xE8, 0xEA) : QColor(0x66, 0x66, 0x6E));
+        QPainterPath spk;
+        spk.moveTo(bx + 1.0, cy - 3.5);
+        spk.lineTo(bx + 6.0, cy - 3.5);
+        spk.lineTo(bx + 12.0, cy - 9.5);
+        spk.lineTo(bx + 12.0, cy + 9.5);
+        spk.lineTo(bx + 6.0, cy + 3.5);
+        spk.lineTo(bx + 1.0, cy + 3.5);
+        spk.closeSubpath();
+        painter.drawPath(spk);
+        painter.setBrush(Qt::NoBrush);
+        if (on)
+        {
+            painter.setPen(QPen(Theme::Accent, 2.0));
+            painter.drawArc(QRectF(bx + 15.0, cy - 5.0, 10.0, 10.0), -50 * 16, 100 * 16);
+            painter.drawArc(QRectF(bx + 18.0, cy - 9.0, 18.0, 18.0), -55 * 16, 110 * 16);
+        }
+        else
+        {
+            painter.setPen(QPen(QColor(0xE0, 0x62, 0x62), 2.0));
+            painter.drawLine(QPointF(bx + 15.0, cy - 6.0), QPointF(bx + 25.0, cy + 6.0));
+            painter.drawLine(QPointF(bx + 25.0, cy - 6.0), QPointF(bx + 15.0, cy + 6.0));
+        }
+    }
+
     painter.restore();
 }
 
@@ -1931,6 +1963,10 @@ int TimeLineCells::hitVideoProps(int layerNumber, const QPoint& pos) const
     else if (row == 2)
     {
         if (xx >= 58 && xx < 58 + 78) { return 4; }      // 位移Y数值
+    }
+    else if (row == 3)
+    {
+        if (xx >= 56 && xx < 56 + 36) { return 5; }      // 声音开关(喇叭+声波/红叉)
     }
     return 0;
 }
@@ -2637,12 +2673,12 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             break;
         }
 
-        // ---- 图层右键：成组入口菜单 ----
+        // ---- 图层右键：通用层菜单（删除/成组等，组项按可组性显示） ----
         if (event->button() == Qt::RightButton
             && layerNumber != -1 && layerNumber < mEditor->object()->getLayerCount())
         {
             Layer* menuLayer = mEditor->object()->getLayer(layerNumber);
-            if (menuLayer != nullptr && menuLayer->isGroupable())
+            if (menuLayer != nullptr)
             {
                 showLayerGroupMenu(event->pos(), layerNumber);
                 break;
@@ -2703,6 +2739,13 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 if (field > 0)
                 {
                     auto* video = static_cast<LayerVideo*>(mEditor->object()->getLayer(layerNumber));
+                    if (field == 5)
+                    {
+                        // 声音开关:按下即切换(非拖动控件,不进拖动状态机)
+                        video->setVideoMuted(!video->videoMuted());
+                        update(QRect(0, getLayerY(layerNumber) + mLayerHeight, width(), kVideoPropsH));
+                        return;
+                    }
                     mVideoPropsDragField = field;
                     mVideoPropsPressPos = event->pos();
                     mVideoPropsDragging = false;
@@ -3027,7 +3070,8 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
             if (layerNumber >= 0 && layerNumber < mEditor->object()->getLayerCount())
             {
                 const int field = hitVideoProps(layerNumber, event->pos());
-                setCursor(field > 0 ? Qt::SizeHorCursor : Qt::ArrowCursor);
+                setCursor(field == 5 ? Qt::PointingHandCursor
+                                     : (field > 0 ? Qt::SizeHorCursor : Qt::ArrowCursor));
             }
         }
     }
@@ -3624,7 +3668,7 @@ void TimeLineCells::mouseDoubleClickEvent(QMouseEvent* event)
     if (mType == TIMELINE_CELL_TYPE::Layers)
     {
         const int field = hitVideoProps(layerNumber, event->pos());
-        if (field >= 2)
+        if (field >= 2 && field <= 4) // 数值字段才有行内编辑器;声音(5)是点击开关
         {
             openVideoPropsEditor(layerNumber, field);
             QWidget::mouseDoubleClickEvent(event);
@@ -3764,13 +3808,16 @@ void TimeLineCells::showGroupHeaderMenu(QPoint pos, int groupId)
 void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
 {
     Layer* layer = mEditor->object()->getLayer(layerIndex);
-    if (layer == nullptr || !layer->isGroupable()) { return; }
+    if (layer == nullptr) { return; }
 
     QMenu menu(this);
     QAction* createAction = nullptr;
     QAction* groupSelectedAction = nullptr;
     QAction* leaveAction = nullptr;
     QAction* dissolveAction = nullptr;
+
+    // 成组只对位图系层开放(视频/矢量/声音/相机等不可入组)
+    const bool groupable = layer->isGroupable();
 
     // 多选（含本层且全可入组）时提供批量成组
     const QList<int> selection = mEditor->layers()->selectedLayerIds();
@@ -3783,20 +3830,23 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
             allGroupable = false;
         }
     }
-    if (selection.size() >= 2 && allGroupable)
+    if (groupable && selection.size() >= 2 && allGroupable)
     {
         groupSelectedAction = menu.addAction(tr("将选中 %1 个图层成组").arg(selection.size()));
         menu.addSeparator();
     }
 
-    if (layer->groupId() < 0)
+    if (groupable)
     {
-        createAction = menu.addAction(tr("新建组（包含“%1”）").arg(layer->name()));
-    }
-    else
-    {
-        leaveAction = menu.addAction(tr("移出组"));
-        dissolveAction = menu.addAction(tr("解散所在组"));
+        if (layer->groupId() < 0)
+        {
+            createAction = menu.addAction(tr("新建组（包含“%1”）").arg(layer->name()));
+        }
+        else
+        {
+            leaveAction = menu.addAction(tr("移出组"));
+            dissolveAction = menu.addAction(tr("解散所在组"));
+        }
     }
 
     // 向下合并：当前层与其正下方（栈序-1）都是位图层才提供
@@ -3813,18 +3863,25 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
     menu.addSeparator();
     QAction* deleteLayerAction = menu.addAction(tr("删除图层…"));
 
-    // 循环模式（TVP式）：开放尾块区域的取帧回绕；显式尾块 = 播完即不受影响
-    menu.addSeparator();
-    QMenu* loopMenu = menu.addMenu(tr("循环模式"));
-    QAction* loopHoldAction = loopMenu->addAction(tr("保持（默认）"));
-    QAction* loopCycleAction = loopMenu->addAction(tr("循环"));
-    QAction* loopPingPongAction = loopMenu->addAction(tr("往复循环"));
-    loopHoldAction->setCheckable(true);
-    loopCycleAction->setCheckable(true);
-    loopPingPongAction->setCheckable(true);
-    loopHoldAction->setChecked(layer->loopMode() == Layer::LoopMode::None);
-    loopCycleAction->setChecked(layer->loopMode() == Layer::LoopMode::Cycle);
-    loopPingPongAction->setChecked(layer->loopMode() == Layer::LoopMode::PingPong);
+    // 循环模式（TVP式）：开放尾块区域的取帧回绕；显式尾块 = 播完即不受影响。
+    // 只对位图系层有意义(视频层单 clip 显式时长,无尾块回绕语义)
+    QAction* loopHoldAction = nullptr;
+    QAction* loopCycleAction = nullptr;
+    QAction* loopPingPongAction = nullptr;
+    if (layer->isBitmapKind())
+    {
+        menu.addSeparator();
+        QMenu* loopMenu = menu.addMenu(tr("循环模式"));
+        loopHoldAction = loopMenu->addAction(tr("保持（默认）"));
+        loopCycleAction = loopMenu->addAction(tr("循环"));
+        loopPingPongAction = loopMenu->addAction(tr("往复循环"));
+        loopHoldAction->setCheckable(true);
+        loopCycleAction->setCheckable(true);
+        loopPingPongAction->setCheckable(true);
+        loopHoldAction->setChecked(layer->loopMode() == Layer::LoopMode::None);
+        loopCycleAction->setChecked(layer->loopMode() == Layer::LoopMode::Cycle);
+        loopPingPongAction->setChecked(layer->loopMode() == Layer::LoopMode::PingPong);
+    }
 
     QAction* chosen = menu.exec(mapToGlobal(pos));
     Layer::LoopMode newLoopMode = layer->loopMode();

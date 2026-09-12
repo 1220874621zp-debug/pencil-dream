@@ -81,6 +81,10 @@ public:
     QPointF videoOffset() const { return mOffset; }
     void setVideoOffset(const QPointF& offset) { mOffset = offset; }
 
+    /** 声音开关(false=静音,音轨不随播放出声);静态属性不参与关键帧 */
+    bool videoMuted() const { return mVideoMuted; }
+    void setVideoMuted(bool muted);
+
     // 时间轴同步(pull 模式,Editor::scrubTo 每帧驱动):
     // 区间外暂停;区间内首次起步/失步超阈值才 setPosition——
     // 播放中让解码器自由前进,不逐帧 seek。
@@ -102,6 +106,7 @@ private:
     double mVideoFps = 24.0;
     qreal mScale = 1.0;
     QPointF mOffset;
+    bool mVideoMuted = false;
     QMediaPlayer* mPlayer = nullptr;
     QVideoSink* mSink = nullptr;
     QAudioOutput* mAudioOutput = nullptr;
