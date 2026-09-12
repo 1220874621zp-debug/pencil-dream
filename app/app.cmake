@@ -349,3 +349,26 @@ if(WIN32 AND TARGET Qt6::windeployqt)
         COMMENT "Deploying Qt runtime next to pencil2d.exe"
     )
 endif()
+
+# Windows: bundle the VC++ runtime (msvcp140/vcruntime140 etc.) next to the
+# executable as well, so the package also runs on machines without the
+# Visual C++ redistributable installed. Prefer the redist dir exported by
+# vcvars (VCToolsRedistDir); fall back to globbing the VS install.
+if(WIN32)
+    if(DEFINED ENV{VCToolsRedistDir})
+        set(VCRT_DIR "$ENV{VCToolsRedistDir}/x64/Microsoft.VC143.CRT")
+    else()
+        file(GLOB _redist_crt_dirs "C:/Program Files (x86)/Microsoft Visual Studio/*/VC/Redist/MSVC/*/x64/Microsoft.VC143.CRT")
+        if(_redist_crt_dirs)
+            list(SORT _redist_crt_dirs)
+            list(GET _redist_crt_dirs -1 VCRT_DIR)
+        endif()
+    endif()
+    if(VCRT_DIR AND EXISTS "${VCRT_DIR}")
+        add_custom_command(TARGET pencil2d POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                "${VCRT_DIR}" "$<TARGET_FILE_DIR:pencil2d>"
+            COMMENT "Bundling VC++ runtime DLLs next to pencil2d.exe"
+        )
+    endif()
+endif()
