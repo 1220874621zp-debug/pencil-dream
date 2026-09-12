@@ -1152,66 +1152,17 @@ Status ActionCommands::fillHolesOnCurrentFrame()
     QImage* img = bitmap->image();
     Q_CHECK_PTR(img);
 
-    // 循环判定：同层同关键帧且画面仍是上轮结果（没画过画/没撤销过）→
-    // 还原到循环前快照、换下一方向重填；否则从"左取色"开新一轮。
-    // 交互式试错：方向由用户点击决定（左→右→上→下循环），算法不替用户选
-    const bool cycleContinues = mHoleCycleActive
-        && mHoleCycleLayerId == layer->id()
-        && mHoleCycleFramePos == bitmap->pos()
-        && mHoleCycleLastResult == *img;
-
-    int mode = HoleFiller::TakeLeft;
-    if (cycleContinues)
-    {
-        *img = mHoleCycleBefore.copy();
-        mode = (mHoleCycleMode + 1) % 4;
-    }
-    else
-    {
-        mHoleCycleBefore = img->copy();
-    }
-
     const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
-    const int filled = HoleFiller::fillHoles(*img, mode);
+    const int filled = HoleFiller::fillHoles(*img);
     if (filled == 0)
     {
-        // 无变化不进撤销栈；循环作废（下一点击重新开始）
-        mHoleCycleActive = false;
+        // 无变化不进撤销栈
         QMessageBox::information(mParent, tipTitle, tr("未检测到封闭镂空。"));
         return Status::OK;
     }
 
-    mHoleCycleActive = true;
-    mHoleCycleMode = mode;
-    mHoleCycleLayerId = layer->id();
-    mHoleCycleFramePos = bitmap->pos();
-    mHoleCycleLastResult = img->copy();
-
-    QString undoText;
-    QString statusTip;
-    switch (mode)
-    {
-    case HoleFiller::TakeRight:
-        undoText = tr("镂空检测填充（右取色）", "Undo step text");
-        statusTip = tr("镂空检测：已按「右取色」填充。再点＝上取色");
-        break;
-    case HoleFiller::TakeUp:
-        undoText = tr("镂空检测填充（上取色）", "Undo step text");
-        statusTip = tr("镂空检测：已按「上取色」填充。再点＝下取色");
-        break;
-    case HoleFiller::TakeDown:
-        undoText = tr("镂空检测填充（下取色）", "Undo step text");
-        statusTip = tr("镂空检测：已按「下取色」填充。再点＝回到左取色");
-        break;
-    default:
-        undoText = tr("镂空检测填充（左取色）", "Undo step text");
-        statusTip = tr("镂空检测：已按「左取色」填充。再点＝右取色（左→右→上→下循环，直到满意为止）");
-        break;
-    }
-
     mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
-    mEditor->undoRedo()->record(saveStateId, undoText);
-    emit holeFillStatusChanged(statusTip);
+    mEditor->undoRedo()->record(saveStateId, tr("镂空检测填充", "Undo step text"));
     return Status::OK;
 }
 

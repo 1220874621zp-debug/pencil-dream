@@ -20,9 +20,7 @@ GNU General Public License for more details.
 #include <QRgb>
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #include <vector>
 
 namespace
@@ -32,6 +30,8 @@ namespace
 constexpr uint8_t ALPHA_TRANSPARENT_MAX = 7;
 // 闭运算方形核半径：宽度 < 2*半径+1（11px）的缝会被抓住
 constexpr int CLOSE_RADIUS = 5;
+// 填充范围向非完全不透明像素膨胀的像素数（吸收抗锯齿毛边）
+constexpr int FRINGE_GROW = 2;
 
 // 预乘像素 → 直通 RGB（种子颜色须反预乘，否则半透明源会整体偏暗）
 uint32_t unpremultiplyRgb(const uint8_t alpha, const QRgb premul)
@@ -119,51 +119,9 @@ void boxMin(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst,
     }
 }
 
-// 沿单位方向 (dx,dy) 从 (x,y) 像素中心步进（Amanatides-Woo 体素遍历），
-// 返回第一碰到的种子像素索引；走出画面仍未命中返回 -1（扫空，调用方回退）
-int marchSeed(const int x, const int y, const double dx, const double dy,
-              const std::vector<uint8_t>& seedMask, const int w, const int h)
-{
-    const double px = x + 0.5;
-    const double py = y + 0.5;
-    const int stepX = dx > 0.0 ? 1 : (dx < 0.0 ? -1 : 0);
-    const int stepY = dy > 0.0 ? 1 : (dy < 0.0 ? -1 : 0);
-    const double inf = std::numeric_limits<double>::max();
-    // 除以带符号的 d：分子与 d 同号，保证步进时间为正
-    double tMaxX = stepX != 0
-        ? ((stepX > 0 ? x + 1.0 : static_cast<double>(x)) - px) / dx : inf;
-    double tMaxY = stepY != 0
-        ? ((stepY > 0 ? y + 1.0 : static_cast<double>(y)) - py) / dy : inf;
-    const double tDX = stepX != 0 ? 1.0 / std::abs(dx) : inf;
-    const double tDY = stepY != 0 ? 1.0 / std::abs(dy) : inf;
-
-    int X = x;
-    int Y = y;
-    while (true)
-    {
-        if (tMaxX < tMaxY)
-        {
-            X += stepX;
-            if (X < 0 || X >= w)
-                return -1;
-            tMaxX += tDX;
-        }
-        else
-        {
-            Y += stepY;
-            if (Y < 0 || Y >= h)
-                return -1;
-            tMaxY += tDY;
-        }
-        const size_t idx = static_cast<size_t>(Y) * w + X;
-        if (seedMask[idx] != 0)
-            return static_cast<int>(idx);
-    }
-}
-
 } // namespace
 
-int HoleFiller::fillHoles(QImage& img, const int mode)
+int HoleFiller::fillHoles(QImage& img)
 {
     if (img.format() != QImage::Format_ARGB32_Premultiplied || img.isNull())
         return 0;
@@ -189,137 +147,106 @@ int HoleFiller::fillHoles(QImage& img, const int mode)
     if (!hasTransparent)
         return 0;
 
-    // ---- 1. 镂空定位：限步测地膨胀（开运算重建），补出“真背景” ----
-    // 老思路（透明区直接连到边界 = 背景）有个洞：色块中间的镂空若通过一条
-    // 细缝（笔触缺口）与外界连通，会被整片判成背景——缝补上了、缝背后的
-    // 镂空却留下。改为：先腐蚀透明掩码得到“宽区核心”（宽度 ≤ ~10px 的缝、
-    // 细通道、小斑点被整条抹掉，其背后的镂空因此与外界断开）；再从核心
-    // 出发只在透明像素内做 ≤ CLOSE_RADIUS 步的十字测地膨胀——核心区域
-    // 连同自身边缘环完整补回，但走不出任何 ≥1px 的不透明墙，也不会顺着
-    // 细通道爬超过 5px 深。补回的才是真背景；其余透明像素（缝本身、封闭
-    // 镂空、窄通道背后的镂空、小斑点）全部进入填充范围，实现“图像区域
-    // 内部没有任何镂空”。贴边 CLOSE_RADIUS 内的透明按开放处理（不封画布
-    // 边上的缝，与旧闭运算的贴边保守语义一致）。
-    std::vector<uint8_t> fillMask(n, 0);
+    // ---- 1. 镂空定位：8 连通，触边连通域 = 背景，其余 = 封闭镂空 ----
+    std::vector<int32_t> comp(n, 0); // 0 = 非透明
+    std::vector<uint8_t> compTouchesBorder(1, 0); // 下标 = 连通域 id
+    std::vector<int32_t> stack;
+    int32_t compCount = 0;
+    for (int sy = 0; sy < h; ++sy)
     {
-        std::vector<uint8_t> transMask(n);
-        std::vector<uint8_t> eroded(n);
-        for (size_t i = 0; i < n; ++i)
-            transMask[i] = alpha[i] <= ALPHA_TRANSPARENT_MAX ? 1 : 0;
-        boxMin(transMask, eroded, w, h, CLOSE_RADIUS); // min 滤波 = 透明掩码腐蚀
-
-        // 核心的 8 连通标记；贴近边界（≤ CLOSE_RADIUS，补偿腐蚀的贴边置零）
-        // 的核心连通域 = 背景核心
-        std::vector<int32_t> comp(n, 0);
-        std::vector<uint8_t> compIsBg(1, 0);
-        std::vector<int32_t> stack;
-        int32_t compCount = 0;
-        for (int sy = 0; sy < h; ++sy)
+        for (int sx = 0; sx < w; ++sx)
         {
-            for (int sx = 0; sx < w; ++sx)
-            {
-                const size_t s = static_cast<size_t>(sy) * w + sx;
-                if (eroded[s] == 0 || comp[s] != 0)
-                    continue;
+            const size_t s = static_cast<size_t>(sy) * w + sx;
+            if (alpha[s] > ALPHA_TRANSPARENT_MAX || comp[s] != 0)
+                continue;
 
-                const int32_t id = ++compCount;
-                compIsBg.push_back(0);
-                bool touchesBorder = false;
-                comp[s] = id;
-                stack.clear();
-                stack.push_back(static_cast<int32_t>(s));
-                while (!stack.empty())
+            const int32_t id = ++compCount;
+            compTouchesBorder.push_back(0);
+            bool touchesBorder = false;
+            comp[s] = id;
+            stack.clear();
+            stack.push_back(static_cast<int32_t>(s));
+            while (!stack.empty())
+            {
+                const int32_t cur = stack.back();
+                stack.pop_back();
+                const int cy = cur / w;
+                const int cx = cur % w;
+                if (cx == 0 || cx == w - 1 || cy == 0 || cy == h - 1)
+                    touchesBorder = true;
+                for (int dy = -1; dy <= 1; ++dy)
                 {
-                    const int32_t cur = stack.back();
-                    stack.pop_back();
-                    const int cy = cur / w;
-                    const int cx = cur % w;
-                    if (cx <= CLOSE_RADIUS || cx >= w - 1 - CLOSE_RADIUS
-                        || cy <= CLOSE_RADIUS || cy >= h - 1 - CLOSE_RADIUS)
+                    const int ny = cy + dy;
+                    if (ny < 0 || ny >= h)
+                        continue;
+                    for (int dx = -1; dx <= 1; ++dx)
                     {
-                        touchesBorder = true;
-                    }
-                    for (int dy = -1; dy <= 1; ++dy)
-                    {
-                        const int ny = cy + dy;
-                        if (ny < 0 || ny >= h)
+                        const int nx = cx + dx;
+                        if (nx < 0 || nx >= w)
                             continue;
-                        for (int dx = -1; dx <= 1; ++dx)
+                        const size_t ni = static_cast<size_t>(ny) * w + nx;
+                        if (alpha[ni] <= ALPHA_TRANSPARENT_MAX && comp[ni] == 0)
                         {
-                            const int nx = cx + dx;
-                            if (nx < 0 || nx >= w)
-                                continue;
-                            const size_t ni = static_cast<size_t>(ny) * w + nx;
-                            if (eroded[ni] != 0 && comp[ni] == 0)
-                            {
-                                comp[ni] = id;
-                                stack.push_back(static_cast<int32_t>(ni));
-                            }
+                            comp[ni] = id;
+                            stack.push_back(static_cast<int32_t>(ni));
                         }
                     }
                 }
-                compIsBg[static_cast<size_t>(id)] = touchesBorder ? 1 : 0;
             }
+            compTouchesBorder[static_cast<size_t>(id)] = touchesBorder ? 1 : 0;
         }
+    }
 
-        // 背景 = 贴边透明 ∪ 从背景核心出发、限深 CLOSE_RADIUS 步的透明域内
-        // 十字测地膨胀（分层 BFS，任何不透明像素都是墙）
-        std::vector<uint8_t> bgMask(n, 0);
-        std::vector<int32_t> step(n, 0);
-        std::vector<int32_t> queue;
+    std::vector<uint8_t> fillMask(n, 0);
+    for (size_t i = 0; i < n; ++i)
+    {
+        if (comp[i] != 0 && compTouchesBorder[static_cast<size_t>(comp[i])] == 0)
+            fillMask[i] = 1;
+    }
+    comp = std::vector<int32_t>(); // 释放连通域标记，腾出内存
+    std::vector<int32_t> dist(n, -1);
+
+    // ---- 2. 细缝检测：闭运算（膨胀→腐蚀），闭出来的透明像素 = 窄缝 ----
+    {
+        std::vector<uint8_t> opaqueMask(n);
+        std::vector<uint8_t> dilated(n);
+        std::vector<uint8_t> closed(n);
+        for (size_t i = 0; i < n; ++i)
+            opaqueMask[i] = alpha[i] > ALPHA_TRANSPARENT_MAX ? 1 : 0;
+        boxMax(opaqueMask, dilated, w, h, CLOSE_RADIUS);
+        boxMin(dilated, closed, w, h, CLOSE_RADIUS);
+        for (size_t i = 0; i < n; ++i)
+        {
+            if (closed[i] != 0 && opaqueMask[i] == 0)
+                fillMask[i] = 1;
+        }
+    }
+
+    // ---- 3. 毛边吸收：掩码向非完全不透明像素膨胀 2px（绝不碰全不透明笔画）----
+    for (int iter = 0; iter < FRINGE_GROW; ++iter)
+    {
+        std::vector<uint8_t> grown(fillMask);
         for (int y = 0; y < h; ++y)
         {
             for (int x = 0; x < w; ++x)
             {
                 const size_t i = static_cast<size_t>(y) * w + x;
-                if (transMask[i] == 0)
+                if (fillMask[i] != 0 || alpha[i] == 255)
                     continue;
-                const bool nearBorder = x <= CLOSE_RADIUS || x >= w - 1 - CLOSE_RADIUS
-                    || y <= CLOSE_RADIUS || y >= h - 1 - CLOSE_RADIUS;
-                const bool bgCore = eroded[i] != 0 && compIsBg[static_cast<size_t>(comp[i])] != 0;
-                if (nearBorder || bgCore)
-                {
-                    bgMask[i] = 1;
-                    step[i] = 0;
-                    queue.push_back(static_cast<int32_t>(i));
-                }
+                const bool nextToMask =
+                    (x > 0 && fillMask[i - 1] != 0) ||
+                    (x < w - 1 && fillMask[i + 1] != 0) ||
+                    (y > 0 && fillMask[i - w] != 0) ||
+                    (y < h - 1 && fillMask[i + w] != 0);
+                if (nextToMask)
+                    grown[i] = 1;
             }
         }
-        for (size_t head = 0; head < queue.size(); ++head)
-        {
-            const int32_t cur = queue[head];
-            if (step[cur] >= CLOSE_RADIUS)
-                continue;
-            const int cy = cur / w;
-            const int cx = cur % w;
-            const int nx4[4] = { cx - 1, cx + 1, cx, cx };
-            const int ny4[4] = { cy, cy, cy - 1, cy + 1 };
-            for (int k = 0; k < 4; ++k)
-            {
-                const int nx = nx4[k];
-                const int ny = ny4[k];
-                if (nx < 0 || nx >= w || ny < 0 || ny >= h)
-                    continue;
-                const size_t ni = static_cast<size_t>(ny) * w + nx;
-                if (transMask[ni] != 0 && bgMask[ni] == 0)
-                {
-                    bgMask[ni] = 1;
-                    step[ni] = step[cur] + 1;
-                    queue.push_back(static_cast<int32_t>(ni));
-                }
-            }
-        }
-
-        for (size_t i = 0; i < n; ++i)
-            fillMask[i] = (transMask[i] != 0 && bgMask[i] == 0) ? 1 : 0;
+        fillMask.swap(grown);
     }
-    std::vector<int32_t> dist(n, -1);
 
-    // ---- 3. 多源 BFS：每个待填像素取最近有效像素的颜色（方向自适应）----
-    // 填充范围 = 检测出的透明像素本身，绝不向半透明边缘膨胀：
-    // 0 < alpha < 255 的抗锯齿边缘像素不进掩码、不被改写（防外溢）
+    // ---- 4. 多源 BFS：每个待填像素取最近有效像素的颜色（方向自适应）----
     std::vector<uint32_t> color(n, 0); // 直通 RGB，随波前继承
-    std::vector<uint8_t> seedMask(n, 0); // 有效参考色像素（方向模式的射线命中判定用）
     std::vector<int32_t> queue;
     for (int y = 0; y < h; ++y)
     {
@@ -330,7 +257,6 @@ int HoleFiller::fillHoles(QImage& img, const int mode)
             if (fillMask[i] != 0 || alpha[i] <= ALPHA_TRANSPARENT_MAX)
                 continue;
             dist[i] = 0;
-            seedMask[i] = 1;
             color[i] = unpremultiplyRgb(alpha[i], line[x]);
             bool nextToMask = false;
             for (int dy = -1; dy <= 1 && !nextToMask; ++dy)
@@ -377,31 +303,6 @@ int HoleFiller::fillHoles(QImage& img, const int mode)
                     color[ni] = color[cur];
                     queue.push_back(static_cast<int32_t>(ni));
                 }
-            }
-        }
-    }
-
-    // ---- 4b. 方向取色：所有待填像素沿用户指定方向（左/右/上/下）步进取第一参考色 ----
-    if (mode == TakeLeft || mode == TakeRight || mode == TakeUp || mode == TakeDown)
-    {
-        double dx = 0.0, dy = 0.0;
-        switch (mode)
-        {
-        case TakeLeft:  dx = -1.0; break;
-        case TakeRight: dx = 1.0; break;
-        case TakeUp:    dy = -1.0; break;
-        case TakeDown:  dy = 1.0; break;
-        }
-        for (int y = 0; y < h; ++y)
-        {
-            for (int x = 0; x < w; ++x)
-            {
-                const size_t i = static_cast<size_t>(y) * w + x;
-                if (fillMask[i] == 0 || dist[i] <= 0)
-                    continue;
-                const int hit = marchSeed(x, y, dx, dy, seedMask, w, h);
-                if (hit >= 0)
-                    color[i] = color[hit]; // 射线扫空（逃逸出画面）保留 BFS 最近色回退
             }
         }
     }

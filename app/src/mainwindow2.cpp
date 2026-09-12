@@ -2153,12 +2153,11 @@ void MainWindow2::createToolbars()
         mMainToolbar->addAction(xrayAction);
     }
 
-    // 镂空检测：一键补齐当前帧线稿的封闭镂空与细缝；连点循环取色方向 左→右→上→下
+    // 镂空检测：一键补齐当前帧线稿的封闭镂空与细缝（各像素自动取最近不透明像素的颜色）
     {
         QAction* holeFillAction = new QAction(QIcon(":/icons/themes/playful/misc/hole-detect.svg"), tr("镂空检测"), this);
-        holeFillAction->setToolTip(tr("镂空检测：填充当前帧的封闭镂空与细缝。首次点击按「左取色」填充，效果不对就再点：左 → 右 → 上 → 下 循环换方向（每次基于原始画面重填），满意为止，可撤销"));
+        holeFillAction->setToolTip(tr("镂空检测：自动填充当前帧的封闭镂空与细缝，每个像素取最近不透明像素的颜色（可撤销）"));
         connect(holeFillAction, &QAction::triggered, mCommands, &ActionCommands::fillHolesOnCurrentFrame);
-        connect(mCommands, &ActionCommands::holeFillStatusChanged, holeFillAction, &QAction::setToolTip);
         mMainToolbar->addAction(holeFillAction);
     }
 
