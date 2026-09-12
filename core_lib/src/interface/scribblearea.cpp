@@ -119,6 +119,7 @@ void ScribbleArea::settingUpdated(SETTING setting)
     case SETTING::ONION_PREV_FRAMES_NUM:
     case SETTING::ONION_NEXT_FRAMES_NUM:
     case SETTING::ONION_CUSTOM_FRAME:
+    case SETTING::ONION_CUSTOM_FRAME_ENABLED:
     case SETTING::ONION_MIN_OPACITY:
     case SETTING::ONION_MAX_OPACITY:
         invalidateAllCache();
@@ -1201,9 +1202,21 @@ void ScribbleArea::prepCameraPainter(int frame)
     onionSkinOptions.minOpacity = mPrefs->getInt(SETTING::ONION_MIN_OPACITY);
     onionSkinOptions.customFrame = mPrefs->getInt(SETTING::ONION_CUSTOM_FRAME);
 
+    // 跳帧显示开关:开启=只留跳帧幽灵,自动屏蔽前后帧(不回写偏好设置);
+    // 关闭=恢复正常前后帧且跳帧幽灵归零。相机层幽灵同规则。
+    if (mPrefs->isOn(SETTING::ONION_CUSTOM_FRAME_ENABLED))
+    {
+        onionSkinOptions.customFrame = qMax(1, onionSkinOptions.customFrame);
+        onionSkinOptions.skinPrevFrames = false;
+        onionSkinOptions.skinNextFrames = false;
+    }
+    else
+    {
+        onionSkinOptions.customFrame = 0;
+    }
+
     mCameraPainter.setOnionSkinPainterOptions(onionSkinOptions);
 }
-
 void ScribbleArea::prepCanvas(int frame)
 {
     Object* object = mEditor->object();
@@ -1229,6 +1242,24 @@ void ScribbleArea::prepCanvas(int frame)
     onionSkinOptions.maxOpacity = mPrefs->getInt(SETTING::ONION_MAX_OPACITY);
     onionSkinOptions.minOpacity = mPrefs->getInt(SETTING::ONION_MIN_OPACITY);
     onionSkinOptions.customFrame = mPrefs->getInt(SETTING::ONION_CUSTOM_FRAME);
+
+    // 跳帧显示开关:开启=只留跳帧幽灵,自动屏蔽前后帧(不回写偏好设置);
+    // 关闭=恢复正常前后帧且跳帧幽灵归零。
+    // 对位工具依赖前后帧幽灵工作,激活期间不屏蔽(跳帧幽灵照常叠加)。
+    const bool customFrameOn = mPrefs->isOn(SETTING::ONION_CUSTOM_FRAME_ENABLED);
+    if (customFrameOn)
+    {
+        onionSkinOptions.customFrame = qMax(1, onionSkinOptions.customFrame);
+        if (mEditor->tools()->currentTool()->type() != ToolType::ONION_ALIGN)
+        {
+            onionSkinOptions.skinPrevFrames = false;
+            onionSkinOptions.skinNextFrames = false;
+        }
+    }
+    else
+    {
+        onionSkinOptions.customFrame = 0;
+    }
 
     // 对位工具依赖红/蓝区分前后幽灵，激活期间强制着色显示（不回写偏好设置）
     if (mEditor->tools()->currentTool()->type() == ToolType::ONION_ALIGN)

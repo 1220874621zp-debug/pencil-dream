@@ -27,6 +27,7 @@ namespace Ui
 class Editor;
 class QToolButton;
 class QSlider;
+class QCheckBox;
 class QDoubleSpinBox;
 class ViewManager;
 
@@ -50,6 +51,7 @@ private slots:
     void onionPrevFramesNumChange(int);
     void onionNextFramesNumChange(int);
     void onionCustomFrameChange(int);
+    void onionCustomFrameToggle(bool);
     void onionSkinModeChange(int);
     void onionSkinMultipleLayersEnabled(bool value);
     void onionToggleClicked(bool);
@@ -73,7 +75,8 @@ private:
     QSlider* mMinOpacitySlider = nullptr;
     QDoubleSpinBox* mMinOpacitySpin = nullptr;
 
-    // 跳帧显示：把指定帧号额外叠为洋葱皮幽灵（0=关闭，无滑杆）
+    // 跳帧显示：勾选=开启(屏蔽前后帧只显该帧幽灵)，取消=恢复；帧号输入框跟随启停
+    QCheckBox* mCustomFrameCheck = nullptr;
     QDoubleSpinBox* mCustomFrameSpin = nullptr;
 
     QToolButton* mOnionRedButton = nullptr;

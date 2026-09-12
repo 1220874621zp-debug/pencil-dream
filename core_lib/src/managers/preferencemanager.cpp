@@ -192,6 +192,7 @@ void PreferenceManager::loadPrefs()
     set(SETTING::ONION_WHILE_PLAYBACK,     settings.value(SETTING_ONION_WHILE_PLAYBACK,   0).toInt());
     set(SETTING::ONION_TYPE,               settings.value(SETTING_ONION_TYPE,             "relative").toString());
     set(SETTING::ONION_CUSTOM_FRAME,       settings.value(SETTING_ONION_CUSTOM_FRAME,     0).toInt());
+    set(SETTING::ONION_CUSTOM_FRAME_ENABLED, settings.value(SETTING_ONION_CUSTOM_FRAME_ENABLED, false).toBool());
     set(SETTING::LAYER_VISIBILITY,         settings.value(SETTING_LAYER_VISIBILITY,       2).toInt());
     set(SETTING::LAYER_VISIBILITY_THRESHOLD, settings.value(SETTING_LAYER_VISIBILITY_THRESHOLD, 0.5f).toFloat());
 
@@ -502,6 +503,9 @@ void PreferenceManager::set(SETTING option, bool value)
         break;
     case SETTING::ONION_RED:
         settings.setValue(SETTING_ONION_RED, value);
+        break;
+    case SETTING::ONION_CUSTOM_FRAME_ENABLED:
+        settings.setValue(SETTING_ONION_CUSTOM_FRAME_ENABLED, value);
         break;
     case SETTING::TOOL_CURSOR:
         settings.setValue(SETTING_TOOL_CURSOR, value);

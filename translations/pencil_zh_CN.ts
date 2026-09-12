@@ -6832,14 +6832,9 @@ If you believe that this error is an issue with Pencil2D, please create a new is
         <translation>最小不透明度</translation>
     </message>
     <message>
-        <location filename="../app/src/onionskinwidget.cpp" line="141"/>
-        <source>Off</source>
-        <translation>关</translation>
-    </message>
-    <message>
         <location filename="../app/src/onionskinwidget.cpp" line="142"/>
-        <source>Show this frame as an extra onion skin ghost, 0 = off</source>
-        <translation>把该帧额外显示为洋葱皮幽灵，0 为关闭</translation>
+        <source>Show only this frame as onion skin (hides previous/next frames); uncheck to restore</source>
+        <translation>只显示该帧的洋葱皮（隐藏前后帧）；取消勾选恢复</translation>
     </message>
     <message>
         <location filename="../app/src/onionskinwidget.cpp" line="149"/>
