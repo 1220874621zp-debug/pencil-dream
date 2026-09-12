@@ -16,6 +16,8 @@ GNU General Public License for more details.
 */
 #include "referencecardpanel.h"
 
+#include <algorithm>
+
 #include <QButtonGroup>
 #include <QColorDialog>
 #include <QDebug>
@@ -99,10 +101,15 @@ void ReferenceCardCanvas::fitToWindow()
 
 // ------------------------------------------------------------- 持久化 ---+
 
+QString ReferenceCardCanvas::sidecarPathFor(const QString& imagePath)
+{
+    const QFileInfo info(imagePath);
+    return info.absoluteDir().filePath(info.completeBaseName() + ".setcard.json");
+}
+
 QString ReferenceCardCanvas::sidecarPath() const
 {
-    const QFileInfo info(mImagePath);
-    return info.absoluteDir().filePath(info.completeBaseName() + ".setcard.json");
+    return sidecarPathFor(mImagePath);
 }
 
 void ReferenceCardCanvas::saveSidecar()
@@ -172,6 +179,7 @@ bool ReferenceCardCanvas::loadSidecarData(const QString& jsonPath, bool restoreV
     const QJsonObject root = doc.object();
 
     mSwatches.clear();
+    mSelected.clear();
     const QJsonArray swatchArray = root["swatches"].toArray();
     for (const QJsonValue& v : swatchArray)
     {
@@ -218,7 +226,7 @@ bool ReferenceCardCanvas::loadSidecarData(const QString& jsonPath, bool restoreV
     return true;
 }
 
-bool ReferenceCardCanvas::loadImage(const QString& path)
+bool ReferenceCardCanvas::loadImage(const QString& path, int extractCount)
 {
     QImageReader reader(path);
     reader.setAutoTransform(true);
@@ -235,6 +243,7 @@ bool ReferenceCardCanvas::loadImage(const QString& path)
     mSwatches.clear();
     mLines.clear();
     mDraftPoints.clear();
+    mSelected.clear();
 
     if (QFile::exists(sidecarPath()) && loadSidecarData(sidecarPath(), true))
     {
@@ -243,7 +252,7 @@ bool ReferenceCardCanvas::loadImage(const QString& path)
     else
     {
         fitToWindow();
-        extractSwatches(8);   // 首次导入自动提取
+        extractSwatches(extractCount);   // 首次导入自动提取
     }
     emit imageChanged(true);
     update();
@@ -300,6 +309,7 @@ bool ReferenceCardCanvas::importPreset(const QString& jsonPath)
     mImage = image;
     mImagePath = QFileInfo(resolved).absoluteFilePath();
     mDraftPoints.clear();
+    mSelected.clear();
     if (!loadSidecarData(jsonPath, true))
     {
         mSwatches.clear();
@@ -319,6 +329,7 @@ void ReferenceCardCanvas::extractSwatches(int count)
     if (colors.isEmpty()) { return; }
 
     mSwatches.clear();
+    mSelected.clear();
     // 初始排在图片右侧一列，间距按当前缩放折算成图像坐标
     const qreal colX = mImage.width() + 24.0 / mScale;
     const qreal stepYImage = (SWATCH_H + LABEL_H + 12.0) / mScale;
@@ -496,9 +507,15 @@ void ReferenceCardCanvas::paintEvent(QPaintEvent* event)
         painter.setBrush(mSwatches[i].color);
         painter.drawRect(r);
 
-        if (i == mHoverSwatch || (mDragging && i == mPressIndex))
+        if (mSelected.contains(i) || (mDragging && i == mPressIndex))
         {
             painter.setPen(QPen(lineColor, 2));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawRect(r.adjusted(1.0, 1.0, -1.0, -1.0));
+        }
+        else if (i == mHoverSwatch)
+        {
+            painter.setPen(QPen(QColor(255, 255, 255, 210), 2));
             painter.setBrush(Qt::NoBrush);
             painter.drawRect(r.adjusted(1.0, 1.0, -1.0, -1.0));
         }
@@ -514,6 +531,14 @@ void ReferenceCardCanvas::paintEvent(QPaintEvent* event)
             painter.drawText(lr, Qt::AlignCenter, mSwatches[i].name);
         }
     }
+
+    // 框选矩形
+    if (mRubberActive)
+    {
+        painter.setPen(QPen(QColor(120, 170, 255), 1, Qt::DashLine));
+        painter.setBrush(QColor(120, 170, 255, 30));
+        painter.drawRect(QRectF(mRubberStart, mRubberCur).normalized());
+    }
 }
 
 // --------------------------------------------------------------- 交互 ---+
@@ -521,9 +546,10 @@ void ReferenceCardCanvas::paintEvent(QPaintEvent* event)
 void ReferenceCardCanvas::updateCursor(const QPointF& pos)
 {
     if (mMarkerMode) { setCursor(Qt::CrossCursor); return; }
-    if (mPanning || mDragging) { setCursor(Qt::ClosedHandCursor); return; }
+    if (mPanning) { setCursor(Qt::ClosedHandCursor); return; }
+    if (mDragging) { setCursor(Qt::ClosedHandCursor); return; }
     if (hitSwatch(pos) >= 0) { setCursor(Qt::SizeAllCursor); return; }
-    setCursor(Qt::OpenHandCursor);
+    setCursor(Qt::ArrowCursor);
 }
 
 void ReferenceCardCanvas::mousePressEvent(QMouseEvent* event)
@@ -563,12 +589,24 @@ void ReferenceCardCanvas::mousePressEvent(QMouseEvent* event)
             mPressPos = pos;
             mDragging = false;
             mGrabOffset = widgetToImage(pos) - mSwatches[idx].pos;
+            if (!mSelected.contains(idx))
+            {
+                mSelected.clear();
+                mSelected.insert(idx);
+            }
+            // 整组拖动起点快照（含单选）
+            mDragOrigins.clear();
+            for (int i : std::as_const(mSelected))
+            {
+                mDragOrigins.append(qMakePair(i, mSwatches[i].pos));
+            }
         }
         else
         {
-            mPanning = true;
-            mPanPressPos = pos;
-            mPanPressPan = mPan;
+            // 空白处左键＝框选色块
+            mRubberActive = true;
+            mRubberStart = pos;
+            mRubberCur = pos;
         }
         updateCursor(pos);
         return;
@@ -592,10 +630,23 @@ void ReferenceCardCanvas::mouseMoveEvent(QMouseEvent* event)
         }
         if (mDragging)
         {
-            mSwatches[mPressIndex].pos = widgetToImage(mHoverPos) - mGrabOffset;
+            QPointF basePos(0.0, 0.0);
+            for (const auto& origin : std::as_const(mDragOrigins))
+            {
+                if (origin.first == mPressIndex) { basePos = origin.second; }
+            }
+            const QPointF delta = (widgetToImage(mHoverPos) - mGrabOffset) - basePos;
+            for (const auto& origin : std::as_const(mDragOrigins))
+            {
+                mSwatches[origin.first].pos = origin.second + delta;
+            }
         }
     }
-    else if (mPanning && (event->buttons() & (Qt::LeftButton | Qt::MiddleButton)))
+    else if (mRubberActive && (event->buttons() & Qt::LeftButton))
+    {
+        mRubberCur = mHoverPos;
+    }
+    else if (mPanning && (event->buttons() & Qt::MiddleButton))
     {
         mPan = mPanPressPan + (mHoverPos - mPanPressPos);
     }
@@ -623,9 +674,30 @@ void ReferenceCardCanvas::mouseReleaseEvent(QMouseEvent* event)
         }
         mPressIndex = -1;
         mDragging = false;
+        mDragOrigins.clear();
         update();
     }
-    else if (mPanning && (event->button() == Qt::LeftButton || event->button() == Qt::MiddleButton))
+    else if (event->button() == Qt::LeftButton && mRubberActive)
+    {
+        mRubberActive = false;
+        const QRectF band = QRectF(mRubberStart, mRubberCur).normalized();
+        if (band.width() < 3.0 && band.height() < 3.0)
+        {
+            mSelected.clear();   // 空白单击＝取消选择
+        }
+        else
+        {
+            mSelected.clear();
+            for (int i = 0; i < mSwatches.size(); ++i)
+            {
+                const bool hitsBand = swatchRect(i).intersects(band)
+                                      || (!labelRect(i).isNull() && labelRect(i).intersects(band));
+                if (hitsBand) { mSelected.insert(i); }
+            }
+        }
+        update();
+    }
+    else if (mPanning && event->button() == Qt::MiddleButton)
     {
         mPanning = false;
         updateCursor(event->position());
@@ -664,6 +736,18 @@ void ReferenceCardCanvas::keyPressEvent(QKeyEvent* event)
 {
     if (!mMarkerMode)
     {
+        if ((event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)
+            && !mSelected.isEmpty())
+        {
+            deleteSelected();
+            return;
+        }
+        if (event->key() == Qt::Key_Escape && !mSelected.isEmpty())
+        {
+            mSelected.clear();
+            update();
+            return;
+        }
         QWidget::keyPressEvent(event);
         return;
     }
@@ -686,6 +770,20 @@ void ReferenceCardCanvas::keyPressEvent(QKeyEvent* event)
     {
         QWidget::keyPressEvent(event);
     }
+}
+
+void ReferenceCardCanvas::deleteSelected()
+{
+    QList<int> indices = mSelected.values();
+    std::sort(indices.begin(), indices.end(), [](int a, int b) { return a > b; });
+    for (int i : indices)
+    {
+        if (i >= 0 && i < mSwatches.size()) { mSwatches.removeAt(i); }
+    }
+    mSelected.clear();
+    mHoverSwatch = -1;
+    saveSidecar();
+    update();
 }
 
 void ReferenceCardCanvas::confirmDraft()
@@ -740,6 +838,7 @@ void ReferenceCardCanvas::showContextMenu(const QPointF& pos, const QPoint& glob
         else if (chosen == deleteAction)
         {
             mSwatches.removeAt(swIdx);
+            mSelected.clear();
             mHoverSwatch = -1;
             saveSidecar();
             update();
@@ -791,23 +890,11 @@ void ReferenceCardPanel::initUI()
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(4);
 
-    auto* fileRow = new QHBoxLayout();
+    // 单排工具栏：文件操作 + 工具切换 + 视图
     mImportButton = new QPushButton(tr("导入图片"), central);
     mPresetButton = new QPushButton(tr("导入预设"), central);
     mExtractButton = new QPushButton(tr("提取色卡"), central);
     mExtractButton->setEnabled(false);
-    mCountSpin = new QSpinBox(central);
-    mCountSpin->setRange(1, 20);
-    mCountSpin->setValue(8);
-    mCountSpin->setToolTip(tr("提取颜色数量"));
-    mCountSpin->setFixedWidth(56);
-    fileRow->addWidget(mImportButton);
-    fileRow->addWidget(mPresetButton);
-    fileRow->addStretch();
-    fileRow->addWidget(mExtractButton);
-    fileRow->addWidget(mCountSpin);
-
-    auto* toolRow = new QHBoxLayout();
     mSelectToolButton = new QPushButton(tr("选择"), central);
     mMarkerToolButton = new QPushButton(tr("标记线"), central);
     mFitButton = new QPushButton(tr("适应窗口"), central);
@@ -818,16 +905,20 @@ void ReferenceCardPanel::initUI()
     toolGroup->setExclusive(true);
     toolGroup->addButton(mSelectToolButton);
     toolGroup->addButton(mMarkerToolButton);
-    toolRow->addWidget(mSelectToolButton);
-    toolRow->addWidget(mMarkerToolButton);
-    toolRow->addStretch();
-    toolRow->addWidget(mFitButton);
+
+    auto* toolbar = new QHBoxLayout();
+    toolbar->setSpacing(4);
+    toolbar->addWidget(mImportButton);
+    toolbar->addWidget(mPresetButton);
+    toolbar->addWidget(mExtractButton);
+    toolbar->addWidget(mSelectToolButton);
+    toolbar->addWidget(mMarkerToolButton);
+    toolbar->addWidget(mFitButton);
 
     mCanvas = new ReferenceCardCanvas(central);
     mCanvas->setEditor(editor());
 
-    layout->addLayout(fileRow);
-    layout->addLayout(toolRow);
+    layout->addLayout(toolbar);
     layout->addWidget(mCanvas, 1);
 
     setWidget(central);
@@ -852,7 +943,18 @@ void ReferenceCardPanel::importImage()
 {
     const QString path = FileDialog::getOpenFileName(this, FileType::IMAGE, tr("导入设定图"));
     if (path.isEmpty()) { return; }
-    mCanvas->loadImage(path);
+
+    int count = mLastCount;
+    if (!QFile::exists(ReferenceCardCanvas::sidecarPathFor(path)))
+    {
+        // 没有旁路数据才会提取，先问数量；取消则放弃导入
+        bool ok = false;
+        count = QInputDialog::getInt(this, tr("提取色卡"), tr("颜色数量："),
+                                     mLastCount, 1, 20, 1, &ok);
+        if (!ok) { return; }
+        mLastCount = count;
+    }
+    mCanvas->loadImage(path, count);
 }
 
 void ReferenceCardPanel::importPreset()
@@ -868,5 +970,10 @@ void ReferenceCardPanel::importPreset()
 
 void ReferenceCardPanel::reextractSwatches()
 {
-    mCanvas->extractSwatches(mCountSpin->value());
+    bool ok = false;
+    const int count = QInputDialog::getInt(this, tr("提取色卡"), tr("颜色数量："),
+                                           mLastCount, 1, 20, 1, &ok);
+    if (!ok) { return; }
+    mLastCount = count;
+    mCanvas->extractSwatches(count);
 }

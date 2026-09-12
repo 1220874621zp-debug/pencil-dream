@@ -21,7 +21,9 @@ GNU General Public License for more details.
 
 #include <QColor>
 #include <QImage>
+#include <QPair>
 #include <QPointF>
+#include <QSet>
 #include <QString>
 #include <QVector>
 #include <QWidget>
@@ -54,10 +56,12 @@ public:
     void setEditor(Editor* editor) { mEditor = editor; }
     void setMarkerMode(bool marker);
 
-    bool loadImage(const QString& path);        // 读图，旁边有 .setcard.json 则自动恢复
+    bool loadImage(const QString& path, int extractCount = 8);  // 读图，旁边有 .setcard.json 则自动恢复
     void extractSwatches(int count);            // 重新提取色卡（替换色块，保留标记线）
     bool importPreset(const QString& jsonPath); // 导入预设数据文件
     void fitToWindow();
+
+    static QString sidecarPathFor(const QString& imagePath);
 
     bool hasImage() const { return !mImage.isNull(); }
 
@@ -82,6 +86,7 @@ private:
     QRectF labelRect(int index) const;
     int    hitSwatch(const QPointF& widgetPos) const;   // 顶层优先，-1 = 未命中
     int    hitLine(const QPointF& widgetPos) const;     // 距折线 < 6px，-1 = 未命中
+    void   deleteSelected();
     void   showContextMenu(const QPointF& pos, const QPoint& globalPos);
     void   confirmDraft();
     void   updateCursor(const QPointF& pos);
@@ -108,13 +113,18 @@ private:
 
     bool mMarkerMode = false;
 
-    // 色块拖动/点击判别
+    // 色块拖动/点击判别（多选时整组一起拖）
     int     mPressIndex = -1;
     bool    mDragging = false;
     QPointF mPressPos;
     QPointF mGrabOffset;   // 按下时光标（图坐标）相对色块锚点偏移
+    QVector<QPair<int, QPointF>> mDragOrigins;   // 拖动起点快照（索引→图坐标）
 
-    // 空白处平移
+    // 左键框选（选择模式）/ 中键平移
+    QSet<int> mSelected;
+    bool    mRubberActive = false;
+    QPointF mRubberStart;
+    QPointF mRubberCur;
     bool    mPanning = false;
     QPointF mPanPressPos;
     QPointF mPanPressPan;
@@ -145,10 +155,10 @@ private:
     QPushButton* mImportButton = nullptr;
     QPushButton* mPresetButton = nullptr;
     QPushButton* mExtractButton = nullptr;
-    QSpinBox*    mCountSpin = nullptr;
     QPushButton* mSelectToolButton = nullptr;
     QPushButton* mMarkerToolButton = nullptr;
     QPushButton* mFitButton = nullptr;
+    int mLastCount = 8;   // 上次提取数量（弹窗默认值）
 };
 
 #endif // REFERENCECARDPANEL_H

@@ -293,6 +293,7 @@ void MainWindow2::createDockWidgets()
     addDockWidget(Qt::BottomDockWidgetArea, mTimeLine);
     // 设定卡片：独立浮动窗口（窗口菜单可开合）
     addDockWidget(Qt::RightDockWidgetArea, mReferenceCardPanel);
+    mReferenceCardPanel->resize(800, 560);
     mReferenceCardPanel->setFloating(true);
     setDockNestingEnabled(true);
     // give the timeline a generous share of the window height
