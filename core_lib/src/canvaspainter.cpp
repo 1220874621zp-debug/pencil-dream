@@ -167,6 +167,10 @@ void CanvasPainter::initializePainter(QPainter& painter, QPaintDevice& device, c
 {
     painter.begin(&device);
 
+    // 1x 的帧图/tile 画到非整数 DPR(如 Windows 150%)设备上时必须双线性重采样：
+    // 默认最近邻会把 dab 边缘的抗锯齿渐变拉成硬阶梯（恒定锯齿，100% 缩放屏不可见）
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
     // Only draw inside the clipped rectangle
     painter.setClipRect(blitRect);
 
