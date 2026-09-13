@@ -89,16 +89,15 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     // tracks need horizontal room; the layer column must not force the
     // splitter open — 500px here kept the divider far right of the layer
     // toolbar (it has to sit right beside the tools dropdown instead)
-    // 垂直最小高只保 1 行：行溢出由常驻滚动条兜底，4 行地板会把
-    // 底部 dock 钉在 ~375 逻辑px（含工具栏/滚动条/标题栏），高分屏
-    // 150% 缩放下用户无法把时间轴压扁
+    // 垂直最小高为 0：允许把底部 dock 拖到只剩一行工具栏（工具栏 42 +
+    // 滚动条由外层布局兜底）；行区被压扁时只是裁剪绘制，拖回即恢复
     if (type == TIMELINE_CELL_TYPE::Tracks)
     {
-        setMinimumSize(500, mLayerHeight);
+        setMinimumSize(500, 0);
     }
     else
     {
-        setMinimumSize(120, mLayerHeight);
+        setMinimumSize(120, 0);
     }
     setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
     setAttribute(Qt::WA_OpaquePaintEvent, false);
