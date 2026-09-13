@@ -70,6 +70,7 @@ GNU General Public License for more details.
 #include "colorpalettewidget.h"
 #include "brushpresetpanel.h"
 #include "referencecardpanel.h"
+#include "exposuresheetpanel.h"
 #include "tooloptionwidget.h"
 #include "preferencesdialog.h"
 #include "ocaexportdialog.h"
@@ -246,6 +247,9 @@ void MainWindow2::createDockWidgets()
     mReferenceCardPanel = new ReferenceCardPanel(this);
     mReferenceCardPanel->setObjectName("ReferenceCard");
 
+    mExposureSheetPanel = new ExposureSheetPanel(this);
+    mExposureSheetPanel->setObjectName("ExposureSheet");
+
     mToolOptions = new ToolOptionWidget(this);
     mToolOptions->setObjectName("ToolOption");
 
@@ -260,6 +264,7 @@ void MainWindow2::createDockWidgets()
         << mBrushPresetPanel
         << mOnionSkinWidget
         << mReferenceCardPanel
+        << mExposureSheetPanel
         << mToolOptions
         << mToolBox;
 
@@ -295,6 +300,9 @@ void MainWindow2::createDockWidgets()
     addDockWidget(Qt::RightDockWidgetArea, mReferenceCardPanel);
     mReferenceCardPanel->resize(800, 560);
     mReferenceCardPanel->setFloating(true);
+    // 摄影表（律表）：默认停靠右侧隐藏，窗口菜单勾选打开
+    addDockWidget(Qt::RightDockWidgetArea, mExposureSheetPanel);
+    mExposureSheetPanel->hide();
     setDockNestingEnabled(true);
     // give the timeline a generous share of the window height
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
@@ -550,7 +558,8 @@ void MainWindow2::createMenus()
         mTimeLine->toggleViewAction(),
         mColorInspector->toggleViewAction(),
         mOnionSkinWidget->toggleViewAction(),
-        mReferenceCardPanel->toggleViewAction()
+        mReferenceCardPanel->toggleViewAction(),
+        mExposureSheetPanel->toggleViewAction()
     };
 
     for (QAction* action : actions)

@@ -47,6 +47,10 @@ public:
     bool isLengthExplicit() const { return mLengthExplicit; }
     void setLengthExplicit(bool b) { mLengthExplicit = b; }
 
+    /** 原画标记（摄影表/律表）：true=原画（圆圈+张数编号），false=中割（点）。默认原画。 */
+    bool isKeyDrawing() const { return mIsKeyDrawing; }
+    void setKeyDrawing(bool b) { mIsKeyDrawing = b; }
+
     void modification() { mIsModified = true; }
     virtual void setModified(bool b) { mIsModified = b; }
     bool isModified() const { return mIsModified; }
@@ -75,6 +79,7 @@ private:
     int mFrame = -1;
     int mLength = 1;
     bool mLengthExplicit = false;
+    bool mIsKeyDrawing = true;
     bool mIsModified = true;
     QString mAttachedFileName;
 

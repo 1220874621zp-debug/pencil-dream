@@ -200,6 +200,10 @@ QDomElement LayerBitmap::createDomElement(QDomDocument& doc) const
         {
             imageTag.setAttribute("length", pKeyFrame->length());
         }
+        if (!pKeyFrame->isKeyDrawing())
+        {
+            imageTag.setAttribute("keyDrawing", "0");
+        }
         layerElem.appendChild(imageTag);
 
         if (!pKeyFrame->fileName().isEmpty()) {
@@ -241,6 +245,12 @@ void LayerBitmap::loadDomElement(const QDomElement& element, QString dataDirPath
                             key->setLengthExplicit(true);
                         }
                     }
+                }
+
+                KeyFrame* loadedKey = getKeyFrameAt(position);
+                if (loadedKey != nullptr)
+                {
+                    loadedKey->setKeyDrawing(imageElement.attribute("keyDrawing", "1").toInt() != 0);
                 }
             }
 
