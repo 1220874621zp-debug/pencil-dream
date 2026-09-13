@@ -643,8 +643,6 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     // ---- 列头：钉在视口上缘（不随纵向滚动），高度/字号/图标随缩放等比 ----
     const int hh = headerH();
     p.fillRect(QRect(0, 0, vpW, hh), mPalette.headerBg);
-    // 标尺拐角：帧号栏顶格属标尺区域，恒用标尺底色（不随主题变浅）
-    p.fillRect(QRect(0, 0, gw, hh), GUTTER_BG);
     p.translate(-hOff, 0);
     QFont nameFont = font();
     nameFont.setPixelSize(qBound(6, qRound(10 * mZoom), 30));
@@ -703,6 +701,9 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     p.drawLine(gw, hh - 1, cW, hh - 1);
     p.setBrush(Qt::NoBrush);
     p.translate(hOff, 0);
+    // 标尺拐角最后盖回：横向滚动后列内容（当前列高亮/文字/分隔线）会随平移
+    // 越进视口左缘 [0..gw]，帧号栏顶格恒属标尺区域，须保持标尺底色
+    p.fillRect(QRect(0, 0, gw, hh), GUTTER_BG);
 }
 
 void ExposureSheetView::mousePressEvent(QMouseEvent* event)
