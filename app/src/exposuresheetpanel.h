@@ -71,6 +71,8 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
     void leaveEvent(QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void showEvent(QShowEvent* event) override;
@@ -80,10 +82,17 @@ private:
     int  rowForY(int y) const;           // y → 帧号（可能越界，调用方校验）
     int  contentWidth() const;
     int  contentHeight() const;
+    int  gutterW() const;                // 随缩放
+    int  colW() const;                   // 随缩放
+    int  rowH() const;                   // 随缩放
     void updateScrollRanges();
     void ensureFrameVisible(int frame);
     void updateToggleTarget();
     void toggleKeyDrawingAt(Layer* layer, int pos);
+    void addKeyAt(Layer* layer, int pos);
+    void deleteKeyAt(Layer* layer, int pos);
+    void moveKeyBetween(Layer* srcLayer, int srcPos, Layer* dstLayer, int dstPos);
+    void commitDrag();
     Layer* columnLayer(int index) const;
 
     Editor* mEditor = nullptr;
@@ -94,6 +103,19 @@ private:
     int mCurrentFrame = 1;
     int mCurrentLayerId = -1;
     int mHoverEyeColumn = -1; // 列头眼睛悬浮高亮的列
+    int mBitmapColCount = 0;  // 位图族列数（相机列恒在尾部）
+    qreal mZoom = 1.0;        // 律表缩放（0.6..3.0，滚轮调节）
+
+    // 拖动帧格状态（按下有帧格的格子→越过阈值进入拖动→松手提交移动事务）
+    bool    mDragArmed = false;
+    bool    mDragging = false;
+    QPoint  mDragPressPos;
+    int     mDragPressCol = -1;
+    int     mDragSrcPos = -1;
+    bool    mDragWasKeyDrawing = true;
+    int     mDragNumber = 0;
+    int     mDragCurCol = -1;
+    int     mDragCurPos = -1;
 };
 
 /** 摄影表（律表）面板：顶部“原画/中割”切换开关 + 律表主体 */

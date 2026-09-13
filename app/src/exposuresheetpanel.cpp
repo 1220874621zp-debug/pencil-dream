@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPolygonF>
@@ -38,10 +39,15 @@ GNU General Public License for more details.
 
 namespace
 {
-constexpr int GUTTER_W = 38; // 帧号栏宽
-constexpr int COL_W    = 66; // 图层列宽
-constexpr int ROW_H    = 16; // 一帧行高
-constexpr int HEADER_H = 46; // 列头高
+constexpr int GUTTER_W = 38; // 帧号栏宽（缩放基准）
+constexpr int COL_W    = 66; // 图层列宽（缩放基准）
+constexpr int ROW_H    = 16; // 一帧行高（缩放基准）
+constexpr int HEADER_H = 46; // 列头高（固定，不随缩放）
+
+constexpr qreal ZOOM_MIN = 0.6;
+constexpr qreal ZOOM_MAX = 3.0;
+constexpr qreal ZOOM_STEP = 1.15;
+constexpr int    DRAG_THRESHOLD = 4; // 拖动启动阈值（像素）
 
 const QColor BODY_BG      (0x1e, 0x1e, 0x1e);
 const QColor GUTTER_BG    (0x19, 0x19, 0x19);
@@ -130,28 +136,30 @@ ExposureSheetView::ExposureSheetView(QWidget* parent) : QAbstractScrollArea(pare
 {
     setFrameStyle(QFrame::NoFrame);
     viewport()->setMouseTracking(true);
-    horizontalScrollBar()->setSingleStep(COL_W / 2);
-    verticalScrollBar()->setSingleStep(ROW_H * 3);
 }
+
+int ExposureSheetView::gutterW() const { return qRound(GUTTER_W * mZoom); }
+int ExposureSheetView::colW() const { return qRound(COL_W * mZoom); }
+int ExposureSheetView::rowH() const { return qRound(ROW_H * mZoom); }
 
 int ExposureSheetView::frameRow(int frame) const
 {
-    return HEADER_H + (frame - 1) * ROW_H;
+    return HEADER_H + (frame - 1) * rowH();
 }
 
 int ExposureSheetView::rowForY(int y) const
 {
-    return (y - HEADER_H) / ROW_H + 1;
+    return (y - HEADER_H) / rowH() + 1;
 }
 
 int ExposureSheetView::contentWidth() const
 {
-    return GUTTER_W + static_cast<int>(mColumns.size()) * COL_W;
+    return gutterW() + static_cast<int>(mColumns.size()) * colW();
 }
 
 int ExposureSheetView::contentHeight() const
 {
-    return HEADER_H + mFrameCount * ROW_H;
+    return HEADER_H + mFrameCount * rowH();
 }
 
 void ExposureSheetView::updateScrollRanges()
@@ -160,8 +168,10 @@ void ExposureSheetView::updateScrollRanges()
     const int h = qMax(contentHeight(), viewport()->height());
     horizontalScrollBar()->setRange(0, w - viewport()->width());
     horizontalScrollBar()->setPageStep(viewport()->width());
+    horizontalScrollBar()->setSingleStep(qMax(1, colW() / 2));
     verticalScrollBar()->setRange(0, h - viewport()->height());
     verticalScrollBar()->setPageStep(viewport()->height());
+    verticalScrollBar()->setSingleStep(qMax(1, rowH() * 3));
 }
 
 void ExposureSheetView::rebuildColumns()
@@ -241,6 +251,13 @@ void ExposureSheetView::rebuildColumns()
         }
     }
 
+    mBitmapColCount = 0;
+    for (const SheetColumn& c : mColumns)
+    {
+        if (!c.isCamera) { ++mBitmapColCount; }
+        else { break; }
+    }
+
     mFrameCount = qMax(48, lastKeyPos + mFps);
     updateScrollRanges();
     viewport()->update();
@@ -273,7 +290,7 @@ void ExposureSheetView::ensureFrameVisible(int frame)
 {
     QScrollBar* vb = verticalScrollBar();
     const int yTop = frameRow(frame);
-    const int yBot = yTop + ROW_H;
+    const int yBot = yTop + rowH();
     if (yTop < vb->value() + HEADER_H)
     {
         vb->setValue(qMax(0, yTop - HEADER_H));
@@ -313,6 +330,77 @@ void ExposureSheetView::toggleKeyDrawingAt(Layer* layer, int pos)
         new ToggleKeyDrawingCommand(mEditor, layer->id(), pos, !key->isKeyDrawing()));
 }
 
+void ExposureSheetView::addKeyAt(Layer* layer, int pos)
+{
+    if (layer == nullptr || !layer->isBitmapKind() || layer->keyExists(pos)) { return; }
+
+    mEditor->beginLayerLayoutEdit(layer);
+    const bool added = layer->addNewKeyFrameAt(pos);
+    mEditor->endLayerLayoutEdit(tr("添加关键帧"));
+
+    if (added)
+    {
+        mEditor->scrubTo(pos);
+        mEditor->layers()->notifyLayerChanged(layer);
+        mEditor->layers()->notifyAnimationLengthChanged();
+        emit mEditor->framesModified();
+    }
+}
+
+void ExposureSheetView::deleteKeyAt(Layer* layer, int pos)
+{
+    if (layer == nullptr || !layer->isBitmapKind() || !layer->keyExists(pos)) { return; }
+    if (layer->keyFrameCount() <= 1) { return; } // 非声音层保底留最后一帧（与时间轴一致）
+
+    mEditor->beginLayerLayoutEdit(layer);
+    mEditor->takeLayerKeyFrame(layer, pos);
+    layer->absorbGapsAt({ pos });
+    mEditor->endLayerLayoutEdit(tr("删除关键帧"));
+
+    mEditor->layers()->notifyLayerChanged(layer);
+    mEditor->layers()->notifyAnimationLengthChanged();
+    emit mEditor->framesModified();
+}
+
+void ExposureSheetView::moveKeyBetween(Layer* srcLayer, int srcPos, Layer* dstLayer, int dstPos)
+{
+    if (srcLayer == nullptr || dstLayer == nullptr) { return; }
+    if (!srcLayer->isBitmapKind() || !dstLayer->isBitmapKind()) { return; }
+    if (srcLayer == dstLayer && srcPos == dstPos) { return; }
+    if (!srcLayer->keyExists(srcPos)) { return; }
+    if (dstLayer->keyExists(dstPos)) { return; } // 目标格已有关键帧：放弃移动
+
+    mEditor->beginLayerLayoutEdit(srcLayer);
+    if (dstLayer != srcLayer)
+    {
+        mEditor->addLayerToLayoutEdit(dstLayer);
+    }
+    KeyFrame* key = mEditor->takeLayerKeyFrame(srcLayer, srcPos);
+    dstLayer->addKeyFrame(dstPos, key);
+    srcLayer->absorbGapsAt({ srcPos });
+    mEditor->endLayerLayoutEdit(tr("移动律表张数"));
+
+    mEditor->layers()->notifyLayerChanged(srcLayer);
+    if (dstLayer != srcLayer)
+    {
+        mEditor->layers()->notifyLayerChanged(dstLayer);
+    }
+    mEditor->layers()->notifyAnimationLengthChanged();
+    emit mEditor->framesModified();
+}
+
+void ExposureSheetView::commitDrag()
+{
+    if (!mDragging) { return; }
+    if (mDragCurCol >= 0 && mDragCurPos >= 1 && mDragCurPos <= mFrameCount
+        && (mDragCurCol != mDragPressCol || mDragCurPos != mDragSrcPos))
+    {
+        Layer* srcLayer = columnLayer(mDragPressCol);
+        Layer* dstLayer = columnLayer(mDragCurCol);
+        moveKeyBetween(srcLayer, mDragSrcPos, dstLayer, mDragCurPos);
+    }
+}
+
 void ExposureSheetView::toggleCurrentKeyDrawing()
 {
     if (mEditor == nullptr || mEditor->object() == nullptr) { return; }
@@ -337,6 +425,9 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     const int vOff = verticalScrollBar()->value();
     const int vpW = viewport()->width();
     const int vpH = viewport()->height();
+    const int gw = gutterW();
+    const int cw = colW();
+    const int rh = rowH();
     const int cW = qMax(contentWidth(), vpW);
     const int cH = contentHeight();
 
@@ -349,7 +440,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     {
         if (mColumns[i].layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(GUTTER_W + i * COL_W, HEADER_H, COL_W, cH - HEADER_H), LAYER_TINT);
+            p.fillRect(QRect(gw + i * cw, HEADER_H, cw, cH - HEADER_H), LAYER_TINT);
         }
     }
 
@@ -359,71 +450,73 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     p.setBrush(Qt::NoBrush);
     for (int f = fFirst; f <= fLast; ++f)
     {
-        const int y = frameRow(f) + ROW_H;
+        const int y = frameRow(f) + rh;
         p.setPen(QPen(f % mFps == 0 ? LINE_STRONG : (f % 3 == 0 ? LINE_MID : LINE_FAINT)));
-        p.drawLine(GUTTER_W, y, cW, y);
+        p.drawLine(gw, y, cW, y);
     }
 
     // 列分隔竖线
     p.setPen(QPen(COL_SEP));
     for (int i = 0; i <= mColumns.size(); ++i)
     {
-        const int x = GUTTER_W + i * COL_W;
+        const int x = gw + i * cw;
         p.drawLine(x, HEADER_H, x, cH);
     }
 
     // 符号：原画=圆圈数字 / 中割=点 / 相机=菱形；曝光延续竖线（开放尾块=虚线）
     QFont numFont = font();
-    numFont.setPixelSize(9);
+    numFont.setPixelSize(qMax(6, qRound(9 * mZoom)));
     numFont.setBold(true);
     const QFontMetrics numFm(numFont);
+    const qreal dotR = qBound(2.0, 3.0 * mZoom, 6.0);
+    const qreal diamondR = qBound(3.0, 5.0 * mZoom, 10.0);
+    const int expoInset = qBound(4, qRound(6 * mZoom), 12);
     for (int i = 0; i < mColumns.size(); ++i)
     {
         const SheetColumn& col = mColumns[i];
-        const int cx = GUTTER_W + i * COL_W;
+        const int cx = gw + i * cw;
         for (const SheetKeyEntry& e : col.keys)
         {
             if (e.blockEnd > 0 && e.blockEnd < fFirst) { continue; } // 整块在可视区上方
             if (e.pos > fLast) { break; }                            // keys 升序，后面更远
 
-            const int cy = frameRow(e.pos) + ROW_H / 2;
+            const int cy = frameRow(e.pos) + rh / 2;
             const int exposureEnd = (e.blockEnd > 0) ? e.blockEnd - 1 : mFrameCount;
             if (exposureEnd > e.pos)
             {
                 QPen expoPen(e.blockEnd > 0 ? EXPO_LINE : EXPO_OPEN);
                 if (e.blockEnd < 0) { expoPen.setStyle(Qt::DashLine); }
                 p.setPen(expoPen);
-                p.drawLine(cx + COL_W / 2, cy + 6, cx + COL_W / 2, frameRow(exposureEnd) + ROW_H / 2 - 6);
+                p.drawLine(cx + cw / 2, cy + expoInset, cx + cw / 2, frameRow(exposureEnd) + rh / 2 - expoInset);
             }
 
             if (col.isCamera)
             {
                 p.setPen(QPen(CAMERA_MARK));
                 p.setBrush(CAMERA_MARK);
-                const qreal r = 5.0;
                 QPolygonF diamond;
-                diamond << QPointF(cx + COL_W / 2, cy - r)
-                        << QPointF(cx + COL_W / 2 + r, cy)
-                        << QPointF(cx + COL_W / 2, cy + r)
-                        << QPointF(cx + COL_W / 2 - r, cy);
+                diamond << QPointF(cx + cw / 2, cy - diamondR)
+                        << QPointF(cx + cw / 2 + diamondR, cy)
+                        << QPointF(cx + cw / 2, cy + diamondR)
+                        << QPointF(cx + cw / 2 - diamondR, cy);
                 p.drawPolygon(diamond);
             }
             else if (e.keyDrawing)
             {
                 const QString text = QString::number(e.number);
-                const qreal w = qMax<qreal>(ROW_H - 3, numFm.horizontalAdvance(text) + 6);
+                const qreal w = qMax<qreal>(rh - 3, numFm.horizontalAdvance(text) + 6);
                 p.setPen(QPen(KEY_CIRCLE));
                 p.setBrush(Qt::NoBrush);
-                p.drawEllipse(QPointF(cx + COL_W / 2, cy + 0.5), w / 2, (ROW_H - 3) / 2.0);
+                p.drawEllipse(QPointF(cx + cw / 2, cy + 0.5), w / 2, (rh - 3) / 2.0);
                 p.setPen(KEY_NUMBER);
                 p.setFont(numFont);
-                p.drawText(QRect(cx, cy - ROW_H / 2, COL_W, ROW_H), Qt::AlignCenter, text);
+                p.drawText(QRect(cx, cy - rh / 2, cw, rh), Qt::AlignCenter, text);
             }
             else
             {
                 p.setPen(Qt::NoPen);
                 p.setBrush(DOT_FILL);
-                p.drawEllipse(QPointF(cx + COL_W / 2, cy + 0.5), 3.0, 3.0);
+                p.drawEllipse(QPointF(cx + cw / 2, cy + 0.5), dotR, dotR);
             }
         }
     }
@@ -432,30 +525,61 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     if (mCurrentFrame >= 1 && mCurrentFrame <= mFrameCount)
     {
         const int bandY = frameRow(mCurrentFrame);
-        p.fillRect(QRect(GUTTER_W, bandY, cW - GUTTER_W, ROW_H), BAND_FILL);
+        p.fillRect(QRect(gw, bandY, cW - gw, rh), BAND_FILL);
         p.setPen(QPen(BAND_LINE));
-        p.drawLine(GUTTER_W, bandY, cW, bandY);
-        p.drawLine(GUTTER_W, bandY + ROW_H, cW, bandY + ROW_H);
+        p.drawLine(gw, bandY, cW, bandY);
+        p.drawLine(gw, bandY + rh, cW, bandY + rh);
+    }
+
+    // 拖动预览：目标格高亮 + 半透明符号
+    if (mDragging && mDragCurCol >= 0 && mDragCurPos >= 1 && mDragCurPos <= mFrameCount)
+    {
+        const int gx = gw + mDragCurCol * cw;
+        const int gy = frameRow(mDragCurPos);
+        p.fillRect(QRect(gx, gy, cw, rh), QColor(255, 171, 64, 38));
+        p.setPen(QPen(BAND_LINE));
+        p.setBrush(Qt::NoBrush);
+        p.drawRect(QRect(gx, gy, cw, rh).adjusted(0, 0, -1, -1));
+
+        p.setOpacity(0.55);
+        const int cy = gy + rh / 2;
+        if (mDragWasKeyDrawing)
+        {
+            const QString text = QString::number(mDragNumber);
+            const qreal w = qMax<qreal>(rh - 3, numFm.horizontalAdvance(text) + 6);
+            p.setPen(QPen(KEY_CIRCLE));
+            p.drawEllipse(QPointF(gx + cw / 2, cy + 0.5), w / 2, (rh - 3) / 2.0);
+            p.setPen(KEY_NUMBER);
+            p.setFont(numFont);
+            p.drawText(QRect(gx, cy - rh / 2, cw, rh), Qt::AlignCenter, text);
+        }
+        else
+        {
+            p.setPen(Qt::NoPen);
+            p.setBrush(DOT_FILL);
+            p.drawEllipse(QPointF(gx + cw / 2, cy + 0.5), dotR, dotR);
+        }
+        p.setOpacity(1.0);
     }
     p.setBrush(Qt::NoBrush);
     p.translate(hOff, vOff);
 
     // ---- 帧号栏：钉在视口左缘（不随横向滚动） ----
-    p.fillRect(QRect(0, 0, GUTTER_W, vpH), GUTTER_BG);
+    p.fillRect(QRect(0, 0, gw, vpH), GUTTER_BG);
     p.translate(0, -vOff);
     QFont gutterFont = font();
-    gutterFont.setPixelSize(9);
+    gutterFont.setPixelSize(qMax(6, qRound(9 * mZoom)));
     p.setFont(gutterFont);
     for (int f = fFirst; f <= fLast; ++f)
     {
         if (f != 1 && f % 3 != 0) { continue; }
-        const int cy = frameRow(f) + ROW_H / 2;
+        const int cy = frameRow(f) + rh / 2;
         p.setPen(f == mCurrentFrame ? BAND_TEXT : GUTTER_TEXT);
-        p.drawText(QRect(0, cy - ROW_H / 2, GUTTER_W - 6, ROW_H),
+        p.drawText(QRect(0, cy - rh / 2, gw - 6, rh),
                    Qt::AlignVCenter | Qt::AlignRight, QString::number(f));
     }
     p.setPen(QPen(COL_SEP));
-    p.drawLine(GUTTER_W - 1, 0, GUTTER_W - 1, cH);
+    p.drawLine(gw - 1, 0, gw - 1, cH);
     p.setBrush(Qt::NoBrush);
     p.translate(0, vOff);
 
@@ -471,16 +595,16 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     for (int i = 0; i < mColumns.size(); ++i)
     {
         const SheetColumn& col = mColumns[i];
-        const int hx = GUTTER_W + i * COL_W;
+        const int hx = gw + i * cw;
         if (col.layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(hx + 1, 0, COL_W - 1, HEADER_H - 1), HEADER_BG_CUR);
+            p.fillRect(QRect(hx + 1, 0, cw - 1, HEADER_H - 1), HEADER_BG_CUR);
         }
 
         p.setFont(nameFont);
         p.setPen(col.visible ? QColor(0xee, 0xee, 0xee) : TEXT_DIM);
-        p.drawText(QRect(hx + 4, 3, COL_W - 8, 18), Qt::AlignVCenter | Qt::AlignLeft,
-                   nameFm.elidedText(col.name, Qt::ElideRight, COL_W - 8));
+        p.drawText(QRect(hx + 4, 3, cw - 8, 18), Qt::AlignVCenter | Qt::AlignLeft,
+                   nameFm.elidedText(col.name, Qt::ElideRight, cw - 8));
 
         const QRectF eyeRect(hx + 6, HEADER_H - 20, 18, 14);
         drawEyeGlyph(p, eyeRect, col.visible);
@@ -489,7 +613,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
         {
             p.setFont(metaFont);
             p.setPen(TEXT_DIM);
-            p.drawText(QRect(hx, HEADER_H - 21, COL_W - 8, 16), Qt::AlignVCenter | Qt::AlignRight,
+            p.drawText(QRect(hx, HEADER_H - 21, cw - 8, 16), Qt::AlignVCenter | Qt::AlignRight,
                        QString::number(qRound(col.opacity * 100)) + QStringLiteral("%"));
         }
 
@@ -503,7 +627,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     p.setPen(QPen(COL_SEP));
     for (int i = 0; i <= mColumns.size(); ++i)
     {
-        const int x = GUTTER_W + i * COL_W;
+        const int x = gw + i * cw;
         p.drawLine(x, 0, x, HEADER_H);
     }
     p.setPen(QPen(LINE_STRONG));
@@ -520,16 +644,18 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
     const int y = event->pos().y();
     const int hOff = horizontalScrollBar()->value();
     const int vOff = verticalScrollBar()->value();
+    const int gw = gutterW();
+    const int cw = colW();
     const int contentX = x + hOff;
 
     if (y < HEADER_H)
     {
-        if (contentX < GUTTER_W) { return; }
-        const int idx = (contentX - GUTTER_W) / COL_W;
+        if (contentX < gw) { return; }
+        const int idx = (contentX - gw) / cw;
         Layer* layer = columnLayer(idx);
         if (layer == nullptr) { return; }
 
-        const QRect eyeRect(GUTTER_W + idx * COL_W + 6 - hOff, HEADER_H - 20, 18, 14);
+        const QRect eyeRect(gw + idx * cw + 6 - hOff, HEADER_H - 20, 18, 14);
         if (eyeRect.contains(event->pos()))
         {
             layer->setVisible(!layer->visible());
@@ -546,20 +672,64 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
     const int frame = rowForY(y + vOff);
     if (frame < 1 || frame > mFrameCount) { return; }
 
-    const int idx = (contentX >= GUTTER_W) ? (contentX - GUTTER_W) / COL_W : -1;
+    const int idx = (contentX >= gw) ? (contentX - gw) / cw : -1;
+    Layer* layer = columnLayer(idx);
+    const bool bitmapCol = (layer && layer->isBitmapKind());
 
     if (event->button() == Qt::RightButton)
     {
-        Layer* layer = columnLayer(idx);
-        if (layer && layer->isBitmapKind())
+        if (!bitmapCol) { return; }
+
+        // 右键菜单：添加/删除关键帧 + 原画/中割切换
+        QMenu menu(this);
+        if (layer->keyExists(frame))
         {
-            toggleKeyDrawingAt(layer, frame);
+            KeyFrame* key = layer->getKeyFrameAt(frame);
+            QAction* toggleAct = menu.addAction(
+                key->isKeyDrawing() ? tr("标记为中割") : tr("标记为原画"));
+            menu.addSeparator();
+            QAction* delAct = menu.addAction(tr("删除关键帧"));
+
+            QAction* chosen = menu.exec(event->globalPosition().toPoint());
+            if (chosen == toggleAct) { toggleKeyDrawingAt(layer, frame); }
+            else if (chosen == delAct) { deleteKeyAt(layer, frame); }
+        }
+        else
+        {
+            QAction* addAct = menu.addAction(tr("添加关键帧"));
+            if (menu.exec(event->globalPosition().toPoint()) == addAct)
+            {
+                addKeyAt(layer, frame);
+            }
         }
         return;
     }
 
+    if (event->button() != Qt::LeftButton) { return; }
+
+    // 按在帧格上：先走点击语义（跳帧+切层），同时布防拖动
+    if (bitmapCol && layer->keyExists(frame))
+    {
+        mDragArmed = true;
+        mDragging = false;
+        mDragPressPos = event->pos();
+        mDragPressCol = idx;
+        mDragSrcPos = frame;
+        mDragCurCol = idx;
+        mDragCurPos = frame;
+        for (const SheetKeyEntry& e : mColumns[idx].keys)
+        {
+            if (e.pos == frame)
+            {
+                mDragWasKeyDrawing = e.keyDrawing;
+                mDragNumber = e.number;
+                break;
+            }
+        }
+    }
+
     mEditor->scrubTo(frame);
-    if (Layer* layer = columnLayer(idx))
+    if (layer)
     {
         mEditor->layers()->setCurrentLayer(layer);
     }
@@ -567,18 +737,50 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
 
 void ExposureSheetView::mouseMoveEvent(QMouseEvent* event)
 {
+    if (mDragArmed && (event->buttons() & Qt::LeftButton))
+    {
+        if (!mDragging)
+        {
+            if ((event->pos() - mDragPressPos).manhattanLength() > DRAG_THRESHOLD)
+            {
+                mDragging = true;
+                mHoverEyeColumn = -1;
+                viewport()->setCursor(Qt::ClosedHandCursor);
+            }
+        }
+        if (mDragging)
+        {
+            const int vOff = verticalScrollBar()->value();
+            const int hOff = horizontalScrollBar()->value();
+            // 目标行/列：夹在位图列范围与表长内
+            int frame = rowForY(event->pos().y() + vOff);
+            frame = qBound(1, frame, mFrameCount);
+            int col = (event->pos().x() + hOff >= gutterW())
+                          ? (event->pos().x() + hOff - gutterW()) / colW() : 0;
+            col = qBound(0, col, qMax(0, mBitmapColCount - 1));
+
+            if (col != mDragCurCol || frame != mDragCurPos)
+            {
+                mDragCurCol = col;
+                mDragCurPos = frame;
+                viewport()->update();
+            }
+        }
+        return;
+    }
+
     const int x = event->pos().x();
     const int y = event->pos().y();
     const int hOff = horizontalScrollBar()->value();
     const int contentX = x + hOff;
 
     int hover = -1;
-    if (y < HEADER_H && contentX >= GUTTER_W)
+    if (y < HEADER_H && contentX >= gutterW())
     {
-        const int idx = (contentX - GUTTER_W) / COL_W;
+        const int idx = (contentX - gutterW()) / colW();
         if (idx >= 0 && idx < mColumns.size())
         {
-            const QRect eyeRect(GUTTER_W + idx * COL_W + 6 - hOff, HEADER_H - 20, 18, 14);
+            const QRect eyeRect(gutterW() + idx * colW() + 6 - hOff, HEADER_H - 20, 18, 14);
             if (eyeRect.contains(event->pos()))
             {
                 hover = idx;
@@ -591,6 +793,46 @@ void ExposureSheetView::mouseMoveEvent(QMouseEvent* event)
         mHoverEyeColumn = hover;
         viewport()->update();
     }
+}
+
+void ExposureSheetView::mouseReleaseEvent(QMouseEvent* event)
+{
+    QAbstractScrollArea::mouseReleaseEvent(event);
+
+    if (mDragArmed)
+    {
+        commitDrag();
+        mDragArmed = false;
+        mDragging = false;
+        mDragCurCol = -1;
+        mDragCurPos = -1;
+        viewport()->setCursor(Qt::ArrowCursor);
+        viewport()->update();
+    }
+}
+
+void ExposureSheetView::wheelEvent(QWheelEvent* event)
+{
+    // 滚轮=缩放律表（光标下的帧/列锚定不动）
+    const qreal oldZoom = mZoom;
+    const qreal factor = (event->angleDelta().y() > 0) ? ZOOM_STEP : (1.0 / ZOOM_STEP);
+    mZoom = qBound<qreal>(ZOOM_MIN, mZoom * factor, ZOOM_MAX);
+    if (qFuzzyCompare(mZoom, oldZoom))
+    {
+        event->accept();
+        return;
+    }
+
+    const qreal px = event->position().x();
+    const qreal py = event->position().y();
+    const qreal rowF = (py + verticalScrollBar()->value() - HEADER_H) / qMax<qreal>(1.0, qRound(ROW_H * oldZoom));
+    const qreal colF = (px + horizontalScrollBar()->value() - qRound(GUTTER_W * oldZoom)) / qMax<qreal>(1.0, qRound(COL_W * oldZoom));
+
+    updateScrollRanges();
+    verticalScrollBar()->setValue(qRound(HEADER_H + rowF * rowH() - py));
+    horizontalScrollBar()->setValue(qRound(gutterW() + colF * colW() - px));
+    viewport()->update();
+    event->accept();
 }
 
 void ExposureSheetView::leaveEvent(QEvent* event)
@@ -641,7 +883,8 @@ void ExposureSheetPanel::initUI()
     mToggleKeyButton->setEnabled(false);
     mToggleKeyButton->setFixedHeight(24);
     mToggleKeyButton->setMinimumWidth(72);
-    mToggleKeyButton->setToolTip(tr("切换当前张的原画/中割标记（也可右键律表格子切换）"));
+    mToggleKeyButton->setToolTip(
+        tr("切换当前张的原画/中割标记。\n右键律表格子：添加/删除关键帧、切换原画/中割。\n拖动帧格：移动张数（可跨层列）；滚轮：缩放。"));
     topRow->addWidget(label);
     topRow->addWidget(mToggleKeyButton);
     topRow->addStretch();
