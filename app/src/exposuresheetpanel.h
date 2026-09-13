@@ -20,11 +20,26 @@ GNU General Public License for more details.
 #include "basedockwidget.h"
 
 #include <QAbstractScrollArea>
+#include <QColor>
 #include <QVector>
 
 class Editor;
 class Layer;
 class QPushButton;
+
+/** 律表配色（暗色/亮色两套；帧号栏为标尺区域，恒用暗色不变） */
+struct SheetPalette
+{
+    QColor bodyBg, headerBg, headerBgCur;
+    QColor lineFaint, lineMid, lineStrong;
+    QColor colSep;
+    QColor keyCircle, keyNumber, dotFill;
+    QColor expoLine, expoOpen;
+    QColor cameraMark;
+    QColor layerTint;
+    QColor nameText, nameHidden, metaText;
+    QColor eyeOn, eyeOff;
+};
 
 /** 律表列内一个关键帧（绘张/相机key）的绘制数据 */
 struct SheetKeyEntry
@@ -59,6 +74,8 @@ public:
     void rebuildColumns();              // 层结构/帧数据/时长变化：重建列与滚动范围
     void updateCurrentFrame(int frame); // 播放头移动：高亮+跟随滚动（不重建）
     void refreshHighlight();            // 当前层/帧变化但数据未变：仅重绘
+    void setLightMode(bool light);      // 亮色/暗色配色切换
+    bool isLightMode() const { return mLightMode; }
 
 signals:
     /** 当前(层,帧)的关键帧状态：hasKey=false 表示无关键帧（切换按钮置灰） */
@@ -105,6 +122,8 @@ private:
     int mHoverEyeColumn = -1; // 列头眼睛悬浮高亮的列
     int mBitmapColCount = 0;  // 位图族列数（相机列恒在尾部）
     qreal mZoom = 1.0;        // 律表缩放（0.6..3.0，滚轮调节）
+    SheetPalette mPalette;    // 当前配色（setLightMode 切换）
+    bool mLightMode = false;
 
     // 拖动帧格状态（按下有帧格的格子→越过阈值进入拖动→松手提交移动事务）
     bool    mDragArmed = false;
@@ -139,6 +158,7 @@ private:
 
     ExposureSheetView* mView = nullptr;
     QPushButton* mToggleKeyButton = nullptr;
+    QPushButton* mThemeButton = nullptr;
     bool mSyncingButton = false;
 };
 

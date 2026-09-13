@@ -33,7 +33,10 @@ GNU General Public License for more details.
 #include <QPolygonF>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QSettings>
 #include <QUndoCommand>
+
+#include "pencildef.h"
 
 #include <algorithm>
 
@@ -49,28 +52,64 @@ constexpr qreal ZOOM_MAX = 3.0;
 constexpr qreal ZOOM_STEP = 1.15;
 constexpr int    DRAG_THRESHOLD = 4; // 拖动启动阈值（像素）
 
-const QColor BODY_BG      (0x1e, 0x1e, 0x1e);
+// 帧号栏（标尺区域）与播放头高亮：两套主题下保持不变
 const QColor GUTTER_BG    (0x19, 0x19, 0x19);
-const QColor HEADER_BG    (0x23, 0x23, 0x23);
-const QColor HEADER_BG_CUR(0x30, 0x30, 0x30);
-const QColor LINE_FAINT   (255, 255, 255, 18);
-const QColor LINE_MID     (255, 255, 255, 34);
-const QColor LINE_STRONG  (255, 255, 255, 72);
-const QColor COL_SEP      (255, 255, 255, 30);
-const QColor KEY_CIRCLE   (0xf2, 0xf2, 0xf2);
-const QColor KEY_NUMBER   (255, 255, 255);
-const QColor DOT_FILL     (0xc8, 0xc8, 0xc8);
-const QColor EXPO_LINE    (0x7a, 0x7a, 0x7a);
-const QColor EXPO_OPEN    (0x5e, 0x5e, 0x5e);
-const QColor CAMERA_MARK  (0x86, 0xb9, 0xe8);
+const QColor GUTTER_TEXT  (0xb9, 0xb9, 0xb9);
 const QColor BAND_FILL    (255, 171, 64, 46);
 const QColor BAND_LINE    (255, 171, 64, 200);
-const QColor LAYER_TINT   (255, 255, 255, 10);
-const QColor EYE_ON       (0xe6, 0xe6, 0xe6);
-const QColor EYE_OFF      (0x78, 0x78, 0x78);
-const QColor TEXT_DIM     (0x9a, 0x9a, 0x9a);
-const QColor GUTTER_TEXT  (0xb9, 0xb9, 0xb9);
 const QColor BAND_TEXT    (0xff, 0xab, 0x40);
+
+/** 暗色配色（默认） */
+SheetPalette darkSheetPalette()
+{
+    SheetPalette p;
+    p.bodyBg      = QColor(0x1e, 0x1e, 0x1e);
+    p.headerBg    = QColor(0x23, 0x23, 0x23);
+    p.headerBgCur = QColor(0x30, 0x30, 0x30);
+    p.lineFaint   = QColor(255, 255, 255, 18);
+    p.lineMid     = QColor(255, 255, 255, 34);
+    p.lineStrong  = QColor(255, 255, 255, 72);
+    p.colSep      = QColor(255, 255, 255, 30);
+    p.keyCircle   = QColor(0xf2, 0xf2, 0xf2);
+    p.keyNumber   = QColor(255, 255, 255);
+    p.dotFill     = QColor(0xc8, 0xc8, 0xc8);
+    p.expoLine    = QColor(0x7a, 0x7a, 0x7a);
+    p.expoOpen    = QColor(0x5e, 0x5e, 0x5e);
+    p.cameraMark  = QColor(0x86, 0xb9, 0xe8);
+    p.layerTint   = QColor(255, 255, 255, 10);
+    p.nameText    = QColor(0xee, 0xee, 0xee);
+    p.nameHidden  = QColor(0x9a, 0x9a, 0x9a);
+    p.metaText    = QColor(0x9a, 0x9a, 0x9a);
+    p.eyeOn       = QColor(0xe6, 0xe6, 0xe6);
+    p.eyeOff      = QColor(0x78, 0x78, 0x78);
+    return p;
+}
+
+/** 亮色配色（参考图）：底色 #DEDEDE、黑线、黑字 */
+SheetPalette lightSheetPalette()
+{
+    SheetPalette p;
+    p.bodyBg      = QColor(0xDE, 0xDE, 0xDE);
+    p.headerBg    = QColor(0xDE, 0xDE, 0xDE);
+    p.headerBgCur = QColor(0xC9, 0xC9, 0xC9);
+    p.lineFaint   = QColor(0, 0, 0, 45);
+    p.lineMid     = QColor(0, 0, 0, 90);
+    p.lineStrong  = QColor(0, 0, 0, 160);
+    p.colSep      = QColor(0, 0, 0, 60);
+    p.keyCircle   = QColor(0x1a, 0x1a, 0x1a);
+    p.keyNumber   = QColor(0x00, 0x00, 0x00);
+    p.dotFill     = QColor(0x22, 0x22, 0x22);
+    p.expoLine    = QColor(0x55, 0x55, 0x55);
+    p.expoOpen    = QColor(0x77, 0x77, 0x77);
+    p.cameraMark  = QColor(0x3a, 0x6e, 0xa5);
+    p.layerTint   = QColor(0, 0, 0, 14);
+    p.nameText    = QColor(0x1f, 0x1f, 0x1f);
+    p.nameHidden  = QColor(0x8a, 0x8a, 0x8a);
+    p.metaText    = QColor(0x5a, 0x5a, 0x5a);
+    p.eyeOn       = QColor(0x33, 0x33, 0x33);
+    p.eyeOff      = QColor(0x99, 0x99, 0x99);
+    return p;
+}
 
 /** 原画/中割标记切换（撤销命令）：按 layerId+pos 寻址，图层/关键帧已删则安全空转 */
 class ToggleKeyDrawingCommand : public QUndoCommand
@@ -103,10 +142,10 @@ private:
     bool mNewValue = true;
 };
 
-void drawEyeGlyph(QPainter& p, const QRectF& r, bool open)
+void drawEyeGlyph(QPainter& p, const QRectF& r, bool open, const QColor& onColor, const QColor& offColor)
 {
     p.save();
-    QPen pen(open ? EYE_ON : EYE_OFF);
+    QPen pen(open ? onColor : offColor);
     pen.setWidthF(1.2);
     p.setPen(pen);
     p.setBrush(Qt::NoBrush);
@@ -114,7 +153,7 @@ void drawEyeGlyph(QPainter& p, const QRectF& r, bool open)
     {
         const QRectF eye(r.left(), r.center().y() - r.height() / 2, r.width(), r.height());
         p.drawEllipse(eye);
-        p.setBrush(open ? EYE_ON : EYE_OFF);
+        p.setBrush(open ? onColor : offColor);
         p.drawEllipse(eye.center(), 1.8, 1.8);
     }
     else
@@ -136,6 +175,14 @@ ExposureSheetView::ExposureSheetView(QWidget* parent) : QAbstractScrollArea(pare
 {
     setFrameStyle(QFrame::NoFrame);
     viewport()->setMouseTracking(true);
+    mPalette = darkSheetPalette();
+}
+
+void ExposureSheetView::setLightMode(bool light)
+{
+    mLightMode = light;
+    mPalette = light ? lightSheetPalette() : darkSheetPalette();
+    viewport()->update();
 }
 
 int ExposureSheetView::gutterW() const { return qRound(GUTTER_W * mZoom); }
@@ -433,14 +480,14 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
 
     // ---- 主体：帧网格 + 符号 + 播放头带 ----
     p.translate(-hOff, -vOff);
-    p.fillRect(QRect(0, 0, cW, cH), BODY_BG);
+    p.fillRect(QRect(0, 0, cW, cH), mPalette.bodyBg);
 
     // 当前层列淡色底
     for (int i = 0; i < mColumns.size(); ++i)
     {
         if (mColumns[i].layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(gw + i * cw, HEADER_H, cw, cH - HEADER_H), LAYER_TINT);
+            p.fillRect(QRect(gw + i * cw, HEADER_H, cw, cH - HEADER_H), mPalette.layerTint);
         }
     }
 
@@ -451,12 +498,12 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     for (int f = fFirst; f <= fLast; ++f)
     {
         const int y = frameRow(f) + rh;
-        p.setPen(QPen(f % mFps == 0 ? LINE_STRONG : (f % 3 == 0 ? LINE_MID : LINE_FAINT)));
+        p.setPen(QPen(f % mFps == 0 ? mPalette.lineStrong : (f % 3 == 0 ? mPalette.lineMid : mPalette.lineFaint)));
         p.drawLine(gw, y, cW, y);
     }
 
     // 列分隔竖线
-    p.setPen(QPen(COL_SEP));
+    p.setPen(QPen(mPalette.colSep));
     for (int i = 0; i <= mColumns.size(); ++i)
     {
         const int x = gw + i * cw;
@@ -484,7 +531,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
             const int exposureEnd = (e.blockEnd > 0) ? e.blockEnd - 1 : mFrameCount;
             if (exposureEnd > e.pos)
             {
-                QPen expoPen(e.blockEnd > 0 ? EXPO_LINE : EXPO_OPEN);
+                QPen expoPen(e.blockEnd > 0 ? mPalette.expoLine : mPalette.expoOpen);
                 if (e.blockEnd < 0) { expoPen.setStyle(Qt::DashLine); }
                 p.setPen(expoPen);
                 p.drawLine(cx + cw / 2, cy + expoInset, cx + cw / 2, frameRow(exposureEnd) + rh / 2 - expoInset);
@@ -492,8 +539,8 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
 
             if (col.isCamera)
             {
-                p.setPen(QPen(CAMERA_MARK));
-                p.setBrush(CAMERA_MARK);
+                p.setPen(QPen(mPalette.cameraMark));
+                p.setBrush(mPalette.cameraMark);
                 QPolygonF diamond;
                 diamond << QPointF(cx + cw / 2, cy - diamondR)
                         << QPointF(cx + cw / 2 + diamondR, cy)
@@ -505,17 +552,17 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
             {
                 const QString text = QString::number(e.number);
                 const qreal w = qMax<qreal>(rh - 3, numFm.horizontalAdvance(text) + 6);
-                p.setPen(QPen(KEY_CIRCLE));
+                p.setPen(QPen(mPalette.keyCircle));
                 p.setBrush(Qt::NoBrush);
                 p.drawEllipse(QPointF(cx + cw / 2, cy + 0.5), w / 2, (rh - 3) / 2.0);
-                p.setPen(KEY_NUMBER);
+                p.setPen(mPalette.keyNumber);
                 p.setFont(numFont);
                 p.drawText(QRect(cx, cy - rh / 2, cw, rh), Qt::AlignCenter, text);
             }
             else
             {
                 p.setPen(Qt::NoPen);
-                p.setBrush(DOT_FILL);
+                p.setBrush(mPalette.dotFill);
                 p.drawEllipse(QPointF(cx + cw / 2, cy + 0.5), dotR, dotR);
             }
         }
@@ -547,16 +594,16 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
         {
             const QString text = QString::number(mDragNumber);
             const qreal w = qMax<qreal>(rh - 3, numFm.horizontalAdvance(text) + 6);
-            p.setPen(QPen(KEY_CIRCLE));
+            p.setPen(QPen(mPalette.keyCircle));
             p.drawEllipse(QPointF(gx + cw / 2, cy + 0.5), w / 2, (rh - 3) / 2.0);
-            p.setPen(KEY_NUMBER);
+            p.setPen(mPalette.keyNumber);
             p.setFont(numFont);
             p.drawText(QRect(gx, cy - rh / 2, cw, rh), Qt::AlignCenter, text);
         }
         else
         {
             p.setPen(Qt::NoPen);
-            p.setBrush(DOT_FILL);
+            p.setBrush(mPalette.dotFill);
             p.drawEllipse(QPointF(gx + cw / 2, cy + 0.5), dotR, dotR);
         }
         p.setOpacity(1.0);
@@ -578,13 +625,13 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
         p.drawText(QRect(0, cy - rh / 2, gw - 6, rh),
                    Qt::AlignVCenter | Qt::AlignRight, QString::number(f));
     }
-    p.setPen(QPen(COL_SEP));
+    p.setPen(QPen(mPalette.colSep));
     p.drawLine(gw - 1, 0, gw - 1, cH);
     p.setBrush(Qt::NoBrush);
     p.translate(0, vOff);
 
     // ---- 列头：钉在视口上缘（不随纵向滚动） ----
-    p.fillRect(QRect(0, 0, vpW, HEADER_H), HEADER_BG);
+    p.fillRect(QRect(0, 0, vpW, HEADER_H), mPalette.headerBg);
     p.translate(-hOff, 0);
     QFont nameFont = font();
     nameFont.setPixelSize(10);
@@ -598,39 +645,39 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
         const int hx = gw + i * cw;
         if (col.layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(hx + 1, 0, cw - 1, HEADER_H - 1), HEADER_BG_CUR);
+            p.fillRect(QRect(hx + 1, 0, cw - 1, HEADER_H - 1), mPalette.headerBgCur);
         }
 
         p.setFont(nameFont);
-        p.setPen(col.visible ? QColor(0xee, 0xee, 0xee) : TEXT_DIM);
+        p.setPen(col.visible ? mPalette.nameText : mPalette.nameHidden);
         p.drawText(QRect(hx + 4, 3, cw - 8, 18), Qt::AlignVCenter | Qt::AlignLeft,
                    nameFm.elidedText(col.name, Qt::ElideRight, cw - 8));
 
         const QRectF eyeRect(hx + 6, HEADER_H - 20, 18, 14);
-        drawEyeGlyph(p, eyeRect, col.visible);
+        drawEyeGlyph(p, eyeRect, col.visible, mPalette.eyeOn, mPalette.eyeOff);
 
         if (!col.isCamera)
         {
             p.setFont(metaFont);
-            p.setPen(TEXT_DIM);
+            p.setPen(mPalette.metaText);
             p.drawText(QRect(hx, HEADER_H - 21, cw - 8, 16), Qt::AlignVCenter | Qt::AlignRight,
                        QString::number(qRound(col.opacity * 100)) + QStringLiteral("%"));
         }
 
         if (mHoverEyeColumn == i)
         {
-            p.setPen(QPen(EYE_ON));
+            p.setPen(QPen(mPalette.eyeOn));
             p.setBrush(Qt::NoBrush);
             p.drawRoundedRect(eyeRect.adjusted(-3, -2, 3, 2), 3, 3);
         }
     }
-    p.setPen(QPen(COL_SEP));
+    p.setPen(QPen(mPalette.colSep));
     for (int i = 0; i <= mColumns.size(); ++i)
     {
         const int x = gw + i * cw;
         p.drawLine(x, 0, x, HEADER_H);
     }
-    p.setPen(QPen(LINE_STRONG));
+    p.setPen(QPen(mPalette.lineStrong));
     p.drawLine(0, HEADER_H - 1, cW, HEADER_H - 1);
     p.setBrush(Qt::NoBrush);
     p.translate(hOff, 0);
@@ -918,6 +965,13 @@ void ExposureSheetPanel::initUI()
     topRow->addWidget(label);
     topRow->addWidget(mToggleKeyButton);
     topRow->addStretch();
+
+    // 主题切换：亮色（参考图配色）/暗色（默认），选择持久化
+    mThemeButton = new QPushButton(tr("暗色"), root);
+    mThemeButton->setFixedHeight(24);
+    mThemeButton->setMinimumWidth(72);
+    mThemeButton->setToolTip(tr("切换摄影表亮色/暗色配色"));
+    topRow->addWidget(mThemeButton);
     rootLay->addLayout(topRow);
 
     mView = new ExposureSheetView(root);
@@ -928,6 +982,20 @@ void ExposureSheetPanel::initUI()
     Editor* e = editor();
     Q_ASSERT(e != nullptr);
     mView->setEditor(e);
+
+    // 恢复上次主题选择
+    QSettings settings(PENCIL2D, PENCIL2D);
+    const bool light = settings.value(QStringLiteral("ExposureSheet/LightMode"), false).toBool();
+    mView->setLightMode(light);
+    mThemeButton->setText(light ? tr("亮色") : tr("暗色"));
+    connect(mThemeButton, &QPushButton::clicked, this, [this]
+    {
+        const bool light = !mView->isLightMode();
+        mView->setLightMode(light);
+        mThemeButton->setText(light ? tr("亮色") : tr("暗色"));
+        QSettings s(PENCIL2D, PENCIL2D);
+        s.setValue(QStringLiteral("ExposureSheet/LightMode"), light);
+    });
 
     // 按钮与律表状态双向同步（mSyncingButton 防回环）
     connect(mToggleKeyButton, &QPushButton::toggled, this, [this](bool)
