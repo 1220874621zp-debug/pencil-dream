@@ -632,6 +632,8 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
 
     // ---- 列头：钉在视口上缘（不随纵向滚动） ----
     p.fillRect(QRect(0, 0, vpW, HEADER_H), mPalette.headerBg);
+    // 标尺拐角：帧号栏顶格属标尺区域，恒用标尺底色（不随主题变浅）
+    p.fillRect(QRect(0, 0, gw, HEADER_H), GUTTER_BG);
     p.translate(-hOff, 0);
     QFont nameFont = font();
     nameFont.setPixelSize(10);
@@ -678,7 +680,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
         p.drawLine(x, 0, x, HEADER_H);
     }
     p.setPen(QPen(mPalette.lineStrong));
-    p.drawLine(0, HEADER_H - 1, cW, HEADER_H - 1);
+    p.drawLine(gw, HEADER_H - 1, cW, HEADER_H - 1);
     p.setBrush(Qt::NoBrush);
     p.translate(hOff, 0);
 }
