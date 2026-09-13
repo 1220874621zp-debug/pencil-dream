@@ -71,6 +71,7 @@ GNU General Public License for more details.
 #include "brushpresetpanel.h"
 #include "referencecardpanel.h"
 #include "exposuresheetpanel.h"
+#include "builtinworkspaces.h"
 #include "tooloptionwidget.h"
 #include "preferencesdialog.h"
 #include "ocaexportdialog.h"
@@ -1274,7 +1275,12 @@ void MainWindow2::saveCurrentWorkspaceAs()
 void MainWindow2::applyWorkspace(const QString& name)
 {
     QSettings settings(PENCIL2D, PENCIL2D);
-    const QByteArray state = settings.value(workspaceStateKey(name)).toByteArray();
+    QByteArray state = settings.value(workspaceStateKey(name)).toByteArray();
+    if (state.isEmpty())
+    {
+        // 用户未另存过该名字：落到软件自带的同名预设
+        state = BuiltinWorkspaces::state(name);
+    }
     if (state.isEmpty()) { return; }
     restoreState(state);
     // remember the applied workspace so it is restored on startup
@@ -1337,7 +1343,28 @@ void MainWindow2::rebuildWorkspaceMenu()
 
     QSettings settings(PENCIL2D, PENCIL2D);
     const QString active = settings.value("workspaces/active").toString();
-    const QStringList names = savedWorkspaceNames();
+
+    // 软件自带的工作区预设：随程序分发、不可删除（用户另存同名工作区会覆盖生效）
+    const QStringList builtinNames = BuiltinWorkspaces::names();
+    if (!builtinNames.isEmpty())
+    {
+        mWorkspaceMenu->addSeparator();
+        for (const auto& name : builtinNames)
+        {
+            QAction* act = mWorkspaceMenu->addAction(name, this, [this, name]() {
+                applyWorkspace(name);
+            });
+            act->setCheckable(true);
+            act->setChecked(name == active);
+        }
+    }
+
+    // 用户自存工作区（与内置同名的不再重复列出）
+    QStringList names = savedWorkspaceNames();
+    for (const auto& builtin : builtinNames)
+    {
+        names.removeAll(builtin);
+    }
     if (!names.isEmpty())
     {
         mWorkspaceMenu->addSeparator();
@@ -1476,7 +1503,12 @@ void MainWindow2::readSettings()
     const QString activeWorkspace = settings.value("workspaces/active").toString();
     if (!activeWorkspace.isEmpty())
     {
-        const QByteArray workspaceState = settings.value(workspaceStateKey(activeWorkspace)).toByteArray();
+        QByteArray workspaceState = settings.value(workspaceStateKey(activeWorkspace)).toByteArray();
+        if (workspaceState.isEmpty())
+        {
+            // 活动工作区可能是软件自带的预设（新机器上无用户存档）
+            workspaceState = BuiltinWorkspaces::state(activeWorkspace);
+        }
         if (!workspaceState.isEmpty())
         {
             winState = workspaceState;
