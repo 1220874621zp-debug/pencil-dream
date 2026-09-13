@@ -188,15 +188,25 @@ void ExposureSheetView::setLightMode(bool light)
 int ExposureSheetView::gutterW() const { return qRound(GUTTER_W * mZoom); }
 int ExposureSheetView::colW() const { return qRound(COL_W * mZoom); }
 int ExposureSheetView::rowH() const { return qRound(ROW_H * mZoom); }
+int ExposureSheetView::headerH() const { return qMax(30, qRound(HEADER_H * mZoom)); }
+
+QRectF ExposureSheetView::eyeRectForColumn(int index) const
+{
+    const qreal w = qMax<qreal>(14.0, 18.0 * mZoom);
+    const qreal h = qMax<qreal>(11.0, 14.0 * mZoom);
+    return QRectF(gutterW() + index * colW() + qMax<qreal>(4.0, 6.0 * mZoom),
+                  headerH() - h - qMax<qreal>(3.0, 4.0 * mZoom),
+                  w, h);
+}
 
 int ExposureSheetView::frameRow(int frame) const
 {
-    return HEADER_H + (frame - 1) * rowH();
+    return headerH() + (frame - 1) * rowH();
 }
 
 int ExposureSheetView::rowForY(int y) const
 {
-    return (y - HEADER_H) / rowH() + 1;
+    return (y - headerH()) / rowH() + 1;
 }
 
 int ExposureSheetView::contentWidth() const
@@ -338,9 +348,9 @@ void ExposureSheetView::ensureFrameVisible(int frame)
     QScrollBar* vb = verticalScrollBar();
     const int yTop = frameRow(frame);
     const int yBot = yTop + rowH();
-    if (yTop < vb->value() + HEADER_H)
+    if (yTop < vb->value() + headerH())
     {
-        vb->setValue(qMax(0, yTop - HEADER_H));
+        vb->setValue(qMax(0, yTop - headerH()));
     }
     else if (yBot > vb->value() + viewport()->height())
     {
@@ -487,7 +497,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     {
         if (mColumns[i].layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(gw + i * cw, HEADER_H, cw, cH - HEADER_H), mPalette.layerTint);
+            p.fillRect(QRect(gw + i * cw, headerH(), cw, cH - headerH()), mPalette.layerTint);
         }
     }
 
@@ -507,7 +517,7 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     for (int i = 0; i <= mColumns.size(); ++i)
     {
         const int x = gw + i * cw;
-        p.drawLine(x, HEADER_H, x, cH);
+        p.drawLine(x, headerH(), x, cH);
     }
 
     // 符号：原画=圆圈数字 / 中割=点 / 相机=菱形；曝光延续竖线（开放尾块=虚线）
@@ -630,39 +640,49 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     p.setBrush(Qt::NoBrush);
     p.translate(0, vOff);
 
-    // ---- 列头：钉在视口上缘（不随纵向滚动） ----
-    p.fillRect(QRect(0, 0, vpW, HEADER_H), mPalette.headerBg);
+    // ---- 列头：钉在视口上缘（不随纵向滚动），高度/字号/图标随缩放等比 ----
+    const int hh = headerH();
+    p.fillRect(QRect(0, 0, vpW, hh), mPalette.headerBg);
     // 标尺拐角：帧号栏顶格属标尺区域，恒用标尺底色（不随主题变浅）
-    p.fillRect(QRect(0, 0, gw, HEADER_H), GUTTER_BG);
+    p.fillRect(QRect(0, 0, gw, hh), GUTTER_BG);
     p.translate(-hOff, 0);
     QFont nameFont = font();
-    nameFont.setPixelSize(10);
+    nameFont.setPixelSize(qBound(6, qRound(10 * mZoom), 30));
     nameFont.setBold(true);
     const QFontMetrics nameFm(nameFont);
     QFont metaFont = font();
-    metaFont.setPixelSize(9);
+    metaFont.setPixelSize(qBound(5, qRound(9 * mZoom), 26));
+    const int namePad = qMax(3, qRound(4 * mZoom));
+    const int bottomRowH = qMax(15, qRound(20 * mZoom));
     for (int i = 0; i < mColumns.size(); ++i)
     {
         const SheetColumn& col = mColumns[i];
         const int hx = gw + i * cw;
         if (col.layerId == mCurrentLayerId)
         {
-            p.fillRect(QRect(hx + 1, 0, cw - 1, HEADER_H - 1), mPalette.headerBgCur);
+            p.fillRect(QRect(hx + 1, 0, cw - 1, hh - 1), mPalette.headerBgCur);
         }
 
+        // 层名：列头上半区（超宽省略）
         p.setFont(nameFont);
         p.setPen(col.visible ? mPalette.nameText : mPalette.nameHidden);
-        p.drawText(QRect(hx + 4, 3, cw - 8, 18), Qt::AlignVCenter | Qt::AlignLeft,
-                   nameFm.elidedText(col.name, Qt::ElideRight, cw - 8));
+        const int nameRight = cw - 2 * namePad;
+        p.drawText(QRect(hx + namePad, qRound(2 * mZoom), nameRight,
+                         hh - bottomRowH - qRound(2 * mZoom)),
+                   Qt::AlignVCenter | Qt::AlignLeft,
+                   nameFm.elidedText(col.name, Qt::ElideRight, nameRight));
 
-        const QRectF eyeRect(hx + 6, HEADER_H - 20, 18, 14);
+        // 眼睛 + 透明度：列头下半区
+        const QRectF eyeRect = eyeRectForColumn(i);
         drawEyeGlyph(p, eyeRect, col.visible, mPalette.eyeOn, mPalette.eyeOff);
 
         if (!col.isCamera)
         {
             p.setFont(metaFont);
             p.setPen(mPalette.metaText);
-            p.drawText(QRect(hx, HEADER_H - 21, cw - 8, 16), Qt::AlignVCenter | Qt::AlignRight,
+            const int metaLeft = qRound(eyeRect.right()) + qMax(4, qRound(6 * mZoom));
+            p.drawText(QRect(metaLeft, hh - bottomRowH, cw - (metaLeft - hx) - namePad, bottomRowH),
+                       Qt::AlignVCenter | Qt::AlignRight,
                        QString::number(qRound(col.opacity * 100)) + QStringLiteral("%"));
         }
 
@@ -677,10 +697,10 @@ void ExposureSheetView::paintEvent(QPaintEvent*)
     for (int i = 0; i <= mColumns.size(); ++i)
     {
         const int x = gw + i * cw;
-        p.drawLine(x, 0, x, HEADER_H);
+        p.drawLine(x, 0, x, hh);
     }
     p.setPen(QPen(mPalette.lineStrong));
-    p.drawLine(gw, HEADER_H - 1, cW, HEADER_H - 1);
+    p.drawLine(gw, hh - 1, cW, hh - 1);
     p.setBrush(Qt::NoBrush);
     p.translate(hOff, 0);
 }
@@ -713,15 +733,16 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
     const int cw = colW();
     const int contentX = x + hOff;
 
-    if (y < HEADER_H)
+    if (y < headerH())
     {
         if (contentX < gw) { return; }
         const int idx = (contentX - gw) / cw;
         Layer* layer = columnLayer(idx);
         if (layer == nullptr) { return; }
 
-        const QRect eyeRect(gw + idx * cw + 6 - hOff, HEADER_H - 20, 18, 14);
-        if (eyeRect.contains(event->pos()))
+        QRectF eyeRect = eyeRectForColumn(idx);
+        eyeRect.translate(-hOff, 0);
+        if (eyeRect.contains(event->position()))
         {
             layer->setVisible(!layer->visible());
             emit mEditor->updateTimeLine();
@@ -847,13 +868,14 @@ void ExposureSheetView::mouseMoveEvent(QMouseEvent* event)
     const int contentX = x + hOff;
 
     int hover = -1;
-    if (y < HEADER_H && contentX >= gutterW())
+    if (y < headerH() && contentX >= gutterW())
     {
         const int idx = (contentX - gutterW()) / colW();
         if (idx >= 0 && idx < mColumns.size())
         {
-            const QRect eyeRect(gutterW() + idx * colW() + 6 - hOff, HEADER_H - 20, 18, 14);
-            if (eyeRect.contains(event->pos()))
+            QRectF eyeRect = eyeRectForColumn(idx);
+            eyeRect.translate(-hOff, 0);
+            if (eyeRect.contains(event->position()))
             {
                 hover = idx;
             }
@@ -892,8 +914,13 @@ void ExposureSheetView::mouseReleaseEvent(QMouseEvent* event)
 
 void ExposureSheetView::wheelEvent(QWheelEvent* event)
 {
-    // 滚轮=缩放律表（光标下的帧/列锚定不动）
+    // 滚轮=缩放律表（光标下的帧/列锚定不动；锚定用缩放前后各自的真实度量）
     const qreal oldZoom = mZoom;
+    const int oldHeaderH = headerH();
+    const int oldRowH = rowH();
+    const int oldGutterW = gutterW();
+    const int oldColW = colW();
+
     const qreal factor = (event->angleDelta().y() > 0) ? ZOOM_STEP : (1.0 / ZOOM_STEP);
     mZoom = qBound<qreal>(ZOOM_MIN, mZoom * factor, ZOOM_MAX);
     if (qFuzzyCompare(mZoom, oldZoom))
@@ -904,11 +931,11 @@ void ExposureSheetView::wheelEvent(QWheelEvent* event)
 
     const qreal px = event->position().x();
     const qreal py = event->position().y();
-    const qreal rowF = (py + verticalScrollBar()->value() - HEADER_H) / qMax<qreal>(1.0, qRound(ROW_H * oldZoom));
-    const qreal colF = (px + horizontalScrollBar()->value() - qRound(GUTTER_W * oldZoom)) / qMax<qreal>(1.0, qRound(COL_W * oldZoom));
+    const qreal rowF = (py + verticalScrollBar()->value() - oldHeaderH) / qMax<qreal>(1.0, oldRowH);
+    const qreal colF = (px + horizontalScrollBar()->value() - oldGutterW) / qMax<qreal>(1.0, oldColW);
 
     updateScrollRanges();
-    verticalScrollBar()->setValue(qRound(HEADER_H + rowF * rowH() - py));
+    verticalScrollBar()->setValue(qRound(headerH() + rowF * rowH() - py));
     horizontalScrollBar()->setValue(qRound(gutterW() + colF * colW() - px));
     viewport()->update();
     event->accept();

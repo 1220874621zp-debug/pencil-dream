@@ -21,6 +21,7 @@ GNU General Public License for more details.
 
 #include <QAbstractScrollArea>
 #include <QColor>
+#include <QRectF>
 #include <QVector>
 
 class Editor;
@@ -102,6 +103,8 @@ private:
     int  gutterW() const;                // 随缩放
     int  colW() const;                   // 随缩放
     int  rowH() const;                   // 随缩放
+    int  headerH() const;                // 随缩放（列头整体等比）
+    QRectF eyeRectForColumn(int index) const; // 眼睛热区（内容坐标，随缩放）
     void updateScrollRanges();
     void ensureFrameVisible(int frame);
     void updateToggleTarget();
