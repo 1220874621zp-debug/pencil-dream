@@ -116,6 +116,12 @@ private:
     int     mDragNumber = 0;
     int     mDragCurCol = -1;
     int     mDragCurPos = -1;
+
+    // 中键按住拖动平移
+    bool    mPanning = false;
+    QPoint  mPanStartPos;
+    int     mPanStartH = 0;
+    int     mPanStartV = 0;
 };
 
 /** 摄影表（律表）面板：顶部“原画/中割”切换开关 + 律表主体 */

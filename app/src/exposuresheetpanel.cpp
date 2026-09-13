@@ -640,6 +640,22 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
 {
     if (mEditor == nullptr || mEditor->object() == nullptr) { return; }
 
+    // 中键按住拖动 = 平移律表（两轴自由滚动）
+    if (event->button() == Qt::MiddleButton)
+    {
+        mPanning = true;
+        mDragArmed = false;
+        mDragging = false;
+        mDragCurCol = -1;
+        mDragCurPos = -1;
+        mPanStartPos = event->pos();
+        mPanStartH = horizontalScrollBar()->value();
+        mPanStartV = verticalScrollBar()->value();
+        viewport()->setCursor(Qt::ClosedHandCursor);
+        viewport()->update();
+        return;
+    }
+
     const int x = event->pos().x();
     const int y = event->pos().y();
     const int hOff = horizontalScrollBar()->value();
@@ -737,6 +753,13 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
 
 void ExposureSheetView::mouseMoveEvent(QMouseEvent* event)
 {
+    if (mPanning && (event->buttons() & Qt::MiddleButton))
+    {
+        horizontalScrollBar()->setValue(mPanStartH - (event->pos().x() - mPanStartPos.x()));
+        verticalScrollBar()->setValue(mPanStartV - (event->pos().y() - mPanStartPos.y()));
+        return;
+    }
+
     if (mDragArmed && (event->buttons() & Qt::LeftButton))
     {
         if (!mDragging)
@@ -798,6 +821,13 @@ void ExposureSheetView::mouseMoveEvent(QMouseEvent* event)
 void ExposureSheetView::mouseReleaseEvent(QMouseEvent* event)
 {
     QAbstractScrollArea::mouseReleaseEvent(event);
+
+    if (event->button() == Qt::MiddleButton && mPanning)
+    {
+        mPanning = false;
+        viewport()->setCursor(Qt::ArrowCursor);
+        return;
+    }
 
     if (mDragArmed)
     {
@@ -884,7 +914,7 @@ void ExposureSheetPanel::initUI()
     mToggleKeyButton->setFixedHeight(24);
     mToggleKeyButton->setMinimumWidth(72);
     mToggleKeyButton->setToolTip(
-        tr("切换当前张的原画/中割标记。\n右键律表格子：添加/删除关键帧、切换原画/中割。\n拖动帧格：移动张数（可跨层列）；滚轮：缩放。"));
+        tr("切换当前张的原画/中割标记。\n右键律表格子：添加/删除关键帧、切换原画/中割。\n拖动帧格：移动张数（可跨层列）；滚轮：缩放；中键拖动：平移。"));
     topRow->addWidget(label);
     topRow->addWidget(mToggleKeyButton);
     topRow->addStretch();
