@@ -416,6 +416,34 @@ void TimeLineCells::showCameraMenu(QPoint pos)
     menu.exec(mapToGlobal(pos));
 }
 
+/** 轨道区帧格右键菜单：相机层维持原 CameraContextMenu（含缓动等）；
+ *  位图系层提供"添加中割"——在该格插入空白画格，其后画格右移一格 */
+void TimeLineCells::showTracksFrameMenu(QPoint pos)
+{
+    Layer* curLayer = mEditor->layers()->currentLayer();
+    if (curLayer == nullptr) { return; }
+
+    if (curLayer->type() == Layer::CAMERA)
+    {
+        showCameraMenu(pos);
+        return;
+    }
+
+    if (!curLayer->isBitmapKind()) { return; }
+
+    const int frameNumber = getFrameNumber(pos.x());
+
+    QMenu menu(this);
+    QAction* inbetweenAction = menu.addAction(tr("添加中割"));
+    inbetweenAction->setEnabled(!curLayer->locked() && frameNumber >= 1);
+
+    QAction* chosen = menu.exec(mapToGlobal(pos));
+    if (chosen == inbetweenAction)
+    {
+        mTimeLine->insertInbetween(frameNumber);
+    }
+}
+
 void TimeLineCells::drawContent()
 {
     if (mCache == nullptr)
@@ -2955,10 +2983,10 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             }
                         }
 
-                        // ... or we show the camera context menu, if it is the right button
+                        // ... or we show the frame context menu, if it is the right button
                         if (event->button() == Qt::RightButton)
                         {
-                            showCameraMenu(event->pos());
+                            showTracksFrameMenu(event->pos());
                         }
 
                         // 相机键：按住未选中的键直接进入拖动改位（免二次点击）；
@@ -2976,7 +3004,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         // If selected they can also be interpolated
                         if (event->button() == Qt::RightButton)
                         {
-                            showCameraMenu(event->pos());
+                            showTracksFrameMenu(event->pos());
                         }
                         // We clicked on a selected frame, we can move it
                         qDebug() << "[ui] tracks click: drag selected frames at" << frameNumber << "layer" << layerNumber;
