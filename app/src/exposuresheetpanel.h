@@ -109,7 +109,7 @@ private:
     void ensureFrameVisible(int frame);
     void updateToggleTarget();
     void toggleKeyDrawingAt(Layer* layer, int pos);
-    void addKeyAt(Layer* layer, int pos);
+    void addKeyAt(Layer* layer, int pos, bool inbetween = false);
     void deleteKeyAt(Layer* layer, int pos);
     void moveKeyBetween(Layer* srcLayer, int srcPos, Layer* dstLayer, int dstPos);
     void commitDrag();

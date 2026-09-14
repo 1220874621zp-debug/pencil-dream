@@ -387,13 +387,18 @@ void ExposureSheetView::toggleKeyDrawingAt(Layer* layer, int pos)
         new ToggleKeyDrawingCommand(mEditor, layer->id(), pos, !key->isKeyDrawing()));
 }
 
-void ExposureSheetView::addKeyAt(Layer* layer, int pos)
+void ExposureSheetView::addKeyAt(Layer* layer, int pos, bool inbetween)
 {
     if (layer == nullptr || !layer->isBitmapKind() || layer->keyExists(pos)) { return; }
 
     mEditor->beginLayerLayoutEdit(layer);
     const bool added = layer->addNewKeyFrameAt(pos);
-    mEditor->endLayerLayoutEdit(tr("添加关键帧"));
+    if (added && inbetween)
+    {
+        KeyFrame* key = layer->getKeyFrameAt(pos);
+        if (key != nullptr) { key->setKeyDrawing(false); }
+    }
+    mEditor->endLayerLayoutEdit(inbetween ? tr("添加中割") : tr("添加关键帧"));
 
     if (added)
     {
@@ -784,9 +789,15 @@ void ExposureSheetView::mousePressEvent(QMouseEvent* event)
         else
         {
             QAction* addAct = menu.addAction(tr("添加关键帧"));
-            if (menu.exec(event->globalPosition().toPoint()) == addAct)
+            QAction* addInbetweenAct = menu.addAction(tr("添加中割"));
+            QAction* chosen = menu.exec(event->globalPosition().toPoint());
+            if (chosen == addAct)
             {
                 addKeyAt(layer, frame);
+            }
+            else if (chosen == addInbetweenAct)
+            {
+                addKeyAt(layer, frame, true);
             }
         }
         return;
