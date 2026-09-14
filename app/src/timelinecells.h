@@ -141,8 +141,6 @@ private:
     void paintGroupTrack(QPainter& painter, int groupId, int y, int height) const;
     void showGroupHeaderMenu(QPoint pos, int groupId);
     void showLayerGroupMenu(QPoint pos, int layerIndex); // 图层右键：成组入口
-    /** 轨道区帧格右键：相机层转发原 CameraContextMenu，位图系层提供"添加中割" */
-    void showTracksFrameMenu(QPoint pos);
     /** 组成员帧范围带（Tracks 组头行）：[minKeyPos, maxEnd]；空组返回空 */
     QPair<int, int> groupFrameExtent(int groupId) const;
 

@@ -53,9 +53,6 @@ public:
 
     void extendLength(int frame);
 
-    /** 摄影表右键"添加中割"：在该帧插入空白画格，其后画格右移一格 */
-    void insertInbetween(int frameNumber);
-
     int getRangeLower();
     int getRangeUpper();
 
