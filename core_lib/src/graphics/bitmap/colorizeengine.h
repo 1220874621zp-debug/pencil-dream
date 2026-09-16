@@ -93,12 +93,10 @@ QImage colorize(const QImage& lineArt,
 
 struct TransportOptions
 {
-    int searchRadius = 48;     // 全局位移搜索半径（像素）
-    int refineRadius = 8;      // 组级位移在全局位移邻域内的细化半径
-    int patchRadiusMin = 8;    // 匹配块初始半径（无线稿时自适应增长）
-    int patchRadiusMax = 32;   // 匹配块最大半径
-    qreal motionPenalty = 6.0;  // 全局层偏向零位移的正则系数（压制孔径/切向歧义）
-    qreal refinePenalty = 40.0; // 组级细化偏向全局位移的正则系数（形变噪声下无强证据不动）
+    int searchRadius = 48;    // 全局位移搜索半径（像素）
+    int refineRadius = 8;     // 组级位移在全局位移邻域内的细化半径
+    int patchRadiusMin = 8;   // 匹配块初始半径（无线稿时自适应增长）
+    int patchRadiusMax = 32;  // 匹配块最大半径
 };
 
 /*

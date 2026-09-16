@@ -997,12 +997,14 @@ struct AnchorMatch
 // 块匹配：以 center 为锚，在 A/B 两张线稿 alpha 图间找最佳平移量。
 // 块半径自适应增长到能"看见"线稿（minRadius 起）；锚点附近无线稿
 // （纯平区无法定位）返回 invalid。
-// 代价 = 块内平均 SSD + motionPenalty*|d - reference|²（偏向参考位移，
-// 压制沿弧切向滑动的孔径歧义）；在 reference ± windowRadius 内搜索。
+// 打分 = ε-并列带内选离 reference 最近：先取纯 SSD 最小值，再在
+// minSSD + 10%*reference处SSD 的带内候选里选 |d - reference|² 最小。
+// 平坦区（SSD 处处相等）带内即全体 → 回退 reference；特征区纯 SSD
+// 决胜且不偏好零位移（固定惩罚项与线密度相关的 SSD 量级失配，会
+// 把真实大位移压成 0）。
 AnchorMatch matchAnchor(const QImage& alphaA, const QImage& alphaB, const QPoint& center,
                         const QRect& bounds, const TransportOptions& options,
-                        const QPoint& reference, int windowRadius, int minRadius,
-                        qreal penalty)
+                        const QPoint& reference, int windowRadius, int minRadius)
 {
     // 自适应块半径：增长到块内能"看见"线稿为止
     int radius = qBound(1, minRadius, options.patchRadiusMax);
@@ -1023,8 +1025,14 @@ AnchorMatch matchAnchor(const QImage& alphaA, const QImage& alphaB, const QPoint
 
     const int n = patch.width() * patch.height();
 
-    AnchorMatch best;
-    double bestScore = std::numeric_limits<double>::max();
+    double minSSD = std::numeric_limits<double>::max();
+    double ssdAtReference = std::numeric_limits<double>::max();
+    bool hasReference = false;
+
+    // 候选偏移 → 平均 SSD（两遍中的第一遍数据直接缓存）
+    struct Candidate { double meanSSD; int dx; int dy; };
+    std::vector<Candidate> candidates;
+    candidates.reserve((2 * windowRadius + 1) * (2 * windowRadius + 1));
 
     for (int dy = reference.y() - windowRadius; dy <= reference.y() + windowRadius; ++dy)
     {
@@ -1054,15 +1062,36 @@ AnchorMatch matchAnchor(const QImage& alphaA, const QImage& alphaB, const QPoint
             // 候选块大半落到界外：不可信，跳过
             if (valid * 2 < n)
                 continue;
-            const qreal rx = dx - reference.x();
-            const qreal ry = dy - reference.y();
-            const double score = ssd / valid + penalty * (rx * rx + ry * ry);
-            if (score < bestScore)
+            const double meanSSD = ssd / valid;
+            candidates.push_back(Candidate{ meanSSD, dx, dy });
+            minSSD = qMin(minSSD, meanSSD);
+            if (dx == reference.x() && dy == reference.y())
             {
-                bestScore = score;
-                best.valid = true;
-                best.offset = QPoint(dx, dy);
+                ssdAtReference = meanSSD;
+                hasReference = true;
             }
+        }
+    }
+    if (candidates.empty())
+        return AnchorMatch();
+
+    // ε 带宽度取参考点 SSD 的 10%（平坦区趋 0 → 精确并列 → 回退 reference）
+    const double eps = 0.10 * (hasReference ? ssdAtReference : minSSD) + 1e-9;
+
+    AnchorMatch best;
+    double bestDist = std::numeric_limits<double>::max();
+    for (const Candidate& c : candidates)
+    {
+        if (c.meanSSD > minSSD + eps)
+            continue;
+        const double rx = c.dx - reference.x();
+        const double ry = c.dy - reference.y();
+        const double dist = rx * rx + ry * ry;
+        if (dist < bestDist)
+        {
+            bestDist = dist;
+            best.valid = true;
+            best.offset = QPoint(c.dx, c.dy);
         }
     }
     return best;
@@ -1109,7 +1138,7 @@ QPoint globalOffsetEstimate(const QImage& alphaA, const QImage& alphaB,
     {
         const AnchorMatch m = matchAnchor(alphaA, alphaB, anchors[i], bounds, options,
                                           QPoint(0, 0), options.searchRadius,
-                                          options.patchRadiusMax, options.motionPenalty);
+                                          options.patchRadiusMax);
         if (m.valid)
             votes.append(m.offset);
     }
@@ -1316,7 +1345,7 @@ QImage transportStrokes(const QImage& lineArtA,
         const QPoint centroid(qRound(sumX / double(count)), qRound(sumY / double(count)));
         const AnchorMatch m = matchAnchor(alphaA, alphaB, centroid, bounds, options,
                                            globalOffset, options.refineRadius,
-                                           options.patchRadiusMin, options.refinePenalty);
+                                           options.patchRadiusMin);
         // 纯平锚点无法定位：跟随全局位移
         const QPoint offset = m.valid ? m.offset : globalOffset;
 

@@ -1305,7 +1305,10 @@ Status ActionCommands::propagateColorizeStrokes()
             }
         }
 
-        const QRect canvas = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
+        // 四周留白 ≥ 搜索半径+块半径：真实线稿 bounds 紧贴内容（autoCrop），
+        // 无留白时候选位移出界会被 valid 过滤误杀 → 全局位移估成 0（笔画原地不动）
+        const QRect contentUnion = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
+        const QRect canvas = contentUnion.adjusted(-80, -80, 80, 80);
         // 平铺图是 canvas 相对坐标（原点 0,0）：bounds 必须传图内矩形，传画布原点矩形会越界崩溃
         const QImage transported = Colorize::transportStrokes(flatten(prevLine, canvas),
                                                               flatten(prevStrokes, canvas),
