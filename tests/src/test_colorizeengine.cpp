@@ -105,6 +105,102 @@ qint64 countColor(const QImage& img, QRgb color)
 
 } // namespace
 
+TEST_CASE("Colorize GradientRingsDontEatStrokes")
+{
+    // 用户实拍案（fed48901 后"填不上色"）：绿色背景笔画铺满（标透明）、
+    // 两个交叠闭合轮廓、橙/亮红/暗红笔画分居左/中/右，笔画旁有软笔
+    // 半透明叠色混出的渐变带（无 3x3 实心核）。取组若不按实心核口径，
+    // 渐变带会成为独立组，空间折叠把贴边的真实笔画级联吞掉——
+    // 复现症状=亮红填色为 0（全部颜色可被吞尽=完全填不上色）
+    const QSize size(400, 300);
+    const QRgb green = qRgb(0, 170, 60);
+    const QRgb orange = qRgb(235, 130, 40);
+    const QRgb brightRed = qRgb(230, 30, 40);
+    const QRgb darkRed = qRgb(140, 20, 20);
+
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 3);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawEllipse(60, 60, 190, 160);   // 左轮廓
+        p.drawEllipse(170, 70, 190, 150);  // 右轮廓（交叠）
+    });
+
+    QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+    strokes.fill(Qt::transparent);
+    {
+        QPainter p(&strokes);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(green));
+        p.drawRect(strokes.rect()); // 背景绿铺满（含压到轮廓边上）
+        p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+        // 挖掉两轮廓内部（留墙）：内缩 2px 只去内部大面，边缘留绿压墙
+        p.drawEllipse(64, 64, 182, 152);
+        p.drawEllipse(174, 74, 182, 142);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        p.setBrush(QColor(orange));    p.drawEllipse(100, 110, 24, 14);
+        p.setBrush(QColor(brightRed)); p.drawEllipse(215, 120, 20, 12);
+        p.setBrush(QColor(darkRed));   p.drawEllipse(300, 130, 40, 16);
+        // 软笔渐变环：渐变色笔在亮红两侧扫过（沿笔方向颜色连续变化，
+        // 任何 3x3 内都不同色=无实心核；叠色处为真实混色渐变）
+        QLinearGradient grad(196, 120, 240, 120);
+        grad.setColorAt(0.0, QColor(255, 120, 60, 110));
+        grad.setColorAt(0.5, QColor(200, 60, 35, 110));
+        grad.setColorAt(1.0, QColor(120, 25, 25, 110));
+        QPen soft(grad, 5);
+        p.setPen(soft);
+        p.drawLine(QPointF(196, 120), QPointF(240, 120));
+        p.drawLine(QPointF(198, 132), QPointF(236, 132));
+        p.end();
+    }
+
+    Colorize::FilteringOptions opt;
+    opt.fuzzyRadius = 6.6;
+    opt.cleanUpAmount = 0.7;
+    opt.hasTransparentColor = true;
+    opt.transparentColor = green;
+
+    // 实心口径取组：恰好四种实心色（渐变环色不进组）
+    QVector<Colorize::KeyStroke> solid =
+        Colorize::splitSolidKeyStrokes(strokes, strokes.rect());
+    {
+        QStringList names;
+        for (const auto& g : solid) names << QColor(g.color).name();
+        INFO("splitSolidKeyStrokes 组数 " << solid.size() << " " << names.join(",").toStdString());
+    }
+    // 四种真实笔画色必须成组；渐变带只允许末端量化平坦处成核（一区
+    // 一点会兜住此类微核，不允许其吞掉真实笔画）
+    REQUIRE(solid.size() >= 4);
+    QSet<QRgb> solidColors;
+    for (const auto& g : solid) solidColors.insert(g.color);
+    REQUIRE(solidColors.contains(green));
+    REQUIRE(solidColors.contains(orange));
+    REQUIRE(solidColors.contains(brightRed));
+    REQUIRE(solidColors.contains(darkRed));
+
+    QImage result = Colorize::colorize(lineArt, strokes, lineArt.rect(), opt);
+    int orangeN = 0, brightN = 0, darkN = 0, greenN = 0;
+    for (int y = 0; y < result.height(); ++y)
+        for (int x = 0; x < result.width(); ++x)
+        {
+            if (qAlpha(result.pixel(x, y)) == 0) continue;
+            const QRgb c = nonPremul(result, x, y);
+            if (c == orange) ++orangeN;
+            else if (c == brightRed) ++brightN;
+            else if (c == darkRed) ++darkN;
+            else if (c == green) ++greenN;
+        }
+    {
+        const QString dir = QDir::temp().absoluteFilePath("pencil-colorize-tests");
+        QDir().mkpath(dir);
+        result.save(dir + "/ring_guard.png");
+    }
+    INFO("填色 橙" << orangeN << " 亮红" << brightN << " 暗红" << darkN << " 绿" << greenN);
+    CHECK(orangeN > 500);
+    CHECK(brightN > 300);
+    CHECK(darkN > 500);
+    CHECK(greenN == 0); // 绿标透明：背景不填
+}
+
 TEST_CASE("Colorize buildHeightMap")
 {
     SECTION("black line is barrier, background is flat")
@@ -1677,6 +1773,17 @@ TEST_CASE("Colorize MixedStrokeColors")
                      QPen(QColor(0, 170, 60, 255), 4), QPainter::CompositionMode_SourceOver, false);
 
     colorizeLayer->setTransparentColor(QColor(0, 170, 60).rgba());
+    // 以画布为准：合法颜色集 = 笔画图的实心色（面板同口径）。红笔画
+    // 压在黄上的叠色斑（255,89,0）是画布上可见的实心色——它属于合法
+    // 输出；禁止的是实心集之外的颜色（渐变环/滤波中间色）外溢
+    QSet<QRgb> allowedColors;
+    {
+        QImage* strokesImg = frame1->image();
+        for (const auto& s : Colorize::splitSolidKeyStrokes(
+                 *strokesImg, strokesImg->rect()))
+            allowedColors.insert(s.color);
+        allowedColors.insert(QColor(0, 170, 60).rgba()); // 透明标记色
+    }
     REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
     QImage coloring = frame1->coloringImage();
     QSet<QRgb> coloringColors;
@@ -1686,13 +1793,10 @@ TEST_CASE("Colorize MixedStrokeColors")
             const QRgb px = coloring.pixel(x, y);
             if (qAlpha(px) > 0) coloringColors.insert(qUnpremultiply(px));
         }
-    // 混合橙 (255,89,0) 必须被并回母色：着色结果只允许红/黄
-    const QRgb redMaster = QColor(255, 0, 0).rgba();
-    const QRgb yellowMaster = QColor(255, 215, 0).rgba();
     for (QRgb c : coloringColors)
     {
-        INFO("着色结果出现非母色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
-        REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster)));
+        INFO("着色结果出现实心集外颜色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
+        REQUIRE(allowedColors.contains(c));
     }
 
     // 传播到帧2（管线同 action）
@@ -1740,12 +1844,11 @@ TEST_CASE("Colorize MixedStrokeColors")
             const QRgb px = transported.pixel(x, y);
             if (qAlpha(px) > 0) transportedColors.insert(qUnpremultiply(px));
         }
-    // 传播标记只允许母色+透明标记色（混合色不外溢到其它帧）
-    const QRgb greenTransp = QColor(0, 170, 60).rgba();
+    // 传播标记只允许源帧实心色+透明标记色（实心集之外的颜色不外溢到其它帧）
     for (QRgb c : transportedColors)
     {
-        INFO("传播标记出现非母色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
-        REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster) || c == greenTransp));
+        INFO("传播标记出现实心集外颜色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
+        REQUIRE(allowedColors.contains(c));
     }
 
 }

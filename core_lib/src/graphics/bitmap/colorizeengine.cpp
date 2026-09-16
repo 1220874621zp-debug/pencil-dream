@@ -1266,6 +1266,100 @@ QVector<KeyStroke> splitKeyStrokesByColor(const QImage& strokesImage, const QRec
     return strokes;
 }
 
+QVector<KeyStroke> splitSolidKeyStrokes(const QImage& strokesImage, const QRect& bounds)
+{
+    QVector<KeyStroke> strokes;
+    if (strokesImage.isNull() || bounds.isEmpty())
+        return strokes;
+    if (bounds.width() < 3 || bounds.height() < 3)
+        return strokes; // 放不下 3x3 核：无实心色可言
+
+    // bounds 内每像素的反预乘精确色与 α（0 = 透明），一次算好复用
+    const int w = bounds.width();
+    QVector<QRgb> keyOf(w * bounds.height(), 0);
+    QVector<uchar> alphaOf(w * bounds.height(), 0);
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(strokesImage.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
+            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
+            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
+            const int idx = (y - bounds.top()) * w + (x - bounds.left());
+            keyOf[idx] = qRgb(r, g, b);
+            alphaOf[idx] = static_cast<uchar>(a);
+        }
+    }
+
+    // 实心色集：存在 3x3 邻域全非零且同精确色的核（与面板列表同判据；
+    // 贴 bounds 边一圈的像素不作核——完整核必在界内）
+    QSet<QRgb> solid;
+    const int rows = bounds.height();
+    for (int y = 1; y < rows - 1; ++y)
+    {
+        for (int x = 1; x < w - 1; ++x)
+        {
+            const QRgb key = keyOf[y * w + x];
+            if (key == 0 || solid.contains(key))
+                continue;
+            bool core = true;
+            for (int dy = -1; dy <= 1 && core; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (keyOf[(y + dy) * w + (x + dx)] != key)
+                    {
+                        core = false;
+                        break;
+                    }
+            if (core)
+                solid.insert(key);
+        }
+    }
+    if (solid.isEmpty())
+        return strokes;
+
+    // 组装：实心色蒙版 = 该精确色的全部像素（α 为值），面积（α 和）降序
+    QHash<QRgb, QImage> masks;
+    QHash<QRgb, qint64> areas;
+    for (auto it = solid.begin(); it != solid.end(); ++it)
+    {
+        QImage mask(strokesImage.size(), QImage::Format_Grayscale8);
+        mask.fill(0);
+        masks.insert(*it, mask);
+        areas.insert(*it, 0);
+    }
+    for (int y = 0; y < rows; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            const QRgb key = keyOf[y * w + x];
+            if (key == 0)
+                continue;
+            auto it = masks.find(key);
+            if (it == masks.end())
+                continue; // 非实心色：渐变环，不进任何组
+            it.value().scanLine(y + bounds.top())[x + bounds.left()] = alphaOf[y * w + x];
+            areas[key] += alphaOf[y * w + x];
+        }
+    }
+
+    QVector<QPair<qint64, QRgb>> order;
+    for (auto it = areas.begin(); it != areas.end(); ++it)
+        order.append(qMakePair(it.value(), it.key()));
+    std::sort(order.begin(), order.end(),
+              [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) {
+                  return a.first > b.first;
+              });
+
+    for (const auto& item : order)
+        strokes.append(KeyStroke{ masks.take(item.second), item.second, false });
+    return strokes;
+}
+
 QImage runWatershed(const QImage& heightMap,
                     QVector<KeyStroke> strokes,
                     const QRect& bounds,
@@ -1705,7 +1799,9 @@ QImage colorize(const QImage& lineArt,
                 const std::function<bool(int)>& progress)
 {
     const QImage heightMap = buildHeightMap(lineArt, bounds, options);
-    QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesImage, bounds);
+    // 取组用实心核口径（面板列表同源）：渐变环不产生独立颜色，否则
+    // 空间折叠会把贴边的真实笔画级联吞掉（用户"填不上色"案根因）
+    QVector<KeyStroke> strokes = splitSolidKeyStrokes(strokesImage, bounds);
     // 归并：以画布为准——同色相的实心色是用户分别涂的独立颜色不并
     // （面板/传播同参）；只折空间叠色混合带（贴 ≥2 组的中间色）
     mergeVariantStrokes(strokes, options, /*mergeVariants=*/false);

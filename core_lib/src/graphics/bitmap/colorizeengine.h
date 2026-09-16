@@ -140,6 +140,15 @@ QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const Filterin
 QVector<KeyStroke> splitKeyStrokesByColor(const QImage& strokesImage, const QRect& bounds);
 
 /*
+ * 实心色笔画列表（"以画布为准"的取色口径，面板列表/填色/传播三链唯一
+ * 同源入口）：实心 = 存在 3x3 同色核（手涂色点/传播标记必有核；笔刷软
+ * 边与叠色混出的渐变环无核）。组蒙版 = 该精确色的全部像素（α 为值），
+ * 面积降序。渐变环不产生独立颜色——否则进空间折叠会把贴边的真实
+ * 笔画级联吞掉（mergeVariants=false 后无色相合并兜底，此为硬前提）。
+ */
+QVector<KeyStroke> splitSolidKeyStrokes(const QImage& strokesImage, const QRect& bounds);
+
+/*
  * 相近色组归并：同主色的明暗变体组（画笔半透明叠色混出）并入面积最大的
  * 相似主色组（蒙版逐像素取大），分水岭只按主色扩散，杜绝变体扩散成杂色区。
  * 透明标记色组钉在首位：其变体并入透明组而非普通主色（透明语义不丢）。

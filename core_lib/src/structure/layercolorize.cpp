@@ -281,108 +281,11 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
     if (image == nullptr || image->isNull())
         return colors;
 
-    // 以画布为准（Krita keyStrokesColors 语义——显示全部实心笔画色，
-    // 不做色相似并）：实心 = 存在 3x3 同色核（手涂色点/传播标记必有，
-    // 笔刷软边与抗锯齿的 1-2px 渐变环没有）；叠色混合带（贴 ≥2 组的
-    // 中间色）折叠进母色不显示（与填色治理同源）。
-    QSet<QRgb> solidColors;
-    const int w = image->width(), hgt = image->height();
-    for (int y = 1; y < hgt - 1; ++y)
-    {
-        const QRgb* above = reinterpret_cast<const QRgb*>(image->constScanLine(y - 1));
-        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
-        const QRgb* below = reinterpret_cast<const QRgb*>(image->constScanLine(y + 1));
-        for (int x = 1; x < w - 1; ++x)
-        {
-            const QRgb px = line[x];
-            const int a = qAlpha(px);
-            if (a == 0)
-                continue;
-            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
-            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
-            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
-            const QRgb key = qRgb(r, g, b);
-            if (solidColors.contains(key))
-                continue;
-            bool core = true;
-            for (int dy = -1; dy <= 1 && core; ++dy)
-            {
-                const QRgb* nl = dy < 0 ? above : (dy > 0 ? below : line);
-                for (int dx = -1; dx <= 1; ++dx)
-                {
-                    const QRgb npx = nl[x + dx];
-                    const int na = qAlpha(npx);
-                    if (na == 0) { core = false; break; }
-                    const int nr = qBound(0, qRound(qRed(npx) * 255.0 / na), 255);
-                    const int ng = qBound(0, qRound(qGreen(npx) * 255.0 / na), 255);
-                    const int nb = qBound(0, qRound(qBlue(npx) * 255.0 / na), 255);
-                    if (qRgb(nr, ng, nb) != key) { core = false; break; }
-                }
-            }
-            if (core)
-                solidColors.insert(key);
-        }
-    }
-    if (solidColors.isEmpty())
-        return colors;
-
-    // 面积统计（只计实心色）→ 面积降序组装 KeyStroke 组 → 空间混合带折叠
-    QHash<QRgb, qint64> areas;
-    for (const QRgb key : solidColors)
-        areas.insert(key, 0);
-    for (int y = 0; y < hgt; ++y)
-    {
-        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
-        for (int x = 0; x < w; ++x)
-        {
-            const QRgb px = line[x];
-            const int a = qAlpha(px);
-            if (a == 0)
-                continue;
-            const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
-                                  qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
-                                  qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
-            if (areas.contains(key))
-                areas[key] += a;
-        }
-    }
-    QVector<QPair<qint64, QRgb>> order;
-    for (auto it = areas.begin(); it != areas.end(); ++it)
-        order.append(qMakePair(it.value(), it.key()));
-    std::sort(order.begin(), order.end(),
-              [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) { return a.first > b.first; });
-
-    // 每实心色一张覆盖蒙版（值 = alpha），供空间邻接判定
-    QVector<Colorize::KeyStroke> groups;
-    for (const auto& item : order)
-    {
-        Colorize::KeyStroke stroke;
-        stroke.color = item.second;
-        stroke.mask = QImage(image->size(), QImage::Format_Grayscale8);
-        stroke.mask.fill(0);
-        groups.append(stroke);
-    }
-    QHash<QRgb, QImage*> maskOf;
-    for (auto& g : groups)
-        maskOf[g.color] = &g.mask;
-    for (int y = 0; y < hgt; ++y)
-    {
-        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
-        for (int x = 0; x < w; ++x)
-        {
-            const QRgb px = line[x];
-            const int a = qAlpha(px);
-            if (a == 0)
-                continue;
-            const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
-                                  qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
-                                  qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
-            QImage* m = maskOf.value(key, nullptr);
-            if (m != nullptr)
-                m->scanLine(y)[x] = static_cast<uchar>(a);
-        }
-    }
-
+    // 以画布为准（Krita keyStrokesColors 语义）：显示全部实心笔画色，
+    // 不并色相变体。取组与填色(colorize)/传播同源 splitSolidKeyStrokes
+    // ——三链口径必须一字不差，双份实现必然漂移（画布vs面板分叉史）。
+    QVector<Colorize::KeyStroke> groups =
+        Colorize::splitSolidKeyStrokes(*image, image->rect());
     const QVector<int> master = Colorize::classifyStrokeMasters(
         groups, mTransparentColor, mHasTransparentColor, false /* 以画布为准：不并色相变体 */);
     for (int g = 0; g < groups.size(); ++g)
