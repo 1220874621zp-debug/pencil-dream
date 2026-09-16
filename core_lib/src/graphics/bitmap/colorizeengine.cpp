@@ -2512,10 +2512,16 @@ QImage mergeBidirectionalMarkers(const QImage& forwardMarkers,
                 continue;
             const QRgb fpx = fLine[x];
             if (qAlpha(fpx) > 0)
-                ++fwdStats[label - 1][qUnpremultiply(fpx)];
+            {
+                const QRgb u = qUnpremultiply(fpx);
+                ++fwdStats[label - 1][qRgb(qRed(u), qGreen(u), qBlue(u))];
+            }
             const QRgb bpx = bLine[x];
             if (qAlpha(bpx) > 0)
-                ++bwdStats[label - 1][qUnpremultiply(bpx)];
+            {
+                const QRgb u = qUnpremultiply(bpx);
+                ++bwdStats[label - 1][qRgb(qRed(u), qGreen(u), qBlue(u))];
+            }
         }
     }
 
@@ -2611,14 +2617,16 @@ qreal measureRegionAgreement(const QImage& lineArt,
             const QRgb ppx = pLine[x];
             if (qAlpha(ppx) > 0)
             {
-                const QRgb c = qUnpremultiply(ppx);
+                const QRgb u = qUnpremultiply(ppx);
+                const QRgb c = qRgb(qRed(u), qGreen(u), qBlue(u)); // 剥α：AA边α变化不得拆键
                 if (!(hasTransparent && c == transparentColor))
                     ++pStats[label - 1][c];
             }
             const QRgb apx = aLine[x];
             if (qAlpha(apx) > 0)
             {
-                const QRgb c = qUnpremultiply(apx);
+                const QRgb u = qUnpremultiply(apx);
+                const QRgb c = qRgb(qRed(u), qGreen(u), qBlue(u));
                 if (!(hasTransparent && c == transparentColor))
                     ++aStats[label - 1][c];
             }
@@ -2633,7 +2641,9 @@ qreal measureRegionAgreement(const QImage& lineArt,
         if (pBest == 0 || aBest == 0)
             continue;
         ++compared;
-        if (pBest == aBest)
+        // 相等判据用 similarColors 而非精确==：笔刷合成的同主色明暗变体
+        // （如 #800000 点的支配像素实为 #810000）不应判错配
+        if (pBest == aBest || Colorize::similarColors(pBest, aBest))
             ++agreed;
     }
     return compared > 0 ? qreal(agreed) / compared : 1.0;

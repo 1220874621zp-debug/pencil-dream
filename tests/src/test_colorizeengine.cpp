@@ -2343,6 +2343,34 @@ TEST_CASE("Colorize BidirectionalMergeAndAgreement")
         // 自比 = 1.0
         REQUIRE(Colorize::measureRegionAgreement(
             lineArt, fwd, fwd, lineArt.rect(), Colorize::FilteringOptions()) == 1.0);
+
+        // 用户实拍回归：笔刷合成的同主色明暗变体（#800000 vs #810000）
+        // 与 AA 边 alpha 梯度不得判错配（色键须剥α + 比较用 similarColors）
+        QImage variant(size, QImage::Format_ARGB32_Premultiplied);
+        variant.fill(Qt::transparent);
+        {
+            QPainter v(&variant);
+            v.setPen(Qt::NoPen);
+            v.setBrush(QColor(129, 0, 0)); // #810000（暗红变体）
+            v.drawEllipse(35, 60, 10, 8);
+            v.drawEllipse(115, 60, 10, 8);
+            v.drawEllipse(195, 60, 10, 8);
+            v.end();
+        }
+        // 全部区域：预测=纯红 vs 实画=#810000 变体 → 应全吻合
+        QImage redOnly(size, QImage::Format_ARGB32_Premultiplied);
+        redOnly.fill(Qt::transparent);
+        {
+            QPainter r(&redOnly);
+            r.setPen(Qt::NoPen);
+            r.setBrush(QColor(red));
+            r.drawEllipse(35, 60, 10, 8);
+            r.drawEllipse(115, 60, 10, 8);
+            r.drawEllipse(195, 60, 10, 8);
+            r.end();
+        }
+        REQUIRE(Colorize::measureRegionAgreement(
+            lineArt, redOnly, variant, lineArt.rect(), Colorize::FilteringOptions()) == 1.0);
     }
 }
 
@@ -2424,3 +2452,5 @@ TEST_CASE("Colorize TransparentBgDontEatColors")
     INFO("区域吻合度 " << agree);
     REQUIRE(agree >= 0.5);
 }
+
+
