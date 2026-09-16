@@ -365,7 +365,12 @@ public:
     {
         mKeyStrokeColors << color;
         mKeyStrokeTransparent << isTransparent;
-        mKeyStrokeIsBorder << false;
+        // 透明笔画 = 背景保护组：与颜色组的邻接是合法邻居关系，不参与
+        // 清理 pass 的污染冲突记账（否则贴着透明绿的色点组被当污染整体
+        // 删除——绿色压进封闭区域边缘/穿缝时锚点着色被掏空，用户
+        // "填不上色/校验0%"案根因）。刻意偏离 Krita（其 worker 无透明
+        // 特殊处理，同画法同样会删——Krita 工作流透明笔画只画轮廓外）
+        mKeyStrokeIsBorder << isTransparent;
         // 本地副本：笔画在解析时会被消费
         mKeyStrokes << strokeMask.convertToFormat(QImage::Format_Grayscale8);
 
@@ -2580,7 +2585,9 @@ qreal measureRegionAgreement(const QImage& lineArt,
                              const QImage& predicted,
                              const QImage& actual,
                              const QRect& bounds,
-                             const FilteringOptions& options)
+                             const FilteringOptions& options,
+                             QRgb transparentColor,
+                             bool hasTransparent)
 {
     if (bounds.isEmpty() || predicted.isNull() || actual.isNull())
         return 1.0;
@@ -2603,10 +2610,18 @@ qreal measureRegionAgreement(const QImage& lineArt,
                 continue;
             const QRgb ppx = pLine[x];
             if (qAlpha(ppx) > 0)
-                ++pStats[label - 1][qUnpremultiply(ppx)];
+            {
+                const QRgb c = qUnpremultiply(ppx);
+                if (!(hasTransparent && c == transparentColor))
+                    ++pStats[label - 1][c];
+            }
             const QRgb apx = aLine[x];
             if (qAlpha(apx) > 0)
-                ++aStats[label - 1][qUnpremultiply(apx)];
+            {
+                const QRgb c = qUnpremultiply(apx);
+                if (!(hasTransparent && c == transparentColor))
+                    ++aStats[label - 1][c];
+            }
         }
     }
 

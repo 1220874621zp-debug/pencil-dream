@@ -1350,9 +1350,9 @@ Status ActionCommands::propagateColorizeStrokes()
             // 正/反向区域吻合度（预测标记 vs 用户实画笔画，锚点各自线稿分割）
             PairScore score;
             score.fwd = Colorize::measureRegionAgreement(lineBFlat, predicted, flatten(*B.frame, canvas),
-                                                         canvasRect, filteringOptions);
+                                                         canvasRect, filteringOptions, transp, hasTransp);
             score.bwd = Colorize::measureRegionAgreement(lineAFlat, predictedBack, flatten(*A.frame, canvas),
-                                                         canvasRect, filteringOptions);
+                                                         canvasRect, filteringOptions, transp, hasTransp);
             pairScores.insert(qMakePair(A.pos, B.pos), score);
             agreementNotes << tr("帧%1→帧%2 吻合 正%3%/反%4%")
                                   .arg(A.pos).arg(B.pos)

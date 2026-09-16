@@ -2345,3 +2345,82 @@ TEST_CASE("Colorize BidirectionalMergeAndAgreement")
             lineArt, fwd, fwd, lineArt.rect(), Colorize::FilteringOptions()) == 1.0);
     }
 }
+
+TEST_CASE("Colorize TransparentBgDontEatColors")
+{
+    // 用户实测案（校验0%/填不上色根因链）：透明绿铺底且压进封闭区域
+    // 边缘（内缩挖除留宽绿环），cleanup(0.7) 曾把贴绿的彩色点组当污染
+    // 整体删除 → 锚点着色被掏空 → 预测标记全错 → 校验0%。修复=透明
+    // 笔画组按背景组对待（isBackground 管道），不参与污染冲突记账
+    const QSize size(640, 400);
+    const QRgb green = qRgb(0, 255, 0);
+    const QRgb orange = qRgb(255, 128, 0);
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb darkRed = qRgb(128, 0, 0);
+
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 3);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawEllipse(40, 70, 180, 220);   // 左房：橙
+        p.drawEllipse(250, 70, 180, 220);  // 中房：红
+        p.drawEllipse(460, 70, 150, 220);  // 右房：暗红（一区一点：各房单点）
+    });
+    // 绿铺满全域，挖除内缩 40px 的三椭圆内部 → 墙内侧留宽绿环
+    QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+    strokes.fill(Qt::transparent);
+    {
+        QPainter p(&strokes);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(green));
+        p.drawRect(strokes.rect());
+        p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+        p.drawEllipse(84, 114, 92, 132);
+        p.drawEllipse(294, 114, 92, 132);
+        p.drawEllipse(504, 114, 62, 132);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        p.setBrush(QColor(orange));  p.drawEllipse(110, 160, 24, 16);
+        p.setBrush(QColor(red));     p.drawEllipse(330, 160, 22, 14);
+        p.setBrush(QColor(darkRed)); p.drawEllipse(530, 160, 26, 16);
+        p.end();
+    }
+
+    Colorize::FilteringOptions opt;
+    opt.fuzzyRadius = 6.6;
+    opt.cleanUpAmount = 0.7;
+    opt.hasTransparentColor = true;
+    opt.transparentColor = green;
+
+    QImage coloring = Colorize::colorize(lineArt, strokes, lineArt.rect(), opt);
+    int orangeN = 0, redN = 0, darkN = 0, greenN = 0;
+    for (int y = 0; y < coloring.height(); ++y)
+        for (int x = 0; x < coloring.width(); ++x)
+        {
+            if (qAlpha(coloring.pixel(x, y)) == 0) continue;
+            const QRgb c = nonPremul(coloring, x, y);
+            if (c == orange) ++orangeN;
+            else if (c == red) ++redN;
+            else if (c == darkRed) ++darkN;
+            else if (c == green) ++greenN;
+        }
+    INFO("着色 橙" << orangeN << " 红" << redN << " 暗红" << darkN << " 绿" << greenN);
+    REQUIRE(orangeN > 1000);   // 修复前：全部为 0（cleanup 吞光）
+    REQUIRE(redN > 1000);
+    REQUIRE(darkN > 1000);
+    REQUIRE(greenN == 0);      // 透明背景不落色
+
+    // 端到端校验链：同一场景 A→A' 搬运的预测标记 vs 实画笔画的区域
+    // 吻合度必须显著大于 0（修复前预测全错 → 0%）
+    QImage coloringFlat(size, QImage::Format_ARGB32_Premultiplied);
+    coloringFlat.fill(Qt::transparent);
+    {
+        QPainter p(&coloringFlat);
+        p.drawImage(0, 0, coloring);
+        p.end();
+    }
+    const QImage predicted = Colorize::transportStrokesByRegions(
+        lineArt, coloringFlat, lineArt, lineArt.rect(), opt, green, true);
+    const qreal agree = Colorize::measureRegionAgreement(
+        lineArt, predicted, strokes, lineArt.rect(), opt, green, true);
+    INFO("区域吻合度 " << agree);
+    REQUIRE(agree >= 0.5);
+}

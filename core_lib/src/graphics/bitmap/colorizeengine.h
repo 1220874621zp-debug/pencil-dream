@@ -296,15 +296,18 @@ QImage mergeBidirectionalMarkers(const QImage& forwardMarkers,
 
 /*
  * L3 校验精度：锚点对 A→B 的预测标记图与用户在 B 的实画笔画做
- * 区域级吻合度——每区域取两图支配色相等计吻合，返回吻合区域占比
- * [0..1]（无可比区域返回 1）。驱动 L2 冲突裁决（闭环纠错：精度
- * 悬殊时精度优先于距离）。
+ * 区域级吻合度——每区域取两图支配色（透明标记色两侧都排除：透明
+ * 分配不在颜色对应校验范围，且背景绿笔画常大于色点会霸占支配色）
+ * 相等计吻合，返回吻合区域占比 [0..1]（无可比区域返回 1）。驱动
+ * L2 冲突裁决（闭环纠错：精度悬殊时精度优先于距离）。
  */
 qreal measureRegionAgreement(const QImage& lineArt,
                              const QImage& predicted,
                              const QImage& actual,
                              const QRect& bounds,
-                             const FilteringOptions& options = FilteringOptions());
+                             const FilteringOptions& options = FilteringOptions(),
+                             QRgb transparentColor = 0,
+                             bool hasTransparent = false);
 
 }
 
