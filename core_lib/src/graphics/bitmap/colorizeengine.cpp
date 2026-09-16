@@ -1323,7 +1323,7 @@ QImage dilateMask(const QImage& mask, int radius)
 }
 } // namespace
 
-QVector<int> classifyStrokeMasters(const QVector<KeyStroke>& strokes,
+QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
                                    QRgb transparentColor, bool hasTransparent)
 {
     const int n = strokes.size();
@@ -1426,6 +1426,36 @@ QVector<int> classifyStrokeMasters(const QVector<KeyStroke>& strokes,
         while (master[m] != m && guard++ < n)
             m = master[m];
         master[i] = m;
+    }
+
+    // 主色代表值提升：每族取明度(V)最高、并列取饱和度(S)更高的精确值
+    // ——笔尖混合/涂抹会把大面积像素画脏（混入透明底的黑，明度降低），
+    // 面积最大的代码常是脏色而非用户所选色；笔色是族内最纯最亮的那个。
+    // 透明组精确色不动（isTransparent 按精确 == 匹配）。
+    for (int m = 0; m < n; ++m)
+    {
+        if (master[m] != m)
+            continue;
+        if (hasTransparent && strokes[m].color == transparentColor)
+            continue;
+        int best = m;
+        int bestV = -1;
+        int bestS = -1;
+        for (int g = m; g < n; ++g) // 面积降序：并列时保持更早（面积大）的
+        {
+            if (master[g] != m)
+                continue;
+            int h = 0, s = 0, v = 0;
+            QColor(strokes[g].color).getHsv(&h, &s, &v);
+            if (v > bestV || (v == bestV && s > bestS))
+            {
+                bestV = v;
+                bestS = s;
+                best = g;
+            }
+        }
+        if (best != m)
+            strokes[m].color = strokes[best].color;
     }
     return master;
 }

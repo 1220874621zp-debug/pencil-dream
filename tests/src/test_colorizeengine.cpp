@@ -1786,3 +1786,32 @@ TEST_CASE("Colorize ListMixedColors")
     REQUIRE(redPixels == 0);
     REQUIRE(brownBand < 500); // 棕带=笔画重叠区（有界），不无限扩散
 }
+
+TEST_CASE("Colorize DirtyBrushRepresentative")
+{
+    // 笔尖混合把大面积像素画脏（混入透明底的黑、明度降低）：脏暗红大面积
+    // + 纯红小面积 → 代表色必须取族内最亮的纯红（= 用户所选颜色代码）
+    std::unique_ptr<Object> object(new Object);
+    object->init();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+
+    const QRgb dirtyRed = qRgb(140, 20, 20);
+    const QRgb pureRed = qRgb(255, 0, 0);
+    auto block = [frame](int x, int y, int w, int h, QRgb c) {
+        frame->drawRect(QRectF(x, y, w, h), QPen(Qt::NoPen), QBrush(QColor(c)),
+                        QPainter::CompositionMode_SourceOver, false);
+    };
+    block(10, 10, 40, 30, dirtyRed); // 脏色大面积
+    block(60, 10, 8, 8, pureRed);    // 笔芯纯色小面积
+
+    const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+    INFO("列表颜色数 " << colors.size());
+    REQUIRE(colors.size() == 1);        // 同色族（色相同）
+    REQUIRE(colors.first() == pureRed); // 代表 = 族内最亮的纯色代码
+
+    // 删除显示的纯红：整族（含大面积脏色像素）一并清除
+    colorizeLayer->removeStrokeColor(1, pureRed);
+    REQUIRE(colorizeLayer->strokeColorsAtFrame(1).isEmpty());
+}

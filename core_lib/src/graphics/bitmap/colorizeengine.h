@@ -99,11 +99,13 @@ struct KeyStroke
  *    叠色混合带——半透明叠色/互补混出的中间色（红叠黄混橙、红叠绿
  *    混棕、互补混灰）必然同时贴着两个母色——并入面积最大的相邻组；
  *    刻意选的独立色点不贴别的色，保留；
- * 3) 其余组为主色。返回每组的主色组下标（主色指向自身）。
- * hasTransparent 时 transparentColor 组恒为主色（保护语义，不参与
- * 折叠也不作折叠目标）。
+ * 3) 其余组为主色。
+ * 另将每族主色组的 color 提升为族内明度最高（并列取饱和度更高）的
+ * 精确值——笔尖混合会把大面积像素画脏，面积最大的代码不是用户
+ * 所选色；透明组精确色不动。
+ * 返回每组的主色组下标（主色指向自身）。
  */
-QVector<int> classifyStrokeMasters(const QVector<KeyStroke>& strokes,
+QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
                                    QRgb transparentColor, bool hasTransparent);
 
 /*

@@ -133,19 +133,22 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
 
     // 删除判定与列表同源：像素所属组的主色 == 被删色 → 清除
     // （变体与叠色混合带像素随其主色一并删除）
-    const QVector<Colorize::KeyStroke> groups =
+    QVector<Colorize::KeyStroke> groups =
         Colorize::splitKeyStrokesByColor(*image, image->rect());
+    QVector<QRgb> originalColors;
+    for (const auto& g : groups)
+        originalColors.append(g.color); // 分类会提升主色代表值，先记原始键
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
     QHash<QRgb, QRgb> groupToMaster;
     QSet<QRgb> mixColors;
     for (int g = 0; g < groups.size(); ++g)
     {
-        groupToMaster[groups[g].color] = groups[master[g]].color;
+        groupToMaster[originalColors[g]] = groups[master[g]].color;
         // 混合带 = 被折叠但与主色不相似的组：任何主色被删都一并清除
         // （叠色混出物是两个母色的共同产物，母色去其一即失去归属）
-        if (master[g] != g && !Colorize::similarColors(groups[g].color, groups[master[g]].color))
-            mixColors.insert(groups[g].color);
+        if (master[g] != g && !Colorize::similarColors(originalColors[g], originalColors[master[g]]))
+            mixColors.insert(originalColors[g]);
     }
 
     bool changed = false;
@@ -193,8 +196,8 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
 
     // 主色分类与引擎/删除/传播同源：色相近似变体与叠色混合带
     // （贴 ≥2 组的中间色）并入主色，列表只显示主色（= 用户所选颜色，
-    // 与色板一致）。split 返回面积降序，输出自然降序。
-    const QVector<Colorize::KeyStroke> groups =
+    // 与色板一致；代表值取族内最亮最纯的精确代码）。split 返回面积降序。
+    QVector<Colorize::KeyStroke> groups =
         Colorize::splitKeyStrokesByColor(*image, image->rect());
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
