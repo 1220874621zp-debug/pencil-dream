@@ -65,7 +65,7 @@ void ColorizeOptionsWidget::initUI()
 
     // 跨帧传播填色（原主工具栏入口移入面板：选中填色图层才出现）
     mPropagateButton = new QPushButton(QIcon(":/icons/themes/playful/misc/colorize-propagate.svg"), tr("跨帧传播填色"), this);
-    mPropagateButton->setToolTip(tr("把当前填色帧的色点按线稿自动对齐搬运到后续帧块（缺帧自动补建）并批量平涂，可撤销"));
+    mPropagateButton->setToolTip(tr("以所有已涂色点帧为锚点填满全部空帧（支持开头/中间/结尾先上色，每帧从最近的锚点取色），并自动校验锚点间颜色对应；缺帧自动补建，可撤销"));
     rootLayout->addWidget(mPropagateButton);
 
     // --- 显示/编辑模式（Krita: Edit key strokes / Show output） ---

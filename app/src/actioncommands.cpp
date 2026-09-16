@@ -1189,39 +1189,25 @@ Status ActionCommands::propagateColorizeStrokes()
 
     auto colorizeLayer = static_cast<LayerColorize*>(layer);
 
-    // 源帧 = 当前显示帧背后的关键帧（与画布落笔同源）
+    // 线稿源层（锚点与目标帧的线稿都取自它）。当前帧不必已涂——
+    // 多锚点模式下允许站在任意空帧上触发，锚点 = 全部已涂帧
     const int srcDisplay = colorizeLayer->displayFrameFor(mEditor->currentFrame());
-    auto srcFrame = static_cast<ColorizeImage*>(colorizeLayer->getKeyFrameWhichCovers(srcDisplay));
-    if (srcFrame == nullptr || srcFrame->bounds().isEmpty())
-    {
-        QMessageBox::information(mParent, tipTitle,
-            tr("当前帧没有色点笔画：请先开启编辑模式涂色点，再从这一帧向后传播。"));
-        return Status::CANCELED;
-    }
-    const int srcPos = srcFrame->pos();
-
     LayerBitmap* lineLayer = mEditor->object()->getColorizeSourceLayer(mEditor->currentLayerIndex(), srcDisplay);
     if (lineLayer == nullptr)
     {
         QMessageBox::information(mParent, tipTitle, tr("找不到线稿源图层：当前帧附近没有含画布内容的位图图层。"));
         return Status::CANCELED;
     }
-    auto srcLineFrame = static_cast<BitmapImage*>(
-        lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(srcDisplay)));
-    if (srcLineFrame == nullptr || srcLineFrame->bounds().isEmpty())
-    {
-        QMessageBox::information(mParent, tipTitle, tr("线稿源图层在当前帧没有线稿。"));
-        return Status::CANCELED;
-    }
 
-    // 目标位置 = 线稿源层在源帧之后的全部关键帧（“给所有帧块上色”）
+    // 目标 = 线稿源层全部关键帧（全时间轴填隙：锚点前后的空帧都填，
+    // 各帧从绝对距离最近的锚点取色；锚点/手涂帧由循环内保护逻辑跳过）
     QVector<int> targets;
-    for (int p = srcPos + 1; p <= lineLayer->getMaxKeyFramePosition(); ++p)
+    for (int p = 1; p <= lineLayer->getMaxKeyFramePosition(); ++p)
         if (lineLayer->keyExists(p))
             targets.append(p);
     if (targets.isEmpty())
     {
-        QMessageBox::information(mParent, tipTitle, tr("线稿源图层在当前帧之后没有帧块，无需传播。"));
+        QMessageBox::information(mParent, tipTitle, tr("线稿源图层没有帧块，无需传播。"));
         return Status::CANCELED;
     }
 
@@ -1265,8 +1251,7 @@ Status ActionCommands::propagateColorizeStrokes()
     }
 
     // 区域映射以源帧着色结果为颜色事实源；未算过或已过期（涂后未刷新/
-    // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失。
-    // 接链换源帧时同一守卫复用
+    // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失
     const quint32 structureGen = mEditor->object()->layerStructureGeneration();
     const auto ensureSourceColoring = [&](ColorizeImage* frame) {
         const bool stale = frame->needsUpdate()
@@ -1275,11 +1260,6 @@ Status ActionCommands::propagateColorizeStrokes()
             colorizeLayer->updateColoringAtFrame(frame->pos(), lineLayer, structureGen);
         return !frame->coloringImage().isNull();
     };
-    if (!ensureSourceColoring(srcFrame))
-    {
-        QMessageBox::information(mParent, tipTitle, tr("源帧着色计算失败，无法传播。"));
-        return Status::CANCELED;
-    }
 
     // 分割用滤波选项与填色面板同源（闭缝等参数对区域分割同样生效）
     Colorize::FilteringOptions filteringOptions;
@@ -1288,7 +1268,111 @@ Status ActionCommands::propagateColorizeStrokes()
     filteringOptions.fuzzyRadius = colorizeLayer->fuzzyRadius();
     filteringOptions.cleanUpAmount = colorizeLayer->cleanUpAmount();
 
-    // 区域邻近映射：源帧各封闭区域颜色（着色结果）按质心最近继承到
+    // --- 锚点集：填色层全部非空关键帧（开头/中间/结尾的手涂帧即锚点）---
+    struct Anchor
+    {
+        int pos = 0;
+        ColorizeImage* frame = nullptr;
+        BitmapImage* lineFrame = nullptr;
+    };
+    QVector<Anchor> anchors;
+    colorizeLayer->foreachKeyFrame([&](KeyFrame* key) {
+        auto img = static_cast<ColorizeImage*>(key);
+        if (img == nullptr || img->bounds().isEmpty())
+            return;
+        auto line = static_cast<BitmapImage*>(
+            lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(img->pos())));
+        if (line == nullptr || line->bounds().isEmpty())
+            return; // 无线稿支撑：不能作源（仍受保护跳过）
+        if (!ensureSourceColoring(img))
+            return; // 着色失败：不能作源
+        anchors.append(Anchor{ img->pos(), img, line });
+    });
+    std::sort(anchors.begin(), anchors.end(),
+              [](const Anchor& a, const Anchor& b) { return a.pos < b.pos; });
+    if (anchors.isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle,
+            tr("没有已涂色点的锚点帧：请先在编辑模式下涂色点（开头/中间/结尾多帧都涂，传播更准），再传播。"));
+        return Status::CANCELED;
+    }
+    const auto nearestAnchor = [&anchors](int pos) -> const Anchor* {
+        const Anchor* best = nullptr;
+        int bestDist = 1 << 30;
+        for (const Anchor& a : anchors)
+        {
+            const int d = qAbs(a.pos - pos);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = &a;
+            }
+        }
+        return best;
+    };
+
+    // --- 锚点校验（纠错信号）：锚点对 A→B 直推一遍，与用户在 B 实画的
+    // 颜色集对比。未预测到/多预测的颜色 = 两锚点间对应不稳的定量信号，
+    // 在两锚点之间补涂一个锚点即可显著改善（开环传播 → 闭环校验）
+    QStringList validationNotes;
+    const int pairCount = qMax(0, anchors.size() - 1);
+    progress.setMaximum(targets.size() + pairCount);
+    {
+        const QRgb transp = colorizeLayer->transparentColor();
+        const bool hasTransp = colorizeLayer->hasTransparentColor();
+        for (int i = 0; i + 1 < anchors.size(); ++i)
+        {
+            progress.setValue(i);
+            QCoreApplication::processEvents();
+            const Anchor& A = anchors[i];
+            const Anchor& B = anchors[i + 1];
+            const QRect canvas = (A.lineFrame->bounds() | A.frame->coloringBounds() | B.lineFrame->bounds())
+                                     .adjusted(-16, -16, 16, 16);
+            QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+            coloringFlat.fill(Qt::transparent);
+            {
+                QPainter colorPainter(&coloringFlat);
+                colorPainter.drawImage(A.frame->coloringBounds().topLeft() - canvas.topLeft(),
+                                       A.frame->coloringImage());
+                colorPainter.end();
+            }
+            const QImage predicted = Colorize::transportStrokesByRegions(
+                flatten(*A.lineFrame, canvas), coloringFlat, flatten(*B.lineFrame, canvas),
+                QRect(0, 0, canvas.width(), canvas.height()), filteringOptions, transp, hasTransp);
+
+            QSet<QRgb> predictedColors;
+            for (int y = 0; y < predicted.height(); ++y)
+            {
+                const QRgb* line = reinterpret_cast<const QRgb*>(predicted.constScanLine(y));
+                for (int x = 0; x < predicted.width(); ++x)
+                {
+                    if (qAlpha(line[x]) == 0) continue;
+                    const QRgb c = qUnpremultiply(line[x]);
+                    if (hasTransp && c == transp) continue;
+                    predictedColors.insert(c);
+                }
+            }
+            QSet<QRgb> actualColors;
+            for (QRgb c : colorizeLayer->strokeColorsAtFrame(B.pos))
+                if (!(hasTransp && c == transp))
+                    actualColors.insert(c);
+
+            QStringList missed, extra;
+            for (QRgb c : actualColors)
+                if (!predictedColors.contains(c))
+                    missed << QColor(c).name();
+            for (QRgb c : predictedColors)
+                if (!actualColors.contains(c))
+                    extra << QColor(c).name();
+            if (!missed.isEmpty() || !extra.isEmpty())
+                validationNotes << tr("帧%1→帧%2：未预测到 %3；多预测 %4")
+                                      .arg(A.pos).arg(B.pos)
+                                      .arg(missed.isEmpty() ? QStringLiteral("—") : missed.join(", "))
+                                      .arg(extra.isEmpty() ? QStringLiteral("—") : extra.join(", "));
+        }
+    }
+
+    // 区域邻近映射：锚帧各封闭区域颜色（着色结果）按质心最近继承到
     // 目标帧各区域，每区域一个标准标记点；已有手涂笔画的帧保护跳过
     int created = 0, written = 0, skippedPainted = 0, skippedNoLine = 0, canceled = 0;
     QVector<int> touched;
@@ -1301,7 +1385,7 @@ Status ActionCommands::propagateColorizeStrokes()
 
     for (int i = 0; i < targets.size(); ++i)
     {
-        progress.setValue(i);
+        progress.setValue(pairCount + i);
         QCoreApplication::processEvents();
         if (progress.wasCanceled())
         {
@@ -1318,40 +1402,37 @@ Status ActionCommands::propagateColorizeStrokes()
         }
 
         // 保护判定按「覆盖该帧的关键帧」而非恰在该位的关键帧：手涂键的
-        // 曝光跨度整体保护，不再被逐帧插入的传播帧切走显示；本次运行
-        // 新建/写入的帧不算保护（它们本来就是传播产物）。受保护帧接链
-        // ——后续目标帧改从它映射（用户手涂修正即最近的颜色事实源）
+        // 曝光跨度整体保护（锚点与用户修正帧都是手涂键）。源不再接链——
+        // 每帧从绝对距离最近的锚点取（帧 9 离锚点 10 比锚点 1 近，取 10）
         KeyFrame* cover = colorizeLayer->getKeyFrameWhichCovers(pos);
         auto coverImg = static_cast<ColorizeImage*>(cover);
-        if (coverImg != nullptr && coverImg != srcFrame && !coverImg->bounds().isEmpty()
+        if (coverImg != nullptr && !coverImg->bounds().isEmpty()
             && !touchedPos.contains(coverImg->pos()))
         {
-            ++skippedPainted; // 已有手涂笔画：保护跳过
-            auto coverLine = static_cast<BitmapImage*>(
-                lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(pos)));
-            if (coverLine != nullptr && !coverLine->bounds().isEmpty()
-                && ensureSourceColoring(coverImg))
-            {
-                srcFrame = coverImg;
-                srcLineFrame = coverLine;
-            }
+            ++skippedPainted; // 已有手涂笔画（锚点/修正）：保护跳过
             continue;
         }
 
+        const Anchor* anchor = nearestAnchor(pos);
+        if (anchor == nullptr)
+        {
+            ++skippedNoLine; // 无可用锚点（理论不可达：当前帧必为锚点）
+            continue;
+        }
         KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
 
         // 留白容纳贴边标记点；平铺图是 canvas 相对坐标（原点 0,0），
         // bounds 必须传图内矩形，传画布原点矩形会越界
-        const QRect canvas = (srcLineFrame->bounds() | srcFrame->coloringBounds() | lineFrame->bounds())
+        const QRect canvas = (anchor->lineFrame->bounds() | anchor->frame->coloringBounds() | lineFrame->bounds())
                                  .adjusted(-16, -16, 16, 16);
         QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
         coloringFlat.fill(Qt::transparent);
         {
             QPainter colorPainter(&coloringFlat);
-            colorPainter.drawImage(srcFrame->coloringBounds().topLeft() - canvas.topLeft(), srcFrame->coloringImage());
+            colorPainter.drawImage(anchor->frame->coloringBounds().topLeft() - canvas.topLeft(), anchor->frame->coloringImage());
             colorPainter.end();
         }
-        QImage transported = Colorize::transportStrokesByRegions(flatten(*srcLineFrame, canvas),
+        QImage transported = Colorize::transportStrokesByRegions(flatten(*anchor->lineFrame, canvas),
                                                                  coloringFlat,
                                                                  flatten(*lineFrame, canvas),
                                                                  QRect(0, 0, canvas.width(), canvas.height()),
@@ -1401,7 +1482,7 @@ Status ActionCommands::propagateColorizeStrokes()
         mEditor->undoRedo()->record(saveStateId, tr("跨帧传播填色", "Undo step text"));
     mEditor->endLayerLayoutEdit(tr("跨帧传播填色"));
 
-    progress.setValue(targets.size());
+    progress.setValue(targets.size() + pairCount);
 
     if (!touched.isEmpty())
     {
@@ -1411,8 +1492,16 @@ Status ActionCommands::propagateColorizeStrokes()
         emit mEditor->framesModified();
     }
 
-    QString summary = tr("传播完成：新建 %1 帧、写入 %2 帧；跳过已有笔画 %3 帧、无线稿 %4 帧。")
-                          .arg(created).arg(written).arg(skippedPainted).arg(skippedNoLine);
+    QString summary = tr("传播完成：锚点 %5 个，新建 %1 帧、写入 %2 帧；跳过锚点/手涂 %3 帧、无线稿 %4 帧。")
+                          .arg(created).arg(written).arg(skippedPainted).arg(skippedNoLine).arg(anchors.size());
+    if (anchors.size() >= 2)
+    {
+        if (validationNotes.isEmpty())
+            summary += tr("\n锚点校验：%1 对全部命中。").arg(pairCount);
+        else
+            summary += tr("\n锚点校验（下列锚点对对应不稳，建议在两锚点之间补涂一个锚点后重传）：\n%1")
+                           .arg(validationNotes.join("\n"));
+    }
     if (canceled > 0)
         summary += tr("\n已取消：剩余 %1 帧未处理。").arg(canceled);
     QMessageBox::information(mParent, tipTitle, summary);
