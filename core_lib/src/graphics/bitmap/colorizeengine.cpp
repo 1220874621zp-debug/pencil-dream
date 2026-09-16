@@ -2458,6 +2458,26 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         drawRegionDot(ri, regionColor[ri]);
     }
 
+    // 用户规则：彩色标记点只允许出现在透明包裹矩形（= 目标线稿内容框，
+    // makeBackgroundWrap 沿其外缘描边）之内——框外的彩色像素（开放背景
+    // 误采样成色、补漏/继承落点越界）一律清除；透明标记与框内色点不动
+    if (hasTransparent)
+    {
+        const QRect keep = boxB.adjusted(-2, -2, 2, 2);
+        for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+        {
+            QRgb* line = reinterpret_cast<QRgb*>(result.scanLine(y));
+            for (int x = bounds.left(); x <= bounds.right(); ++x)
+            {
+                if (keep.contains(x, y) || qAlpha(line[x]) == 0)
+                    continue;
+                const QRgb u = qUnpremultiply(line[x]);
+                if (qRgb(qRed(u), qGreen(u), qBlue(u)) != transparentColor)
+                    line[x] = 0;
+            }
+        }
+    }
+
     painter.end();
     return result;
 }

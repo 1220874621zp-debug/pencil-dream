@@ -2454,3 +2454,74 @@ TEST_CASE("Colorize TransparentBgDontEatColors")
 }
 
 
+
+TEST_CASE("Colorize MarkersInsideWrapRect")
+{
+    // 用户规则：彩色标记点只出现在透明包裹矩形（目标线稿内容框）内。
+    // 触发路径：开放背景区域的锚点经内容框映射（u,v 截断）吸附到框内
+    // 色区 → 在框外背景角落画出色点——规则应清除框外彩色，保留框内
+    const QSize size(200, 150);
+    const QRgb green = qRgb(0, 255, 0);
+    const QRgb red = qRgb(255, 0, 0);
+
+    // 源线稿在右侧、目标线稿在左侧（用户工程即逐帧跳位）：目标背景
+    // 锚点的相对映射被截断到源框边缘 → 采到框内红色 → 框外画出红点
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(110, 40, 70, 60);
+    });
+    QImage lineB = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(15, 40, 70, 60);
+    });
+    QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+    strokes.fill(Qt::transparent);
+    {
+        QPainter p(&strokes);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(green));
+        p.drawRect(strokes.rect());
+        p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+        p.drawRect(112, 42, 66, 56); // 源框外绿底，框内留给红点
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        p.setBrush(QColor(red));
+        p.drawEllipse(132, 60, 16, 12);
+        p.end();
+    }
+
+    Colorize::FilteringOptions opt;
+    opt.cleanUpAmount = 0.7;
+    opt.hasTransparentColor = true;
+    opt.transparentColor = green;
+
+    const QImage coloring = Colorize::colorize(lineA, strokes, lineA.rect(), opt);
+    QImage coloringFlat(size, QImage::Format_ARGB32_Premultiplied);
+    coloringFlat.fill(Qt::transparent);
+    {
+        QPainter p(&coloringFlat);
+        p.drawImage(0, 0, coloring);
+        p.end();
+    }
+    const QImage transported = Colorize::transportStrokesByRegions(
+        lineA, coloringFlat, lineB, lineB.rect(), opt, green, true);
+
+    const QRect keepZone = QRect(15, 40, 70, 60).adjusted(-4, -4, 4, 4);
+    int foreignOutside = 0, redInside = 0;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            const QRgb px = transported.pixel(x, y);
+            if (qAlpha(px) == 0) continue;
+            const QRgb c = nonPremul(transported, x, y);
+            if (c == green) continue; // 透明标记不受限
+            if (!keepZone.contains(x, y))
+                ++foreignOutside;
+            else if (c == red)
+                ++redInside;
+        }
+    INFO("框外彩色像素 " << foreignOutside << " 框内红点 " << redInside);
+    REQUIRE(foreignOutside == 0);
+    REQUIRE(redInside > 10);
+}
