@@ -1430,19 +1430,23 @@ Status ActionCommands::propagateColorizeStrokes()
             continue;
         }
 
-        // 保护判定按「覆盖该帧的关键帧」而非恰在该位的关键帧：手涂键的
-        // 曝光跨度整体保护（锚点与用户修正帧）。传播帧（isPropagated）
-        // 是本功能的旧产物，不保护——换锚点重传应能刷新它们。
-        // 源不再接链——每帧从绝对距离最近的锚点取（帧 9 离锚点 10 比
-        // 锚点 1 近，取 10）
-        KeyFrame* cover = colorizeLayer->getKeyFrameWhichCovers(pos);
-        auto coverImg = static_cast<ColorizeImage*>(cover);
-        if (coverImg != nullptr && !coverImg->bounds().isEmpty()
-            && !coverImg->isPropagated()
-            && !touchedPos.contains(coverImg->pos()))
+        // 保护判定只看「恰在该位的关键帧」：手涂键保护自身位置，锚点/
+        // 用户修正帧不被覆盖；传播帧（isPropagated）是旧产物可刷新。
+        // 不再看「覆盖键」（曝光跨度）——锚点工作流下稀疏锚点的曝光
+        // 跨度就是全部空隙帧，覆盖式保护会把每个待填帧都判成手涂
+        // （"新建0帧/跳过9帧"案：锚点1覆盖2-4、5覆盖6-8、9覆盖10-12）。
+        // 空隙帧建键会切分锚点的曝光显示，这正是"根据线稿层建帧"的预期
+        KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
+        if (existing != nullptr)
         {
-            ++skippedPainted; // 手涂帧（锚点/用户修正）：保护跳过
-            continue;
+            auto existingImg = static_cast<ColorizeImage*>(existing);
+            if (!existingImg->bounds().isEmpty()
+                && !existingImg->isPropagated()
+                && !touchedPos.contains(pos))
+            {
+                ++skippedPainted; // 手涂帧（锚点/用户修正）：保护跳过
+                continue;
+            }
         }
 
         // 左右夹逼锚点：t 两侧最近的手涂锚（锚点集升序，O(n) 扫描）
@@ -1461,7 +1465,6 @@ Status ActionCommands::propagateColorizeStrokes()
             ++skippedNoLine; // 无可用锚点（理论不可达：当前帧必为锚点）
             continue;
         }
-        KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
 
         // 着色场平铺与搬运的公共小工具（canvas 相对坐标，原点 0,0）
         const auto flattenColoringOf = [&colorizeLayer](ColorizeImage* frame, const QRect& canvas) {
