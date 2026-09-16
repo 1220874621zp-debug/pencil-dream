@@ -109,6 +109,24 @@ QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
                                    QRgb transparentColor, bool hasTransparent);
 
 /*
+ * 意图色认领（Krita KoColor 属性语义）：用户点击色板时的颜色代码
+ * （涂色那一刻确定，不受笔刷把像素画脏影响）优先作族代表——
+ * 显示/填色/传播用它。master 为 classifyStrokeMasters 的返回值。
+ */
+void claimIntentColors(QVector<KeyStroke>& strokes, const QVector<int>& master,
+                       QRgb transparentColor, bool hasTransparent,
+                       const QVector<QRgb>& intentColors);
+
+/*
+ * 笔画图按主色代表值重涂：族内全部像素精确化为代表代码（用户所选
+ * 颜色代码），返回新图（不修改输入）。填色前调用——引擎收到的
+ * 笔画就是纯色代码，分水岭输出即用户所选色。
+ */
+QImage normalizeStrokeColors(const QImage& strokesImage, const QRect& bounds,
+                             QRgb transparentColor, bool hasTransparent,
+                             const QVector<QRgb>& intentColors);
+
+/*
  * 线稿 → 高度图（Format_Grayscale8，255 = 屏障）。
  * lineArt 通常为 Format_ARGB32_Premultiplied，屏障强度取自 alpha 通道。
  */

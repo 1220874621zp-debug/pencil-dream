@@ -1815,3 +1815,53 @@ TEST_CASE("Colorize DirtyBrushRepresentative")
     colorizeLayer->removeStrokeColor(1, pureRed);
     REQUIRE(colorizeLayer->strokeColorsAtFrame(1).isEmpty());
 }
+
+TEST_CASE("Colorize IntentColorCodes")
+{
+    // 用户点色板的代码是唯一事实源：登记的意图色优先作族代表，
+    // 画布像素被笔尖混合画脏（甚至纯色代码完全不在像素里）也不影响
+    std::unique_ptr<Object> object(new Object);
+    object->init();
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+
+    auto* lineArt = lineArtLayer->getBitmapImageAtFrame(1);
+    lineArt->drawRect(QRectF(8, 8, 48, 48), QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                      QPainter::CompositionMode_SourceOver, false);
+
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+    // 画布上只有"脏红"（笔尖混合产物）——用户所选纯色代码不在像素里
+    frame->drawLine(QPointF(20, 30), QPointF(40, 30),
+                    QPen(QColor(150, 40, 40), 6), QPainter::CompositionMode_SourceOver, false);
+
+    const QRgb clicked = qRgb(255, 0, 0);
+    colorizeLayer->addIntentColor(clicked);
+
+    SECTION("列表显示点击的代码")
+    {
+        const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+        REQUIRE(colors.size() == 1);
+        REQUIRE(colors.first() == clicked);
+    }
+
+    SECTION("填色输出用点击的代码")
+    {
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
+        const QImage coloring = frame->coloringImage();
+        REQUIRE(!coloring.isNull());
+        int colored = 0, foreign = 0;
+        for (int y = 0; y < coloring.height(); ++y)
+            for (int x = 0; x < coloring.width(); ++x)
+            {
+                const QRgb px = coloring.pixel(x, y);
+                if (qAlpha(px) == 0) continue;
+                ++colored;
+                if (qUnpremultiply(px) != clicked) ++foreign;
+            }
+        INFO("着色像素 " << colored << " 非点击代码 " << foreign);
+        REQUIRE(colored > 30 * 30);
+        REQUIRE(foreign == 0);
+    }
+}
+

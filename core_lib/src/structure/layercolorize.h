@@ -19,6 +19,7 @@ GNU General Public License for more details.
 
 #include "layerbitmap.h"
 #include "graphics/bitmap/colorizeengine.h"
+#include <QSet>
 
 class ColorizeImage;
 
@@ -90,6 +91,12 @@ public:
     bool hasTransparentColor() const { return mHasTransparentColor; }
     QRgb transparentColor() const { return mTransparentColor; }
     void setTransparentColor(QRgb color);
+
+    // 意图色登记：用户涂色点时点击色板/选色器的颜色代码（涂色那一刻
+    // 确定）。列表/填色/传播的代表色优先取登记代码，不受笔刷把画布
+    // 像素画脏影响（画布像素仅用于判断颜色存在性与范围）
+    void addIntentColor(QRgb color);
+    QVector<QRgb> intentColors() const;
     void clearTransparentColor() { mHasTransparentColor = false; }
 
     /** 从指定帧的笔画图里删除某颜色的全部笔画（Krita: Remove） */
@@ -109,6 +116,7 @@ private:
     qreal mCleanUpAmount = 0.7;
     bool mEditKeyStrokes = true;
     bool mShowColoring = true;
+    QSet<QRgb> mIntentColors;
     bool mHasTransparentColor = false;
     QRgb mTransparentColor = 0;
 };

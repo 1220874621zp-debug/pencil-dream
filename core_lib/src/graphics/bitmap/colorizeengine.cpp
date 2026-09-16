@@ -1457,7 +1457,68 @@ QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
         if (best != m)
             strokes[m].color = strokes[best].color;
     }
+
     return master;
+}
+
+void claimIntentColors(QVector<KeyStroke>& strokes, const QVector<int>& master,
+                       QRgb transparentColor, bool hasTransparent,
+                       const QVector<QRgb>& intentColors)
+{
+    if (intentColors.isEmpty())
+        return;
+    const int n = strokes.size();
+    for (int m = 0; m < n; ++m)
+    {
+        if (master[m] != m)
+            continue;
+        if (hasTransparent && strokes[m].color == transparentColor)
+            continue;
+        for (const QRgb intent : intentColors)
+        {
+            if (similarColors(intent, strokes[m].color))
+            {
+                strokes[m].color = intent;
+                break;
+            }
+        }
+    }
+}
+
+QImage normalizeStrokeColors(const QImage& strokesImage, const QRect& bounds,
+                             QRgb transparentColor, bool hasTransparent,
+                             const QVector<QRgb>& intentColors)
+{
+    QImage result(strokesImage.size(), QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    if (bounds.isEmpty() || strokesImage.isNull())
+        return result;
+
+    QVector<KeyStroke> groups = splitKeyStrokesByColor(strokesImage, bounds);
+    if (groups.isEmpty())
+        return result;
+    const QVector<int> master = classifyStrokeMasters(groups, transparentColor,
+                                                      hasTransparent);
+    claimIntentColors(groups, master, transparentColor, hasTransparent, intentColors);
+    // 族内像素精确重涂为代表代码（含意图色）：α 取原像素透明度
+    for (int g = 0; g < groups.size(); ++g)
+    {
+        const QRgb rep = groups[master[g]].color;
+        const QImage& mask = groups[g].mask;
+        for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+        {
+            const uchar* mLine = mask.constScanLine(y);
+            QRgb* dst = reinterpret_cast<QRgb*>(result.scanLine(y));
+            for (int x = bounds.left(); x <= bounds.right(); ++x)
+            {
+                if (mLine[x] == 0)
+                    continue;
+                const int a = mLine[x];
+                dst[x] = qPremultiply(qRgba(qRed(rep), qGreen(rep), qBlue(rep), a));
+            }
+        }
+    }
+    return result;
 }
 
 void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options)

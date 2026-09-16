@@ -1376,7 +1376,16 @@ void ScribbleArea::drawPolyline(QPainterPath path, QPen pen, bool useAA)
 
 void ScribbleArea::endStroke()
 {
-    if (mEditor->layers()->currentLayer()->isBitmapKind()) {
+    auto* layer = mEditor->layers()->currentLayer();
+    // 填色层涂色点：登记用户此刻点击的颜色代码（意图色）——列表
+    // 显示/填色/传播的代表色用它，不受笔刷把画布像素画脏影响
+    if (layer != nullptr && layer->type() == Layer::COLORIZE
+        && currentTool()->type() != ERASER)
+    {
+        static_cast<LayerColorize*>(layer)->addIntentColor(mEditor->color()->frontColor().rgba());
+    }
+
+    if (layer != nullptr && layer->isBitmapKind()) {
         paintBitmapBuffer();
     }
 

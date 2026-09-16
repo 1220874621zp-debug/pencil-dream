@@ -87,6 +87,13 @@ QDomElement LayerColorize::createDomElement(QDomDocument& doc) const
         layerElem.setAttribute("colorizeShowColoring", 0);
     if (mHasTransparentColor)
         layerElem.setAttribute("colorizeTransparentColor", static_cast<int>(mTransparentColor));
+    if (!mIntentColors.isEmpty())
+    {
+        QStringList hex;
+        for (QRgb c : mIntentColors)
+            hex << QString::number(static_cast<uint>(c), 16);
+        layerElem.setAttribute("colorizeIntentColors", hex.join(";"));
+    }
 
     return layerElem;
 }
@@ -109,6 +116,16 @@ void LayerColorize::loadDomElement(const QDomElement& element, QString dataDirPa
     {
         mTransparentColor = static_cast<QRgb>(element.attribute("colorizeTransparentColor").toInt());
         mHasTransparentColor = true;
+    }
+    if (element.hasAttribute("colorizeIntentColors"))
+    {
+        for (const QString& hex : element.attribute("colorizeIntentColors").split(';'))
+        {
+            bool ok = false;
+            const uint c = hex.toUInt(&ok, 16);
+            if (ok && c != 0)
+                mIntentColors.insert(static_cast<QRgb>(c));
+        }
     }
 
     LayerBitmap::loadDomElement(element, dataDirPath, progressStep);
@@ -140,6 +157,7 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
         originalColors.append(g.color); // 分类会提升主色代表值，先记原始键
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
+    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentColors());
     QHash<QRgb, QRgb> groupToMaster;
     QSet<QRgb> mixColors;
     for (int g = 0; g < groups.size(); ++g)
@@ -182,6 +200,22 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
         mHasTransparentColor = false;
 }
 
+void LayerColorize::addIntentColor(QRgb color)
+{
+    if (mIntentColors.contains(color))
+        return;
+    mIntentColors.insert(color);
+    // 无需主动失效：登记发生在涂色（endStroke）时，笔画修改本就触发
+    // 着色重算；面板「更新全部」重算时新代表色生效
+}
+
+QVector<QRgb> LayerColorize::intentColors() const
+{
+    QVector<QRgb> list = mIntentColors.values().toVector();
+    std::sort(list.begin(), list.end());
+    return list;
+}
+
 QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
 {
     QVector<QRgb> colors;
@@ -201,6 +235,7 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
         Colorize::splitKeyStrokesByColor(*image, image->rect());
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
+    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentColors());
     for (int g = 0; g < groups.size(); ++g)
         if (master[g] == g)
             colors.append(groups[g].color);
@@ -218,7 +253,11 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
         return true;
     }
 
-    QImage result = Colorize::colorize(data.lineImg, data.strokeImg, data.lineImg.rect(), data.options);
+    // 笔画按主色代表值（优先意图色=用户所选颜色代码）重涂后喂引擎：
+    // 填色输出即用户所选色，画布脏像素不参与取色
+    const QImage normalized = Colorize::normalizeStrokeColors(
+        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, intentColors());
+    QImage result = Colorize::colorize(data.lineImg, normalized, data.lineImg.rect(), data.options);
     if (auto* frame = getColorizeImageAtFrame(data.keyPos))
         frame->setColoringResult(result, data.bounds, structureGeneration);
     return true;
