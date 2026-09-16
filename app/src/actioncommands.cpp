@@ -49,6 +49,9 @@ GNU General Public License for more details.
 #include "layersound.h"
 #include "layerbitmap.h"
 #include "bitmapimage.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
+#include "colorizeupdatemanager.h"
 #include "holefiller.h"
 #include "soundclip.h"
 #include "camera.h"
@@ -1166,6 +1169,196 @@ Status ActionCommands::fillHolesOnCurrentFrame()
 
     mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
     mEditor->undoRedo()->record(saveStateId, tr("镂空检测填充", "Undo step text"));
+    return Status::OK;
+}
+
+Status ActionCommands::propagateColorizeStrokes()
+{
+    const QString tipTitle = tr("跨帧传播填色");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (layer->type() != Layer::COLORIZE)
+    {
+        QMessageBox::information(mParent, tipTitle,
+            tr("跨帧传播只能在填色图层上使用：请选中填色图层，在当前帧涂好色点后再传播。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法传播。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    auto colorizeLayer = static_cast<LayerColorize*>(layer);
+
+    // 源帧 = 当前显示帧背后的关键帧（与画布落笔同源）
+    const int srcDisplay = colorizeLayer->displayFrameFor(mEditor->currentFrame());
+    auto srcFrame = static_cast<ColorizeImage*>(colorizeLayer->getKeyFrameWhichCovers(srcDisplay));
+    if (srcFrame == nullptr || srcFrame->bounds().isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle,
+            tr("当前帧没有色点笔画：请先开启编辑模式涂色点，再从这一帧向后传播。"));
+        return Status::CANCELED;
+    }
+    const int srcPos = srcFrame->pos();
+
+    LayerBitmap* lineLayer = mEditor->object()->getColorizeSourceLayer(mEditor->currentLayerIndex(), srcDisplay);
+    if (lineLayer == nullptr)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("找不到线稿源图层：当前帧附近没有含画布内容的位图图层。"));
+        return Status::CANCELED;
+    }
+    auto srcLineFrame = static_cast<BitmapImage*>(
+        lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(srcDisplay)));
+    if (srcLineFrame == nullptr || srcLineFrame->bounds().isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("线稿源图层在当前帧没有线稿。"));
+        return Status::CANCELED;
+    }
+
+    // 目标位置 = 线稿源层在源帧之后的全部关键帧（“给所有帧块上色”）
+    QVector<int> targets;
+    for (int p = srcPos + 1; p <= lineLayer->getMaxKeyFramePosition(); ++p)
+        if (lineLayer->keyExists(p))
+            targets.append(p);
+    if (targets.isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("线稿源图层在当前帧之后没有帧块，无需传播。"));
+        return Status::CANCELED;
+    }
+
+    // 搬运要求三图同尺寸：各帧图像按各自 topLeft 平铺到公共矩形（画布坐标系）
+    auto flatten = [](BitmapImage& bmp, const QRect& canvas) {
+        QImage img(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter p(&img);
+        p.drawImage(bmp.bounds().topLeft() - canvas.topLeft(),
+                    bmp.image()->convertToFormat(QImage::Format_ARGB32_Premultiplied));
+        p.end();
+        return img;
+    };
+    auto nonEmptyBBox = [](const QImage& img) {
+        int minX = img.width(), minY = img.height(), maxX = -1, maxY = -1;
+        for (int y = 0; y < img.height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(img.constScanLine(y));
+            for (int x = 0; x < img.width(); ++x)
+                if (qAlpha(line[x]) > 0)
+                {
+                    minX = qMin(minX, x); maxX = qMax(maxX, x);
+                    minY = qMin(minY, y); maxY = qMax(maxY, y);
+                }
+        }
+        return maxX < 0 ? QRect() : QRect(QPoint(minX, minY), QPoint(maxX, maxY));
+    };
+
+    QProgressDialog progress(tr("正在跨帧传播色点…"), tr("取消"), 0, targets.size(), mParent);
+    progress.setWindowTitle(tipTitle);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(300);
+
+    // 链式搬运：相邻帧接力（大幅动作也能跟），源 = 最近一个有效帧；
+    // 遇手涂帧（质量更高）自动接链
+    BitmapImage prevLine = *srcLineFrame;
+    BitmapImage prevStrokes = *srcFrame;
+
+    int created = 0, written = 0, skippedPainted = 0, skippedNoLine = 0, canceled = 0;
+    QVector<int> touched;
+
+    mEditor->beginLayerLayoutEdit(colorizeLayer);
+    // 已有空块的像素修改走快照链；新建帧由布局事务托管，帧删除即整体撤销
+    const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    bool contentDirty = false;
+
+    for (int i = 0; i < targets.size(); ++i)
+    {
+        progress.setValue(i);
+        QCoreApplication::processEvents();
+        if (progress.wasCanceled())
+        {
+            canceled = targets.size() - i;
+            break;
+        }
+
+        const int pos = targets[i];
+        auto lineFrame = static_cast<BitmapImage*>(lineLayer->getKeyFrameAt(pos));
+        if (lineFrame == nullptr || lineFrame->bounds().isEmpty())
+        {
+            ++skippedNoLine; // 空帧块：跳过继续
+            continue;
+        }
+
+        KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
+        if (existing != nullptr)
+        {
+            auto existingImg = static_cast<ColorizeImage*>(existing);
+            if (!existingImg->bounds().isEmpty())
+            {
+                ++skippedPainted; // 已有手涂笔画：保护并接链
+                prevLine = *lineFrame;
+                prevStrokes = *existingImg;
+                continue;
+            }
+        }
+
+        const QRect canvas = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
+        const QImage transported = Colorize::transportStrokes(flatten(prevLine, canvas),
+                                                              flatten(prevStrokes, canvas),
+                                                              flatten(*lineFrame, canvas),
+                                                              canvas);
+        const QRect box = nonEmptyBBox(transported);
+        if (box.isEmpty())
+        {
+            ++skippedNoLine; // 搬运结果为空（色点全被移出公共区域）：跳过
+            continue;
+        }
+        BitmapImage newStrokes(box.topLeft() + canvas.topLeft(), transported.copy(box));
+
+        if (existing == nullptr)
+        {
+            auto newFrame = new ColorizeImage();
+            newFrame->paste(&newStrokes);
+            colorizeLayer->addKeyFrame(pos, newFrame);
+            ++created;
+        }
+        else
+        {
+            auto existingImg = static_cast<ColorizeImage*>(existing);
+            existingImg->paste(&newStrokes);
+            existingImg->setModified(true);
+            existingImg->setNeedsUpdate(true);
+            contentDirty = true;
+            ++written;
+        }
+        touched.append(pos);
+
+        prevLine = *lineFrame;
+        prevStrokes = newStrokes;
+    }
+
+    if (contentDirty)
+        mEditor->undoRedo()->record(saveStateId, tr("跨帧传播填色", "Undo step text"));
+    mEditor->endLayerLayoutEdit(tr("跨帧传播填色"));
+
+    progress.setValue(targets.size());
+
+    if (!touched.isEmpty())
+    {
+        for (int pos : touched)
+            mEditor->colorizeUpdates()->requestUpdate(colorizeLayer, pos);
+        emit mEditor->updateTimeLine();
+        emit mEditor->framesModified();
+    }
+
+    QString summary = tr("传播完成：新建 %1 帧、写入 %2 帧；跳过已有笔画 %3 帧、无线稿 %4 帧。")
+                          .arg(created).arg(written).arg(skippedPainted).arg(skippedNoLine);
+    if (canceled > 0)
+        summary += tr("\n已取消：剩余 %1 帧未处理。").arg(canceled);
+    QMessageBox::information(mParent, tipTitle, summary);
     return Status::OK;
 }
 

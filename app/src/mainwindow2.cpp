@@ -2222,6 +2222,14 @@ void MainWindow2::createToolbars()
         mMainToolbar->addAction(holeFillAction);
     }
 
+    // 跨帧传播填色：把填色层当前帧的色点自动搬运到后续帧块并批量平涂
+    {
+        QAction* propagateAction = new QAction(QIcon(":/icons/themes/playful/misc/colorize-propagate.svg"), tr("跨帧传播填色"), this);
+        propagateAction->setToolTip(tr("跨帧传播填色：把当前填色帧的色点按线稿自动对齐搬运到后续帧块（缺帧自动补建）并批量平涂，可撤销"));
+        connect(propagateAction, &QAction::triggered, mCommands, &ActionCommands::propagateColorizeStrokes);
+        mMainToolbar->addAction(propagateAction);
+    }
+
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");
     mViewToolbar->addAction(ui->actionCut);
