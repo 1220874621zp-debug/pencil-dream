@@ -47,6 +47,9 @@ public:
 
     void makeConnectionToEditor(Editor* editor);
 
+    /** 填色图层选项面板（MainWindow2 接跨帧传播信号用） */
+    ColorizeOptionsWidget* colorizeOptionsWidget() const { return mColorizeOptionsWidget; }
+
 public slots:
     void onToolsReset();
     void onToolChanged(ToolType);

@@ -42,6 +42,10 @@ public:
     void initUI() override;
     void updateUI() override;
 
+Q_SIGNALS:
+    /** 请求跨帧传播填色（MainWindow2 接到 ActionCommands 执行） */
+    void propagateRequested();
+
 private slots:
     void refreshCurrentFrame();
     void refreshAllFrames();
@@ -59,6 +63,7 @@ private:
     QLabel* mSourceLabel = nullptr;
     QPushButton* mRefreshButton = nullptr;
     QPushButton* mRefreshAllButton = nullptr;
+    QPushButton* mPropagateButton = nullptr;
     QCheckBox* mEditKeyStrokesCheck = nullptr;
     QCheckBox* mShowColoringCheck = nullptr;
     QHBoxLayout* mColorsRow = nullptr;

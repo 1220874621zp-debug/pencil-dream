@@ -73,6 +73,7 @@ GNU General Public License for more details.
 #include "exposuresheetpanel.h"
 #include "builtinworkspaces.h"
 #include "tooloptionwidget.h"
+#include "colorizeoptionswidget.h"
 #include "preferencesdialog.h"
 #include "ocaexportdialog.h"
 #include "layercamera.h"
@@ -1936,6 +1937,10 @@ void MainWindow2::makeConnections(Editor*, OnionSkinWidget*)
 void MainWindow2::makeConnections(Editor* editor, ToolOptionWidget* toolOptions)
 {
     toolOptions->makeConnectionToEditor(editor);
+
+    // 填色选项面板的跨帧传播按钮 → ActionCommands（入口从主工具栏移入面板）
+    connect(toolOptions->colorizeOptionsWidget(), &ColorizeOptionsWidget::propagateRequested,
+            mCommands, &ActionCommands::propagateColorizeStrokes);
 }
 
 void MainWindow2::makeConnections(Editor* pEditor, ColorPaletteWidget* pColorPalette)
@@ -2222,13 +2227,7 @@ void MainWindow2::createToolbars()
         mMainToolbar->addAction(holeFillAction);
     }
 
-    // 跨帧传播填色：把填色层当前帧的色点自动搬运到后续帧块并批量平涂
-    {
-        QAction* propagateAction = new QAction(QIcon(":/icons/themes/playful/misc/colorize-propagate.svg"), tr("跨帧传播填色"), this);
-        propagateAction->setToolTip(tr("跨帧传播填色：把当前填色帧的色点按线稿自动对齐搬运到后续帧块（缺帧自动补建）并批量平涂，可撤销"));
-        connect(propagateAction, &QAction::triggered, mCommands, &ActionCommands::propagateColorizeStrokes);
-        mMainToolbar->addAction(propagateAction);
-    }
+    // 跨帧传播填色入口已移至填色图层选项面板（选中填色图层才出现）
 
     mViewToolbar = addToolBar(tr("View Toolbar"));
     mViewToolbar->setObjectName("mViewToolbar");

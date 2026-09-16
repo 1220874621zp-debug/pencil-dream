@@ -70,6 +70,11 @@ void ColorizeOptionsWidget::initUI()
     titleRow->addWidget(mRefreshAllButton);
     rootLayout->addLayout(titleRow);
 
+    // 跨帧传播填色（原主工具栏入口移入面板：选中填色图层才出现）
+    mPropagateButton = new QPushButton(QIcon(":/icons/themes/playful/misc/colorize-propagate.svg"), tr("跨帧传播填色"), this);
+    mPropagateButton->setToolTip(tr("把当前填色帧的色点按线稿自动对齐搬运到后续帧块（缺帧自动补建）并批量平涂，可撤销"));
+    rootLayout->addWidget(mPropagateButton);
+
     // --- 显示/编辑模式（Krita: Edit key strokes / Show output） ---
     mEditKeyStrokesCheck = new QCheckBox(tr("Edit key strokes"), this);
     mShowColoringCheck = new QCheckBox(tr("Show output"), this);
@@ -172,6 +177,7 @@ void ColorizeOptionsWidget::initUI()
     // --- 连接 ---
     connect(mRefreshButton, &QPushButton::clicked, this, &ColorizeOptionsWidget::refreshCurrentFrame);
     connect(mRefreshAllButton, &QPushButton::clicked, this, &ColorizeOptionsWidget::refreshAllFrames);
+    connect(mPropagateButton, &QPushButton::clicked, this, &ColorizeOptionsWidget::propagateRequested);
 
     connect(mEditKeyStrokesCheck, &QCheckBox::toggled, this, [this](bool value) {
         LayerColorize* layer = currentColorizeLayer();
