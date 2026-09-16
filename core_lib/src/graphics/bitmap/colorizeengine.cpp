@@ -1467,7 +1467,8 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
     if (bounds.isEmpty())
         return seg;
 
-    // 屏障 = 滤波后的高度图（含闭缝/边缘检测；抗锯齿半边缘也算屏障）
+    // 屏障 = 滤波后的高度图（含闭缝/边缘检测）；阈值取低值——
+    // 画笔软边/抗锯齿边缘也是墙，否则角色内外顺软边渗漏连通成一片
     const QImage height = buildHeightMap(lineArt, bounds, options);
     seg.labelOf.fill(0, bounds.width() * bounds.height());
 
@@ -1481,7 +1482,7 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
         const uchar* hLine = height.constScanLine(y);
         for (int x = bounds.left(); x <= bounds.right(); ++x)
         {
-            if (hLine[x] >= 96 || labelAt(x, y) != 0)
+            if (hLine[x] >= 16 || labelAt(x, y) != 0)
                 continue;
 
             const qint32 label = static_cast<qint32>(seg.regions.size()) + 1;
@@ -1509,7 +1510,7 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
                 {
                     if (!bounds.contains(n))
                         continue;
-                    if (height.constScanLine(n.y())[n.x()] >= 96)
+                    if (height.constScanLine(n.y())[n.x()] >= 16)
                         continue;
                     if (labelAt(n.x(), n.y()) != 0)
                         continue;
@@ -1557,65 +1558,102 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     if (bounds.isEmpty())
         return result;
 
-    const RegionSegmentation segA = segmentRegions(lineArtA, bounds, options);
+    // 落点 = 目标帧各分割区域锚点（保证标记落进封闭区域）；
+    // 颜色 = 锚点经包围盒相对映射回源帧、采样源帧着色颜色场——
+    // 不做"源区域单色"假设（软边/缺口的半连通区域里分水岭本就两色分治）
     const RegionSegmentation segB = segmentRegions(lineArtB, bounds, options);
-    if (segA.regions.isEmpty() || segB.regions.isEmpty())
+    if (segB.regions.isEmpty())
         return result;
 
-    // 源区域颜色表：锚点采样着色结果（纯色平涂；透明 = 透明/未着色区域）
-    struct SourceColor
-    {
-        QRgb color = 0;
-        bool transparent = false;
-        QPoint centroid;
-    };
-    QVector<SourceColor> palette;
-    palette.reserve(segA.regions.size());
-    for (const RegionLabel& r : segA.regions)
-    {
-        SourceColor sc;
-        sc.centroid = r.centroid;
-        const QRgb px = coloringA.pixel(r.anchor);
-        if (qAlpha(px) > 0)
-            sc.color = qUnpremultiply(px);
-        else
-            sc.transparent = true;
-        palette.append(sc);
-    }
+    const QRect boxA = nonEmptyBounds(lineArtA, bounds);
+    const QRect boxB = nonEmptyBounds(lineArtB, bounds);
+    if (boxA.isEmpty() || boxB.isEmpty() || boxA.width() < 1 || boxA.height() < 1)
+        return result;
 
-    // 目标区域：质心邻近继承，每区域画一个标准标记点
     const int dot = 9;
     QPainter painter(&result);
     painter.setPen(Qt::NoPen);
+
+    QSet<QRgb> drawnColors;
+
+    const auto sampleSource = [&](const QPoint& targetPoint, QRgb& outColor, bool& outTransparent) {
+        const qreal u = qBound(0.0, (targetPoint.x() - boxB.left()) / double(boxB.width()), 1.0);
+        const qreal v = qBound(0.0, (targetPoint.y() - boxB.top()) / double(boxB.height()), 1.0);
+        const QPoint src(qRound(boxA.left() + u * boxA.width()),
+                         qRound(boxA.top() + v * boxA.height()));
+        if (!bounds.contains(src))
+        {
+            outTransparent = true;
+            outColor = 0;
+            return;
+        }
+        const QRgb px = coloringA.pixel(src);
+        if (qAlpha(px) > 0)
+        {
+            outColor = qUnpremultiply(px);
+            outTransparent = false;
+        }
+        else
+        {
+            outColor = 0;
+            outTransparent = true;
+        }
+    };
+
     for (const RegionLabel& r : segB.regions)
     {
-        int best = -1;
-        qint64 bestDist = std::numeric_limits<qint64>::max();
-        for (int i = 0; i < palette.size(); ++i)
-        {
-            const qint64 dx = r.centroid.x() - palette[i].centroid.x();
-            const qint64 dy = r.centroid.y() - palette[i].centroid.y();
-            const qint64 d = dx * dx + dy * dy;
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = i;
-            }
-        }
-        if (best < 0)
-            continue;
-        if (palette[best].transparent)
+        QRgb color = 0;
+        bool transparent = false;
+        sampleSource(r.anchor, color, transparent);
+        if (transparent)
         {
             if (!hasTransparent)
-                continue; // 未标透明色：透明区域不标记
+                continue;
             painter.setBrush(QColor(transparentColor));
         }
         else
         {
-            painter.setBrush(QColor(palette[best].color));
+            painter.setBrush(QColor(color));
+            drawnColors.insert(color);
         }
         painter.drawRect(r.anchor.x(), r.anchor.y(), dot, dot);
     }
+
+    // 颜色补漏：源帧着色里每种颜色（面积≥64px）都应出现在目标帧标记中，
+    // 缺失则按该颜色质心相对映射补画——保证任何颜色不丢（落点可后续手动修）
+    struct ColorStat
+    {
+        qint64 count = 0;
+        qint64 sumX = 0;
+        qint64 sumY = 0;
+    };
+    QHash<QRgb, ColorStat> stats;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(coloringA.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const QRgb px = line[x];
+            if (qAlpha(px) == 0)
+                continue;
+            ColorStat& s = stats[qUnpremultiply(px)];
+            ++s.count;
+            s.sumX += x;
+            s.sumY += y;
+        }
+    }
+    for (auto it = stats.begin(); it != stats.end(); ++it)
+    {
+        if (it->count < 64 || drawnColors.contains(it.key()))
+            continue;
+        const qreal u = qBound(0.0, (it->sumX / double(it->count) - boxA.left()) / double(boxA.width()), 1.0);
+        const qreal v = qBound(0.0, (it->sumY / double(it->count) - boxA.top()) / double(boxA.height()), 1.0);
+        const QPoint target(qRound(boxB.left() + u * boxB.width()),
+                            qRound(boxB.top() + v * boxB.height()));
+        painter.setBrush(QColor(it.key()));
+        painter.drawRect(target.x(), target.y(), dot, dot);
+    }
+
     painter.end();
     return result;
 }

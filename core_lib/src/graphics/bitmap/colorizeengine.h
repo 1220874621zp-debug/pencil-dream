@@ -162,11 +162,13 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds,
                                   const FilteringOptions& options = FilteringOptions());
 
 /*
- * 色点跨帧搬运（区域邻近映射）：
- * 源帧各封闭区域的颜色从其着色结果（纯色平涂）锚点采样，目标帧每个
- * 区域按"质心最近"继承源帧有色区域颜色，在区域锚点画标准标记点——
- * 每区域只标一色；新增区域拿最近区域颜色（后续可手动修正）。
- * 着色结果为透明的区域：hasTransparent 时画透明标记色，否则不标。
+ * 色点跨帧搬运（区域锚点 + 颜色场映射）：
+ * 落点 = 目标帧各分割区域锚点（保证标记落进封闭区域，每区域一个标记）；
+ * 颜色 = 锚点经"源包围盒→目标包围盒"相对映射回源帧、采样源帧着色颜色场
+ * （不做源区域单色假设——软边/缺口半连通区域里分水岭本就两色分治）；
+ * 颜色补漏：源帧每种颜色（面积≥64px）若未出现在目标标记中，按其质心
+ * 相对映射补画一个标记，保证任何颜色不丢（落点可手动修正）。
+ * 采样为透明时：hasTransparent 画透明标记色，否则不标。
  * coloringA 为平铺到与 lineArtA 同尺寸画布的源帧着色结果。
  */
 QImage transportStrokesByRegions(const QImage& lineArtA,

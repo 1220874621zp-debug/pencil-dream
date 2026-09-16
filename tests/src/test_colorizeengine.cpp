@@ -1300,3 +1300,44 @@ TEST_CASE("Colorize TransportByRegions")
     REQUIRE(hasMarkNear(green, c2, 10));  // C' 绿
     REQUIRE(hasMarkNear(blue, d2, 10));   // 新区域 D 邻近继承 B 的蓝
 }
+
+TEST_CASE("Colorize RegionsNoColorLoss")
+{
+    // 回归（用户实测丢红）：目标帧区域锚点全部映射采样到透明时，
+    // 颜色补漏必须把源帧的红色补画回来，任何颜色不允许丢失
+    const QSize size(260, 160);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(20, 50, 60, 60); // 左框（源：红）
+    });
+    QImage lineB = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(180, 50, 60, 60); // 大位移到右侧
+    });
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 0, 0));
+        p.drawRect(21, 51, 58, 58);
+        p.end();
+    }
+
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineB, lineB.rect(),
+                                                     Colorize::FilteringOptions(),
+                                                     QColor(0, 200, 0).rgba(), true);
+    // 红色标记必须存在（右框区域锚点采到透明 → 补漏按红质心映射补画）
+    int redPixels = 0;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            const QRgb px = out.pixel(x, y);
+            if (qAlpha(px) > 0 && nonPremul(out, x, y) == qRgb(255, 0, 0))
+                ++redPixels;
+        }
+    INFO("红色标记像素数 " << redPixels);
+    REQUIRE(redPixels >= 64);
+}
