@@ -1255,6 +1255,15 @@ Status ActionCommands::propagateColorizeStrokes()
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(300);
 
+    // 工程色板注入（存量笔画无登记时认领）后源帧着色补算
+    {
+        QVector<QRgb> paletteColors;
+        const int n = mEditor->object()->getColorCount();
+        for (int i = 0; i < n; ++i)
+            paletteColors.append(mEditor->object()->getColor(i).color.rgba());
+        colorizeLayer->setPaletteColors(paletteColors);
+    }
+
     // 区域映射以源帧着色结果为颜色事实源；未算过则同步补算一次
     if (srcFrame->coloringImage().isNull())
         colorizeLayer->updateColoringAtFrame(srcPos, lineLayer, mEditor->object()->layerStructureGeneration());

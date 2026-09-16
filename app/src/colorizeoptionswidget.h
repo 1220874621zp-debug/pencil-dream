@@ -50,6 +50,7 @@ private slots:
 private:
     LayerColorize* currentColorizeLayer() const;
     void refreshColors();
+    void syncPaletteToLayer(LayerColorize* layer);
     void invalidateAllFrames(LayerColorize* layer);
     void repaintCanvas();
 

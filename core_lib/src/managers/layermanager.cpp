@@ -238,15 +238,28 @@ LayerBitmap* LayerManager::createColorizeLayer(const QString& strLayerName)
     LayerBitmap* layer = object()->addNewColorizeLayer();
     layer->setName(strLayerName);
 
-    // 插到当前层正下方：若当前层是位图图层，新填色层立即获得线稿源
+    // 插到线稿层正下方（渲染于线稿之下）：索引小者渲染在下。
+    // 当前层是位图层→插其下；否则向上找最近的位图层插其下；无位图层→垫底
     const int currentIndex = currentLayerIndex();
-    if (currentIndex >= 0 && currentIndex < count() - 1)
+    int anchor = -1;
+    if (currentIndex >= 0 && object()->getLayer(currentIndex)->type() == Layer::BITMAP)
+        anchor = currentIndex;
+    else
     {
-        object()->moveLayer(count() - 1, currentIndex + 1);
+        for (int i = currentIndex + 1; i < count(); ++i)
+        {
+            if (object()->getLayer(i)->type() == Layer::BITMAP) { anchor = i; break; }
+        }
     }
+    if (anchor < 0)
+        anchor = 0; // 垫底（新层在列表尾=最上层，移到 0）
+
+    const int newIndex = qMin(anchor, count() - 1);
+    if (newIndex != count() - 1)
+        object()->moveLayer(count() - 1, newIndex);
 
     emit layerCountChanged(count());
-    setCurrentLayer(currentIndex + 1);
+    setCurrentLayer(newIndex);
 
     return layer;
 }

@@ -199,6 +199,7 @@ void ColorizeOptionsWidget::initUI()
     connect(mRemoveButton, &QPushButton::clicked, this, [this]() {
         LayerColorize* layer = currentColorizeLayer();
         if (layer == nullptr || mSelectedColor < 0) { return; }
+        syncPaletteToLayer(layer);
         layer->removeStrokeColor(mEditor->currentFrame(), static_cast<QRgb>(mSelectedColor));
         mSelectedColor = -1;
         refreshColors();
@@ -265,6 +266,19 @@ void ColorizeOptionsWidget::updateUI()
     refreshColors();
 }
 
+// 工程色板注入：存量笔画无落笔登记时由色板色认领（Krita KoColor 属性
+// 语义的文件级替代——色板即用户选色的权威记录）
+void ColorizeOptionsWidget::syncPaletteToLayer(LayerColorize* layer)
+{
+    if (layer == nullptr || mEditor == nullptr || mEditor->object() == nullptr)
+        return;
+    QVector<QRgb> colors;
+    const int n = mEditor->object()->getColorCount();
+    for (int i = 0; i < n; ++i)
+        colors.append(mEditor->object()->getColor(i).color.rgba());
+    layer->setPaletteColors(colors);
+}
+
 void ColorizeOptionsWidget::refreshColors()
 {
     LayerColorize* layer = currentColorizeLayer();
@@ -283,6 +297,7 @@ void ColorizeOptionsWidget::refreshColors()
         return;
     }
 
+    syncPaletteToLayer(layer);
     const QVector<QRgb> colors = layer->strokeColorsAtFrame(mEditor->currentFrame());
     qDebug() << "[填色] 颜色列表刷新 帧" << mEditor->currentFrame() << "颜色数" << colors.size();
     for (int i = 0; i < colors.size() && i < 16; ++i)

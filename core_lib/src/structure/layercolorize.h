@@ -97,6 +97,11 @@ public:
     // 像素画脏影响（画布像素仅用于判断颜色存在性与范围）
     void addIntentColor(QRgb color);
     QVector<QRgb> intentColors() const;
+
+    // 工程色板候选（调用方注入）：存量笔画没有落笔登记时，色板色
+    // （用户选过的颜色的权威清单）认领像素色族——旧工程免重涂即得
+    // 正确显示/填色代码
+    void setPaletteColors(const QVector<QRgb>& colors);
     void clearTransparentColor() { mHasTransparentColor = false; }
 
     /** 从指定帧的笔画图里删除某颜色的全部笔画（Krita: Remove） */
@@ -117,6 +122,8 @@ private:
     bool mEditKeyStrokes = true;
     bool mShowColoring = true;
     QSet<QRgb> mIntentColors;
+    QVector<QRgb> mPaletteColors; // 色板候选（不持久化，面板/入口注入）
+    QVector<QRgb> intentCandidateColors() const; // 登记意图色在前、色板色在后
     bool mHasTransparentColor = false;
     QRgb mTransparentColor = 0;
 };

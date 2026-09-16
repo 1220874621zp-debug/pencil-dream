@@ -157,7 +157,7 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
         originalColors.append(g.color); // 分类会提升主色代表值，先记原始键
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
-    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentColors());
+    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentCandidateColors());
     QHash<QRgb, QRgb> groupToMaster;
     QSet<QRgb> mixColors;
     for (int g = 0; g < groups.size(); ++g)
@@ -200,6 +200,19 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
         mHasTransparentColor = false;
 }
 
+void LayerColorize::setPaletteColors(const QVector<QRgb>& colors)
+{
+    mPaletteColors = colors;
+}
+
+QVector<QRgb> LayerColorize::intentCandidateColors() const
+{
+    QVector<QRgb> list = mIntentColors.values().toVector();
+    std::sort(list.begin(), list.end());
+    list += mPaletteColors;
+    return list;
+}
+
 void LayerColorize::addIntentColor(QRgb color)
 {
     if (mIntentColors.contains(color))
@@ -235,7 +248,7 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
         Colorize::splitKeyStrokesByColor(*image, image->rect());
     const QVector<int> master =
         Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
-    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentColors());
+    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentCandidateColors());
     for (int g = 0; g < groups.size(); ++g)
         if (master[g] == g)
             colors.append(groups[g].color);
@@ -256,7 +269,7 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
     // 笔画按主色代表值（优先意图色=用户所选颜色代码）重涂后喂引擎：
     // 填色输出即用户所选色，画布脏像素不参与取色
     const QImage normalized = Colorize::normalizeStrokeColors(
-        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, intentColors());
+        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, intentCandidateColors());
     QImage result = Colorize::colorize(data.lineImg, normalized, data.lineImg.rect(), data.options);
     if (auto* frame = getColorizeImageAtFrame(data.keyPos))
         frame->setColoringResult(result, data.bounds, structureGeneration);
