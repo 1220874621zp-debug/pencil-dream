@@ -1286,6 +1286,97 @@ QImage runWatershed(const QImage& heightMap,
     return worker.takeResult();
 }
 
+namespace {
+/* 灰度蒙版 Chebyshev 膨胀（每遍 3x3 取大扩 1px） */
+QImage dilateMask(const QImage& mask, int radius)
+{
+    QImage cur = mask;
+    for (int pass = 0; pass < radius; ++pass)
+    {
+        QImage next = cur;
+        for (int y = 0; y < cur.height(); ++y)
+        {
+            for (int x = 0; x < cur.width(); ++x)
+            {
+                uchar m = 0;
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                    const int yy = y + dy;
+                    if (yy < 0 || yy >= cur.height())
+                        continue;
+                    const uchar* line = cur.constScanLine(yy);
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        const int xx = x + dx;
+                        if (xx < 0 || xx >= cur.width())
+                            continue;
+                        if (line[xx] > m)
+                            m = line[xx];
+                    }
+                }
+                next.scanLine(y)[x] = m;
+            }
+        }
+        cur = next;
+    }
+    return cur;
+}
+} // namespace
+
+void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options)
+{
+    if (strokes.size() <= 1)
+        return;
+
+    // 透明组钉首位：其色相变体优先并入透明组（保透明语义），
+    // 且精确色保持不变（后续 isTransparent 按精确 == 标记仍命中）
+    if (options.hasTransparentColor)
+    {
+        for (int i = 0; i < strokes.size(); ++i)
+        {
+            if (strokes[i].color == options.transparentColor)
+            {
+                if (i != 0)
+                    strokes.move(i, 0);
+                break;
+            }
+        }
+    }
+
+    QVector<KeyStroke> merged;
+    for (KeyStroke& stroke : strokes)
+    {
+        KeyStroke* master = nullptr;
+        for (KeyStroke& m : merged)
+        {
+            if (similarColors(m.color, stroke.color))
+            {
+                master = &m;
+                break;
+            }
+        }
+        if (master == nullptr)
+        {
+            merged.append(stroke);
+            continue;
+        }
+        // 变体只在其主色覆盖邻域（膨胀2px）内并入（抗锯齿边/叠色交界
+        // 补强主色种子）；远离主色的孤立变体岛（如落在另一色域中的
+        // 混色条纹）整岛丢弃——否则它们仍会以主色名义扩散成杂色区
+        const QImage nearMaster = dilateMask(master->mask, 2);
+        for (int y = 0; y < master->mask.height(); ++y)
+        {
+            uchar* dst = master->mask.scanLine(y);
+            const uchar* src = stroke.mask.constScanLine(y);
+            const uchar* nearLine = nearMaster.constScanLine(y);
+            for (int x = 0; x < master->mask.width(); ++x)
+                if (nearLine[x] > 0 && src[x] > dst[x])
+                    dst[x] = src[x];
+        }
+    }
+    strokes = merged;
+}
+
 QImage colorize(const QImage& lineArt,
                 const QImage& strokesImage,
                 const QRect& bounds,
@@ -1294,6 +1385,8 @@ QImage colorize(const QImage& lineArt,
 {
     const QImage heightMap = buildHeightMap(lineArt, bounds, options);
     QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesImage, bounds);
+    // 变体组归并：混色变体不再作为独立颜色源扩散（防杂色区）
+    mergeVariantStrokes(strokes, options);
 
     // 透明颜色标记（Krita transparentIndex：该颜色区域保持不填）
     if (options.hasTransparentColor)

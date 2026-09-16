@@ -104,6 +104,14 @@ QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const Filterin
 QVector<KeyStroke> splitKeyStrokesByColor(const QImage& strokesImage, const QRect& bounds);
 
 /*
+ * 相近色组归并：同主色的明暗变体组（画笔半透明叠色混出）并入面积最大的
+ * 相似主色组（蒙版逐像素取大），分水岭只按主色扩散，杜绝变体扩散成杂色区。
+ * 透明标记色组钉在首位：其变体并入透明组而非普通主色（透明语义不丢）。
+ * strokes 须为面积降序（splitKeyStrokesByColor 的返回序）。
+ */
+void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options);
+
+/*
  * 分水岭填充。strokes 按值传入（算法会消费其中的蒙版副本）。
  * 返回 ARGB32_Premultiplied 结果（bounds 大小，未覆盖/透明笔画区为全透明）。
  * progress 以 0..100 回调，返回 false 则取消并返回空 QImage。

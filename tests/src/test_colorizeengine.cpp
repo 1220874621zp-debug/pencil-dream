@@ -1401,3 +1401,108 @@ TEST_CASE("Colorize HueVariantMerge")
         REQUIRE(after.contains(brightYellow));
     }
 }
+
+TEST_CASE("Colorize VariantStrokeMerge")
+{
+    const QSize size(160, 120);
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(10, 30, 130, 60);
+    });
+
+    SECTION("mergeVariantStrokes 分组归并")
+    {
+        QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+        strokes.fill(Qt::transparent);
+        {
+            QPainter p(&strokes);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(230, 30, 40));  p.drawRect(20, 40, 30, 12);
+            p.setBrush(QColor(140, 20, 20));  p.drawRect(20, 50, 8, 6); // 与红主色相邻（交界处并入）
+            p.setBrush(QColor(235, 130, 40)); p.drawRect(60, 40, 20, 12);
+            p.setBrush(QColor(245, 230, 60)); p.drawRect(90, 40, 25, 12);
+            p.setBrush(QColor(240, 195, 60)); p.drawRect(95, 60, 8, 6);
+            p.end();
+        }
+        auto split = Colorize::splitKeyStrokesByColor(strokes, strokes.rect());
+        REQUIRE(split.size() == 5);
+        Colorize::mergeVariantStrokes(split, Colorize::FilteringOptions());
+        REQUIRE(split.size() == 3);
+        QVector<QRgb> merged;
+        for (const auto& s : split) merged.append(s.color);
+        REQUIRE(merged.contains(QColor(230, 30, 40).rgba()));
+        REQUIRE(merged.contains(QColor(235, 130, 40).rgba()));
+        REQUIRE(merged.contains(QColor(245, 230, 60).rgba()));
+        // 暗红蒙版并入红主组：红组蒙版在暗红标记处应有覆盖
+        const auto& redGroup = *std::find_if(split.begin(), split.end(),
+            [](const Colorize::KeyStroke& s) { return s.color == QColor(230, 30, 40).rgba(); });
+        // Grayscale8 的 pixelIndex 恒 0（无色表），须读 scanLine 原始字节
+        REQUIRE(redGroup.mask.constScanLine(50)[24] > 0); // 暗红交界像素并入红组
+        REQUIRE(redGroup.mask.constScanLine(53)[24] == 0); // 超出膨胀半径的暗红下缘：孤岛丢弃
+
+        // 透明组钉首位：小面积透明绿 + 大面积深绿变体 → 变体并入透明组
+        {
+            QPainter p(&strokes);
+            p.setBrush(QColor(0, 200, 0)); p.drawRect(120, 60, 6, 6);
+            p.setBrush(QColor(0, 120, 0)); p.drawRect(120, 80, 30, 12);
+            p.end();
+        }
+        Colorize::FilteringOptions opt;
+        opt.hasTransparentColor = true;
+        opt.transparentColor = QColor(0, 200, 0).rgba();
+        auto split2 = Colorize::splitKeyStrokesByColor(strokes, strokes.rect());
+        Colorize::mergeVariantStrokes(split2, opt);
+        REQUIRE(split2.front().color == opt.transparentColor);
+        bool hasDarkGreen = false;
+        for (const auto& s : split2)
+            if (s.color == QColor(0, 120, 0).rgba()) hasDarkGreen = true;
+        REQUIRE_FALSE(hasDarkGreen);
+    }
+
+    SECTION("平涂无杂色（用户实拍：橙域内金黄变体笔画）")
+    {
+        // 双房间：左房橙主色+混入的金黄变体笔画（黄系色相46°，归并进明黄主色55°）
+        QImage twoBoxes = makeLineArt(size, [](QPainter& p) {
+            QPen pen(Qt::black, 2);
+            p.setPen(pen); p.setBrush(Qt::NoBrush);
+            p.drawRect(10, 30, 65, 60);
+            p.drawRect(85, 30, 65, 60);
+        });
+        QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+        strokes.fill(Qt::transparent);
+        {
+            QPainter p(&strokes);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(235, 130, 40)); p.drawRect(20, 45, 45, 30); // 左房：橙大区
+            p.setBrush(QColor(240, 195, 60)); p.drawRect(28, 56, 24, 3);  // 左房：金黄变体笔画混入
+            p.setBrush(QColor(245, 230, 60)); p.drawRect(95, 45, 45, 30); // 右房：明黄主色
+            p.end();
+        }
+        QImage result = Colorize::colorize(twoBoxes, strokes, twoBoxes.rect(),
+                                           Colorize::FilteringOptions());
+        const QRgb golden = QColor(240, 195, 60).rgba();
+        const QRgb orange = QColor(235, 130, 40).rgba();
+        const QRgb yellow = QColor(245, 230, 60).rgba();
+        int goldenCount = 0, orangeCount = 0, yellowCount = 0;
+        int yellowInLeft = 0;
+        for (int y = 0; y < result.height(); ++y)
+            for (int x = 0; x < result.width(); ++x)
+            {
+                if (qAlpha(result.pixel(x, y)) == 0) continue;
+                const QRgb c = nonPremul(result, x, y);
+                if (c == golden) ++goldenCount;
+                else if (c == orange) ++orangeCount;
+                else if (c == yellow) { ++yellowCount; if (x < 80) ++yellowInLeft; }
+            }
+        INFO("金黄" << goldenCount << " 橙" << orangeCount << " 明黄" << yellowCount
+             << " 左房明黄" << yellowInLeft);
+        // 变体色不再作为独立颜色源扩散
+        REQUIRE(goldenCount == 0);
+        REQUIRE(orangeCount > 40 * 30);
+        REQUIRE(yellowCount > 40 * 30);
+        // 左房被并入明黄的变体种子不应再显性成块（清理强度吞掉小污染区）
+        REQUIRE(yellowInLeft < 120);
+    }
+}
+
