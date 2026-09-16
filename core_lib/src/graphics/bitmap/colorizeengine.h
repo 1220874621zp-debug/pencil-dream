@@ -89,6 +89,33 @@ QImage colorize(const QImage& lineArt,
                 const FilteringOptions& options,
                 const std::function<bool(int)>& progress = std::function<bool(int)>());
 
+/* ===================== 跨帧色点搬运 ===================== */
+
+struct TransportOptions
+{
+    int searchRadius = 48;     // 全局位移搜索半径（像素）
+    int refineRadius = 8;      // 组级位移在全局位移邻域内的细化半径
+    int patchRadiusMin = 8;    // 匹配块初始半径（无线稿时自适应增长）
+    int patchRadiusMax = 32;   // 匹配块最大半径
+    qreal motionPenalty = 6.0;  // 全局层偏向零位移的正则系数（压制孔径/切向歧义）
+    qreal refinePenalty = 40.0; // 组级细化偏向全局位移的正则系数（形变噪声下无强证据不动）
+};
+
+/*
+ * 色点跨帧搬运（"自动给下一帧上色"的传播步骤）：
+ * 把帧A的彩色笔画图 strokesA 按线稿块匹配平移到帧B的坐标系。
+ * 每个颜色组在全局位移邻域内细化各自的刚体平移（相邻动画帧以
+ * 整体运动为主、局部形变为次）；锚点附近无线稿（纯平区）的组
+ * 跟随全局位移。
+ * 透明颜色语义由上层 colorize/options 处理，这里只搬运颜色笔画。
+ * 返回尺寸与输入一致、可直接喂给 colorize() 的帧B笔画图。
+ */
+QImage transportStrokes(const QImage& lineArtA,
+                        const QImage& strokesA,
+                        const QImage& lineArtB,
+                        const QRect& bounds,
+                        const TransportOptions& options = TransportOptions());
+
 }
 
 #endif // COLORIZE_ENGINE_H

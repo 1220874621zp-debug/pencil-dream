@@ -23,6 +23,7 @@ by Dmitry Kazakov <dimula73@gmail.com>, 2016-2017.
 #include <QHash>
 #include <QDebug>
 #include <QMap>
+#include <QPainter>
 #include <QStack>
 #include <QtMath>
 #include <algorithm>
@@ -957,16 +958,11 @@ private:
     QImage mResult;
 };
 
-} // namespace
+// ===================== 跨帧色点搬运 =====================
 
-// ===================== 公开 API =====================
-
-QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const FilteringOptions& options)
+// 线稿 alpha 提取为灰度图（bounds 内，无线稿 = 0）
+QImage extractAlphaMap(const QImage& lineArt, const QRect& bounds)
 {
-    Q_ASSERT(lineArt.format() == QImage::Format_ARGB32_Premultiplied ||
-             lineArt.format() == QImage::Format_ARGB32);
-
-    // 1) alpha 提取（QImage 构造不保证清零，先整体填 0 = 无线稿）
     QImage alphaImg(lineArt.size(), QImage::Format_Grayscale8);
     alphaImg.fill(0);
     for (int y = bounds.top(); y <= bounds.bottom(); ++y)
@@ -976,6 +972,163 @@ QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const Filterin
         for (int x = bounds.left(); x <= bounds.right(); ++x)
             dstLine[x] = static_cast<uchar>(qAlpha(srcLine[x]));
     }
+    return alphaImg;
+}
+
+int countLinePixels(const QImage& alphaMap, const QRect& rc, int threshold = 128)
+{
+    int count = 0;
+    for (int y = rc.top(); y <= rc.bottom(); ++y)
+    {
+        const uchar* line = alphaMap.constScanLine(y);
+        for (int x = rc.left(); x <= rc.right(); ++x)
+            if (line[x] >= threshold)
+                ++count;
+    }
+    return count;
+}
+
+struct AnchorMatch
+{
+    bool valid = false;
+    QPoint offset;
+};
+
+// 块匹配：以 center 为锚，在 A/B 两张线稿 alpha 图间找最佳平移量。
+// 块半径自适应增长到能"看见"线稿（minRadius 起）；锚点附近无线稿
+// （纯平区无法定位）返回 invalid。
+// 代价 = 块内平均 SSD + motionPenalty*|d - reference|²（偏向参考位移，
+// 压制沿弧切向滑动的孔径歧义）；在 reference ± windowRadius 内搜索。
+AnchorMatch matchAnchor(const QImage& alphaA, const QImage& alphaB, const QPoint& center,
+                        const QRect& bounds, const TransportOptions& options,
+                        const QPoint& reference, int windowRadius, int minRadius,
+                        qreal penalty)
+{
+    // 自适应块半径：增长到块内能"看见"线稿为止
+    int radius = qBound(1, minRadius, options.patchRadiusMax);
+    QRect patch;
+    int linePixels = 0;
+    while (true)
+    {
+        patch = QRect(center - QPoint(radius, radius), QSize(2 * radius + 1, 2 * radius + 1)).intersected(bounds);
+        if (patch.isEmpty())
+            return AnchorMatch();
+        linePixels = countLinePixels(alphaA, patch);
+        if (linePixels >= 8 || radius >= options.patchRadiusMax)
+            break;
+        radius = qMin(options.patchRadiusMax, radius * 2);
+    }
+    if (linePixels < 8)
+        return AnchorMatch();
+
+    const int n = patch.width() * patch.height();
+
+    AnchorMatch best;
+    double bestScore = std::numeric_limits<double>::max();
+
+    for (int dy = reference.y() - windowRadius; dy <= reference.y() + windowRadius; ++dy)
+    {
+        for (int dx = reference.x() - windowRadius; dx <= reference.x() + windowRadius; ++dx)
+        {
+            double ssd = 0.0;
+            int valid = 0;
+            for (int py = 0; py < patch.height(); ++py)
+            {
+                const int ay = patch.top() + py;
+                const int by = ay + dy;
+                if (by < bounds.top() || by > bounds.bottom())
+                    continue;
+                const uchar* aLine = alphaA.constScanLine(ay);
+                const uchar* bLine = alphaB.constScanLine(by);
+                for (int px = 0; px < patch.width(); ++px)
+                {
+                    const int ax = patch.left() + px;
+                    const int bx = ax + dx;
+                    if (bx < bounds.left() || bx > bounds.right())
+                        continue;
+                    const int diff = int(aLine[ax]) - int(bLine[bx]);
+                    ssd += diff * diff;
+                    ++valid;
+                }
+            }
+            // 候选块大半落到界外：不可信，跳过
+            if (valid * 2 < n)
+                continue;
+            const qreal rx = dx - reference.x();
+            const qreal ry = dy - reference.y();
+            const double score = ssd / valid + penalty * (rx * rx + ry * ry);
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best.valid = true;
+                best.offset = QPoint(dx, dy);
+            }
+        }
+    }
+    return best;
+}
+
+// 位移列表每轴取中位数（多锚投票的鲁棒聚合）
+QPoint medianOffset(const QVector<QPoint>& offsets)
+{
+    Q_ASSERT(!offsets.isEmpty());
+    QVector<int> xs, ys;
+    xs.reserve(offsets.size());
+    ys.reserve(offsets.size());
+    for (const QPoint& p : offsets)
+    {
+        xs.append(p.x());
+        ys.append(p.y());
+    }
+    std::sort(xs.begin(), xs.end());
+    std::sort(ys.begin(), ys.end());
+    return QPoint(xs[xs.size() / 2], ys[ys.size() / 2]);
+}
+
+// 全局位移估计：在线稿像素上均匀采样锚点（大窗口，覆盖多结构），
+// 各锚独立匹配后取中位数。相邻动画帧以整体运动为主，该层先吸收
+// 全部位移，组级细化只需处理残差形变。
+// 注意：大分辨率下应换金字塔/下采样实现（锚数×窗口²×块² 的暴力积）。
+QPoint globalOffsetEstimate(const QImage& alphaA, const QImage& alphaB,
+                            const QRect& bounds, const TransportOptions& options)
+{
+    QVector<QPoint> anchors;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const uchar* line = alphaA.constScanLine(y);
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+            if (line[x] >= 128)
+                anchors.append(QPoint(x, y));
+    }
+    if (anchors.isEmpty())
+        return QPoint(0, 0);
+
+    const int step = qMax(1, anchors.size() / 9);
+    QVector<QPoint> votes;
+    for (int i = step / 2; i < anchors.size(); i += step)
+    {
+        const AnchorMatch m = matchAnchor(alphaA, alphaB, anchors[i], bounds, options,
+                                          QPoint(0, 0), options.searchRadius,
+                                          options.patchRadiusMax, options.motionPenalty);
+        if (m.valid)
+            votes.append(m.offset);
+    }
+    if (votes.size() < 3)
+        return QPoint(0, 0);
+    return medianOffset(votes);
+}
+
+} // namespace
+
+// ===================== 公开 API =====================
+
+QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const FilteringOptions& options)
+{
+    Q_ASSERT(lineArt.format() == QImage::Format_ARGB32_Premultiplied ||
+             lineArt.format() == QImage::Format_ARGB32);
+
+    // 1) alpha 提取（QImage 构造不保证清零，extractAlphaMap 整体填 0 = 无线稿）
+    QImage alphaImg = extractAlphaMap(lineArt, bounds);
 
     // 2) 可选 LoG 边缘检测：LoG(0.5*size) → 线性归一化 → 高斯(size)
     if (options.useEdgeDetection && options.edgeDetectionSize > 0.0)
@@ -1107,6 +1260,85 @@ QImage colorize(const QImage& lineArt,
     }
 
     return runWatershed(heightMap, strokes, bounds, options.cleanUpAmount, progress);
+}
+
+QImage transportStrokes(const QImage& lineArtA,
+                        const QImage& strokesA,
+                        const QImage& lineArtB,
+                        const QRect& bounds,
+                        const TransportOptions& options)
+{
+    Q_ASSERT(lineArtA.size() == strokesA.size());
+    Q_ASSERT(lineArtB.size() == strokesA.size());
+
+    QImage result(strokesA.size(), QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    if (bounds.isEmpty())
+        return result;
+
+    const QImage alphaA = extractAlphaMap(lineArtA, bounds);
+    const QImage alphaB = extractAlphaMap(lineArtB, bounds);
+
+    // 第一层：全图锚点投票估计全局位移（整体运动）
+    const QPoint globalOffset = globalOffsetEstimate(alphaA, alphaB, bounds, options);
+
+    QPainter painter(&result);
+
+    // 第二层：每个颜色组在全局位移邻域内细化（残差形变），
+    // 锚点 = 组质心，整组按包围盒抠出平移贴回。
+    // 组间不同位移若造成重叠，后贴者（面积较小色组）覆盖先贴者
+    const QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesA, bounds);
+    for (const KeyStroke& stroke : strokes)
+    {
+        int minX = bounds.right(), minY = bounds.bottom();
+        int maxX = bounds.left(), maxY = bounds.top();
+        qint64 sumX = 0, sumY = 0, count = 0;
+        for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+        {
+            const uchar* line = stroke.mask.constScanLine(y);
+            for (int x = bounds.left(); x <= bounds.right(); ++x)
+            {
+                if (line[x] > 0)
+                {
+                    minX = qMin(minX, x);
+                    maxX = qMax(maxX, x);
+                    minY = qMin(minY, y);
+                    maxY = qMax(maxY, y);
+                    sumX += x;
+                    sumY += y;
+                    ++count;
+                }
+            }
+        }
+        if (count == 0)
+            continue;
+
+        const QPoint centroid(qRound(sumX / double(count)), qRound(sumY / double(count)));
+        const AnchorMatch m = matchAnchor(alphaA, alphaB, centroid, bounds, options,
+                                           globalOffset, options.refineRadius,
+                                           options.patchRadiusMin, options.refinePenalty);
+        // 纯平锚点无法定位：跟随全局位移
+        const QPoint offset = m.valid ? m.offset : globalOffset;
+
+        const QRect box(QPoint(minX, minY), QPoint(maxX, maxY));
+        QImage colored(box.size(), QImage::Format_ARGB32_Premultiplied);
+        colored.fill(Qt::transparent);
+        for (int y = 0; y < box.height(); ++y)
+        {
+            const uchar* mLine = stroke.mask.constScanLine(box.top() + y);
+            QRgb* cLine = reinterpret_cast<QRgb*>(colored.scanLine(y));
+            for (int x = 0; x < box.width(); ++x)
+            {
+                const uchar a = mLine[box.left() + x];
+                if (a > 0)
+                    cLine[x] = qPremultiply(qRgba(qRed(stroke.color), qGreen(stroke.color), qBlue(stroke.color), a));
+            }
+        }
+        painter.drawImage(box.topLeft() + offset, colored);
+    }
+
+    painter.end();
+    return result;
 }
 
 } // namespace Colorize

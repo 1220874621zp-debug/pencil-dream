@@ -328,6 +328,140 @@ TEST_CASE("Colorize splitKeyStrokesByColor")
     }
 }
 
+TEST_CASE("Colorize TransportStrokes")
+{
+    // 两帧「雪人」：帧B = 帧A 平移 (9,-6) + 轻微形变（头/扣子半径各 +1）
+    // 头身两圆重叠 2px 保证封闭；扣子是身体内的嵌套区域
+    const QSize size(128, 128);
+    const QPoint shift(9, -6);
+    const QRgb red = QColor(255, 0, 0).rgba();
+    const QRgb blue = QColor(0, 80, 255).rgba();
+    const QRgb green = QColor(0, 160, 0).rgba();
+
+    auto drawSnowman = [](QPainter& p, int headR, int buttonR) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPoint(64, 38), headR, headR);     // 头
+        p.drawEllipse(QPoint(64, 80), 26, 26);           // 身体
+        p.drawEllipse(QPoint(64, 80), buttonR, buttonR); // 扣子（嵌套区域）
+    };
+
+    QImage lineArtA = makeLineArt(size, [&](QPainter& p) { drawSnowman(p, 18, 6); });
+    QImage lineArtB = makeLineArt(size, [&](QPainter& p) {
+        p.translate(shift);
+        drawSnowman(p, 19, 7);
+    });
+
+    QImage strokesA = makeStrokes(size, [&](QPainter& p) {
+        p.setPen(QPen(QColor(255, 0, 0), 4));
+        p.drawLine(58, 38, 70, 38); // 头：红
+        p.setPen(QPen(QColor(0, 80, 255), 4));
+        p.drawLine(46, 88, 56, 88); // 身体（扣子外）：蓝
+        p.setPen(QPen(QColor(0, 160, 0), 2));
+        p.drawPoint(64, 80);        // 扣子：绿
+    });
+
+    const QRect bounds = contentRect(lineArtA) | contentRect(lineArtB) | contentRect(strokesA);
+    REQUIRE(!bounds.isEmpty());
+
+    // 某颜色笔画组的像素质心（搬运正确性的直接观测量）
+    auto strokeCentroid = [&](const QImage& strokes, QRgb color) {
+        const QVector<Colorize::KeyStroke> split = Colorize::splitKeyStrokesByColor(strokes, bounds);
+        for (const auto& s : split)
+        {
+            if (s.color != color)
+                continue;
+            qint64 sumX = 0, sumY = 0, count = 0;
+            for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+            {
+                const uchar* line = s.mask.constScanLine(y);
+                for (int x = bounds.left(); x <= bounds.right(); ++x)
+                    if (line[x] > 0) { sumX += x; sumY += y; ++count; }
+            }
+            if (count > 0)
+                return QPoint(qRound(sumX / double(count)), qRound(sumY / double(count)));
+        }
+        return QPoint(-1, -1);
+    };
+
+    SECTION("搬运位移跟随角色整体运动")
+    {
+        QImage strokesB = Colorize::transportStrokes(lineArtA, strokesA, lineArtB, bounds);
+
+        const QPoint redA = strokeCentroid(strokesA, red);
+        const QPoint blueA = strokeCentroid(strokesA, blue);
+        const QPoint greenA = strokeCentroid(strokesA, green);
+        REQUIRE(redA != QPoint(-1, -1));
+        REQUIRE(blueA != QPoint(-1, -1));
+        REQUIRE(greenA != QPoint(-1, -1));
+
+        const QPoint redB = strokeCentroid(strokesB, red);
+        const QPoint blueB = strokeCentroid(strokesB, blue);
+        const QPoint greenB = strokeCentroid(strokesB, green);
+        REQUIRE(redB != QPoint(-1, -1));
+        REQUIRE(blueB != QPoint(-1, -1));
+        REQUIRE(greenB != QPoint(-1, -1));
+
+        const int tol = 3; // 允许 ±3px：形变导致的次优对齐
+        REQUIRE(qAbs((redB - redA).x() - shift.x()) <= tol);
+        REQUIRE(qAbs((redB - redA).y() - shift.y()) <= tol);
+        REQUIRE(qAbs((blueB - blueA).x() - shift.x()) <= tol);
+        REQUIRE(qAbs((blueB - blueA).y() - shift.y()) <= tol);
+        REQUIRE(qAbs((greenB - greenA).x() - shift.x()) <= tol);
+        REQUIRE(qAbs((greenB - greenA).y() - shift.y()) <= tol);
+    }
+
+    SECTION("搬运后直接平涂帧B")
+    {
+        QImage strokesB = Colorize::transportStrokes(lineArtA, strokesA, lineArtB, bounds);
+        QImage result = Colorize::colorize(lineArtB, strokesB, bounds, Colorize::FilteringOptions());
+        REQUIRE(!result.isNull());
+
+        // colorize 返回 bounds 尺寸图：采样须扣掉 bounds 左上偏移
+        auto sampleB = [&](int x, int y) { return nonPremul(result, x - bounds.x(), y - bounds.y()); };
+
+        // 帧B几何：头心 (73,32)，身体心 (73,74) r26，扣子心 (73,74) r7
+        REQUIRE(sampleB(73, 32) == red);
+        REQUIRE(sampleB(60, 88) == blue);  // 身体（扣子外）
+        REQUIRE(sampleB(73, 74) == green); // 扣子
+        REQUIRE(sampleB(73, 32) != blue);  // 头身不串色
+        REQUIRE(sampleB(60, 88) != green);
+
+        // 视觉基准（同 house.png 惯例）：填色层下、线稿上、笔画半透明
+        QImage preview(size, QImage::Format_ARGB32_Premultiplied);
+        preview.fill(Qt::white);
+        QPainter p(&preview);
+        p.drawImage(bounds.topLeft(), result);
+        p.drawImage(0, 0, lineArtB);
+        p.setOpacity(0.6);
+        p.drawImage(0, 0, strokesB);
+        p.end();
+        const QString outDir = QDir::temp().absoluteFilePath("pencil-colorize-tests");
+        QDir().mkpath(outDir);
+        REQUIRE(preview.save(outDir + "/transport.png"));
+        qDebug() << "[colorize] 跨帧搬运视觉基准已保存:" << outDir + "/transport.png";
+    }
+
+    SECTION("同帧搬运零位移")
+    {
+        QImage strokesSame = Colorize::transportStrokes(lineArtA, strokesA, lineArtA, bounds);
+        REQUIRE((strokeCentroid(strokesSame, red) - strokeCentroid(strokesA, red)).manhattanLength() <= 1);
+        REQUIRE((strokeCentroid(strokesSame, blue) - strokeCentroid(strokesA, blue)).manhattanLength() <= 1);
+        REQUIRE((strokeCentroid(strokesSame, green) - strokeCentroid(strokesA, green)).manhattanLength() <= 1);
+    }
+
+    SECTION("无线稿纯平区回退零位移且不崩")
+    {
+        QImage emptyArt(size, QImage::Format_ARGB32_Premultiplied);
+        emptyArt.fill(Qt::transparent);
+        QImage strokesB = Colorize::transportStrokes(emptyArt, strokesA, emptyArt, bounds);
+        REQUIRE(strokeCentroid(strokesB, red) == strokeCentroid(strokesA, red));
+        REQUIRE(strokeCentroid(strokesB, blue) == strokeCentroid(strokesA, blue));
+        REQUIRE(strokeCentroid(strokesB, green) == strokeCentroid(strokesA, green));
+    }
+}
+
 TEST_CASE("Colorize VisualPerf")
 {
     SECTION("house colorize and save png")
