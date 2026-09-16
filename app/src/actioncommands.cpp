@@ -1304,10 +1304,21 @@ Status ActionCommands::propagateColorizeStrokes()
         // bounds 必须传图内矩形，传画布原点矩形会越界
         const QRect canvas = (srcLineFrame->bounds() | lineFrame->bounds() | srcFrame->bounds())
                                  .adjusted(-16, -16, 16, 16);
-        const QImage transported = Colorize::transportStrokesByBounds(flatten(*srcLineFrame, canvas),
-                                                                     flatten(*srcFrame, canvas),
-                                                                     flatten(*lineFrame, canvas),
-                                                                     QRect(0, 0, canvas.width(), canvas.height()));
+        QImage transported = Colorize::transportStrokesByBounds(flatten(*srcLineFrame, canvas),
+                                                                flatten(*srcFrame, canvas),
+                                                                flatten(*lineFrame, canvas),
+                                                                QRect(0, 0, canvas.width(), canvas.height()));
+        // 已标记透明颜色：自动包裹背景——线稿外泛洪填透明保护色（Krita 手绘
+        // 透明笔画保护背景的自动化），色点后画覆盖包裹
+        if (colorizeLayer->hasTransparentColor())
+        {
+            const QImage wrap = Colorize::makeBackgroundWrap(flatten(*lineFrame, canvas),
+                                                             QRect(0, 0, canvas.width(), canvas.height()),
+                                                             colorizeLayer->transparentColor());
+            QPainter wrapPainter(&transported);
+            wrapPainter.drawImage(0, 0, wrap);
+            wrapPainter.end();
+        }
         const QRect box = nonEmptyBBox(transported);
         if (box.isEmpty())
         {

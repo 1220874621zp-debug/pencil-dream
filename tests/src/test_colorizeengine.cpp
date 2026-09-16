@@ -1169,3 +1169,37 @@ TEST_CASE("Colorize StrokeUndoOnColorize")
     editor->undoRedo()->undo();
     REQUIRE(frame->bounds().isEmpty());
 }
+
+TEST_CASE("Colorize BackgroundWrap")
+{
+    // 自动背景包裹：线稿外泛洪填保护色（标透明）→ 平涂时框内着色、框外透明
+    const QSize size(160, 120);
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(40, 30, 80, 50); // 封闭方框
+    });
+    const QRgb protect = QColor(120, 120, 120).rgba();
+
+    QImage wrap = Colorize::makeBackgroundWrap(lineArt, lineArt.rect(), protect);
+    REQUIRE(qAlpha(wrap.pixel(80, 55)) == 0);   // 框中心：不包裹
+    REQUIRE(qAlpha(wrap.pixel(10, 10)) == 255); // 框外角落：包裹
+    REQUIRE(nonPremul(wrap, 10, 10) == protect);
+    REQUIRE(qAlpha(wrap.pixel(150, 100)) == 255);
+
+    // 合并色点后平涂：框内红、框外不着色（透明保护语义）
+    QImage strokes = wrap;
+    {
+        QPainter p(&strokes);
+        p.setPen(QPen(QColor(255, 0, 0), 4));
+        p.drawLine(60, 50, 90, 50);
+        p.end();
+    }
+    Colorize::FilteringOptions opt;
+    opt.hasTransparentColor = true;
+    opt.transparentColor = protect;
+    QImage result = Colorize::colorize(lineArt, strokes, lineArt.rect(), opt);
+    REQUIRE(nonPremul(result, 80, 55) == qRgb(255, 0, 0)); // 框内红
+    REQUIRE(result.pixel(10, 10) == 0);                    // 框外透明
+    REQUIRE(result.pixel(150, 100) == 0);
+}

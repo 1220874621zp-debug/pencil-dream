@@ -126,6 +126,15 @@ QImage transportStrokesByBounds(const QImage& lineArtA,
                                 const QImage& lineArtB,
                                 const QRect& bounds);
 
+/*
+ * 背景透明包裹（Krita"手画透明笔画保护背景"的自动化）：
+ * 以线稿为屏障，从计算域四边泛洪填充"线稿外"的连通区域为指定颜色
+ * （通常为标记透明的背景色）。线稿缺口会让保护漏进角色内部，
+ * 与手绘透明笔画同样的限制；bounds 外不在计算域无需包裹。
+ * 返回与 lineArt 同尺寸、仅含包裹填充的 ARGB32_Premultiplied 图。
+ */
+QImage makeBackgroundWrap(const QImage& lineArt, const QRect& bounds, QRgb color);
+
 }
 
 #endif // COLORIZE_ENGINE_H
