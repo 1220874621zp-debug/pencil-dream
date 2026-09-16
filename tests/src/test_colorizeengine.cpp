@@ -1388,19 +1388,27 @@ TEST_CASE("Colorize HueVariantMerge")
         block(50, 60, 25, 25, brightYellow);
         block(90, 60, 8, 8, golden);
 
+        // 以画布为准：五个实心色块全部独立显示（不并色相变体——
+        // 暗红/金黄是画布上实心的笔画色）
         const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
         INFO("列表颜色数 " << colors.size());
-        REQUIRE(colors.size() == 3);
+        REQUIRE(colors.size() == 6);
         REQUIRE(colors.contains(brightRed));
+        REQUIRE(colors.contains(darkRed));
+        REQUIRE(colors.contains(brickRed));
         REQUIRE(colors.contains(orange));
         REQUIRE(colors.contains(brightYellow));
+        REQUIRE(colors.contains(golden));
 
-        // 容差删除主色红：暗红/砖红变体像素一并清除，列表剩 2
+        // 删除红：只清红（暗红/砖红是独立实心色保留），列表剩 5
         colorizeLayer->removeStrokeColor(1, brightRed);
         const QVector<QRgb> after = colorizeLayer->strokeColorsAtFrame(1);
-        REQUIRE(after.size() == 2);
+        REQUIRE(after.size() == 5);
+        REQUIRE(after.contains(darkRed));
+        REQUIRE(after.contains(brickRed));
         REQUIRE(after.contains(orange));
         REQUIRE(after.contains(brightYellow));
+        REQUIRE(after.contains(golden));
     }
 }
 
@@ -1456,6 +1464,7 @@ TEST_CASE("Colorize VariantStrokeMerge")
         auto split2 = Colorize::splitKeyStrokesByColor(strokes, strokes.rect());
         Colorize::mergeVariantStrokes(split2, opt);
         REQUIRE(split2.front().color == opt.transparentColor);
+        // 引擎填色路径（classify hue 合并开着）：深绿色相变体并入透明组
         bool hasDarkGreen = false;
         for (const auto& s : split2)
             if (s.color == QColor(0, 120, 0).rgba()) hasDarkGreen = true;
@@ -1806,14 +1815,19 @@ TEST_CASE("Colorize DirtyBrushRepresentative")
     block(10, 10, 40, 30, dirtyRed); // 脏色大面积
     block(60, 10, 8, 8, pureRed);    // 笔芯纯色小面积
 
+    // 以画布为准：脏红与纯红都是实心色，独立显示（落笔重染保证
+    // 新涂笔画只会产生纯色代码，脏色是重染上线前的历史像素）
     const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
     INFO("列表颜色数 " << colors.size());
-    REQUIRE(colors.size() == 1);        // 同色族（色相同）
-    REQUIRE(colors.first() == pureRed); // 代表 = 族内最亮的纯色代码
+    REQUIRE(colors.size() == 2);
+    REQUIRE(colors.contains(dirtyRed));
+    REQUIRE(colors.contains(pureRed));
 
-    // 删除显示的纯红：整族（含大面积脏色像素）一并清除
+    // 删除纯红：只清纯红像素，脏红保留
     colorizeLayer->removeStrokeColor(1, pureRed);
-    REQUIRE(colorizeLayer->strokeColorsAtFrame(1).isEmpty());
+    const QVector<QRgb> after = colorizeLayer->strokeColorsAtFrame(1);
+    REQUIRE(after.size() == 1);
+    REQUIRE(after.contains(dirtyRed));
 }
 
 TEST_CASE("Colorize IntentClaimNearest")
@@ -1857,17 +1871,17 @@ TEST_CASE("Colorize IntentColorCodes")
     frame->drawLine(QPointF(20, 30), QPointF(40, 30),
                     QPen(QColor(150, 40, 40), 6), QPainter::CompositionMode_SourceOver, false);
 
-    const QRgb clicked = qRgb(255, 0, 0);
-    colorizeLayer->addIntentColor(clicked);
+    const QRgb painted = qRgb(150, 40, 40); // 画布像素的实际颜色代码
+    colorizeLayer->addIntentColor(qRgb(255, 0, 0)); // 登记不再影响显示/填色
 
-    SECTION("列表显示点击的代码")
+    SECTION("列表显示画布实心颜色代码")
     {
         const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
         REQUIRE(colors.size() == 1);
-        REQUIRE(colors.first() == clicked);
+        REQUIRE(colors.first() == painted);
     }
 
-    SECTION("填色输出用点击的代码")
+    SECTION("填色输出用画布颜色代码")
     {
         REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
         const QImage coloring = frame->coloringImage();
@@ -1879,9 +1893,9 @@ TEST_CASE("Colorize IntentColorCodes")
                 const QRgb px = coloring.pixel(x, y);
                 if (qAlpha(px) == 0) continue;
                 ++colored;
-                if (qUnpremultiply(px) != clicked) ++foreign;
+                if (qUnpremultiply(px) != painted) ++foreign;
             }
-        INFO("着色像素 " << colored << " 非点击代码 " << foreign);
+        INFO("着色像素 " << colored << " 非画布代码 " << foreign);
         REQUIRE(colored > 30 * 30);
         REQUIRE(foreign == 0);
     }

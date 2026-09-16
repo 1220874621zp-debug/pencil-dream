@@ -148,25 +148,67 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
     if (image == nullptr || image->isNull())
         return;
 
-    // 删除判定与列表同源：像素所属组的主色 == 被删色 → 清除
-    // （变体与叠色混合带像素随其主色一并删除）
-    QVector<Colorize::KeyStroke> groups =
-        Colorize::splitKeyStrokesByColor(*image, image->rect());
-    QVector<QRgb> originalColors;
-    for (const auto& g : groups)
-        originalColors.append(g.color); // 分类会提升主色代表值，先记原始键
-    const QVector<int> master =
-        Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
-    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentCandidateColors());
-    QHash<QRgb, QRgb> groupToMaster;
-    QSet<QRgb> mixColors;
+    // 删除判定与列表同源（以画布为准）：显示色（实心主色）被删时，
+    // 清除该精确色全部像素（含同色软边低 alpha）+ 折叠进它的混合带组
+    const QVector<QRgb> shown = strokeColorsAtFrame(frameNumber);
+    if (!shown.contains(color))
+        return; // 非列表显示色：无对应删除按钮
+
+    QVector<Colorize::KeyStroke> groups;
+    QHash<QRgb, QImage*> maskOf;
+    {
+        QSet<QRgb> allColors;
+        for (int y = 0; y < image->height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+            for (int x = 0; x < image->width(); ++x)
+            {
+                const QRgb px = line[x];
+                const int a = qAlpha(px);
+                if (a == 0) continue;
+                allColors.insert(qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
+                                      qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
+                                      qBound(0, qRound(qBlue(px) * 255.0 / a), 255)));
+            }
+        }
+        for (const QRgb c : allColors)
+        {
+            Colorize::KeyStroke g;
+            g.color = c;
+            g.mask = QImage(image->size(), QImage::Format_Grayscale8);
+            g.mask.fill(0);
+            groups.append(g);
+        }
+        for (auto& g : groups)
+            maskOf[g.color] = &g.mask;
+        for (int y = 0; y < image->height(); ++y)
+        {
+            const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+            for (int x = 0; x < image->width(); ++x)
+            {
+                const QRgb px = line[x];
+                const int a = qAlpha(px);
+                if (a == 0) continue;
+                const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
+                                      qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
+                                      qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
+                maskOf.value(key, nullptr)->scanLine(y)[x] = static_cast<uchar>(a);
+            }
+        }
+    }
+
+    QSet<QRgb> familyColors;
+    familyColors.insert(color);
+    const QVector<int> master = Colorize::classifyStrokeMasters(
+        groups, mTransparentColor, mHasTransparentColor, false);
     for (int g = 0; g < groups.size(); ++g)
     {
-        groupToMaster[originalColors[g]] = groups[master[g]].color;
-        // 混合带 = 被折叠但与主色不相似的组：任何主色被删都一并清除
-        // （叠色混出物是两个母色的共同产物，母色去其一即失去归属）
-        if (master[g] != g && !Colorize::similarColors(originalColors[g], originalColors[master[g]]))
-            mixColors.insert(originalColors[g]);
+        if (master[g] == g)
+            continue;
+        // 混合带（贴 ≥2 组的非相似折叠组）随任意删除一并清——母色去其一
+        // 即失去归属，且删除后重分类会使其只剩单邻而冒充主色
+        if (!Colorize::similarColors(groups[g].color, groups[master[g]].color))
+            familyColors.insert(groups[g].color);
     }
 
     bool changed = false;
@@ -179,12 +221,10 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
             const int a = qAlpha(px);
             if (a == 0)
                 continue;
-            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
-            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
-            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
-            // 容差删除：归并到该列表色的像素与叠色混合带一并清除
-            const QRgb groupColor = qRgb(r, g, b);
-            if (groupToMaster.value(groupColor, groupColor) == color || mixColors.contains(groupColor))
+            const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
+            if (familyColors.contains(key))
             {
                 line[x] = 0;
                 changed = true;
@@ -241,14 +281,110 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
     if (image == nullptr || image->isNull())
         return colors;
 
-    // 主色分类与引擎/删除/传播同源：色相近似变体与叠色混合带
-    // （贴 ≥2 组的中间色）并入主色，列表只显示主色（= 用户所选颜色，
-    // 与色板一致；代表值取族内最亮最纯的精确代码）。split 返回面积降序。
-    QVector<Colorize::KeyStroke> groups =
-        Colorize::splitKeyStrokesByColor(*image, image->rect());
-    const QVector<int> master =
-        Colorize::classifyStrokeMasters(groups, mTransparentColor, mHasTransparentColor);
-    Colorize::claimIntentColors(groups, master, mTransparentColor, mHasTransparentColor, intentCandidateColors());
+    // 以画布为准（Krita keyStrokesColors 语义——显示全部实心笔画色，
+    // 不做色相似并）：实心 = 存在 3x3 同色核（手涂色点/传播标记必有，
+    // 笔刷软边与抗锯齿的 1-2px 渐变环没有）；叠色混合带（贴 ≥2 组的
+    // 中间色）折叠进母色不显示（与填色治理同源）。
+    QSet<QRgb> solidColors;
+    const int w = image->width(), hgt = image->height();
+    for (int y = 1; y < hgt - 1; ++y)
+    {
+        const QRgb* above = reinterpret_cast<const QRgb*>(image->constScanLine(y - 1));
+        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+        const QRgb* below = reinterpret_cast<const QRgb*>(image->constScanLine(y + 1));
+        for (int x = 1; x < w - 1; ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const int r = qBound(0, qRound(qRed(px) * 255.0 / a), 255);
+            const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
+            const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
+            const QRgb key = qRgb(r, g, b);
+            if (solidColors.contains(key))
+                continue;
+            bool core = true;
+            for (int dy = -1; dy <= 1 && core; ++dy)
+            {
+                const QRgb* nl = dy < 0 ? above : (dy > 0 ? below : line);
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    const QRgb npx = nl[x + dx];
+                    const int na = qAlpha(npx);
+                    if (na == 0) { core = false; break; }
+                    const int nr = qBound(0, qRound(qRed(npx) * 255.0 / na), 255);
+                    const int ng = qBound(0, qRound(qGreen(npx) * 255.0 / na), 255);
+                    const int nb = qBound(0, qRound(qBlue(npx) * 255.0 / na), 255);
+                    if (qRgb(nr, ng, nb) != key) { core = false; break; }
+                }
+            }
+            if (core)
+                solidColors.insert(key);
+        }
+    }
+    if (solidColors.isEmpty())
+        return colors;
+
+    // 面积统计（只计实心色）→ 面积降序组装 KeyStroke 组 → 空间混合带折叠
+    QHash<QRgb, qint64> areas;
+    for (const QRgb key : solidColors)
+        areas.insert(key, 0);
+    for (int y = 0; y < hgt; ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+        for (int x = 0; x < w; ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
+            if (areas.contains(key))
+                areas[key] += a;
+        }
+    }
+    QVector<QPair<qint64, QRgb>> order;
+    for (auto it = areas.begin(); it != areas.end(); ++it)
+        order.append(qMakePair(it.value(), it.key()));
+    std::sort(order.begin(), order.end(),
+              [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) { return a.first > b.first; });
+
+    // 每实心色一张覆盖蒙版（值 = alpha），供空间邻接判定
+    QVector<Colorize::KeyStroke> groups;
+    for (const auto& item : order)
+    {
+        Colorize::KeyStroke stroke;
+        stroke.color = item.second;
+        stroke.mask = QImage(image->size(), QImage::Format_Grayscale8);
+        stroke.mask.fill(0);
+        groups.append(stroke);
+    }
+    QHash<QRgb, QImage*> maskOf;
+    for (auto& g : groups)
+        maskOf[g.color] = &g.mask;
+    for (int y = 0; y < hgt; ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(image->constScanLine(y));
+        for (int x = 0; x < w; ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            const QRgb key = qRgb(qBound(0, qRound(qRed(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qGreen(px) * 255.0 / a), 255),
+                                  qBound(0, qRound(qBlue(px) * 255.0 / a), 255));
+            QImage* m = maskOf.value(key, nullptr);
+            if (m != nullptr)
+                m->scanLine(y)[x] = static_cast<uchar>(a);
+        }
+    }
+
+    const QVector<int> master = Colorize::classifyStrokeMasters(
+        groups, mTransparentColor, mHasTransparentColor, false /* 以画布为准：不并色相变体 */);
     for (int g = 0; g < groups.size(); ++g)
         if (master[g] == g)
             colors.append(groups[g].color);
@@ -268,8 +404,10 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
 
     // 笔画按主色代表值（优先意图色=用户所选颜色代码）重涂后喂引擎：
     // 填色输出即用户所选色，画布脏像素不参与取色
+    // 以画布为准：填色用像素色本身（重染保证新笔画=纯色代码），
+    // normalize 只做族代表统一与混合带归并，不再意图/色板认领
     const QImage normalized = Colorize::normalizeStrokeColors(
-        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, intentCandidateColors());
+        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, QVector<QRgb>());
     QImage result = Colorize::colorize(data.lineImg, normalized, data.lineImg.rect(), data.options);
     if (auto* frame = getColorizeImageAtFrame(data.keyPos))
         frame->setColoringResult(result, data.bounds, structureGeneration);

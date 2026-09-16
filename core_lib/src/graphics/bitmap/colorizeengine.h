@@ -106,7 +106,8 @@ struct KeyStroke
  * 返回每组的主色组下标（主色指向自身）。
  */
 QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
-                                   QRgb transparentColor, bool hasTransparent);
+                                   QRgb transparentColor, bool hasTransparent,
+                                   bool mergeVariants = true);
 
 /*
  * 意图色认领（Krita KoColor 属性语义）：用户点击色板时的颜色代码

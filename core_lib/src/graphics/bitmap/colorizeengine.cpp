@@ -1324,7 +1324,8 @@ QImage dilateMask(const QImage& mask, int radius)
 } // namespace
 
 QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
-                                   QRgb transparentColor, bool hasTransparent)
+                                   QRgb transparentColor, bool hasTransparent,
+                                   bool mergeVariants)
 {
     const int n = strokes.size();
     QVector<int> master(n);
@@ -1339,18 +1340,24 @@ QVector<int> classifyStrokeMasters(QVector<KeyStroke>& strokes,
 
     // pass 1: 色相近似并入首个相似主色（面积降序 → 首个 = 最大）。
     // 透明组自身不折叠（恒为主色），但可作折叠目标（其色相变体并入）。
-    for (int i = 0; i < n; ++i)
+    // mergeVariants=false 时跳过（显示路径"以画布为准"：同色相的
+    // 实心色如暗红/纯红是用户分别涂的，独立显示；软边渐变无 3x3
+    // 同色核已被上游滤除，无需靠色相合并收拾）
+    if (mergeVariants)
     {
-        if (isTransp(i))
-            continue;
-        for (int j = 0; j < i; ++j)
+        for (int i = 0; i < n; ++i)
         {
-            if (master[j] != j)
+            if (isTransp(i))
                 continue;
-            if (similarColors(strokes[j].color, strokes[i].color))
+            for (int j = 0; j < i; ++j)
             {
-                master[i] = j;
-                break;
+                if (master[j] != j)
+                    continue;
+                if (similarColors(strokes[j].color, strokes[i].color))
+                {
+                    master[i] = j;
+                    break;
+                }
             }
         }
     }
