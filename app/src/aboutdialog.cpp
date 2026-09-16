@@ -40,6 +40,9 @@ AboutDialog::~AboutDialog()
 
 void AboutDialog::init()
 {
+    // icon.png 为 256x256，对话框固定 450x450，缩放显示避免挤压下方系统信息区
+    ui->logo->setPixmap(QPixmap(":/icons/icon.png").scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
     QStringList devText;
 
     QString version(APP_VERSION);
