@@ -952,6 +952,11 @@ void ScribbleArea::paintBitmapBuffer()
         default: //nothing
             break;
         }
+        // 填色层落笔重染（Krita KoColor 语义）：笔刷软边/半透明叠色混出的
+        // 脏色在落盘前统一替换为用户所选颜色代码（保留 alpha 形状）——
+        // 画布上从此只存纯色，显示/填色/传播天然正确
+        if (layer->type() == Layer::COLORIZE && cm == QPainter::CompositionMode_SourceOver)
+            mTiledBuffer.redye(mEditor->color()->frontColor());
         targetImage->paste(&mTiledBuffer, cm, paintBufferClip());
     }
 

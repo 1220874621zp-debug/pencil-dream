@@ -24,6 +24,8 @@ GNU General Public License for more details.
 #include "washblend.h"
 
 class QImage;
+
+class QColor;
 class QRect;
 class Tile;
 
@@ -74,6 +76,10 @@ public:
     void drawImage(const QImage& image, const QRect& imageBounds, QPainter::CompositionMode cm, bool antialiasing);
 
     QHash<TileIndex, Tile*> tiles() const { return mTiles; }
+
+    /** 落笔重染（填色层）：全部瓦片非零像素 RGB 替换为 color（保留 alpha），
+     *  笔刷软边/叠色混出的脏色在落盘前统一为用户所选颜色代码 */
+    void redye(const QColor& color);
 
     const QRect& bounds() const { return mTileBounds; }
 

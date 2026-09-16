@@ -236,6 +236,32 @@ void TiledBuffer::drawPath(QPainterPath path, QPen pen, QBrush brush,
     }
 }
 
+void TiledBuffer::redye(const QColor& color)
+{
+    const int r = color.red(), g = color.green(), b = color.blue();
+    for (auto it = mTiles.begin(); it != mTiles.end(); ++it)
+    {
+        Tile* tile = it.value();
+        QImage img = tile->pixmap().toImage();
+        bool changed = false;
+        for (int y = 0; y < img.height(); ++y)
+        {
+            QRgb* line = reinterpret_cast<QRgb*>(img.scanLine(y));
+            for (int x = 0; x < img.width(); ++x)
+            {
+                const int a = qAlpha(line[x]);
+                if (a > 0)
+                {
+                    line[x] = qPremultiply(qRgba(r, g, b, a));
+                    changed = true;
+                }
+            }
+        }
+        if (changed)
+            tile->load(img, tile->pos());
+    }
+}
+
 void TiledBuffer::clear()
 {
     QHashIterator<TileIndex, Tile*> i(mTiles);

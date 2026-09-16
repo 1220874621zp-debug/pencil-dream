@@ -26,6 +26,7 @@ GNU General Public License for more details.
 #include <QSlider>
 #include <QGridLayout>
 #include <QSpinBox>
+#include <QStringList>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -299,7 +300,14 @@ void ColorizeOptionsWidget::refreshColors()
 
     syncPaletteToLayer(layer);
     const QVector<QRgb> colors = layer->strokeColorsAtFrame(mEditor->currentFrame());
-    qDebug() << "[填色] 颜色列表刷新 帧" << mEditor->currentFrame() << "颜色数" << colors.size();
+    {
+        QStringList hex;
+        for (QRgb c : colors) hex << QColor(c).name();
+        qDebug() << "[填色] 颜色列表刷新 帧" << mEditor->currentFrame()
+                 << "颜色数" << colors.size() << hex.join(",")
+                 << "登记意图色" << layer->intentColors().size()
+                 << "色板色" << mEditor->object()->getColorCount();
+    }
     for (int i = 0; i < colors.size() && i < 16; ++i)
     {
         const QRgb color = colors[i];
