@@ -1007,14 +1007,8 @@ Status ActionCommands::addNewBitmapLayer()
 
 Status ActionCommands::addNewColorizeLayer()
 {
-    bool ok;
-    QString text = QInputDialog::getText(nullptr, tr("Layer Properties"),
-                                         tr("Layer name:"), QLineEdit::Normal,
-                                         mEditor->layers()->nameSuggestLayer(tr("Colorize Layer")), &ok);
-    if (ok && !text.isEmpty())
-    {
-        mEditor->layers()->createColorizeLayer(text);
-    }
+    // 静默建层（用户拍板）：直接用建议名，不弹命名对话框打断流程
+    mEditor->layers()->createColorizeLayer(mEditor->layers()->nameSuggestLayer(tr("Colorize Layer")));
     return Status::OK;
 }
 

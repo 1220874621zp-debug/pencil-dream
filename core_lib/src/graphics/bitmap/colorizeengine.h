@@ -40,6 +40,17 @@ GNU General Public License for more details.
 namespace Colorize
 {
 
+/* 两颜色 RGB 欧氏距离平方（相近色合并用；≤ MERGE_COLOR_DIST_SQ 视为同一色） */
+inline int colorDistanceSq(QRgb a, QRgb b)
+{
+    const int dr = qRed(a) - qRed(b);
+    const int dg = qGreen(a) - qGreen(b);
+    const int db = qBlue(a) - qBlue(b);
+    return dr * dr + dg * dg + db * db;
+}
+constexpr int MERGE_COLOR_DIST_SQ = 1200; // ≈每通道差20：画笔软边/流量中间色并入主色
+
+
 struct FilteringOptions
 {
     bool useEdgeDetection = false;  // LoG 边缘检测（软/灰线稿增强为清晰屏障）

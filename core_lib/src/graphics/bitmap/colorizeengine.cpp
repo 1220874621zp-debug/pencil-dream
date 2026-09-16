@@ -1571,6 +1571,77 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         return result;
 
     const int dot = 9;
+
+    // 源帧颜色统计 → 主色表：相近色并入面积最大者（画笔软边/流量中间色
+    // 不产生独立标记，防止杂色在帧间滚雪球）
+    struct ColorStat
+    {
+        qint64 count = 0;
+        qint64 sumX = 0;
+        qint64 sumY = 0;
+    };
+    QHash<QRgb, ColorStat> exact;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(coloringA.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const QRgb px = line[x];
+            if (qAlpha(px) == 0)
+                continue;
+            ColorStat& s = exact[qUnpremultiply(px)];
+            ++s.count;
+            s.sumX += x;
+            s.sumY += y;
+        }
+    }
+    QVector<QPair<qint64, QRgb>> order;
+    for (auto it = exact.begin(); it != exact.end(); ++it)
+        order.append(qMakePair(it.value().count, it.key()));
+    std::sort(order.begin(), order.end(),
+              [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) { return a.first > b.first; });
+    struct MajorColor
+    {
+        QRgb color = 0;
+        ColorStat stat;
+    };
+    QVector<MajorColor> majors;
+    for (const auto& item : order)
+    {
+        const ColorStat& s = exact[item.second];
+        bool merged = false;
+        for (MajorColor& m : majors)
+        {
+            if (colorDistanceSq(m.color, item.second) <= MERGE_COLOR_DIST_SQ)
+            {
+                m.stat.count += s.count;
+                m.stat.sumX += s.sumX;
+                m.stat.sumY += s.sumY;
+                merged = true;
+                break;
+            }
+        }
+        if (!merged)
+            majors.append(MajorColor{ item.second, s });
+    }
+    if (majors.isEmpty())
+        return result;
+
+    const auto normalizeColor = [&majors](QRgb c) {
+        QRgb best = c;
+        int bestDist = MERGE_COLOR_DIST_SQ + 1;
+        for (const MajorColor& m : majors)
+        {
+            const int d = colorDistanceSq(m.color, c);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = m.color;
+            }
+        }
+        return best;
+    };
+
     QPainter painter(&result);
     painter.setPen(Qt::NoPen);
 
@@ -1590,7 +1661,7 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         const QRgb px = coloringA.pixel(src);
         if (qAlpha(px) > 0)
         {
-            outColor = qUnpremultiply(px);
+            outColor = normalizeColor(qUnpremultiply(px));
             outTransparent = false;
         }
         else
@@ -1619,38 +1690,17 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         painter.drawRect(r.anchor.x(), r.anchor.y(), dot, dot);
     }
 
-    // 颜色补漏：源帧着色里每种颜色（面积≥64px）都应出现在目标帧标记中，
-    // 缺失则按该颜色质心相对映射补画——保证任何颜色不丢（落点可后续手动修）
-    struct ColorStat
+    // 颜色补漏：主色表每种颜色（面积≥64px）都应出现在目标帧标记中，
+    // 缺失则按该颜色质心相对映射补画——保证任何颜色不丢（落点可手动修）
+    for (const MajorColor& m : majors)
     {
-        qint64 count = 0;
-        qint64 sumX = 0;
-        qint64 sumY = 0;
-    };
-    QHash<QRgb, ColorStat> stats;
-    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
-    {
-        const QRgb* line = reinterpret_cast<const QRgb*>(coloringA.constScanLine(y));
-        for (int x = bounds.left(); x <= bounds.right(); ++x)
-        {
-            const QRgb px = line[x];
-            if (qAlpha(px) == 0)
-                continue;
-            ColorStat& s = stats[qUnpremultiply(px)];
-            ++s.count;
-            s.sumX += x;
-            s.sumY += y;
-        }
-    }
-    for (auto it = stats.begin(); it != stats.end(); ++it)
-    {
-        if (it->count < 64 || drawnColors.contains(it.key()))
+        if (m.stat.count < 64 || drawnColors.contains(m.color))
             continue;
-        const qreal u = qBound(0.0, (it->sumX / double(it->count) - boxA.left()) / double(boxA.width()), 1.0);
-        const qreal v = qBound(0.0, (it->sumY / double(it->count) - boxA.top()) / double(boxA.height()), 1.0);
+        const qreal u = qBound(0.0, (m.stat.sumX / double(m.stat.count) - boxA.left()) / double(boxA.width()), 1.0);
+        const qreal v = qBound(0.0, (m.stat.sumY / double(m.stat.count) - boxA.top()) / double(boxA.height()), 1.0);
         const QPoint target(qRound(boxB.left() + u * boxB.width()),
                             qRound(boxB.top() + v * boxB.height()));
-        painter.setBrush(QColor(it.key()));
+        painter.setBrush(QColor(m.color));
         painter.drawRect(target.x(), target.y(), dot, dot);
     }
 
