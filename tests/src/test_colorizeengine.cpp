@@ -1440,6 +1440,170 @@ TEST_CASE("Colorize RegionsNoColorLoss")
     REQUIRE(redPixels >= 64);
 }
 
+TEST_CASE("Colorize TransportRegionMajority")
+{
+    // 区域级众数色：源区域着色大部分为蓝、正中残留一小块红（半连通/
+    // 旧笔画残留），传播取众数（蓝）——旧单像素映射采样锚点正中会取红
+    const QSize size(200, 140);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(40, 40, 120, 60);
+    });
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 80, 255));
+        p.drawRect(41, 41, 118, 58);      // 房间整体蓝
+        p.setBrush(QColor(255, 0, 0));
+        p.drawRect(97, 67, 6, 6);         // 正中红残块（<64px 不触发补漏）
+        p.end();
+    }
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineA, lineA.rect());
+    INFO("蓝标记 " << countColor(out, qRgb(0, 80, 255)) << " 红标记 " << countColor(out, qRgb(255, 0, 0)));
+    REQUIRE(countColor(out, qRgb(0, 80, 255)) >= 64); // 众数蓝标记房间
+    REQUIRE(countColor(out, qRgb(255, 0, 0)) == 0);   // 少数红不得成标记
+}
+
+TEST_CASE("Colorize TransportRobustBox")
+{
+    // 鲁棒内容框：源帧一根细长离群笔画（分位裁掉）不撑歪映射框——
+    // 两房间颜色仍各自正确；全量包围盒会把右房采样点拖进离群区采空
+    const QSize size(300, 140);
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb blue = qRgb(0, 80, 255);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(20, 30, 60, 60);   // 左房（红）
+        p.drawRect(110, 30, 60, 60);  // 右房（蓝）
+        QPen thin(Qt::black, 1);
+        p.setPen(thin);
+        p.drawLine(190, 30, 230, 30); // 离群细线（目标帧没有）
+    });
+    QImage lineB = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(20, 30, 60, 60);
+        p.drawRect(110, 30, 60, 60);
+    });
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(red));
+        p.drawRect(21, 31, 58, 58);
+        p.setBrush(QColor(blue));
+        p.drawRect(111, 31, 58, 58);
+        p.end();
+    }
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineB, lineB.rect());
+    int redN = 0, blueN = 0, redWrong = 0, blueWrong = 0;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            if (qAlpha(out.pixel(x, y)) == 0) continue;
+            const QRgb c = nonPremul(out, x, y);
+            if (c == red)  { ++redN;  if (x > 105) ++redWrong; }
+            if (c == blue) { ++blueN; if (x < 105) ++blueWrong; }
+        }
+    INFO("红 " << redN << " 蓝 " << blueN << " 红错位 " << redWrong << " 蓝错位 " << blueWrong);
+    REQUIRE(redN >= 64);
+    REQUIRE(blueN >= 64);
+    REQUIRE(redWrong == 0);   // 红标只在左房
+    REQUIRE(blueWrong == 0);  // 蓝标只在右房
+}
+
+TEST_CASE("Colorize TransportRescueNoOverwrite")
+{
+    // 补漏只占未标记区域：源=红环+蓝内室，目标只有外室 → 外室预测点
+    // 落进源内室（蓝）；红缺失时不得偷走外室的蓝——只能补进背景，
+    // 两色俱在（旧实现改写式补漏：外室被红顶掉、蓝反而丢失）
+    const QSize size(220, 160);
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb blue = qRgb(0, 80, 255);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(30, 30, 120, 90); // 外室（红环）
+        p.drawRect(75, 55, 30, 40);  // 内室（蓝）
+    });
+    QImage lineB = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(30, 30, 120, 90); // 目标只剩外室
+    });
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(red));
+        p.drawRect(31, 31, 118, 88);
+        p.setBrush(QColor(blue));
+        p.drawRect(76, 56, 28, 38);
+        p.end();
+    }
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineB, lineB.rect());
+    const QRect interior(33, 33, 114, 84);
+    int blueInside = 0, redInside = 0, redOutside = 0;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            if (qAlpha(out.pixel(x, y)) == 0) continue;
+            const QRgb c = nonPremul(out, x, y);
+            const bool inside = interior.contains(x, y);
+            if (c == blue && inside) ++blueInside;
+            if (c == red && inside) ++redInside;
+            if (c == red && !inside) ++redOutside;
+        }
+    INFO("外室蓝 " << blueInside << " 外室红 " << redInside << " 背景红 " << redOutside);
+    REQUIRE(blueInside >= 64); // 外室保持蓝（预测点=源内室）
+    REQUIRE(redInside == 0);   // 红不得顶掉外室的蓝
+    REQUIRE(redOutside >= 64); // 红补漏进未标记的背景
+}
+
+TEST_CASE("Colorize TransportDotFitsThinRegion")
+{
+    // 标记点随净空收缩不越屏障：4px 宽窄条区域的小点全部落在条内，
+    // 不压线稿墙、不外溢进邻区（旧固定 9px 点必越墙）
+    const QSize size(200, 140);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(80, 20, 8, 100); // 窄竖条房间
+    });
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 0, 0));
+        p.drawRect(81, 21, 6, 98);
+        p.end();
+    }
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineA, lineA.rect());
+    int count = 0, minX = size.width(), maxX = -1;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            if (qAlpha(out.pixel(x, y)) == 0 || nonPremul(out, x, y) != qRgb(255, 0, 0))
+                continue;
+            ++count;
+            minX = qMin(minX, x);
+            maxX = qMax(maxX, x);
+        }
+    INFO("红点 " << count << " x范围 " << minX << ".." << maxX);
+    // 窄条内部为 x∈[81,86]（笔宽2 墙在 79..80/87..88）：净空3 → 5px 点，
+    // 完整落在条内；旧固定 9px 点以锚点为左上角必溢出到 x≈92
+    REQUIRE(count >= 9);
+    REQUIRE(minX >= 81);   // 不压左墙
+    REQUIRE(maxX <= 86);   // 不压右墙
+}
+
 TEST_CASE("Colorize HueVariantMerge")
 {
     // 用户实拍场景：画笔半透明叠色混出同一主色的明暗变体（红系3个+黄系2个+橙1个）。

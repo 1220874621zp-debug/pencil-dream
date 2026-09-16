@@ -1265,15 +1265,17 @@ Status ActionCommands::propagateColorizeStrokes()
     }
 
     // 区域映射以源帧着色结果为颜色事实源；未算过或已过期（涂后未刷新/
-    // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失
-    {
-        const quint32 gen = mEditor->object()->layerStructureGeneration();
-        const bool stale = srcFrame->needsUpdate()
-            || srcFrame->computedStructureGeneration() != gen;
-        if (srcFrame->coloringImage().isNull() || stale)
-            colorizeLayer->updateColoringAtFrame(srcPos, lineLayer, gen);
-    }
-    if (srcFrame->coloringImage().isNull())
+    // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失。
+    // 接链换源帧时同一守卫复用
+    const quint32 structureGen = mEditor->object()->layerStructureGeneration();
+    const auto ensureSourceColoring = [&](ColorizeImage* frame) {
+        const bool stale = frame->needsUpdate()
+            || frame->computedStructureGeneration() != structureGen;
+        if (frame->coloringImage().isNull() || stale)
+            colorizeLayer->updateColoringAtFrame(frame->pos(), lineLayer, structureGen);
+        return !frame->coloringImage().isNull();
+    };
+    if (!ensureSourceColoring(srcFrame))
     {
         QMessageBox::information(mParent, tipTitle, tr("源帧着色计算失败，无法传播。"));
         return Status::CANCELED;
@@ -1290,6 +1292,7 @@ Status ActionCommands::propagateColorizeStrokes()
     // 目标帧各区域，每区域一个标准标记点；已有手涂笔画的帧保护跳过
     int created = 0, written = 0, skippedPainted = 0, skippedNoLine = 0, canceled = 0;
     QVector<int> touched;
+    QSet<int> touchedPos; // 本次运行写入的帧位（不算作保护对象）
 
     mEditor->beginLayerLayoutEdit(colorizeLayer);
     // 已有空块的像素修改走快照链；新建帧由布局事务托管，帧删除即整体撤销
@@ -1314,16 +1317,28 @@ Status ActionCommands::propagateColorizeStrokes()
             continue;
         }
 
-        KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
-        if (existing != nullptr)
+        // 保护判定按「覆盖该帧的关键帧」而非恰在该位的关键帧：手涂键的
+        // 曝光跨度整体保护，不再被逐帧插入的传播帧切走显示；本次运行
+        // 新建/写入的帧不算保护（它们本来就是传播产物）。受保护帧接链
+        // ——后续目标帧改从它映射（用户手涂修正即最近的颜色事实源）
+        KeyFrame* cover = colorizeLayer->getKeyFrameWhichCovers(pos);
+        auto coverImg = static_cast<ColorizeImage*>(cover);
+        if (coverImg != nullptr && coverImg != srcFrame && !coverImg->bounds().isEmpty()
+            && !touchedPos.contains(coverImg->pos()))
         {
-            auto existingImg = static_cast<ColorizeImage*>(existing);
-            if (!existingImg->bounds().isEmpty())
+            ++skippedPainted; // 已有手涂笔画：保护跳过
+            auto coverLine = static_cast<BitmapImage*>(
+                lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(pos)));
+            if (coverLine != nullptr && !coverLine->bounds().isEmpty()
+                && ensureSourceColoring(coverImg))
             {
-                ++skippedPainted; // 已有手涂笔画：保护跳过
-                continue;
+                srcFrame = coverImg;
+                srcLineFrame = coverLine;
             }
+            continue;
         }
+
+        KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
 
         // 留白容纳贴边标记点；平铺图是 canvas 相对坐标（原点 0,0），
         // bounds 必须传图内矩形，传画布原点矩形会越界
@@ -1379,6 +1394,7 @@ Status ActionCommands::propagateColorizeStrokes()
             ++written;
         }
         touched.append(pos);
+        touchedPos.insert(pos);
     }
 
     if (contentDirty)
