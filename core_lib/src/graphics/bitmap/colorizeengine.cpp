@@ -2457,4 +2457,171 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     return result;
 }
 
+namespace {
+/* 区域统计表中的支配色（像素数最多的精确色；空表返回 0） */
+QRgb dominantOf(const QHash<QRgb, qint64>& stats)
+{
+    QRgb best = 0;
+    qint64 bestCount = 0;
+    for (auto it = stats.constBegin(); it != stats.constEnd(); ++it)
+    {
+        if (it.value() > bestCount)
+        {
+            bestCount = it.value();
+            best = it.key();
+        }
+    }
+    return best;
+}
+} // namespace
+
+QImage mergeBidirectionalMarkers(const QImage& forwardMarkers,
+                                 const QImage& backwardMarkers,
+                                 const QImage& lineArtTarget,
+                                 const QRect& bounds,
+                                 const FilteringOptions& options,
+                                 bool preferForward)
+{
+    QImage result(forwardMarkers.size(), QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    if (bounds.isEmpty() || forwardMarkers.isNull() || backwardMarkers.isNull())
+        return result;
+
+    const RegionSegmentation seg = segmentRegions(lineArtTarget, bounds, options);
+    const int regionCount = seg.regions.size();
+    if (regionCount == 0)
+        return result;
+    const int bw = seg.bounds.width();
+
+    // 每区域两图的 色→像素数 统计（一次扫描）
+    QVector<QHash<QRgb, qint64>> fwdStats(regionCount), bwdStats(regionCount);
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const qint32* labelLine = seg.labelOf.constData() + (y - bounds.top()) * bw;
+        const QRgb* fLine = reinterpret_cast<const QRgb*>(forwardMarkers.constScanLine(y));
+        const QRgb* bLine = reinterpret_cast<const QRgb*>(backwardMarkers.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const qint32 label = labelLine[x - bounds.left()];
+            if (label <= 0)
+                continue;
+            const QRgb fpx = fLine[x];
+            if (qAlpha(fpx) > 0)
+                ++fwdStats[label - 1][qUnpremultiply(fpx)];
+            const QRgb bpx = bLine[x];
+            if (qAlpha(bpx) > 0)
+                ++bwdStats[label - 1][qUnpremultiply(bpx)];
+        }
+    }
+
+    for (int r = 0; r < regionCount; ++r)
+    {
+        const QRgb fBest = dominantOf(fwdStats[r]);
+        const QRgb bBest = dominantOf(bwdStats[r]);
+        const QImage* src = nullptr;
+        QRgb chosen = 0;
+        if (fBest != 0 && bBest != 0)
+        {
+            src = preferForward ? &forwardMarkers : &backwardMarkers;
+            chosen = preferForward ? fBest : bBest; // 一致时任取首选侧；冲突按裁决
+        }
+        else if (fBest != 0)
+        {
+            src = &forwardMarkers;
+            chosen = fBest;
+        }
+        else if (bBest != 0)
+        {
+            src = &backwardMarkers;
+            chosen = bBest;
+        }
+        if (src == nullptr)
+            continue;
+
+        // 只拷贝该区域中裁定颜色的像素（保 α）——每区域恰一个标记点
+        const RegionLabel& reg = seg.regions[r];
+        for (int y = reg.bounds.top(); y <= reg.bounds.bottom(); ++y)
+        {
+            const qint32* labelLine = seg.labelOf.constData() + (y - bounds.top()) * bw;
+            const QRgb* sLine = reinterpret_cast<const QRgb*>(src->constScanLine(y));
+            QRgb* dLine = reinterpret_cast<QRgb*>(result.scanLine(y));
+            for (int x = reg.bounds.left(); x <= reg.bounds.right(); ++x)
+            {
+                if (labelLine[x - bounds.left()] != r + 1)
+                    continue;
+                const QRgb px = sLine[x];
+                if (qAlpha(px) > 0 && qUnpremultiply(px) == chosen)
+                    dLine[x] = px;
+            }
+        }
+    }
+
+    // 区域外像素（墙上的残点等）：取首选侧
+    {
+        const QImage& src = preferForward ? forwardMarkers : backwardMarkers;
+        for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+        {
+            const qint32* labelLine = seg.labelOf.constData() + (y - bounds.top()) * bw;
+            const QRgb* sLine = reinterpret_cast<const QRgb*>(src.constScanLine(y));
+            QRgb* dLine = reinterpret_cast<QRgb*>(result.scanLine(y));
+            for (int x = bounds.left(); x <= bounds.right(); ++x)
+            {
+                if (labelLine[x - bounds.left()] > 0)
+                    continue;
+                if (qAlpha(sLine[x]) > 0)
+                    dLine[x] = sLine[x];
+            }
+        }
+    }
+    return result;
+}
+
+qreal measureRegionAgreement(const QImage& lineArt,
+                             const QImage& predicted,
+                             const QImage& actual,
+                             const QRect& bounds,
+                             const FilteringOptions& options)
+{
+    if (bounds.isEmpty() || predicted.isNull() || actual.isNull())
+        return 1.0;
+    const RegionSegmentation seg = segmentRegions(lineArt, bounds, options);
+    const int regionCount = seg.regions.size();
+    if (regionCount == 0)
+        return 1.0;
+    const int bw = seg.bounds.width();
+
+    QVector<QHash<QRgb, qint64>> pStats(regionCount), aStats(regionCount);
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const qint32* labelLine = seg.labelOf.constData() + (y - bounds.top()) * bw;
+        const QRgb* pLine = reinterpret_cast<const QRgb*>(predicted.constScanLine(y));
+        const QRgb* aLine = reinterpret_cast<const QRgb*>(actual.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const qint32 label = labelLine[x - bounds.left()];
+            if (label <= 0)
+                continue;
+            const QRgb ppx = pLine[x];
+            if (qAlpha(ppx) > 0)
+                ++pStats[label - 1][qUnpremultiply(ppx)];
+            const QRgb apx = aLine[x];
+            if (qAlpha(apx) > 0)
+                ++aStats[label - 1][qUnpremultiply(apx)];
+        }
+    }
+
+    int compared = 0, agreed = 0;
+    for (int r = 0; r < regionCount; ++r)
+    {
+        const QRgb pBest = dominantOf(pStats[r]);
+        const QRgb aBest = dominantOf(aStats[r]);
+        if (pBest == 0 || aBest == 0)
+            continue;
+        ++compared;
+        if (pBest == aBest)
+            ++agreed;
+    }
+    return compared > 0 ? qreal(agreed) / compared : 1.0;
+}
+
 } // namespace Colorize

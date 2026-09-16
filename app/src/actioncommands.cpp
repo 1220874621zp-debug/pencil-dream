@@ -1296,25 +1296,15 @@ Status ActionCommands::propagateColorizeStrokes()
             tr("没有已涂色点的锚点帧：请先在编辑模式下涂色点（开头/中间/结尾多帧都涂，传播更准），再传播。"));
         return Status::CANCELED;
     }
-    const auto nearestAnchor = [&anchors](int pos) -> const Anchor* {
-        const Anchor* best = nullptr;
-        int bestDist = 1 << 30;
-        for (const Anchor& a : anchors)
-        {
-            const int d = qAbs(a.pos - pos);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = &a;
-            }
-        }
-        return best;
-    };
 
-    // --- 锚点校验（纠错信号）：锚点对 A→B 直推一遍，与用户在 B 实画的
-    // 颜色集对比。未预测到/多预测的颜色 = 两锚点间对应不稳的定量信号，
-    // 在两锚点之间补涂一个锚点即可显著改善（开环传播 → 闭环校验）
+    // --- 锚点校验（纠错信号）：锚点对 A→B / B→A 各直推一遍，与用户实画
+    // 对比。①区域级吻合度（正/反向）= 搬运精度的定量评分，驱动填隙的
+    // 双向冲突裁决（L3 闭环纠错：精度悬殊时精度优先于距离）；②色集
+    // 未预测到/多预测 = 两锚点间对应不稳的信号，补涂锚点即可改善
     QStringList validationNotes;
+    QStringList agreementNotes;
+    struct PairScore { qreal fwd = 1.0; qreal bwd = 1.0; };
+    QHash<QPair<int, int>, PairScore> pairScores;
     const int pairCount = qMax(0, anchors.size() - 1);
     progress.setMaximum(targets.size() + pairCount);
     {
@@ -1334,19 +1324,39 @@ Status ActionCommands::propagateColorizeStrokes()
             QCoreApplication::processEvents();
             const Anchor& A = anchors[i];
             const Anchor& B = anchors[i + 1];
-            const QRect canvas = (A.lineFrame->bounds() | A.frame->coloringBounds() | B.lineFrame->bounds())
+            const QRect canvas = (A.lineFrame->bounds() | A.frame->coloringBounds()
+                                  | B.lineFrame->bounds() | B.frame->coloringBounds())
                                      .adjusted(-16, -16, 16, 16);
-            QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
-            coloringFlat.fill(Qt::transparent);
-            {
-                QPainter colorPainter(&coloringFlat);
-                colorPainter.drawImage(A.frame->coloringBounds().topLeft() - canvas.topLeft(),
-                                       A.frame->coloringImage());
-                colorPainter.end();
-            }
+            const QRect canvasRect(0, 0, canvas.width(), canvas.height());
+            const QImage lineAFlat = flatten(*A.lineFrame, canvas);
+            const QImage lineBFlat = flatten(*B.lineFrame, canvas);
+            // 着色场平铺（两锚点各自）
+            const auto flattenColoring = [&canvas](ColorizeImage* frame) {
+                QImage flat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+                flat.fill(Qt::transparent);
+                QPainter p(&flat);
+                p.drawImage(frame->coloringBounds().topLeft() - canvas.topLeft(), frame->coloringImage());
+                p.end();
+                return flat;
+            };
+            const QImage coloringAFlat = flattenColoring(A.frame);
+            const QImage coloringBFlat = flattenColoring(B.frame);
+
             const QImage predicted = Colorize::transportStrokesByRegions(
-                flatten(*A.lineFrame, canvas), coloringFlat, flatten(*B.lineFrame, canvas),
-                QRect(0, 0, canvas.width(), canvas.height()), filteringOptions, transp, hasTransp);
+                lineAFlat, coloringAFlat, lineBFlat, canvasRect, filteringOptions, transp, hasTransp);
+            const QImage predictedBack = Colorize::transportStrokesByRegions(
+                lineBFlat, coloringBFlat, lineAFlat, canvasRect, filteringOptions, transp, hasTransp);
+
+            // 正/反向区域吻合度（预测标记 vs 用户实画笔画，锚点各自线稿分割）
+            PairScore score;
+            score.fwd = Colorize::measureRegionAgreement(lineBFlat, predicted, flatten(*B.frame, canvas),
+                                                         canvasRect, filteringOptions);
+            score.bwd = Colorize::measureRegionAgreement(lineAFlat, predictedBack, flatten(*A.frame, canvas),
+                                                         canvasRect, filteringOptions);
+            pairScores.insert(qMakePair(A.pos, B.pos), score);
+            agreementNotes << tr("帧%1→帧%2 吻合 正%3%/反%4%")
+                                  .arg(A.pos).arg(B.pos)
+                                  .arg(qRound(score.fwd * 100)).arg(qRound(score.bwd * 100));
 
             QSet<QRgb> predictedColors;
             for (int y = 0; y < predicted.height(); ++y)
@@ -1435,7 +1445,17 @@ Status ActionCommands::propagateColorizeStrokes()
             continue;
         }
 
-        const Anchor* anchor = nearestAnchor(pos);
+        // 左右夹逼锚点：t 两侧最近的手涂锚（锚点集升序，O(n) 扫描）
+        const Anchor* leftA = nullptr;   // 最大 pos < t
+        const Anchor* rightB = nullptr;  // 最小 pos > t
+        for (const Anchor& a : anchors)
+        {
+            if (a.pos < pos && (leftA == nullptr || a.pos > leftA->pos))
+                leftA = &a;
+            if (a.pos > pos && (rightB == nullptr || a.pos < rightB->pos))
+                rightB = &a;
+        }
+        const Anchor* anchor = (leftA != nullptr) ? leftA : rightB;
         if (anchor == nullptr)
         {
             ++skippedNoLine; // 无可用锚点（理论不可达：当前帧必为锚点）
@@ -1443,24 +1463,51 @@ Status ActionCommands::propagateColorizeStrokes()
         }
         KeyFrame* existing = colorizeLayer->getKeyFrameAt(pos);
 
-        // 留白容纳贴边标记点；平铺图是 canvas 相对坐标（原点 0,0），
-        // bounds 必须传图内矩形，传画布原点矩形会越界
-        const QRect canvas = (anchor->lineFrame->bounds() | anchor->frame->coloringBounds() | lineFrame->bounds())
-                                 .adjusted(-16, -16, 16, 16);
-        QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
-        coloringFlat.fill(Qt::transparent);
+        // 着色场平铺与搬运的公共小工具（canvas 相对坐标，原点 0,0）
+        const auto flattenColoringOf = [&colorizeLayer](ColorizeImage* frame, const QRect& canvas) {
+            QImage flat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+            flat.fill(Qt::transparent);
+            QPainter p(&flat);
+            p.drawImage(frame->coloringBounds().topLeft() - canvas.topLeft(), frame->coloringImage());
+            p.end();
+            return flat;
+        };
+        const auto transportFrom = [&](const Anchor& src, const QRect& canvas) {
+            return Colorize::transportStrokesByRegions(
+                flatten(*src.lineFrame, canvas), flattenColoringOf(src.frame, canvas),
+                flatten(*lineFrame, canvas),
+                QRect(0, 0, canvas.width(), canvas.height()), filteringOptions,
+                colorizeLayer->transparentColor(), colorizeLayer->hasTransparentColor());
+        };
+
+        QImage transported;
+        QRect canvas;
+        if (leftA != nullptr && rightB != nullptr)
         {
-            QPainter colorPainter(&coloringFlat);
-            colorPainter.drawImage(anchor->frame->coloringBounds().topLeft() - canvas.topLeft(), anchor->frame->coloringImage());
-            colorPainter.end();
+            // L2 双向传播：两侧锚点各搬运到本帧，按区域融合。
+            // 冲突裁决（L3 闭环纠错）：正/反向校验精度悬殊（差≥25%）时
+            // 精度优先；否则近锚点方向优先
+            canvas = (leftA->lineFrame->bounds() | leftA->frame->coloringBounds()
+                      | rightB->lineFrame->bounds() | rightB->frame->coloringBounds()
+                      | lineFrame->bounds()).adjusted(-16, -16, 16, 16);
+            const QImage fwd = transportFrom(*leftA, canvas);
+            const QImage bwd = transportFrom(*rightB, canvas);
+            const PairScore score = pairScores.value(qMakePair(leftA->pos, rightB->pos), PairScore());
+            const bool preferForward = qAbs(score.fwd - score.bwd) >= 0.25
+                ? score.fwd > score.bwd
+                : (pos - leftA->pos) <= (rightB->pos - pos);
+            transported = Colorize::mergeBidirectionalMarkers(
+                fwd, bwd, flatten(*lineFrame, canvas),
+                QRect(0, 0, canvas.width(), canvas.height()), filteringOptions, preferForward);
         }
-        QImage transported = Colorize::transportStrokesByRegions(flatten(*anchor->lineFrame, canvas),
-                                                                 coloringFlat,
-                                                                 flatten(*lineFrame, canvas),
-                                                                 QRect(0, 0, canvas.width(), canvas.height()),
-                                                                 filteringOptions,
-                                                                 colorizeLayer->transparentColor(),
-                                                                 colorizeLayer->hasTransparentColor());
+        else
+        {
+            // 锚点范围外（首锚点之前/末锚点之后）：最近锚点单侧搬运
+            canvas = (anchor->lineFrame->bounds() | anchor->frame->coloringBounds() | lineFrame->bounds())
+                         .adjusted(-16, -16, 16, 16);
+            transported = transportFrom(*anchor, canvas);
+        }
+
         // 已标记透明颜色：自动包裹背景——线稿外泛洪填透明保护色（Krita 手绘
         // 透明笔画保护背景的自动化），色点后画覆盖包裹
         if (colorizeLayer->hasTransparentColor())
@@ -1520,10 +1567,11 @@ Status ActionCommands::propagateColorizeStrokes()
                           .arg(created).arg(written).arg(skippedPainted).arg(skippedNoLine).arg(anchors.size());
     if (anchors.size() >= 2)
     {
+        summary += tr("\n锚点校验：%1").arg(agreementNotes.join("；"));
         if (validationNotes.isEmpty())
-            summary += tr("\n锚点校验：%1 对全部命中。").arg(pairCount);
+            summary += tr("\n色集全部命中。");
         else
-            summary += tr("\n锚点校验（下列锚点对对应不稳，建议在两锚点之间补涂一个锚点后重传）：\n%1")
+            summary += tr("\n对应不稳对（建议在两锚点之间补涂一个锚点后重传）：\n%1")
                            .arg(validationNotes.join("\n"));
     }
     if (canceled > 0)

@@ -281,6 +281,31 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
                                  QRgb transparentColor = 0,
                                  bool hasTransparent = false);
 
+/*
+ * L2 双向融合：同一目标帧的前向（锚点A→t）与反向（锚点B→t）标记图
+ * 按区域消解冲突——每区域取两图支配色：一致=高置信任取；冲突按
+ * preferForward 裁决（调用方=最近锚点方向，或校验精度更优方向）；
+ * 单侧=直接采用。区域外像素取首选侧。
+ */
+QImage mergeBidirectionalMarkers(const QImage& forwardMarkers,
+                                 const QImage& backwardMarkers,
+                                 const QImage& lineArtTarget,
+                                 const QRect& bounds,
+                                 const FilteringOptions& options = FilteringOptions(),
+                                 bool preferForward = true);
+
+/*
+ * L3 校验精度：锚点对 A→B 的预测标记图与用户在 B 的实画笔画做
+ * 区域级吻合度——每区域取两图支配色相等计吻合，返回吻合区域占比
+ * [0..1]（无可比区域返回 1）。驱动 L2 冲突裁决（闭环纠错：精度
+ * 悬殊时精度优先于距离）。
+ */
+qreal measureRegionAgreement(const QImage& lineArt,
+                             const QImage& predicted,
+                             const QImage& actual,
+                             const QRect& bounds,
+                             const FilteringOptions& options = FilteringOptions());
+
 }
 
 #endif // COLORIZE_ENGINE_H

@@ -2270,3 +2270,78 @@ TEST_CASE("Colorize IntentColorCodes")
     }
 }
 
+
+TEST_CASE("Colorize BidirectionalMergeAndAgreement")
+{
+    // L2/L3：三房间线稿；前向标记 r1红/r2蓝/r3无；反向标记 r1红/r2绿/r3黄。
+    // 融合：r1 双侧一致→红；r2 冲突按 preferForward 裁决；r3 单侧→黄。
+    const QSize size(240, 140);
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(10, 30, 60, 70);   // r1 左房
+        p.drawRect(90, 30, 60, 70);   // r2 中房
+        p.drawRect(170, 30, 60, 70);  // r3 右房
+    });
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb blue = qRgb(0, 0, 255);
+    const QRgb green = qRgb(0, 200, 0);
+    const QRgb yellow = qRgb(255, 230, 0);
+
+    QImage fwd(size, QImage::Format_ARGB32_Premultiplied);
+    fwd.fill(Qt::transparent);
+    QImage bwd(size, QImage::Format_ARGB32_Premultiplied);
+    bwd.fill(Qt::transparent);
+    {
+        QPainter f(&fwd);
+        f.setPen(Qt::NoPen);
+        f.setBrush(QColor(red));  f.drawEllipse(35, 60, 10, 8);
+        f.setBrush(QColor(blue)); f.drawEllipse(115, 60, 10, 8);
+        f.end();
+        QPainter b(&bwd);
+        b.setPen(Qt::NoPen);
+        b.setBrush(QColor(red));    b.drawEllipse(34, 61, 10, 8);
+        b.setBrush(QColor(green));  b.drawEllipse(116, 59, 10, 8);
+        b.setBrush(QColor(yellow)); b.drawEllipse(195, 60, 10, 8);
+        b.end();
+    }
+
+    auto countColorIn = [](const QImage& img, QRgb c, const QRect& zone) {
+        int n = 0;
+        for (int y = zone.top(); y <= zone.bottom(); ++y)
+            for (int x = zone.left(); x <= zone.right(); ++x)
+                if (qAlpha(img.pixel(x, y)) > 0 && nonPremul(img, x, y) == c)
+                    ++n;
+        return n;
+    };
+
+    SECTION("merge conflict resolution by preferForward")
+    {
+        const QRect r1(12, 32, 56, 66), r2(92, 32, 56, 66), r3(172, 32, 56, 66);
+        const QImage mergedF = Colorize::mergeBidirectionalMarkers(
+            fwd, bwd, lineArt, lineArt.rect(), Colorize::FilteringOptions(), /*preferForward=*/true);
+        REQUIRE(countColorIn(mergedF, red, r1) > 10);      // 一致区：红
+        REQUIRE(countColorIn(mergedF, blue, r2) > 10);     // 冲突区：前向胜=蓝
+        REQUIRE(countColorIn(mergedF, green, r2) == 0);
+        REQUIRE(countColorIn(mergedF, yellow, r3) > 10);   // 单侧区：反向的黄保留
+
+        const QImage mergedB = Colorize::mergeBidirectionalMarkers(
+            fwd, bwd, lineArt, lineArt.rect(), Colorize::FilteringOptions(), /*preferForward=*/false);
+        REQUIRE(countColorIn(mergedB, red, r1) > 10);
+        REQUIRE(countColorIn(mergedB, green, r2) > 10);    // 冲突区：反向胜=绿
+        REQUIRE(countColorIn(mergedB, blue, r2) == 0);
+        REQUIRE(countColorIn(mergedB, yellow, r3) > 10);
+    }
+
+    SECTION("region agreement scoring")
+    {
+        // fwd vs bwd：r1 一致、r2 不一致、r3 反向独有 → 吻合 1/2
+        const qreal agree = Colorize::measureRegionAgreement(
+            lineArt, fwd, bwd, lineArt.rect(), Colorize::FilteringOptions());
+        INFO("吻合度 " << agree);
+        REQUIRE(qAbs(agree - 0.5) < 0.01);
+        // 自比 = 1.0
+        REQUIRE(Colorize::measureRegionAgreement(
+            lineArt, fwd, fwd, lineArt.rect(), Colorize::FilteringOptions()) == 1.0);
+    }
+}
