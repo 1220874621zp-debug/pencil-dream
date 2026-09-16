@@ -1261,11 +1261,8 @@ Status ActionCommands::propagateColorizeStrokes()
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(300);
 
-    // 链式搬运：相邻帧接力（大幅动作也能跟），源 = 最近一个有效帧；
-    // 遇手涂帧（质量更高）自动接链
-    BitmapImage prevLine = *srcLineFrame;
-    BitmapImage prevStrokes = *srcFrame;
-
+    // 包围盒相对映射：源帧直映射每个目标帧（无链式累积误差），
+    // 每帧重画标准标记点；已有手涂笔画的帧保护跳过
     int created = 0, written = 0, skippedPainted = 0, skippedNoLine = 0, canceled = 0;
     QVector<int> touched;
 
@@ -1298,26 +1295,23 @@ Status ActionCommands::propagateColorizeStrokes()
             auto existingImg = static_cast<ColorizeImage*>(existing);
             if (!existingImg->bounds().isEmpty())
             {
-                ++skippedPainted; // 已有手涂笔画：保护并接链
-                prevLine = *lineFrame;
-                prevStrokes = *existingImg;
+                ++skippedPainted; // 已有手涂笔画：保护跳过
                 continue;
             }
         }
 
-        // 四周留白 ≥ 搜索半径+块半径：真实线稿 bounds 紧贴内容（autoCrop），
-        // 无留白时候选位移出界会被 valid 过滤误杀 → 全局位移估成 0（笔画原地不动）
-        const QRect contentUnion = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
-        const QRect canvas = contentUnion.adjusted(-80, -80, 80, 80);
-        // 平铺图是 canvas 相对坐标（原点 0,0）：bounds 必须传图内矩形，传画布原点矩形会越界崩溃
-        const QImage transported = Colorize::transportStrokes(flatten(prevLine, canvas),
-                                                              flatten(prevStrokes, canvas),
-                                                              flatten(*lineFrame, canvas),
-                                                              QRect(0, 0, canvas.width(), canvas.height()));
+        // 留白容纳贴边标记点；平铺图是 canvas 相对坐标（原点 0,0），
+        // bounds 必须传图内矩形，传画布原点矩形会越界
+        const QRect canvas = (srcLineFrame->bounds() | lineFrame->bounds() | srcFrame->bounds())
+                                 .adjusted(-16, -16, 16, 16);
+        const QImage transported = Colorize::transportStrokesByBounds(flatten(*srcLineFrame, canvas),
+                                                                     flatten(*srcFrame, canvas),
+                                                                     flatten(*lineFrame, canvas),
+                                                                     QRect(0, 0, canvas.width(), canvas.height()));
         const QRect box = nonEmptyBBox(transported);
         if (box.isEmpty())
         {
-            ++skippedNoLine; // 搬运结果为空（色点全被移出公共区域）：跳过
+            ++skippedNoLine; // 搬运结果为空：跳过
             continue;
         }
         BitmapImage newStrokes(box.topLeft() + canvas.topLeft(), transported.copy(box));
@@ -1339,9 +1333,6 @@ Status ActionCommands::propagateColorizeStrokes()
             ++written;
         }
         touched.append(pos);
-
-        prevLine = *lineFrame;
-        prevStrokes = newStrokes;
     }
 
     if (contentDirty)

@@ -114,6 +114,18 @@ QImage transportStrokes(const QImage& lineArtA,
                         const QRect& bounds,
                         const TransportOptions& options = TransportOptions());
 
+/*
+ * 色点跨帧搬运（包围盒相对映射版）：帧A色点按其在帧A线稿包围盒内的
+ * 相对位置 (u,v)，映射到帧B线稿包围盒的同相对位置，每组重画标准大小
+ * 的实心标记点（颜色保留、不搬像素）。适合"角色整体移动+缩放"型动画
+ * （包围盒位移即整体位移，无匹配歧义）；非刚性形变时落点为近似，
+ * 可在目标帧手动修正色点。
+ */
+QImage transportStrokesByBounds(const QImage& lineArtA,
+                                const QImage& strokesA,
+                                const QImage& lineArtB,
+                                const QRect& bounds);
+
 }
 
 #endif // COLORIZE_ENGINE_H

@@ -988,6 +988,23 @@ int countLinePixels(const QImage& alphaMap, const QRect& rc, int threshold = 128
     return count;
 }
 
+// bounds 内非透明内容的包围盒（无内容返回空矩形）
+QRect nonEmptyBounds(const QImage& img, const QRect& bounds)
+{
+    int minX = img.width(), minY = img.height(), maxX = -1, maxY = -1;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const QRgb* line = reinterpret_cast<const QRgb*>(img.constScanLine(y));
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+            if (qAlpha(line[x]) > 0)
+            {
+                minX = qMin(minX, x); maxX = qMax(maxX, x);
+                minY = qMin(minY, y); maxY = qMax(maxY, y);
+            }
+    }
+    return maxX < 0 ? QRect() : QRect(QPoint(minX, minY), QPoint(maxX, maxY));
+}
+
 struct AnchorMatch
 {
     bool valid = false;
@@ -1364,6 +1381,57 @@ QImage transportStrokes(const QImage& lineArtA,
             }
         }
         painter.drawImage(box.topLeft() + offset, colored);
+    }
+
+    painter.end();
+    return result;
+}
+
+QImage transportStrokesByBounds(const QImage& lineArtA,
+                                const QImage& strokesA,
+                                const QImage& lineArtB,
+                                const QRect& bounds)
+{
+    Q_ASSERT(lineArtA.size() == strokesA.size());
+    Q_ASSERT(lineArtB.size() == strokesA.size());
+
+    QImage result(strokesA.size(), QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    if (bounds.isEmpty())
+        return result;
+
+    const QRect boxA = nonEmptyBounds(lineArtA, bounds);
+    const QRect boxB = nonEmptyBounds(lineArtB, bounds);
+    if (boxA.isEmpty() || boxB.isEmpty() || boxA.width() < 1 || boxA.height() < 1)
+        return result;
+
+    // 每组重画固定大小实心标记点（不搬像素，无链式退化）；落点容差 ≈ dot/2
+    const int dot = 9;
+
+    QPainter painter(&result);
+    painter.setPen(Qt::NoPen);
+
+    const QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesA, bounds);
+    for (const KeyStroke& stroke : strokes)
+    {
+        // 组质心 → 帧A包围盒内相对位置（越界的组钳到边缘附近）
+        qint64 sumX = 0, sumY = 0, count = 0;
+        for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+        {
+            const uchar* line = stroke.mask.constScanLine(y);
+            for (int x = bounds.left(); x <= bounds.right(); ++x)
+                if (line[x] > 0) { sumX += x; sumY += y; ++count; }
+        }
+        if (count == 0)
+            continue;
+
+        const qreal u = qBound(0.02, (sumX / double(count) - boxA.left()) / boxA.width(), 0.98);
+        const qreal v = qBound(0.02, (sumY / double(count) - boxA.top()) / boxA.height(), 0.98);
+        const QPoint target(qRound(boxB.left() + u * (boxB.width() - dot)),
+                            qRound(boxB.top() + v * (boxB.height() - dot)));
+
+        painter.setBrush(QColor(stroke.color));
+        painter.drawRect(target.x(), target.y(), dot, dot);
     }
 
     painter.end();

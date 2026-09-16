@@ -911,6 +911,8 @@ TEST_CASE("Colorize PropagateRealistic")
 
     BitmapImage prevLine = *line1;
     BitmapImage prevStrokes = *frame1;
+    Q_UNUSED(prevLine);
+    Q_UNUSED(prevStrokes);
 
     // 某颜色组在 canvas 相对图上的质心（搬运正确性的直接观测量）
     auto centroidOf = [](const QImage& strokesCanvasRelative, const QRect& canvas, QRgb color) {
@@ -940,20 +942,20 @@ TEST_CASE("Colorize PropagateRealistic")
         auto* lineFrame = lineLayer->getBitmapImageAtFrame(pos);
         REQUIRE(lineFrame != nullptr);
 
-        const QRect contentUnion = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
-        const QRect canvas = contentUnion.adjusted(-80, -80, 80, 80);
-        const QImage flatPrevStrokes = flatten(prevStrokes, canvas);
-        const QImage transported = Colorize::transportStrokes(flatten(prevLine, canvas),
-                                                              flatPrevStrokes,
-                                                              flatten(*lineFrame, canvas),
-                                                              QRect(0, 0, canvas.width(), canvas.height()));
+        // 包围盒相对映射：源帧直映射（无链式），与 propagateColorizeStrokes 同构
+        const QRect canvas = (line1->bounds() | lineFrame->bounds() | frame1->bounds())
+                                 .adjusted(-16, -16, 16, 16);
+        const QImage transported = Colorize::transportStrokesByBounds(flatten(*line1, canvas),
+                                                                     flatten(*frame1, canvas),
+                                                                     flatten(*lineFrame, canvas),
+                                                                     QRect(0, 0, canvas.width(), canvas.height()));
         const QRect box = nonEmptyBBox(transported);
         INFO("帧" << pos << " 搬运结果bbox "
              << box.x() << "," << box.y() << " " << box.width() << "x" << box.height());
         REQUIRE(!box.isEmpty());
         BitmapImage newStrokes(box.topLeft() + canvas.topLeft(), transported.copy(box));
 
-        // 质心断言：搬运后红/蓝应各在对应房间内（期望中心 ± 房间半径内）
+        // 质心断言：等尺寸平移场景下相对映射 = 精确平移（标记点居中偏差 ≤4.5）
         const QPoint redC2 = centroidOf(transported, canvas, redC);
         const QPoint blueC2 = centroidOf(transported, canvas, blueC);
         const QPoint shift = shifts[pos - 1];
@@ -961,17 +963,14 @@ TEST_CASE("Colorize PropagateRealistic")
              << " 期望≈" << 565 + shift.x() << "," << 380 + shift.y()
              << " 蓝质心" << blueC2.x() << "," << blueC2.y()
              << " 期望≈" << 715 + shift.x() << "," << 410 + shift.y());
-        REQUIRE(qAbs(redC2.x() - (565 + shift.x())) <= 5);
-        REQUIRE(qAbs(redC2.y() - (380 + shift.y())) <= 5);
-        REQUIRE(qAbs(blueC2.x() - (715 + shift.x())) <= 5);
-        REQUIRE(qAbs(blueC2.y() - (410 + shift.y())) <= 5);
+        REQUIRE(qAbs(redC2.x() - (565 + shift.x())) <= 6);
+        REQUIRE(qAbs(redC2.y() - (380 + shift.y())) <= 6);
+        REQUIRE(qAbs(blueC2.x() - (715 + shift.x())) <= 6);
+        REQUIRE(qAbs(blueC2.y() - (410 + shift.y())) <= 6);
 
         auto* newFrame = new ColorizeImage();
         newFrame->paste(&newStrokes);
         REQUIRE(colorizeLayer->addKeyFrame(pos, newFrame));
-
-        prevLine = *lineFrame;
-        prevStrokes = newStrokes;
     }
     editor->endLayerLayoutEdit(QStringLiteral("propagate test"));
 
@@ -1056,4 +1055,87 @@ TEST_CASE("Colorize PropagateRealistic")
     INFO("大房间不透明像素 " << opaqueInBigRoom << " / 全图 " << opaqueTotal);
     REQUIRE(opaqueInBigRoom > 3000);
     REQUIRE(opaqueTotal > opaqueInBigRoom);
+}
+
+TEST_CASE("Colorize TransportByBoundsScale")
+{
+    // 帧2 = 帧1 房子放大 2 倍并平移：色点应按包围盒相对位置映射过去
+    const QSize size(900, 640);
+    QImage lineA = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 3);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(100, 100, 200, 150);
+    });
+    QImage lineB = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 3);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(400, 150, 400, 300);
+    });
+    QImage strokesA = makeStrokes(size, [](QPainter& p) {
+        p.setPen(QPen(QColor(255, 0, 0), 4));
+        p.drawPoint(150, 130);
+        p.setPen(QPen(QColor(0, 80, 255), 4));
+        p.drawPoint(250, 220);
+    });
+
+    QImage out = Colorize::transportStrokesByBounds(lineA, strokesA, lineB, lineA.rect());
+    REQUIRE(!out.isNull());
+
+    // 实测两帧线稿包围盒，独立计算相对映射期望位置（标记点居中偏差 ≤ dot/2+1）
+    auto scanBox = [&size](const QImage& img) {
+        int minX = size.width(), minY = size.height(), maxX = -1, maxY = -1;
+        for (int y = 0; y < size.height(); ++y)
+            for (int x = 0; x < size.width(); ++x)
+                if (qAlpha(img.pixel(x, y)) > 0)
+                {
+                    minX = qMin(minX, x); maxX = qMax(maxX, x);
+                    minY = qMin(minY, y); maxY = qMax(maxY, y);
+                }
+        return QRect(QPoint(minX, minY), QPoint(maxX, maxY));
+    };
+    const QRect boxA = scanBox(lineA);
+    const QRect boxB = scanBox(lineB);
+    REQUIRE(!boxA.isEmpty());
+    REQUIRE(!boxB.isEmpty());
+
+    const QRgb redC = QColor(255, 0, 0).rgba();
+    const QRgb blueC = QColor(0, 80, 255).rgba();
+    auto centroidOf = [&size](const QImage& strokes, QRgb color) {
+        const QVector<Colorize::KeyStroke> split = Colorize::splitKeyStrokesByColor(strokes, strokes.rect());
+        for (const auto& s : split)
+        {
+            if (s.color != color) continue;
+            qint64 sx = 0, sy = 0, n = 0;
+            for (int y = 0; y < size.height(); ++y)
+            {
+                const uchar* line = s.mask.constScanLine(y);
+                for (int x = 0; x < size.width(); ++x)
+                    if (line[x] > 0) { sx += x; sy += y; ++n; }
+            }
+            if (n > 0) return QPointF(sx / double(n), sy / double(n));
+        }
+        return QPointF(-1, -1);
+    };
+    auto sourceU = [&](const QPointF& c) {
+        return QPointF((c.x() - boxA.left()) / boxA.width(), (c.y() - boxA.top()) / boxA.height());
+    };
+    auto expectedInB = [&](const QPointF& c) {
+        const QPointF u = sourceU(c);
+        return QPointF(boxB.left() + u.x() * boxB.width(), boxB.top() + u.y() * boxB.height());
+    };
+
+    const QPointF redExp = expectedInB(centroidOf(strokesA, redC));
+    const QPointF blueExp = expectedInB(centroidOf(strokesA, blueC));
+    const QPointF redGot = centroidOf(out, redC);
+    const QPointF blueGot = centroidOf(out, blueC);
+    INFO("红 期望" << redExp.x() << "," << redExp.y() << " 实际" << redGot.x() << "," << redGot.y());
+    INFO("蓝 期望" << blueExp.x() << "," << blueExp.y() << " 实际" << blueGot.x() << "," << blueGot.y());
+    REQUIRE(qAbs(redGot.x() - redExp.x()) <= 6);
+    REQUIRE(qAbs(redGot.y() - redExp.y()) <= 6);
+    REQUIRE(qAbs(blueGot.x() - blueExp.x()) <= 6);
+    REQUIRE(qAbs(blueGot.y() - blueExp.y()) <= 6);
+
+    // 映射后的点必须落进放大后的房间内部（房间 400..800 x 150..450）
+    REQUIRE((redGot.x() > 405 && redGot.x() < 795 && redGot.y() > 155 && redGot.y() < 445));
+    REQUIRE((blueGot.x() > 405 && blueGot.x() < 795 && blueGot.y() > 155 && blueGot.y() < 445));
 }
