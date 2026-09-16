@@ -1460,4 +1460,164 @@ QImage makeBackgroundWrap(const QImage& lineArt, const QRect& bounds, QRgb color
     return result;
 }
 
+RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, const FilteringOptions& options)
+{
+    RegionSegmentation seg;
+    seg.bounds = bounds;
+    if (bounds.isEmpty())
+        return seg;
+
+    // 屏障 = 滤波后的高度图（含闭缝/边缘检测；抗锯齿半边缘也算屏障）
+    const QImage height = buildHeightMap(lineArt, bounds, options);
+    seg.labelOf.fill(0, bounds.width() * bounds.height());
+
+    const int w = bounds.width();
+    const auto labelAt = [&](int x, int y) { return seg.labelOf[(y - bounds.top()) * w + (x - bounds.left())]; };
+    const auto setLabel = [&](int x, int y, qint32 l) { seg.labelOf[(y - bounds.top()) * w + (x - bounds.left())] = l; };
+
+    QStack<QPoint> stack;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const uchar* hLine = height.constScanLine(y);
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            if (hLine[x] >= 96 || labelAt(x, y) != 0)
+                continue;
+
+            const qint32 label = static_cast<qint32>(seg.regions.size()) + 1;
+            RegionLabel r;
+            r.bounds = QRect(x, y, 1, 1);
+            qint64 sumX = 0, sumY = 0;
+            bool touches = false;
+
+            stack.push(QPoint(x, y));
+            setLabel(x, y, label);
+            while (!stack.isEmpty())
+            {
+                const QPoint pt = stack.pop();
+                ++r.area;
+                sumX += pt.x();
+                sumY += pt.y();
+                r.bounds = r.bounds.united(QRect(pt, QSize(1, 1)));
+                if (pt.x() == bounds.left() || pt.x() == bounds.right() ||
+                    pt.y() == bounds.top() || pt.y() == bounds.bottom())
+                    touches = true;
+
+                const QPoint neighbours[4] = { pt + QPoint(-1, 0), pt + QPoint(1, 0),
+                                               pt + QPoint(0, -1), pt + QPoint(0, 1) };
+                for (const QPoint& n : neighbours)
+                {
+                    if (!bounds.contains(n))
+                        continue;
+                    if (height.constScanLine(n.y())[n.x()] >= 96)
+                        continue;
+                    if (labelAt(n.x(), n.y()) != 0)
+                        continue;
+                    setLabel(n.x(), n.y(), label);
+                    stack.push(n);
+                }
+            }
+
+            r.centroid = QPoint(qRound(sumX / double(r.area)), qRound(sumY / double(r.area)));
+            r.touchesEdge = touches;
+            // 锚点 = 区域内离质心最近的像素（扫区域包围盒）
+            qint64 bestDist = std::numeric_limits<qint64>::max();
+            for (int yy = r.bounds.top(); yy <= r.bounds.bottom(); ++yy)
+                for (int xx = r.bounds.left(); xx <= r.bounds.right(); ++xx)
+                    if (labelAt(xx, yy) == label)
+                    {
+                        const qint64 dx = xx - r.centroid.x();
+                        const qint64 dy = yy - r.centroid.y();
+                        const qint64 d = dx * dx + dy * dy;
+                        if (d < bestDist)
+                        {
+                            bestDist = d;
+                            r.anchor = QPoint(xx, yy);
+                        }
+                    }
+            seg.regions.append(r);
+        }
+    }
+    return seg;
+}
+
+QImage transportStrokesByRegions(const QImage& lineArtA,
+                                 const QImage& coloringA,
+                                 const QImage& lineArtB,
+                                 const QRect& bounds,
+                                 const FilteringOptions& options,
+                                 QRgb transparentColor,
+                                 bool hasTransparent)
+{
+    Q_ASSERT(lineArtA.size() == coloringA.size());
+    Q_ASSERT(lineArtB.size() == coloringA.size());
+
+    QImage result(coloringA.size(), QImage::Format_ARGB32_Premultiplied);
+    result.fill(Qt::transparent);
+    if (bounds.isEmpty())
+        return result;
+
+    const RegionSegmentation segA = segmentRegions(lineArtA, bounds, options);
+    const RegionSegmentation segB = segmentRegions(lineArtB, bounds, options);
+    if (segA.regions.isEmpty() || segB.regions.isEmpty())
+        return result;
+
+    // 源区域颜色表：锚点采样着色结果（纯色平涂；透明 = 透明/未着色区域）
+    struct SourceColor
+    {
+        QRgb color = 0;
+        bool transparent = false;
+        QPoint centroid;
+    };
+    QVector<SourceColor> palette;
+    palette.reserve(segA.regions.size());
+    for (const RegionLabel& r : segA.regions)
+    {
+        SourceColor sc;
+        sc.centroid = r.centroid;
+        const QRgb px = coloringA.pixel(r.anchor);
+        if (qAlpha(px) > 0)
+            sc.color = qUnpremultiply(px);
+        else
+            sc.transparent = true;
+        palette.append(sc);
+    }
+
+    // 目标区域：质心邻近继承，每区域画一个标准标记点
+    const int dot = 9;
+    QPainter painter(&result);
+    painter.setPen(Qt::NoPen);
+    for (const RegionLabel& r : segB.regions)
+    {
+        int best = -1;
+        qint64 bestDist = std::numeric_limits<qint64>::max();
+        for (int i = 0; i < palette.size(); ++i)
+        {
+            const qint64 dx = r.centroid.x() - palette[i].centroid.x();
+            const qint64 dy = r.centroid.y() - palette[i].centroid.y();
+            const qint64 d = dx * dx + dy * dy;
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = i;
+            }
+        }
+        if (best < 0)
+            continue;
+        if (palette[best].transparent)
+        {
+            if (!hasTransparent)
+                continue; // 未标透明色：透明区域不标记
+            painter.setBrush(QColor(transparentColor));
+        }
+        else
+        {
+            painter.setBrush(QColor(palette[best].color));
+        }
+        painter.drawRect(r.anchor.x(), r.anchor.y(), dot, dot);
+    }
+    painter.end();
+    return result;
+}
+
 } // namespace Colorize

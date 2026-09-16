@@ -135,6 +135,48 @@ QImage transportStrokesByBounds(const QImage& lineArtA,
  */
 QImage makeBackgroundWrap(const QImage& lineArt, const QRect& bounds, QRgb color);
 
+/* ===================== 封闭区域分割与区域级搬运 ===================== */
+
+/** 一个封闭区域（线稿屏障外的连通域） */
+struct RegionLabel
+{
+    QRect bounds;             // 区域包围盒（图内坐标）
+    QPoint centroid;          // 质心（跨帧邻近匹配用）
+    QPoint anchor;            // 区域内离质心最近的像素（标记点落点）
+    qint64 area = 0;
+    bool touchesEdge = false; // 接触计算域边缘（开放背景区域）
+};
+
+struct RegionSegmentation
+{
+    QVector<qint32> labelOf;      // 每像素标签号（0 = 屏障），bounds 行优先
+    QVector<RegionLabel> regions; // 下标 = 标签号 - 1
+    QRect bounds;
+};
+
+/*
+ * 线稿封闭区域分割：以（含闭缝/边缘检测滤波的）线稿为屏障对 bounds
+ * 做连通域标记。fuzzyRadius 可先桥接线稿小缺口，减少区域误连通。
+ */
+RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds,
+                                  const FilteringOptions& options = FilteringOptions());
+
+/*
+ * 色点跨帧搬运（区域邻近映射）：
+ * 源帧各封闭区域的颜色从其着色结果（纯色平涂）锚点采样，目标帧每个
+ * 区域按"质心最近"继承源帧有色区域颜色，在区域锚点画标准标记点——
+ * 每区域只标一色；新增区域拿最近区域颜色（后续可手动修正）。
+ * 着色结果为透明的区域：hasTransparent 时画透明标记色，否则不标。
+ * coloringA 为平铺到与 lineArtA 同尺寸画布的源帧着色结果。
+ */
+QImage transportStrokesByRegions(const QImage& lineArtA,
+                                 const QImage& coloringA,
+                                 const QImage& lineArtB,
+                                 const QRect& bounds,
+                                 const FilteringOptions& options = FilteringOptions(),
+                                 QRgb transparentColor = 0,
+                                 bool hasTransparent = false);
+
 }
 
 #endif // COLORIZE_ENGINE_H

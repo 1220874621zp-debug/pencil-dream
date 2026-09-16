@@ -1217,3 +1217,86 @@ TEST_CASE("Colorize BackgroundWrap")
     REQUIRE(result.pixel(10, 10) == 0);                    // 框外透明
     REQUIRE(result.pixel(150, 100) == 0);
 }
+
+TEST_CASE("Colorize TransportByRegions")
+{
+    // 区域级搬运：源帧三封闭区域（三角/圆/小圆）各有色，目标帧平移+新增区域，
+    // 按质心邻近继承 + 每区域一色标记
+    const QSize size(240, 160);
+    const QPolygon triangleA = QPolygon() << QPoint(20, 100) << QPoint(90, 100) << QPoint(55, 40);
+    const QPoint circleB(150, 80);
+    const QPoint circleC(95, 45);
+    const QPoint shift(12, -8);
+    const QRect newD(200, 120, 30, 30); // 目标帧新增区域（右下，离平移后的 B 最近 → 继承蓝）
+
+    QImage lineA = makeLineArt(size, [&](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawPolygon(triangleA);
+        p.drawEllipse(circleB, 35, 35);
+        p.drawEllipse(circleC, 15, 15);
+    });
+    QImage lineB = makeLineArt(size, [&](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.save();
+        p.translate(shift);
+        p.drawPolygon(triangleA);
+        p.drawEllipse(circleB, 35, 35);
+        p.drawEllipse(circleC, 15, 15);
+        p.restore();
+        p.drawRect(newD);
+    });
+
+    // 源帧着色结果（纯色平涂）：红 A、蓝 B、绿 C、背景透明
+    QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+    coloringA.fill(Qt::transparent);
+    {
+        QPainter p(&coloringA);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 0, 0));
+        p.drawPolygon(triangleA);
+        p.setBrush(QColor(0, 80, 255));
+        p.drawEllipse(circleB, 35, 35);
+        p.setBrush(QColor(0, 160, 0));
+        p.drawEllipse(circleC, 15, 15);
+        p.end();
+    }
+
+    // 分割健全性：源 4 区域（3 封闭 + 背景），目标 5 区域
+    const Colorize::RegionSegmentation segA = Colorize::segmentRegions(lineA, lineA.rect());
+    const Colorize::RegionSegmentation segB = Colorize::segmentRegions(lineB, lineB.rect());
+    REQUIRE(segA.regions.size() == 4);
+    REQUIRE(segB.regions.size() == 5);
+
+    QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineB, lineB.rect());
+    REQUIRE(!out.isNull());
+
+    // 断言：目标形状中心附近存在对应颜色标记（anchor≈质心，dot=9 → 容差 10）
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb blue = qRgb(0, 80, 255);
+    const QRgb green = qRgb(0, 160, 0);
+    auto hasMarkNear = [&out, &size](QRgb color, QPoint center, int tol) {
+        for (int y = 0; y < size.height(); ++y)
+            for (int x = 0; x < size.width(); ++x)
+            {
+                const QRgb px = out.pixel(x, y);
+                const int a = qAlpha(px);
+                if (a == 0) continue;
+                const QRgb c = qRgb(qRound(qRed(px) * 255.0 / a),
+                                    qRound(qGreen(px) * 255.0 / a),
+                                    qRound(qBlue(px) * 255.0 / a));
+                if (c == color && qAbs(x - center.x()) <= tol && qAbs(y - center.y()) <= tol)
+                    return true;
+            }
+        return false;
+    };
+    const QPoint a2(55 + shift.x(), 80 + shift.y());
+    const QPoint b2 = circleB + shift;
+    const QPoint c2 = circleC + shift;
+    const QPoint d2(newD.center());
+    REQUIRE(hasMarkNear(red, a2, 10));    // A' 红
+    REQUIRE(hasMarkNear(blue, b2, 10));   // B' 蓝
+    REQUIRE(hasMarkNear(green, c2, 10));  // C' 绿
+    REQUIRE(hasMarkNear(blue, d2, 10));   // 新区域 D 邻近继承 B 的蓝
+}

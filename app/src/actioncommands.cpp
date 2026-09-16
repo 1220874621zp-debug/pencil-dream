@@ -1261,8 +1261,24 @@ Status ActionCommands::propagateColorizeStrokes()
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(300);
 
-    // 包围盒相对映射：源帧直映射每个目标帧（无链式累积误差），
-    // 每帧重画标准标记点；已有手涂笔画的帧保护跳过
+    // 区域映射以源帧着色结果为颜色事实源；未算过则同步补算一次
+    if (srcFrame->coloringImage().isNull())
+        colorizeLayer->updateColoringAtFrame(srcPos, lineLayer, mEditor->object()->layerStructureGeneration());
+    if (srcFrame->coloringImage().isNull())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("源帧着色计算失败，无法传播。"));
+        return Status::CANCELED;
+    }
+
+    // 分割用滤波选项与填色面板同源（闭缝等参数对区域分割同样生效）
+    Colorize::FilteringOptions filteringOptions;
+    filteringOptions.useEdgeDetection = colorizeLayer->useEdgeDetection();
+    filteringOptions.edgeDetectionSize = colorizeLayer->edgeDetectionSize();
+    filteringOptions.fuzzyRadius = colorizeLayer->fuzzyRadius();
+    filteringOptions.cleanUpAmount = colorizeLayer->cleanUpAmount();
+
+    // 区域邻近映射：源帧各封闭区域颜色（着色结果）按质心最近继承到
+    // 目标帧各区域，每区域一个标准标记点；已有手涂笔画的帧保护跳过
     int created = 0, written = 0, skippedPainted = 0, skippedNoLine = 0, canceled = 0;
     QVector<int> touched;
 
@@ -1302,12 +1318,22 @@ Status ActionCommands::propagateColorizeStrokes()
 
         // 留白容纳贴边标记点；平铺图是 canvas 相对坐标（原点 0,0），
         // bounds 必须传图内矩形，传画布原点矩形会越界
-        const QRect canvas = (srcLineFrame->bounds() | lineFrame->bounds() | srcFrame->bounds())
+        const QRect canvas = (srcLineFrame->bounds() | srcFrame->coloringBounds() | lineFrame->bounds())
                                  .adjusted(-16, -16, 16, 16);
-        QImage transported = Colorize::transportStrokesByBounds(flatten(*srcLineFrame, canvas),
-                                                                flatten(*srcFrame, canvas),
-                                                                flatten(*lineFrame, canvas),
-                                                                QRect(0, 0, canvas.width(), canvas.height()));
+        QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+        coloringFlat.fill(Qt::transparent);
+        {
+            QPainter colorPainter(&coloringFlat);
+            colorPainter.drawImage(srcFrame->coloringBounds().topLeft() - canvas.topLeft(), srcFrame->coloringImage());
+            colorPainter.end();
+        }
+        QImage transported = Colorize::transportStrokesByRegions(flatten(*srcLineFrame, canvas),
+                                                                 coloringFlat,
+                                                                 flatten(*lineFrame, canvas),
+                                                                 QRect(0, 0, canvas.width(), canvas.height()),
+                                                                 filteringOptions,
+                                                                 colorizeLayer->transparentColor(),
+                                                                 colorizeLayer->hasTransparentColor());
         // 已标记透明颜色：自动包裹背景——线稿外泛洪填透明保护色（Krita 手绘
         // 透明笔画保护背景的自动化），色点后画覆盖包裹
         if (colorizeLayer->hasTransparentColor())
