@@ -2377,6 +2377,11 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         {
             if (!hasTransparent)
                 continue; // 未标记：稍后补漏/按邻近原则继承
+            // 用户规则：封闭区域内不能标记透明颜色——透明只属于开放
+            // 背景；封闭区域采到透明时保持未标记，交给补漏/邻近继承
+            // 上真色（宁可颜色近似也不能留洞）
+            if (!r.touchesEdge)
+                continue;
             regionState[ri] = 2;
             drawRegionDot(ri, transparentColor);
         }

@@ -2525,3 +2525,80 @@ TEST_CASE("Colorize MarkersInsideWrapRect")
     REQUIRE(foreignOutside == 0);
     REQUIRE(redInside > 10);
 }
+
+TEST_CASE("Colorize NoTransparentInsideClosedRegions")
+{
+    // 用户规则：封闭区域内不能标记透明颜色。左房无笔画（源供体=透明），
+    // 右房红点——搬运时左房不得画绿标（留洞），应经邻近继承上真色红；
+    // 开放背景仍正常标透明绿
+    const QSize size(240, 140);
+    const QRgb green = qRgb(0, 255, 0);
+    const QRgb red = qRgb(255, 0, 0);
+
+    QImage lineArt = makeLineArt(size, [](QPainter& p) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(20, 30, 80, 70);   // 左房（源帧空 → 透明供体）
+        p.drawRect(130, 30, 80, 70);  // 右房（红点）
+    });
+    QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+    strokes.fill(Qt::transparent);
+    {
+        QPainter p(&strokes);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(green));
+        p.drawRect(strokes.rect());
+        p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+        p.drawRect(22, 32, 76, 66);   // 两房内部清空（左房无任何笔画）
+        p.drawRect(132, 32, 76, 66);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        p.setBrush(QColor(red));
+        p.drawEllipse(160, 55, 20, 14); // 右房红点
+        p.end();
+    }
+
+    Colorize::FilteringOptions opt;
+    opt.cleanUpAmount = 0.7;
+    opt.hasTransparentColor = true;
+    opt.transparentColor = green;
+
+    const QImage coloring = Colorize::colorize(lineArt, strokes, lineArt.rect(), opt);
+    QImage coloringFlat(size, QImage::Format_ARGB32_Premultiplied);
+    coloringFlat.fill(Qt::transparent);
+    {
+        QPainter p(&coloringFlat);
+        p.drawImage(0, 0, coloring);
+        p.end();
+    }
+    const QImage transported = Colorize::transportStrokesByRegions(
+        lineArt, coloringFlat, lineArt, lineArt.rect(), opt, green, true);
+
+    const QRect leftRoom(26, 36, 68, 58);   // 左房内缩区
+    const QRect rightRoom(136, 36, 68, 58); // 右房内缩区
+    int greenInLeft = 0, redInLeft = 0, greenOutside = 0, redInRight = 0;
+    for (int y = 0; y < size.height(); ++y)
+        for (int x = 0; x < size.width(); ++x)
+        {
+            const QRgb px = transported.pixel(x, y);
+            if (qAlpha(px) == 0) continue;
+            const QRgb c = nonPremul(transported, x, y);
+            const bool isGreen = c == green;
+            if (leftRoom.contains(x, y))
+            {
+                if (isGreen) ++greenInLeft;
+                else if (c == red) ++redInLeft;
+            }
+            else if (rightRoom.contains(x, y))
+            {
+                if (!isGreen && c == red) ++redInRight;
+            }
+            else if (isGreen)
+                ++greenOutside;
+        }
+    INFO("左房绿" << greenInLeft << " 左房红" << redInLeft
+         << " 右房红" << redInRight << " 背景绿" << greenOutside);
+    REQUIRE(greenInLeft == 0);   // 规则：封闭区域内不得标透明
+    REQUIRE(redInLeft > 10);     // 邻近继承上真色
+    REQUIRE(redInRight > 10);    // 右房照常
+    REQUIRE(greenOutside > 10);  // 开放背景透明标不受影响
+}
