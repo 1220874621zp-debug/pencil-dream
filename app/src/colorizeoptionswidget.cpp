@@ -52,7 +52,7 @@ void ColorizeOptionsWidget::initUI()
     rootLayout->setContentsMargins(8, 8, 8, 8);
     rootLayout->setSpacing(6);
 
-    // --- 标题 + 更新（Krita: Update，纯手动刷新） ---
+    // --- 标题（刷新/更新按钮已移至底部"透明/删除"行） ---
     auto* titleRow = new QHBoxLayout;
     auto* titleLabel = new QLabel(tr("Colorize Mask"), this);
     QFont titleFont = titleLabel->font();
@@ -61,13 +61,6 @@ void ColorizeOptionsWidget::initUI()
     titleLabel->setFont(titleFont);
     titleRow->addWidget(titleLabel);
     titleRow->addStretch();
-
-    mRefreshButton = new QPushButton(tr("Refresh"), this);
-    mRefreshAllButton = new QPushButton(tr("Update All"), this);
-    mRefreshButton->setToolTip(tr("Regenerate coloring for the current frame"));
-    mRefreshAllButton->setToolTip(tr("Regenerate coloring for every frame of this layer"));
-    titleRow->addWidget(mRefreshButton);
-    titleRow->addWidget(mRefreshAllButton);
     rootLayout->addLayout(titleRow);
 
     // 跨帧传播填色（原主工具栏入口移入面板：选中填色图层才出现）
@@ -101,6 +94,15 @@ void ColorizeOptionsWidget::initUI()
     mRemoveButton->setToolTip(tr("Erase all strokes of the selected color on this frame"));
     colorButtonsRow->addWidget(mTransparentButton);
     colorButtonsRow->addWidget(mRemoveButton);
+
+    // 刷新/更新全部（用户指定放此行：删除按钮右侧）
+    mRefreshButton = new QPushButton(tr("Refresh"), this);
+    mRefreshAllButton = new QPushButton(tr("Update All"), this);
+    mRefreshButton->setToolTip(tr("Regenerate coloring for the current frame"));
+    mRefreshAllButton->setToolTip(tr("Regenerate coloring for every frame of this layer"));
+    colorButtonsRow->addWidget(mRefreshButton);
+    colorButtonsRow->addWidget(mRefreshAllButton);
+
     colorButtonsRow->addStretch();
     rootLayout->addLayout(colorButtonsRow);
 
