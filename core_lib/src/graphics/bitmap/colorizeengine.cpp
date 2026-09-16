@@ -1474,14 +1474,24 @@ void claimIntentColors(QVector<KeyStroke>& strokes, const QVector<int>& master,
             continue;
         if (hasTransparent && strokes[m].color == transparentColor)
             continue;
+        // 同族可能有多个相似候选（历史选色/色板），取离族内实际像素
+        // （已提升为最亮代表值）RGB 距离最近者——涂纯红时即使登记表
+        // 里残留暗红，认领结果也是纯红
+        int bestDistSq = std::numeric_limits<int>::max();
+        QRgb best = strokes[m].color;
         for (const QRgb intent : intentColors)
         {
             if (similarColors(intent, strokes[m].color))
             {
-                strokes[m].color = intent;
-                break;
+                const int d = colorDistanceSq(intent, strokes[m].color);
+                if (d < bestDistSq)
+                {
+                    bestDistSq = d;
+                    best = intent;
+                }
             }
         }
+        strokes[m].color = best;
     }
 }
 

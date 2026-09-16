@@ -1816,6 +1816,28 @@ TEST_CASE("Colorize DirtyBrushRepresentative")
     REQUIRE(colorizeLayer->strokeColorsAtFrame(1).isEmpty());
 }
 
+TEST_CASE("Colorize IntentClaimNearest")
+{
+    // 用户实测案：登记表残留暗红#800000（历史选色），实际涂纯红#FF0000
+    // ——认领必须选离族内像素最近的纯红，不是排序在前的暗红
+    std::unique_ptr<Object> object(new Object);
+    object->init();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+
+    const QRgb pureRed = qRgb(255, 0, 0);
+    frame->drawLine(QPointF(20, 30), QPointF(50, 30),
+                    QPen(QColor(pureRed), 6), QPainter::CompositionMode_SourceOver, false);
+
+    colorizeLayer->addIntentColor(qRgb(128, 0, 0)); // 残留暗红（数值更小，排序在前）
+    colorizeLayer->addIntentColor(pureRed);
+
+    const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+    REQUIRE(colors.size() == 1);
+    REQUIRE(colors.first() == pureRed);
+}
+
 TEST_CASE("Colorize IntentColorCodes")
 {
     // 用户点色板的代码是唯一事实源：登记的意图色优先作族代表，
