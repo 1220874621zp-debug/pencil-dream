@@ -1377,6 +1377,85 @@ void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& op
     strokes = merged;
 }
 
+namespace {
+/*
+ * 每封闭区域只保留一组有色种子：区域内种子覆盖最大者胜出，其余
+ * 有色种子在该区域内清零。同区域多色点是分水岭多色斑的直接来源
+ * （用户规则：一个封闭区域只标记一个颜色点）。
+ * 仅作用于封闭区域（touchesEdge 豁免）——开放/半开放区域（如缺口
+ * 的连通域）颜色靠分水岭距离竞争分治是既有正确行为，清种子反而丢色。
+ * 透明组豁免——透明是保护标记（可在有色区域内开洞），不参与竞争。
+ */
+void enforceOneSeedPerRegion(QVector<KeyStroke>& strokes,
+                             const RegionSegmentation& seg)
+{
+    const int regionCount = seg.regions.size();
+    const int groupCount = strokes.size();
+    if (regionCount == 0 || groupCount == 0)
+        return;
+
+    // 区域×组 覆盖计数（labelOf 为 bounds 行优先；mask 为全图尺寸）
+    QVector<qint64> counts(regionCount * groupCount, 0);
+    for (int y = 0; y < seg.bounds.height(); ++y)
+    {
+        const qint32* labelLine = seg.labelOf.constData() + y * seg.bounds.width();
+        for (int x = 0; x < seg.bounds.width(); ++x)
+        {
+            const qint32 label = labelLine[x];
+            if (label <= 0)
+                continue;
+            const int absY = y + seg.bounds.top();
+            const int absX = x + seg.bounds.left();
+            for (int g = 0; g < groupCount; ++g)
+            {
+                const QImage& mask = strokes[g].mask;
+                if (!mask.isNull() && mask.constScanLine(absY)[absX] > 0)
+                    ++counts[(label - 1) * groupCount + g];
+            }
+        }
+    }
+
+    const int bw = seg.bounds.width();
+    const int left = seg.bounds.left();
+    for (int r = 0; r < regionCount; ++r)
+    {
+        if (seg.regions[r].touchesEdge)
+            continue; // 开放区域：颜色竞争分治，不清种子
+        int winner = -1;
+        qint64 best = 0;
+        for (int g = 0; g < groupCount; ++g)
+        {
+            if (strokes[g].isTransparent)
+                continue;
+            const qint64 c = counts[r * groupCount + g];
+            if (c > best)
+            {
+                best = c;
+                winner = g;
+            }
+        }
+        if (winner < 0)
+            continue;
+        for (int g = 0; g < groupCount; ++g)
+        {
+            if (g == winner || strokes[g].isTransparent || counts[r * groupCount + g] == 0)
+                continue;
+            QImage& mask = strokes[g].mask;
+            if (mask.isNull())
+                continue;
+            for (int y = 0; y < seg.bounds.height(); ++y)
+            {
+                const qint32* labelLine = seg.labelOf.constData() + y * bw;
+                uchar* maskLine = mask.scanLine(y + seg.bounds.top());
+                for (int x = 0; x < bw; ++x)
+                    if (labelLine[x] == r + 1)
+                        maskLine[x + left] = 0;
+            }
+        }
+    }
+}
+} // namespace
+
 QImage colorize(const QImage& lineArt,
                 const QImage& strokesImage,
                 const QRect& bounds,
@@ -1397,6 +1476,9 @@ QImage colorize(const QImage& lineArt,
                 stroke.isTransparent = true;
         }
     }
+
+    // 一区一点：每个封闭区域只保留覆盖最大的有色种子
+    enforceOneSeedPerRegion(strokes, segmentRegions(lineArt, bounds, options));
 
     return runWatershed(heightMap, strokes, bounds, options.cleanUpAmount, progress);
 }
@@ -1560,8 +1642,9 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
     if (bounds.isEmpty())
         return seg;
 
-    // 屏障 = 滤波后的高度图（含闭缝/边缘检测）；阈值取低值——
-    // 画笔软边/抗锯齿边缘也是墙，否则角色内外顺软边渗漏连通成一片
+    // 屏障 = 滤波后的高度图（含闭缝/边缘检测）；任何非零高度都是墙
+    // （分割须比分水岭的梯度分离更细而非更粗：模糊缝/软重叠墙处
+    // 分水岭能分开两色，若连通域判成一区会连累"一区一种子"误清色）
     const QImage height = buildHeightMap(lineArt, bounds, options);
     seg.labelOf.fill(0, bounds.width() * bounds.height());
 
@@ -1575,7 +1658,7 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
         const uchar* hLine = height.constScanLine(y);
         for (int x = bounds.left(); x <= bounds.right(); ++x)
         {
-            if (hLine[x] >= 16 || labelAt(x, y) != 0)
+            if (hLine[x] > 0 || labelAt(x, y) != 0)
                 continue;
 
             const qint32 label = static_cast<qint32>(seg.regions.size()) + 1;
@@ -1603,7 +1686,7 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds, co
                 {
                     if (!bounds.contains(n))
                         continue;
-                    if (height.constScanLine(n.y())[n.x()] >= 16)
+                    if (height.constScanLine(n.y())[n.x()] > 0)
                         continue;
                     if (labelAt(n.x(), n.y()) != 0)
                         continue;
@@ -1734,7 +1817,9 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     QPainter painter(&result);
     painter.setPen(Qt::NoPen);
 
-    QSet<QRgb> drawnColors;
+    // 区域标记状态：0=未标记 1=颜色标记 2=透明标记（一区一点不变量）
+    QVector<int> regionState(segB.regions.size(), 0);
+    QVector<QRgb> regionColor(segB.regions.size(), 0);
 
     const auto sampleSource = [&](const QPoint& targetPoint, QRgb& outColor, bool& outTransparent) {
         const qreal u = qBound(0.0, (targetPoint.x() - boxB.left()) / double(boxB.width()), 1.0);
@@ -1760,37 +1845,98 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         }
     };
 
-    for (const RegionLabel& r : segB.regions)
+    for (int ri = 0; ri < segB.regions.size(); ++ri)
     {
+        const RegionLabel& r = segB.regions[ri];
         QRgb color = 0;
         bool transparent = false;
         sampleSource(r.anchor, color, transparent);
         if (transparent)
         {
             if (!hasTransparent)
-                continue;
+                continue; // 未标记：稍后按邻近原则继承
             painter.setBrush(QColor(transparentColor));
+            regionState[ri] = 2;
         }
         else
         {
             painter.setBrush(QColor(color));
-            drawnColors.insert(color);
+            regionState[ri] = 1;
+            regionColor[ri] = color;
         }
         painter.drawRect(r.anchor.x(), r.anchor.y(), dot, dot);
     }
 
-    // 颜色补漏：主色表每种颜色（面积≥64px）都应出现在目标帧标记中，
-    // 缺失则按该颜色质心相对映射补画——保证任何颜色不丢（落点可手动修）
+    // 映射点 → 所在区域（出界/落屏障返回 -1）
+    const auto regionAt = [&](const QPoint& pt) {
+        const int rx = pt.x() - segB.bounds.left();
+        const int ry = pt.y() - segB.bounds.top();
+        if (rx < 0 || ry < 0 || rx >= segB.bounds.width() || ry >= segB.bounds.height())
+            return -1;
+        return int(segB.labelOf[ry * segB.bounds.width() + rx]) - 1;
+    };
+    // 最近区域（按质心距离，可限定状态过滤）
+    const auto nearestRegion = [&](const QPoint& pt, int wantedState) {
+        int best = -1;
+        qint64 bestD = std::numeric_limits<qint64>::max();
+        for (int i = 0; i < segB.regions.size(); ++i)
+        {
+            if (wantedState >= 0 && regionState[i] != wantedState)
+                continue;
+            const QPoint d = segB.regions[i].centroid - pt;
+            const qint64 dist = qint64(d.x()) * d.x() + qint64(d.y()) * d.y();
+            if (dist < bestD)
+            {
+                bestD = dist;
+                best = i;
+            }
+        }
+        return best;
+    };
+
+    // 颜色补漏：主色表每种颜色（面积≥64px）都应出现在目标标记中——
+    // 缺失时把映射点所在区域的标记改成该颜色（替换而非叠加，
+    // 维持一区一点），保证任何颜色不丢
     for (const MajorColor& m : majors)
     {
-        if (m.stat.count < 64 || drawnColors.contains(m.color))
+        if (m.stat.count < 64)
+            continue;
+        bool present = false;
+        for (int i = 0; i < regionColor.size() && !present; ++i)
+            if (regionState[i] == 1 && regionColor[i] == m.color)
+                present = true;
+        if (present)
             continue;
         const qreal u = qBound(0.0, (m.stat.sumX / double(m.stat.count) - boxA.left()) / double(boxA.width()), 1.0);
         const qreal v = qBound(0.0, (m.stat.sumY / double(m.stat.count) - boxA.top()) / double(boxA.height()), 1.0);
         const QPoint target(qRound(boxB.left() + u * boxB.width()),
                             qRound(boxB.top() + v * boxB.height()));
+        int ri = regionAt(target);
+        if (ri < 0)
+            ri = nearestRegion(target, -1);
+        if (ri >= 0 && regionState[ri] == 2)
+            ri = nearestRegion(target, 0); // 透明标记区不改写（保护语义优先）
+        if (ri < 0)
+            continue;
+        regionState[ri] = 1;
+        regionColor[ri] = m.color;
         painter.setBrush(QColor(m.color));
-        painter.drawRect(target.x(), target.y(), dot, dot);
+        painter.drawRect(segB.regions[ri].anchor.x(), segB.regions[ri].anchor.y(), dot, dot);
+    }
+
+    // 邻近继承：仍未标记的封闭区域（采空且无透明语义）继承质心最近的
+    // 已标区域颜色——始终保证每个封闭区域有一个颜色点
+    for (int ri = 0; ri < segB.regions.size(); ++ri)
+    {
+        if (regionState[ri] != 0 || segB.regions[ri].touchesEdge)
+            continue;
+        const int src = nearestRegion(segB.regions[ri].centroid, 1);
+        if (src < 0)
+            continue;
+        regionState[ri] = 1;
+        regionColor[ri] = regionColor[src];
+        painter.setBrush(QColor(regionColor[ri]));
+        painter.drawRect(segB.regions[ri].anchor.x(), segB.regions[ri].anchor.y(), dot, dot);
     }
 
     painter.end();

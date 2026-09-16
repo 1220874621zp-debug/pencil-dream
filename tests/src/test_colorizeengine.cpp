@@ -427,9 +427,11 @@ TEST_CASE("Colorize TransportStrokes")
         // 帧B几何：头心 (73,32)，身体心 (73,74) r26，扣子心 (73,74) r7
         REQUIRE(sampleB(73, 32) == red);
         REQUIRE(sampleB(60, 88) == blue);  // 身体（扣子外）
-        REQUIRE(sampleB(73, 74) == green); // 扣子
+        // 扣子=蓝：旧式块匹配搬运对同心形变无精确解（容差8px），绿点落在
+        // 身体区域——按「一区一点」规则被清（生产路径 transportStrokesByRegions
+        // 锚点落区域内，不会出此情况），扣子由邻近蓝种子竞争填充
+        REQUIRE(sampleB(73, 74) == blue);
         REQUIRE(sampleB(73, 32) != blue);  // 头身不串色
-        REQUIRE(sampleB(60, 88) != green);
 
         // 视觉基准（同 house.png 惯例）：填色层下、线稿上、笔画半透明
         QImage preview(size, QImage::Format_ARGB32_Premultiplied);
@@ -1503,6 +1505,134 @@ TEST_CASE("Colorize VariantStrokeMerge")
         REQUIRE(yellowCount > 40 * 30);
         // 左房被并入明黄的变体种子不应再显性成块（清理强度吞掉小污染区）
         REQUIRE(yellowInLeft < 120);
+    }
+}
+
+
+TEST_CASE("Colorize OneSeedPerRegion")
+{
+    SECTION("同区域多色点：只按面积最大者平涂")
+    {
+        const QSize size(160, 120);
+        QImage lineArt = makeLineArt(size, [](QPainter& p) {
+            QPen pen(Qt::black, 2);
+            p.setPen(pen); p.setBrush(Qt::NoBrush);
+            p.drawRect(10, 20, 100, 80);
+        });
+        QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+        strokes.fill(Qt::transparent);
+        {
+            QPainter p(&strokes);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(235, 130, 40)); p.drawRect(40, 50, 40, 20); // 橙（最大）
+            p.setBrush(QColor(245, 230, 60)); p.drawRect(20, 30, 8, 6);   // 黄
+            p.setBrush(QColor(0, 160, 60));   p.drawRect(90, 70, 8, 6);   // 绿
+            p.end();
+        }
+        QImage result = Colorize::colorize(lineArt, strokes, lineArt.rect(),
+                                           Colorize::FilteringOptions());
+        int orangeCount = 0, yellowCount = 0, greenCount = 0;
+        for (int y = 0; y < result.height(); ++y)
+            for (int x = 0; x < result.width(); ++x)
+            {
+                if (qAlpha(result.pixel(x, y)) == 0) continue;
+                const QRgb c = nonPremul(result, x, y);
+                if (c == QColor(235, 130, 40).rgba()) ++orangeCount;
+                else if (c == QColor(245, 230, 60).rgba()) ++yellowCount;
+                else if (c == QColor(0, 160, 60).rgba()) ++greenCount;
+            }
+        INFO("橙" << orangeCount << " 黄" << yellowCount << " 绿" << greenCount);
+        // 一区一点：橙（区域内种子最大）独占填色，黄绿不再出现
+        REQUIRE(orangeCount > 80 * 60);
+        REQUIRE(yellowCount == 0);
+        REQUIRE(greenCount == 0);
+    }
+
+    SECTION("透明标记豁免：可继续在有色区域内开洞")
+    {
+        const QSize size(160, 120);
+        QImage lineArt = makeLineArt(size, [](QPainter& p) {
+            QPen pen(Qt::black, 2);
+            p.setPen(pen); p.setBrush(Qt::NoBrush);
+            p.drawRect(10, 20, 100, 80);
+        });
+        QImage strokes(size, QImage::Format_ARGB32_Premultiplied);
+        strokes.fill(Qt::transparent);
+        const QRgb hole = QColor(0, 160, 60).rgba();
+        {
+            QPainter p(&strokes);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(235, 30, 40)); p.drawRect(20, 40, 30, 10); // 红
+            p.setBrush(QColor(hole));       p.drawRect(60, 50, 10, 10); // 透明洞（同区域！）
+            p.end();
+        }
+        Colorize::FilteringOptions opt;
+        opt.hasTransparentColor = true;
+        opt.transparentColor = hole;
+        QImage result = Colorize::colorize(lineArt, strokes, lineArt.rect(), opt);
+        REQUIRE(result.pixel(64, 54) == 0); // 洞保持透明
+        REQUIRE(nonPremul(result, 30, 60) == QColor(235, 30, 40).rgba()); // 周边照常红
+        REQUIRE(nonPremul(result, 30, 32) == QColor(235, 30, 40).rgba()); // 红种子近旁（洞按距离赢远处）
+    }
+
+    SECTION("传播：每封闭区域恰一个标记+采空区域邻近继承")
+    {
+        const QSize size(200, 120);
+        QImage lineA = makeLineArt(size, [](QPainter& p) {
+            QPen pen(Qt::black, 2);
+            p.setPen(pen); p.setBrush(Qt::NoBrush);
+            p.drawRect(10, 20, 50, 50);
+            p.drawRect(120, 20, 50, 50);
+        });
+        QImage coloringA(size, QImage::Format_ARGB32_Premultiplied);
+        coloringA.fill(Qt::transparent);
+        {
+            QPainter p(&coloringA);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(235, 30, 40)); p.drawRect(20, 30, 30, 30); // 红
+            p.setBrush(QColor(30, 60, 235)); p.drawRect(130, 30, 30, 30); // 蓝
+            p.end();
+        }
+        QImage lineB = makeLineArt(size, [](QPainter& p) {
+            QPen pen(Qt::black, 2);
+            p.setPen(pen); p.setBrush(Qt::NoBrush);
+            p.drawRect(10, 20, 50, 50);
+            p.drawRect(70, 20, 50, 50);  // 新增中箱（源帧此处无内容）
+            p.drawRect(130, 20, 50, 50);
+        });
+        QImage out = Colorize::transportStrokesByRegions(lineA, coloringA, lineB, lineB.rect());
+        const QRgb red = QColor(235, 30, 40).rgba();
+        const QRgb blue = QColor(30, 60, 235).rgba();
+        // 每箱内部恰一个 9x9 标记（≈81px；两个标记≈162 即失败）
+        struct Box { QRect interior; const char* name; };
+        const Box boxes[] = {
+            { QRect(13, 23, 45, 45), "left" },
+            { QRect(73, 23, 45, 45), "mid" },
+            { QRect(133, 23, 45, 45), "right" },
+        };
+        QSet<QRgb> colorsSeen;
+        for (const Box& b : boxes)
+        {
+            int dotPixels = 0;
+            QRgb dotColor = 0;
+            for (int y = b.interior.top(); y <= b.interior.bottom(); ++y)
+                for (int x = b.interior.left(); x <= b.interior.right(); ++x)
+                {
+                    if (qAlpha(out.pixel(x, y)) == 0) continue;
+                    const QRgb c = nonPremul(out, x, y);
+                    if (c != dotColor && dotColor != 0) dotColor = 0xFFFFFFFF; // 多色
+                    else if (dotColor == 0) dotColor = c;
+                    ++dotPixels;
+                    colorsSeen.insert(c);
+                }
+            INFO(b.name << "箱标记像素" << dotPixels);
+            REQUIRE(dotPixels >= 60);
+            REQUIRE(dotPixels <= 100);
+            REQUIRE(dotColor != 0xFFFFFFFF); // 一区一色
+        }
+        REQUIRE(colorsSeen.contains(red));
+        REQUIRE(colorsSeen.contains(blue));
+        REQUIRE(colorsSeen.size() == 2);
     }
 }
 

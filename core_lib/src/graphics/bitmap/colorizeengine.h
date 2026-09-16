@@ -122,7 +122,11 @@ QImage runWatershed(const QImage& heightMap,
                     qreal cleanUpAmount,
                     const std::function<bool(int)>& progress = std::function<bool(int)>());
 
-/* 一步到位的组合入口。 */
+/*
+ * 一步到位的组合入口。保证：每个封闭区域只按一组种子着色
+ * （区域内种子覆盖最大者胜出，透明保护组豁免）——一个封闭
+ * 区域只标记一个颜色点，平涂结果无区域内部多色斑。
+ */
 QImage colorize(const QImage& lineArt,
                 const QImage& strokesImage,
                 const QRect& bounds,
@@ -204,11 +208,12 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds,
 /*
  * 色点跨帧搬运（区域锚点 + 颜色场映射）：
  * 落点 = 目标帧各分割区域锚点（保证标记落进封闭区域，每区域一个标记）；
- * 颜色 = 锚点经"源包围盒→目标包围盒"相对映射回源帧、采样源帧着色颜色场
- * （不做源区域单色假设——软边/缺口半连通区域里分水岭本就两色分治）；
- * 颜色补漏：源帧每种颜色（面积≥64px）若未出现在目标标记中，按其质心
- * 相对映射补画一个标记，保证任何颜色不丢（落点可手动修正）。
- * 采样为透明时：hasTransparent 画透明标记色，否则不标。
+ * 颜色 = 锚点经"源包围盒→目标包围盒"相对映射回源帧、采样源帧着色颜色场；
+ * 颜色补漏：源帧每种颜色（面积≥64px）若未出现在目标标记中，把映射点
+ * 所在区域的标记改成该颜色（替换而非叠加，维持一区一点）；
+ * 邻近继承：采空（源帧透明）且无透明语义的封闭区域，继承质心最近
+ * 已标区域的颜色——始终保证每个封闭区域有一个颜色点。
+ * 采样为透明且 hasTransparent 时画透明标记色。
  * coloringA 为平铺到与 lineArtA 同尺寸画布的源帧着色结果。
  */
 QImage transportStrokesByRegions(const QImage& lineArtA,
