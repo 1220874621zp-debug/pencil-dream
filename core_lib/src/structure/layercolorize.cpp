@@ -95,6 +95,28 @@ QDomElement LayerColorize::createDomElement(QDomDocument& doc) const
         layerElem.setAttribute("colorizeIntentColors", hex.join(";"));
     }
 
+    // 传播帧标记持久化：重开工程后重传播仍能刷新自己的旧产物
+    // （手涂帧不带标记 = 永久保护）
+    {
+        QSet<int> propagatedPos;
+        foreachKeyFrame([&](KeyFrame* key) {
+            auto* img = static_cast<ColorizeImage*>(key);
+            if (img != nullptr && img->isPropagated())
+                propagatedPos.insert(key->pos());
+        });
+        QDomNode imageTag = layerElem.firstChild();
+        while (!imageTag.isNull())
+        {
+            QDomElement imageElement = imageTag.toElement();
+            if (!imageElement.isNull() && imageElement.tagName() == "image"
+                && propagatedPos.contains(imageElement.attribute("frame").toInt()))
+            {
+                imageElement.setAttribute("colorizePropagated", 1);
+            }
+            imageTag = imageTag.nextSibling();
+        }
+    }
+
     return layerElem;
 }
 
@@ -129,6 +151,22 @@ void LayerColorize::loadDomElement(const QDomElement& element, QString dataDirPa
     }
 
     LayerBitmap::loadDomElement(element, dataDirPath, progressStep);
+
+    // 回读传播帧标记（见 createDomElement）
+    {
+        QDomNode imageTag = element.firstChild();
+        while (!imageTag.isNull())
+        {
+            QDomElement imageElement = imageTag.toElement();
+            if (!imageElement.isNull() && imageElement.tagName() == "image"
+                && imageElement.attribute("colorizePropagated").toInt())
+            {
+                if (auto* img = getColorizeImageAtFrame(imageElement.attribute("frame").toInt()))
+                    img->setPropagated(true);
+            }
+            imageTag = imageTag.nextSibling();
+        }
+    }
 }
 
 void LayerColorize::setTransparentColor(QRgb color)
@@ -233,7 +271,10 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
     }
 
     if (changed)
+    {
         frame->setModified(true);
+        frame->setPropagated(false); // 用户整理过：转手涂帧，传播不再覆盖
+    }
 
     // 若删除的是透明颜色本身，一并取消标记
     if (mHasTransparentColor && color == mTransparentColor)

@@ -49,11 +49,17 @@ public:
 
     void setColoringResult(QImage result, QRect bounds, quint32 structureGeneration = 0);
 
+    /** 传播帧标记：true = 笔画来自跨帧传播（重传播可刷新覆盖）；
+     *  用户手涂/删色即复位为手涂帧（永久保护，不被传播覆盖） */
+    bool isPropagated() const { return mPropagated; }
+    void setPropagated(bool b) { mPropagated = b; }
+
 private:
     QImage mColoring;
     QRect mColoringBounds;
     bool mNeedsUpdate = true;
     quint32 mComputedStructureGeneration = 0;
+    bool mPropagated = false;
 };
 
 #endif // COLORIZE_IMAGE_H

@@ -1278,8 +1278,8 @@ Status ActionCommands::propagateColorizeStrokes()
     QVector<Anchor> anchors;
     colorizeLayer->foreachKeyFrame([&](KeyFrame* key) {
         auto img = static_cast<ColorizeImage*>(key);
-        if (img == nullptr || img->bounds().isEmpty())
-            return;
+        if (img == nullptr || img->bounds().isEmpty() || img->isPropagated())
+            return; // 传播帧是本功能旧产物，不是用户意图：不作锚点（可被刷新）
         auto line = static_cast<BitmapImage*>(
             lineLayer->getKeyFrameWhichCovers(lineLayer->displayFrameFor(img->pos())));
         if (line == nullptr || line->bounds().isEmpty())
@@ -1320,6 +1320,14 @@ Status ActionCommands::propagateColorizeStrokes()
     {
         const QRgb transp = colorizeLayer->transparentColor();
         const bool hasTransp = colorizeLayer->hasTransparentColor();
+        // 锚点实画色集（面板同口径实心色，去透明标记色）
+        const auto solidColorsAt = [&](int framePos) {
+            QSet<QRgb> s;
+            for (QRgb c : colorizeLayer->strokeColorsAtFrame(framePos))
+                if (!(hasTransp && c == transp))
+                    s.insert(c);
+            return s;
+        };
         for (int i = 0; i + 1 < anchors.size(); ++i)
         {
             progress.setValue(i);
@@ -1352,10 +1360,7 @@ Status ActionCommands::propagateColorizeStrokes()
                     predictedColors.insert(c);
                 }
             }
-            QSet<QRgb> actualColors;
-            for (QRgb c : colorizeLayer->strokeColorsAtFrame(B.pos))
-                if (!(hasTransp && c == transp))
-                    actualColors.insert(c);
+            QSet<QRgb> actualColors = solidColorsAt(B.pos);
 
             QStringList missed, extra;
             for (QRgb c : actualColors)
@@ -1365,10 +1370,24 @@ Status ActionCommands::propagateColorizeStrokes()
                 if (!actualColors.contains(c))
                     extra << QColor(c).name();
             if (!missed.isEmpty() || !extra.isEmpty())
-                validationNotes << tr("帧%1→帧%2：未预测到 %3；多预测 %4")
+            {
+                // 附两侧锚点实画色集：锚点间色集本就不同（如帧5没涂橙）
+                // vs 搬运丢失，用户看色集即可自诊断
+                const auto setNames = [](QSet<QRgb> colors) {
+                    QStringList names;
+                    QList<QRgb> ordered = colors.values();
+                    std::sort(ordered.begin(), ordered.end());
+                    for (QRgb c : ordered)
+                        names << QColor(c).name();
+                    return names.join(",");
+                };
+                validationNotes << tr("帧%1→帧%2：未预测到 %3；多预测 %4（帧%1 色集[%5] 帧%2 色集[%6]）")
                                       .arg(A.pos).arg(B.pos)
                                       .arg(missed.isEmpty() ? QStringLiteral("—") : missed.join(", "))
-                                      .arg(extra.isEmpty() ? QStringLiteral("—") : extra.join(", "));
+                                      .arg(extra.isEmpty() ? QStringLiteral("—") : extra.join(", "))
+                                      .arg(setNames(solidColorsAt(A.pos)))
+                                      .arg(setNames(actualColors));
+            }
         }
     }
 
@@ -1402,14 +1421,17 @@ Status ActionCommands::propagateColorizeStrokes()
         }
 
         // 保护判定按「覆盖该帧的关键帧」而非恰在该位的关键帧：手涂键的
-        // 曝光跨度整体保护（锚点与用户修正帧都是手涂键）。源不再接链——
-        // 每帧从绝对距离最近的锚点取（帧 9 离锚点 10 比锚点 1 近，取 10）
+        // 曝光跨度整体保护（锚点与用户修正帧）。传播帧（isPropagated）
+        // 是本功能的旧产物，不保护——换锚点重传应能刷新它们。
+        // 源不再接链——每帧从绝对距离最近的锚点取（帧 9 离锚点 10 比
+        // 锚点 1 近，取 10）
         KeyFrame* cover = colorizeLayer->getKeyFrameWhichCovers(pos);
         auto coverImg = static_cast<ColorizeImage*>(cover);
         if (coverImg != nullptr && !coverImg->bounds().isEmpty()
+            && !coverImg->isPropagated()
             && !touchedPos.contains(coverImg->pos()))
         {
-            ++skippedPainted; // 已有手涂笔画（锚点/修正）：保护跳过
+            ++skippedPainted; // 手涂帧（锚点/用户修正）：保护跳过
             continue;
         }
 
@@ -1462,6 +1484,7 @@ Status ActionCommands::propagateColorizeStrokes()
         {
             auto newFrame = new ColorizeImage();
             newFrame->paste(&newStrokes);
+            newFrame->setPropagated(true); // 传播产物：重传可刷新
             colorizeLayer->addKeyFrame(pos, newFrame);
             ++created;
         }
@@ -1471,6 +1494,7 @@ Status ActionCommands::propagateColorizeStrokes()
             existingImg->paste(&newStrokes);
             existingImg->setModified(true);
             existingImg->setNeedsUpdate(true);
+            existingImg->setPropagated(true);
             contentDirty = true;
             ++written;
         }

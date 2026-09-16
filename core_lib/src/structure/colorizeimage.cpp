@@ -20,7 +20,8 @@ ColorizeImage::ColorizeImage(const ColorizeImage& rhs)
     : BitmapImage(rhs),
       mColoring(rhs.mColoring),
       mColoringBounds(rhs.mColoringBounds),
-      mNeedsUpdate(rhs.mNeedsUpdate)
+      mNeedsUpdate(rhs.mNeedsUpdate),
+      mPropagated(rhs.mPropagated)
 {
 }
 

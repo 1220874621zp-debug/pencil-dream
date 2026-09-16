@@ -973,7 +973,9 @@ void ScribbleArea::paintBitmapBuffer()
         if (auto* colorizeLayer = static_cast<LayerColorize*>(layer);
             colorizeLayer->getLastColorizeImageAtFrame(frameNumber) != nullptr)
         {
-            colorizeLayer->getLastColorizeImageAtFrame(frameNumber)->setNeedsUpdate(true);
+            auto* frame = colorizeLayer->getLastColorizeImageAtFrame(frameNumber);
+            frame->setNeedsUpdate(true);
+            frame->setPropagated(false); // 手涂帧：从此被传播保护，不再被重传刷新
         }
 
         // 广播 frameModified：选项面板颜色列表与时间轴待更新点据此刷新
