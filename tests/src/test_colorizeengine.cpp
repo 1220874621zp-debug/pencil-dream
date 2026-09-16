@@ -1139,3 +1139,33 @@ TEST_CASE("Colorize TransportByBoundsScale")
     REQUIRE((redGot.x() > 405 && redGot.x() < 795 && redGot.y() > 155 && redGot.y() < 445));
     REQUIRE((blueGot.x() > 405 && blueGot.x() < 795 && blueGot.y() > 155 && blueGot.y() < 445));
 }
+
+TEST_CASE("Colorize StrokeUndoOnColorize")
+{
+    // 回归：填色层笔画的 KEYFRAME_MODIFY record 曾对 COLORIZE 层空操作
+    // （replaceKeyFrame 只认 BITMAP）→ 笔画从不入撤销栈，一按 Ctrl+Z 直撤更早命令
+    Object* object = new Object;
+    object->init();
+    Editor* editor = new Editor;
+    ScribbleArea* scribbleArea = new ScribbleArea(nullptr);
+    editor->setScribbleArea(scribbleArea);
+    editor->setObject(object);
+    editor->init();
+
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+    editor->layers()->setCurrentLayer(object->getIndex(colorizeLayer));
+
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+
+    // 模拟 stroke tool 链：起笔 createState → 画 → record
+    const SAVESTATE_ID id = editor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    frame->drawLine(QPointF(20, 20), QPointF(60, 60), QPen(QColor(0, 200, 0), 3),
+                    QPainter::CompositionMode_SourceOver, false);
+    REQUIRE(!frame->bounds().isEmpty());
+    editor->undoRedo()->record(id, QStringLiteral("stroke"));
+
+    // undo → 该笔像素应被回滚（修复前无命令可撤）
+    editor->undoRedo()->undo();
+    REQUIRE(frame->bounds().isEmpty());
+}

@@ -198,7 +198,10 @@ void UndoRedoManager::addKeyFrame(const UndoSaveState& undoState, const QString&
 
 void UndoRedoManager::replaceKeyFrame(const UndoSaveState& undoState, const QString& description)
 {
-    if (undoState.layerType == Layer::BITMAP) {
+    // 位图族（BITMAP 与填色层 COLORIZE）的像素修改统一走位图替换命令；
+    // 填色层曾被漏掉 → 填色层笔画撤销一直是空操作（一按 Ctrl+Z 直跳更早命令）
+    if (undoState.keyframe == nullptr) { return; }
+    if (dynamic_cast<BitmapImage*>(undoState.keyframe.get()) != nullptr) {
         replaceBitmap(undoState, description);
     } else {
         // Implement other cases
@@ -218,7 +221,8 @@ void UndoRedoManager::moveKeyFrames(const UndoSaveState& undoState, const QStrin
 
 void UndoRedoManager::replaceBitmap(const UndoSaveState& undoState, const QString& description)
 {
-    if (undoState.keyframe == nullptr || undoState.layerType != Layer::BITMAP) { return; }
+    // keyframe 已在上游确认为 BitmapImage 族（含 ColorizeImage）
+    if (undoState.keyframe == nullptr) { return; }
     BitmapReplaceCommand* element = new BitmapReplaceCommand(static_cast<BitmapImage*>(undoState.keyframe.get()),
                                                undoState.layerId,
                                                description,
