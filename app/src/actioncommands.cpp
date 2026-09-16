@@ -1254,10 +1254,10 @@ Status ActionCommands::propagateColorizeStrokes()
     // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失
     const quint32 structureGen = mEditor->object()->layerStructureGeneration();
     const auto ensureSourceColoring = [&](ColorizeImage* frame) {
-        const bool stale = frame->needsUpdate()
-            || frame->computedStructureGeneration() != structureGen;
-        if (frame->coloringImage().isNull() || stale)
-            colorizeLayer->updateColoringAtFrame(frame->pos(), lineLayer, structureGen);
+        // 无条件重算：着色缓存可能由旧版引擎算出（如清理地雷修复前的
+        // 被掏空结果），needsUpdate/结构代数都识别不出引擎变更——传播
+        // 的颜色事实源必须永远是当前引擎的产物（锚点数量少，成本可接受）
+        colorizeLayer->updateColoringAtFrame(frame->pos(), lineLayer, structureGen);
         return !frame->coloringImage().isNull();
     };
 
