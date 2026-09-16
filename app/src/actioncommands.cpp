@@ -1306,10 +1306,11 @@ Status ActionCommands::propagateColorizeStrokes()
         }
 
         const QRect canvas = prevLine.bounds() | lineFrame->bounds() | prevStrokes.bounds();
+        // 平铺图是 canvas 相对坐标（原点 0,0）：bounds 必须传图内矩形，传画布原点矩形会越界崩溃
         const QImage transported = Colorize::transportStrokes(flatten(prevLine, canvas),
                                                               flatten(prevStrokes, canvas),
                                                               flatten(*lineFrame, canvas),
-                                                              canvas);
+                                                              QRect(0, 0, canvas.width(), canvas.height()));
         const QRect box = nonEmptyBBox(transported);
         if (box.isEmpty())
         {

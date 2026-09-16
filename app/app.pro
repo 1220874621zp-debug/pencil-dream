@@ -83,6 +83,7 @@ HEADERS += \
     src/importpositiondialog.h \
     src/layeropacitydialog.h \
     src/mainwindow2.h \
+    src/colorizeoptionswidget.h \
     src/onionskinwidget.h \
     src/predefinedsetmodel.h \
     src/pegbaralignmentdialog.h \
@@ -142,6 +143,7 @@ SOURCES += \
     src/addtransparencytopaperdialog.cpp \
     src/basewidget.cpp \
     src/buttonappearancewatcher.cpp \
+    src/colorizeoptionswidget.cpp \
     src/importlayersdialog.cpp \
     src/importpositiondialog.cpp \
     src/layeropacitydialog.cpp \
