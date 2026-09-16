@@ -1612,7 +1612,7 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         bool merged = false;
         for (MajorColor& m : majors)
         {
-            if (colorDistanceSq(m.color, item.second) <= MERGE_COLOR_DIST_SQ)
+            if (similarColors(m.color, item.second))
             {
                 m.stat.count += s.count;
                 m.stat.sumX += s.sumX;
@@ -1627,19 +1627,15 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     if (majors.isEmpty())
         return result;
 
+    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者），
+    // 无相似则原样返回
     const auto normalizeColor = [&majors](QRgb c) {
-        QRgb best = c;
-        int bestDist = MERGE_COLOR_DIST_SQ + 1;
         for (const MajorColor& m : majors)
         {
-            const int d = colorDistanceSq(m.color, c);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = m.color;
-            }
+            if (similarColors(m.color, c))
+                return m.color;
         }
-        return best;
+        return c;
     };
 
     QPainter painter(&result);

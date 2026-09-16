@@ -1341,3 +1341,63 @@ TEST_CASE("Colorize RegionsNoColorLoss")
     INFO("红色标记像素数 " << redPixels);
     REQUIRE(redPixels >= 64);
 }
+
+TEST_CASE("Colorize HueVariantMerge")
+{
+    // 用户实拍场景：画笔半透明叠色混出同一主色的明暗变体（红系3个+黄系2个+橙1个）。
+    // 判定维度换色相：同色相的明暗变体并入面积最大的主色，
+    // 刻意分开的相邻色相（红 vs 橙）不得误并。
+    const QRgb brightRed = qRgb(230, 30, 40);
+    const QRgb darkRed = qRgb(140, 20, 20);
+    const QRgb brickRed = qRgb(170, 40, 30);
+    const QRgb orange = qRgb(235, 130, 40);
+    const QRgb brightYellow = qRgb(245, 230, 60);
+    const QRgb golden = qRgb(240, 195, 60);
+
+    SECTION("similarColors 判定")
+    {
+        CHECK(Colorize::similarColors(brightRed, darkRed));
+        CHECK(Colorize::similarColors(brightRed, brickRed));
+        CHECK(Colorize::similarColors(brightYellow, golden));
+        CHECK_FALSE(Colorize::similarColors(brightRed, orange));
+        CHECK_FALSE(Colorize::similarColors(orange, golden));
+        // 低饱和（灰系）退回 RGB 距离
+        CHECK(Colorize::similarColors(qRgb(128, 128, 128), qRgb(140, 140, 140)));
+        CHECK_FALSE(Colorize::similarColors(qRgb(128, 128, 128), qRgb(200, 40, 40)));
+    }
+
+    SECTION("面板列表 6 变体归并为 3 主色")
+    {
+        std::unique_ptr<Object> object(new Object);
+        object->init();
+        auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+        auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+        REQUIRE(frame != nullptr);
+
+        auto block = [frame](int x, int y, int w, int h, QRgb c) {
+            frame->drawRect(QRectF(x, y, w, h), QPen(Qt::NoPen), QBrush(QColor(c)),
+                            QPainter::CompositionMode_SourceOver, false);
+        };
+        // 主色面积 > 变体，保证面积降序时主色先入列表、变体并入
+        block(10, 10, 30, 30, brightRed);
+        block(60, 10, 8, 8, darkRed);
+        block(80, 10, 6, 6, brickRed);
+        block(10, 60, 20, 20, orange);
+        block(50, 60, 25, 25, brightYellow);
+        block(90, 60, 8, 8, golden);
+
+        const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+        INFO("列表颜色数 " << colors.size());
+        REQUIRE(colors.size() == 3);
+        REQUIRE(colors.contains(brightRed));
+        REQUIRE(colors.contains(orange));
+        REQUIRE(colors.contains(brightYellow));
+
+        // 容差删除主色红：暗红/砖红变体像素一并清除，列表剩 2
+        colorizeLayer->removeStrokeColor(1, brightRed);
+        const QVector<QRgb> after = colorizeLayer->strokeColorsAtFrame(1);
+        REQUIRE(after.size() == 2);
+        REQUIRE(after.contains(orange));
+        REQUIRE(after.contains(brightYellow));
+    }
+}

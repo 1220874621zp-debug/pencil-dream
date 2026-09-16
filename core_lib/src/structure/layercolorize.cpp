@@ -145,7 +145,7 @@ void LayerColorize::removeStrokeColor(int frameNumber, QRgb color)
             const int g = qBound(0, qRound(qGreen(px) * 255.0 / a), 255);
             const int b = qBound(0, qRound(qBlue(px) * 255.0 / a), 255);
             // 容差删除：与列表色相近的像素一并清除（与列表的相近色合并一致）
-            if (Colorize::colorDistanceSq(qRgb(r, g, b), color) <= Colorize::MERGE_COLOR_DIST_SQ)
+            if (Colorize::similarColors(qRgb(r, g, b), color))
             {
                 line[x] = 0;
                 changed = true;
@@ -197,12 +197,12 @@ QVector<QRgb> LayerColorize::strokeColorsAtFrame(int frameNumber)
               [](const QPair<qint64, QRgb>& a, const QPair<qint64, QRgb>& b) { return a.first > b.first; });
     for (const auto& item : order)
     {
-        // 相近色并入面积最大的主色：画笔软边/流量叠加产生的中间色
-        // 不单独显示（用户只看到自己选的颜色）
+        // 相近色并入面积最大的主色：画笔半透明叠色混出的明暗变体
+        // （色相同、明度/饱和度不同）不单独显示（用户只看到自己选的颜色）
         bool merged = false;
         for (const QRgb c : colors)
         {
-            if (Colorize::colorDistanceSq(c, item.second) <= Colorize::MERGE_COLOR_DIST_SQ)
+            if (Colorize::similarColors(c, item.second))
             {
                 merged = true;
                 break;

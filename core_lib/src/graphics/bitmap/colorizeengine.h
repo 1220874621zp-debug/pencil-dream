@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #ifndef COLORIZE_ENGINE_H
 #define COLORIZE_ENGINE_H
 
+#include <QColor>
 #include <QImage>
 #include <QRect>
 #include <QRgb>
@@ -40,7 +41,7 @@ GNU General Public License for more details.
 namespace Colorize
 {
 
-/* 两颜色 RGB 欧氏距离平方（相近色合并用；≤ MERGE_COLOR_DIST_SQ 视为同一色） */
+/* 两颜色 RGB 欧氏距离平方 */
 inline int colorDistanceSq(QRgb a, QRgb b)
 {
     const int dr = qRed(a) - qRed(b);
@@ -48,7 +49,27 @@ inline int colorDistanceSq(QRgb a, QRgb b)
     const int db = qBlue(a) - qBlue(b);
     return dr * dr + dg * dg + db * db;
 }
-constexpr int MERGE_COLOR_DIST_SQ = 1200; // ≈每通道差20：画笔软边/流量中间色并入主色
+constexpr int MERGE_COLOR_DIST_SQ = 1200; // 灰系（低饱和）合并阈值 ≈每通道差20
+
+/*
+ * 颜色相似判定（相近色合并）：有彩色按色相（hue 差 ≤ 12° 判同色，
+ * 明度/饱和度变体——画笔半透明叠色混出的深浅变体——全部并入主色，
+ * 而用户刻意分开的相邻色相如红/橙/黄不会被误并）；低饱和（灰系）
+ * 色相无意义，退回 RGB 距离判定。
+ */
+inline bool similarColors(QRgb a, QRgb b)
+{
+    int ha = 0, sa = 0, va = 0, hb = 0, sb = 0, vb = 0;
+    QColor(a).getHsv(&ha, &sa, &va);
+    QColor(b).getHsv(&hb, &sb, &vb);
+    Q_UNUSED(va); Q_UNUSED(vb);
+    if (sa < 40 || sb < 40)
+        return colorDistanceSq(a, b) <= MERGE_COLOR_DIST_SQ;
+    int dh = qAbs(ha - hb);
+    if (dh > 180)
+        dh = 360 - dh;
+    return dh <= 12;
+}
 
 
 struct FilteringOptions
