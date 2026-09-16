@@ -144,8 +144,12 @@ QVector<KeyStroke> splitKeyStrokesByColor(const QImage& strokesImage, const QRec
  * 相似主色组（蒙版逐像素取大），分水岭只按主色扩散，杜绝变体扩散成杂色区。
  * 透明标记色组钉在首位：其变体并入透明组而非普通主色（透明语义不丢）。
  * strokes 须为面积降序（splitKeyStrokesByColor 的返回序）。
+ * mergeVariants=false 跳过色相合并（"以画布为准"：同色相的实心色是
+ * 用户分别涂的独立颜色，不并），只保留空间混合带折叠与代表值提升
+ * ——填色(colorize)/显示/传播三链必须同参，否则画布与面板颜色分叉。
  */
-void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options);
+void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options,
+                         bool mergeVariants = true);
 
 /*
  * 分水岭填充。strokes 按值传入（算法会消费其中的蒙版副本）。

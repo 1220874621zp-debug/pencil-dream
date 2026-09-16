@@ -1750,6 +1750,108 @@ TEST_CASE("Colorize MixedStrokeColors")
 
 }
 
+TEST_CASE("Colorize PropagateKeepsSimilarColors")
+{
+    // 用户实拍案（画布与面板分叉的传播版）：暗红(140,20,20)与纯红(255,0,0)
+    // 同色相、分居两个房间——刻意的独立颜色。填色/传播链必须原样保留
+    // 两种红（色相合并会并成一色：面板两色、传播后只剩一色）
+    Object* object = new Object;
+    object->init();
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+
+    const QSize size(160, 120);
+    const QRgb darkRed = qRgb(140, 20, 20);
+    const QRgb pureRed = qRgb(255, 0, 0);
+    const QPoint shift(10, -6);
+
+    auto drawRooms = [](QPainter& p, const QPoint& off) {
+        QPen pen(Qt::black, 2);
+        p.setPen(pen); p.setBrush(Qt::NoBrush);
+        p.drawRect(10 + off.x(), 30 + off.y(), 65, 60);  // 左房
+        p.drawRect(85 + off.x(), 30 + off.y(), 65, 60);  // 右房
+    };
+    // 独立线稿图（canvas 坐标，原点(0,0)）：源帧 A 与平移后的目标帧 B
+    QImage lineA = makeLineArt(size, [&](QPainter& p) { drawRooms(p, QPoint(0, 0)); });
+    QImage lineB = makeLineArt(size, [&](QPainter& p) { drawRooms(p, shift); });
+    const QRect originRect(QPoint(0, 0), size);
+
+    // 层内源帧内容与独立图 A 同坐标（drawRect 直接用 canvas 坐标）
+    auto* line1 = lineArtLayer->getBitmapImageAtFrame(1);
+    REQUIRE(line1 != nullptr);
+    line1->drawRect(QRectF(10, 30, 65, 60), QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                    QPainter::CompositionMode_SourceOver, false);
+    line1->drawRect(QRectF(85, 30, 65, 60), QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                    QPainter::CompositionMode_SourceOver, false);
+
+    auto* frame1 = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame1 != nullptr);
+    // 左房暗红、右房纯红（各一大块实心色）
+    frame1->drawRect(QRectF(20, 45, 45, 30), QPen(Qt::NoPen), QBrush(QColor(darkRed)),
+                     QPainter::CompositionMode_SourceOver, false);
+    frame1->drawRect(QRectF(95, 45, 45, 30), QPen(Qt::NoPen), QBrush(QColor(pureRed)),
+                     QPainter::CompositionMode_SourceOver, false);
+
+    auto countColor = [](const QImage& img, QRgb c) {
+        int n = 0;
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = 0; x < img.width(); ++x)
+                if (qAlpha(img.pixel(x, y)) > 0 && nonPremul(img, x, y) == c)
+                    ++n;
+        return n;
+    };
+
+    SECTION("source fill keeps both deliberate reds")
+    {
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
+        const QImage coloring = frame1->coloringImage();
+        REQUIRE(!coloring.isNull());
+        INFO("着色场 暗红像素 " << countColor(coloring, darkRed)
+             << " 纯红像素 " << countColor(coloring, pureRed));
+        REQUIRE(countColor(coloring, darkRed) > 40 * 30);
+        REQUIRE(countColor(coloring, pureRed) > 40 * 30);
+    }
+
+    SECTION("propagated markers and target fill keep both")
+    {
+        REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
+        const QImage coloring = frame1->coloringImage();
+        REQUIRE(countColor(coloring, darkRed) > 40 * 30);
+
+        // 复刻 actioncommands 传播管线：三图平铺到公共 canvas 矩形。
+        // 独立图原点=(0,0)；着色缓存按 coloringBounds() 平铺
+        const QRect canvas = (originRect | frame1->coloringBounds()).adjusted(-16, -16, 16, 16);
+        auto flatten = [&canvas](const QImage& img, const QPoint& canvasPos) {
+            QImage out(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+            out.fill(Qt::transparent);
+            QPainter p(&out);
+            p.drawImage(canvasPos - canvas.topLeft(), img);
+            p.end();
+            return out;
+        };
+        QImage transported = Colorize::transportStrokesByRegions(
+            flatten(lineA, QPoint(0, 0)),
+            flatten(coloring, frame1->coloringBounds().topLeft()),
+            flatten(lineB, QPoint(0, 0)),
+            QRect(0, 0, canvas.width(), canvas.height()),
+            Colorize::FilteringOptions());
+
+        INFO("传播标记 暗红像素 " << countColor(transported, darkRed)
+             << " 纯红像素 " << countColor(transported, pureRed));
+        REQUIRE(countColor(transported, darkRed) >= 64);
+        REQUIRE(countColor(transported, pureRed) >= 64);
+
+        // 目标帧平涂：两种红各自填满自己的房间
+        QImage targetFill = Colorize::colorize(
+            flatten(lineB, QPoint(0, 0)), transported,
+            QRect(0, 0, canvas.width(), canvas.height()), Colorize::FilteringOptions());
+        INFO("目标填色 暗红像素 " << countColor(targetFill, darkRed)
+             << " 纯红像素 " << countColor(targetFill, pureRed));
+        REQUIRE(countColor(targetFill, darkRed) > 40 * 30);
+        REQUIRE(countColor(targetFill, pureRed) > 40 * 30);
+    }
+}
+
 TEST_CASE("Colorize ListMixedColors")
 {
     // 列表与删除的归并判定须与引擎同源：红+绿笔画叠色混出的棕色

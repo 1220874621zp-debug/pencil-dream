@@ -402,13 +402,10 @@ bool LayerColorize::updateColoringAtFrame(int frameNumber, LayerBitmap* sourceLa
         return true;
     }
 
-    // 笔画按主色代表值（优先意图色=用户所选颜色代码）重涂后喂引擎：
-    // 填色输出即用户所选色，画布脏像素不参与取色
-    // 以画布为准：填色用像素色本身（重染保证新笔画=纯色代码），
-    // normalize 只做族代表统一与混合带归并，不再意图/色板认领
-    const QImage normalized = Colorize::normalizeStrokeColors(
-        data.strokeImg, data.strokeImg.rect(), mTransparentColor, mHasTransparentColor, QVector<QRgb>());
-    QImage result = Colorize::colorize(data.lineImg, normalized, data.lineImg.rect(), data.options);
+    // 以画布为准，与异步路径(ColorizeUpdateRunnable)完全同源：原始笔画
+    // 直喂 colorize（内部不并色相、只折空间混合带）——两条路径任何
+    // 后处理差异都会让"刷新"与"传播/导出"的填色色分叉
+    QImage result = Colorize::colorize(data.lineImg, data.strokeImg, data.lineImg.rect(), data.options);
     if (auto* frame = getColorizeImageAtFrame(data.keyPos))
         frame->setColoringResult(result, data.bounds, structureGeneration);
     return true;

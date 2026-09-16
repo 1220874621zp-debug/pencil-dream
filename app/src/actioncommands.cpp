@@ -1264,9 +1264,15 @@ Status ActionCommands::propagateColorizeStrokes()
         colorizeLayer->setPaletteColors(paletteColors);
     }
 
-    // 区域映射以源帧着色结果为颜色事实源；未算过则同步补算一次
-    if (srcFrame->coloringImage().isNull())
-        colorizeLayer->updateColoringAtFrame(srcPos, lineLayer, mEditor->object()->layerStructureGeneration());
+    // 区域映射以源帧着色结果为颜色事实源；未算过或已过期（涂后未刷新/
+    // 图层结构变动）都同步补算——否则传播采样的是旧色场，新涂的颜色丢失
+    {
+        const quint32 gen = mEditor->object()->layerStructureGeneration();
+        const bool stale = srcFrame->needsUpdate()
+            || srcFrame->computedStructureGeneration() != gen;
+        if (srcFrame->coloringImage().isNull() || stale)
+            colorizeLayer->updateColoringAtFrame(srcPos, lineLayer, gen);
+    }
     if (srcFrame->coloringImage().isNull())
     {
         QMessageBox::information(mParent, tipTitle, tr("源帧着色计算失败，无法传播。"));

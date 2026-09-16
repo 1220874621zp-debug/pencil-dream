@@ -1514,8 +1514,9 @@ QImage normalizeStrokeColors(const QImage& strokesImage, const QRect& bounds,
     QVector<KeyStroke> groups = splitKeyStrokesByColor(strokesImage, bounds);
     if (groups.isEmpty())
         return result;
+    // 以画布为准（与 colorize/面板同参）：实心色不并色相，只折空间混合带
     const QVector<int> master = classifyStrokeMasters(groups, transparentColor,
-                                                      hasTransparent);
+                                                      hasTransparent, /*mergeVariants=*/false);
     claimIntentColors(groups, master, transparentColor, hasTransparent, intentColors);
     // 族内像素精确重涂为代表代码（含意图色）：α 取原像素透明度
     for (int g = 0; g < groups.size(); ++g)
@@ -1538,7 +1539,8 @@ QImage normalizeStrokeColors(const QImage& strokesImage, const QRect& bounds,
     return result;
 }
 
-void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options)
+void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options,
+                         bool mergeVariants)
 {
     if (strokes.size() <= 1)
         return;
@@ -1557,8 +1559,10 @@ void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& op
         }
     }
 
-    // 主色分类：变体（色相近似）与叠色混合带（空间贴 ≥2 组）并入主色
-    const QVector<int> master = classifyStrokeMasters(strokes, options.transparentColor, options.hasTransparentColor);
+    // 主色分类：变体（色相近似，mergeVariants=false 跳过）与叠色混合带
+    //（空间贴 ≥2 组）并入主色
+    const QVector<int> master = classifyStrokeMasters(strokes, options.transparentColor,
+                                                      options.hasTransparentColor, mergeVariants);
 
     QVector<KeyStroke> merged;
     for (int g = 0; g < strokes.size(); ++g)
@@ -1702,8 +1706,9 @@ QImage colorize(const QImage& lineArt,
 {
     const QImage heightMap = buildHeightMap(lineArt, bounds, options);
     QVector<KeyStroke> strokes = splitKeyStrokesByColor(strokesImage, bounds);
-    // 变体组归并：混色变体不再作为独立颜色源扩散（防杂色区）
-    mergeVariantStrokes(strokes, options);
+    // 归并：以画布为准——同色相的实心色是用户分别涂的独立颜色不并
+    // （面板/传播同参）；只折空间叠色混合带（贴 ≥2 组的中间色）
+    mergeVariantStrokes(strokes, options, /*mergeVariants=*/false);
 
     // 透明颜色标记（Krita transparentIndex：该颜色区域保持不填）
     if (options.hasTransparentColor)
@@ -1986,8 +1991,9 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
 
     const int dot = 9;
 
-    // 源帧颜色统计 → 主色表：相近色并入面积最大者（画笔软边/流量中间色
-    // 不产生独立标记，防止杂色在帧间滚雪球）
+    // 源帧颜色统计 → 主色表：以画布为准，精确色即主色（着色结果源自
+    // colorize 且不并色相——暗红/纯红是用户分别涂的独立颜色，必须原样
+    // 传播；此处再做相似归并会把刻意色在帧间吞掉，画布与面板分叉）
     struct ColorStat
     {
         qint64 count = 0;
@@ -2021,36 +2027,9 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     };
     QVector<MajorColor> majors;
     for (const auto& item : order)
-    {
-        const ColorStat& s = exact[item.second];
-        bool merged = false;
-        for (MajorColor& m : majors)
-        {
-            if (similarColors(m.color, item.second))
-            {
-                m.stat.count += s.count;
-                m.stat.sumX += s.sumX;
-                m.stat.sumY += s.sumY;
-                merged = true;
-                break;
-            }
-        }
-        if (!merged)
-            majors.append(MajorColor{ item.second, s });
-    }
+        majors.append(MajorColor{ item.second, exact[item.second] });
     if (majors.isEmpty())
         return result;
-
-    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者），
-    // 无相似则原样返回（着色结果源自 colorize，混合带已在源头归并）
-    const auto normalizeColor = [&majors](QRgb c) {
-        for (const MajorColor& m : majors)
-        {
-            if (similarColors(m.color, c))
-                return m.color;
-        }
-        return c;
-    };
 
     QPainter painter(&result);
     painter.setPen(Qt::NoPen);
@@ -2073,7 +2052,7 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
         const QRgb px = coloringA.pixel(src);
         if (qAlpha(px) > 0)
         {
-            outColor = normalizeColor(qUnpremultiply(px));
+            outColor = qUnpremultiply(px); // 着色场只含主色代码，原样即主色
             outTransparent = false;
         }
         else
