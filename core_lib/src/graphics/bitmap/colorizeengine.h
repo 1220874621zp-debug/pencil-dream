@@ -72,6 +72,7 @@ inline bool similarColors(QRgb a, QRgb b)
 }
 
 
+
 struct FilteringOptions
 {
     bool useEdgeDetection = false;  // LoG 边缘检测（软/灰线稿增强为清晰屏障）
@@ -90,6 +91,20 @@ struct KeyStroke
     QRgb color = 0;             // 非预乘颜色（isTransparent 时无意义）
     bool isTransparent = false; // 透明笔画：填充结果保持透明（保护区域）
 };
+
+/*
+ * 笔画组主色分类（strokes 须面积降序，splitKeyStrokesByColor 的返回序）：
+ * 1) 色相近似组并入首个相似主色（变体——画笔软边/流量的明暗中间色）；
+ * 2) 余组中与 ≥2 个其它组空间相邻（覆盖膨胀 2px 相交）的组判为
+ *    叠色混合带——半透明叠色/互补混出的中间色（红叠黄混橙、红叠绿
+ *    混棕、互补混灰）必然同时贴着两个母色——并入面积最大的相邻组；
+ *    刻意选的独立色点不贴别的色，保留；
+ * 3) 其余组为主色。返回每组的主色组下标（主色指向自身）。
+ * hasTransparent 时 transparentColor 组恒为主色（保护语义，不参与
+ * 折叠也不作折叠目标）。
+ */
+QVector<int> classifyStrokeMasters(const QVector<KeyStroke>& strokes,
+                                   QRgb transparentColor, bool hasTransparent);
 
 /*
  * 线稿 → 高度图（Format_Grayscale8，255 = 屏障）。

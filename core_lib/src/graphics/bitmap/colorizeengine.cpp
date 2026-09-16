@@ -1323,13 +1323,119 @@ QImage dilateMask(const QImage& mask, int radius)
 }
 } // namespace
 
+QVector<int> classifyStrokeMasters(const QVector<KeyStroke>& strokes,
+                                   QRgb transparentColor, bool hasTransparent)
+{
+    const int n = strokes.size();
+    QVector<int> master(n);
+    for (int i = 0; i < n; ++i)
+        master[i] = i;
+    if (n <= 1)
+        return master;
+
+    const auto isTransp = [&](int i) {
+        return hasTransparent && strokes[i].color == transparentColor;
+    };
+
+    // pass 1: 色相近似并入首个相似主色（面积降序 → 首个 = 最大）。
+    // 透明组自身不折叠（恒为主色），但可作折叠目标（其色相变体并入）。
+    for (int i = 0; i < n; ++i)
+    {
+        if (isTransp(i))
+            continue;
+        for (int j = 0; j < i; ++j)
+        {
+            if (master[j] != j)
+                continue;
+            if (similarColors(strokes[j].color, strokes[i].color))
+            {
+                master[i] = j;
+                break;
+            }
+        }
+    }
+
+    // pass 2: 空间混合带。对未被 pass 1 折叠的组建立膨胀邻接；
+    // 与 ≥2 个其它组相邻 = 叠色混合带，并入面积最大相邻组
+    // （下标最小 = 面积降序最大）。
+    QVector<int> cand;
+    for (int i = 0; i < n; ++i)
+        if (master[i] == i && !strokes[i].mask.isNull() && !isTransp(i))
+            cand.append(i);
+    if (cand.size() >= 3)
+    {
+        // 各组覆盖包围盒（稀疏蒙版全图尺寸，扫一次）
+        QVector<QRect> bbox(n);
+        for (int i : cand)
+        {
+            QRect b;
+            const QImage& m = strokes[i].mask;
+            for (int y = 0; y < m.height(); ++y)
+            {
+                const uchar* line = m.constScanLine(y);
+                for (int x = 0; x < m.width(); ++x)
+                    if (line[x] > 0)
+                        b = b.isNull() ? QRect(x, y, 1, 1) : b.united(QRect(x, y, 1, 1));
+            }
+            bbox[i] = b;
+        }
+        // 膨胀邻接：j 的覆盖像素落在 dilate(i,2) 内即相邻
+        QVector<QImage> dil(n);
+        for (int i : cand)
+            dil[i] = dilateMask(strokes[i].mask, 2);
+        const auto adjacent = [&](int i, int j) {
+            if (bbox[j].isNull() || bbox[i].isNull())
+                return false;
+            for (int y = bbox[j].top(); y <= bbox[j].bottom(); ++y)
+            {
+                const uchar* line = strokes[j].mask.constScanLine(y);
+                const uchar* di = dil[i].constScanLine(y);
+                for (int x = bbox[j].left(); x <= bbox[j].right(); ++x)
+                    if (line[x] > 0 && di[x] > 0)
+                        return true;
+            }
+            return false;
+        };
+        for (int ii = 0; ii < cand.size(); ++ii)
+        {
+            const int i = cand[ii];
+            int bestNeighbor = -1;
+            int neighborCount = 0;
+            for (int jj = 0; jj < cand.size(); ++jj)
+            {
+                if (jj == ii)
+                    continue;
+                const int j = cand[jj];
+                if (adjacent(i, j))
+                {
+                    ++neighborCount;
+                    if (bestNeighbor < 0 || j < bestNeighbor)
+                        bestNeighbor = j;
+                }
+            }
+            if (neighborCount >= 2)
+                master[i] = bestNeighbor;
+        }
+    }
+
+    // 链式跟随：混合带并入的相邻组若也是混合带，顺藤到最终主色
+    for (int i = 0; i < n; ++i)
+    {
+        int m = master[i];
+        int guard = 0;
+        while (master[m] != m && guard++ < n)
+            m = master[m];
+        master[i] = m;
+    }
+    return master;
+}
+
 void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& options)
 {
     if (strokes.size() <= 1)
         return;
 
-    // 透明组钉首位：其色相变体优先并入透明组（保透明语义），
-    // 且精确色保持不变（后续 isTransparent 按精确 == 标记仍命中）
+    // 透明组钉首位：精确色保持不变（后续 isTransparent 按精确 == 标记仍命中）
     if (options.hasTransparentColor)
     {
         for (int i = 0; i < strokes.size(); ++i)
@@ -1343,100 +1449,65 @@ void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& op
         }
     }
 
+    // 主色分类：变体（色相近似）与叠色混合带（空间贴 ≥2 组）并入主色
+    const QVector<int> master = classifyStrokeMasters(strokes, options.transparentColor, options.hasTransparentColor);
+
     QVector<KeyStroke> merged;
-    for (KeyStroke& stroke : strokes)
+    for (int g = 0; g < strokes.size(); ++g)
     {
-        KeyStroke* master = nullptr;
+        const int mg = master[g];
+        if (mg == g)
+        {
+            merged.append(strokes[g]);
+            continue;
+        }
+        // 找 merged 中主色组 mg（mg < g，已在 merged 内；主色色值唯一）
+        KeyStroke* dst = nullptr;
         for (KeyStroke& m : merged)
         {
-            if (similarColors(m.color, stroke.color))
+            if (m.color == strokes[mg].color)
             {
-                master = &m;
+                dst = &m;
                 break;
             }
         }
-        if (master == nullptr && merged.size() >= 2)
+        if (dst == nullptr)
+            continue; // 主色组未入列（蒙版为空等退化）：丢弃该组
+
+        const bool variant = similarColors(dst->color, strokes[g].color);
+        if (variant)
         {
-            // 孤色：贴近两母色连线段 = 半透明叠色混出的中间产物，并入
-            QVector<QRgb> palette;
-            QVector<bool> skipAsTarget;
-            for (const KeyStroke& m : merged)
+            // 变体只在其主色覆盖邻域（膨胀2px）内并入（抗锯齿边/叠色
+            // 交界补强主色种子）；远离主色的孤立变体岛（如落在另一色
+            // 域中的混色条纹）整岛丢弃——否则以主色名义扩散成杂色区
+            const QImage nearMaster = dilateMask(dst->mask, 2);
+            for (int y = 0; y < dst->mask.height(); ++y)
             {
-                palette.append(m.color);
-                skipAsTarget.append(m.color != options.transparentColor ? false : options.hasTransparentColor);
+                uchar* d = dst->mask.scanLine(y);
+                const uchar* src = strokes[g].mask.constScanLine(y);
+                const uchar* nearLine = nearMaster.constScanLine(y);
+                for (int x = 0; x < dst->mask.width(); ++x)
+                    if (nearLine[x] > 0 && src[x] > d[x])
+                        d[x] = src[x];
             }
-            const int idx = mixedColorMasterIndex(stroke.color, palette, skipAsTarget);
-            if (idx >= 0)
-                master = &merged[idx];
         }
-        if (master == nullptr)
+        else
         {
-            merged.append(stroke);
-            continue;
-        }
-        // 变体只在其主色覆盖邻域（膨胀2px）内并入（抗锯齿边/叠色交界
-        // 补强主色种子）；远离主色的孤立变体岛（如落在另一色域中的
-        // 混色条纹）整岛丢弃——否则它们仍会以主色名义扩散成杂色区
-        const QImage nearMaster = dilateMask(master->mask, 2);
-        for (int y = 0; y < master->mask.height(); ++y)
-        {
-            uchar* dst = master->mask.scanLine(y);
-            const uchar* src = stroke.mask.constScanLine(y);
-            const uchar* nearLine = nearMaster.constScanLine(y);
-            for (int x = 0; x < master->mask.width(); ++x)
-                if (nearLine[x] > 0 && src[x] > dst[x])
-                    dst[x] = src[x];
+            // 叠色混合带：空间上必然贴着母色，整组并入（覆盖度取大）
+            for (int y = 0; y < dst->mask.height(); ++y)
+            {
+                uchar* d = dst->mask.scanLine(y);
+                const uchar* src = strokes[g].mask.constScanLine(y);
+                for (int x = 0; x < dst->mask.width(); ++x)
+                    if (src[x] > d[x])
+                        d[x] = src[x];
+            }
         }
     }
     strokes = merged;
 }
 
 namespace {
-/*
- * 孤色（与所有母色色相都差>12°）若贴近任意两母色的 RGB 连线段
- * （距离² ≤ MERGE_COLOR_DIST_SQ），判为半透明叠色混出的中间产物
- * （如红叠黄混橙），返回应并入的母色下标（skipAsTarget 标记者如
- * 透明组不作并入目标，但可作线段端点）；真正独立的新颜色返回 -1。
- */
-int mixedColorMasterIndex(QRgb c, const QVector<QRgb>& palette, const QVector<bool>& skipAsTarget)
-{
-    auto distSqToSegment = [](int cx, int cy, int cz, QRgb a, QRgb b) {
-        const int ax = qRed(a), ay = qGreen(a), az = qBlue(a);
-        const int bx = qRed(b), by = qGreen(b), bz = qBlue(b);
-        const int abx = bx - ax, aby = by - ay, abz = bz - az;
-        const qint64 lenSq = qint64(abx) * abx + qint64(aby) * aby + qint64(abz) * abz;
-        qint64 t = 0;
-        if (lenSq > 0)
-        {
-            t = (qint64(cx - ax) * abx + qint64(cy - ay) * aby + qint64(cz - az) * abz) * 255 / lenSq;
-            t = qBound<qint64>(0, t, 255);
-        }
-        const int px = ax + int(t * abx / 255), py = ay + int(t * aby / 255), pz = az + int(t * abz / 255);
-        const int dx = cx - px, dy = cy - py, dz = cz - pz;
-        return dx * dx + dy * dy + dz * dz;
-    };
-
-    int bestIdx = -1;
-    int bestDist = MERGE_COLOR_DIST_SQ;
-    for (int i = 0; i < palette.size(); ++i)
-    {
-        if (skipAsTarget[i])
-            continue;
-        for (int j = 0; j < palette.size(); ++j)
-        {
-            if (i == j)
-                continue;
-            const int d = distSqToSegment(qRed(c), qGreen(c), qBlue(c), palette[i], palette[j]);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                bestIdx = i;
-            }
-        }
-    }
-    return bestIdx;
-}
-
 /*
  * 每封闭区域只保留一组有色种子：区域内种子覆盖最大者胜出，其余
  * 有色种子在该区域内清零。同区域多色点是分水岭多色斑的直接来源
@@ -1862,27 +1933,13 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     if (majors.isEmpty())
         return result;
 
-    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者）；
-    // 无相似的孤色若贴近两主色连线段（叠色混合产物）并入较近主色，
-    // 真独立色原样返回（防旧缓存着色结果带入混合色）
+    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者），
+    // 无相似则原样返回（着色结果源自 colorize，混合带已在源头归并）
     const auto normalizeColor = [&majors](QRgb c) {
         for (const MajorColor& m : majors)
         {
             if (similarColors(m.color, c))
                 return m.color;
-        }
-        if (majors.size() >= 2)
-        {
-            QVector<QRgb> palette;
-            QVector<bool> noSkip;
-            for (const MajorColor& m : majors)
-            {
-                palette.append(m.color);
-                noSkip.append(false);
-            }
-            const int idx = mixedColorMasterIndex(c, palette, noSkip);
-            if (idx >= 0)
-                return majors[idx].color;
         }
         return c;
     };

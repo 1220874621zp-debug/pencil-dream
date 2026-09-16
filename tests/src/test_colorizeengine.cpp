@@ -1682,7 +1682,7 @@ TEST_CASE("Colorize MixedStrokeColors")
     const QRgb yellowMaster = QColor(255, 215, 0).rgba();
     for (QRgb c : coloringColors)
     {
-        INFO("着色结果出现非母色" << QColor(c).name());
+        INFO("着色结果出现非母色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
         REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster)));
     }
 
@@ -1735,8 +1735,54 @@ TEST_CASE("Colorize MixedStrokeColors")
     const QRgb greenTransp = QColor(0, 170, 60).rgba();
     for (QRgb c : transportedColors)
     {
-        INFO("传播标记出现非母色" << QColor(c).name());
+        INFO("传播标记出现非母色 r/g/b" << qRed(c) << "/" << qGreen(c) << "/" << qBlue(c));
         REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster) || c == greenTransp));
     }
 
+}
+
+TEST_CASE("Colorize ListMixedColors")
+{
+    // 列表与删除的归并判定须与引擎同源：红+绿笔画叠色混出的棕色
+    // 不进列表；删除红时棕色像素（归并到红）一并清除
+    std::unique_ptr<Object> object(new Object);
+    object->init();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+    auto* frame = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+
+    const QRgb red = qRgb(255, 0, 0);
+    const QRgb green = qRgb(0, 170, 60);
+    frame->drawLine(QPointF(20, 30), QPointF(50, 30),
+                    QPen(QColor(green), 8), QPainter::CompositionMode_SourceOver, false);
+    frame->drawLine(QPointF(35, 30), QPointF(60, 30),
+                    QPen(QColor(255, 0, 0, 160), 8), QPainter::CompositionMode_SourceOver, false);
+
+    const QVector<QRgb> colors = colorizeLayer->strokeColorsAtFrame(1);
+    INFO("列表颜色数 " << colors.size());
+    REQUIRE(colors.size() == 2);
+    REQUIRE(colors.contains(red));
+    REQUIRE(colors.contains(green));
+
+    // 删除红：归并到红的混合棕色像素一并清除，列表剩绿
+    colorizeLayer->removeStrokeColor(1, red);
+    const QVector<QRgb> after = colorizeLayer->strokeColorsAtFrame(1);
+    REQUIRE(after.size() == 1);
+    REQUIRE(after.contains(green));
+
+    // 红族像素必须清净；红绿叠出的棕带归并到绿族（大面积母色）保留
+    QImage* img = frame->image();
+    int redPixels = 0, brownBand = 0;
+    for (int y = 0; y < img->height(); ++y)
+        for (int x = 0; x < img->width(); ++x)
+        {
+            const QRgb px = img->pixel(x, y);
+            if (qAlpha(px) == 0) continue;
+            const QRgb c = qUnpremultiply(px);
+            if (c == red) ++redPixels;
+            else if (c != green) ++brownBand;
+        }
+    INFO("红像素 " << redPixels << " 棕带像素 " << brownBand);
+    REQUIRE(redPixels == 0);
+    REQUIRE(brownBand < 500); // 棕带=笔画重叠区（有界），不无限扩散
 }
