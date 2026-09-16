@@ -1445,59 +1445,18 @@ QImage makeBackgroundWrap(const QImage& lineArt, const QRect& bounds, QRgb color
     if (bounds.isEmpty())
         return result;
 
-    // 屏障 = 可见线稿（抗锯齿半透明边缘也算，防漏）
-    QImage alpha = extractAlphaMap(lineArt, bounds);
+    const QRect box = nonEmptyBounds(lineArt, bounds);
+    if (box.isEmpty())
+        return result;
 
-    // 线外连通域标记：从 bounds 四边的非屏障像素多源 BFS
-    QImage visited(lineArt.size(), QImage::Format_Grayscale8);
-    visited.fill(0);
-    QStack<QPoint> stack;
-    const auto trySeed = [&](int x, int y) {
-        if (alpha.constScanLine(y)[x] < 16 && !visited.scanLine(y)[x])
-        {
-            visited.scanLine(y)[x] = 1;
-            stack.push(QPoint(x, y));
-        }
-    };
-    for (int x = bounds.left(); x <= bounds.right(); ++x)
-    {
-        trySeed(x, bounds.top());
-        trySeed(x, bounds.bottom());
-    }
-    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
-    {
-        trySeed(bounds.left(), y);
-        trySeed(bounds.right(), y);
-    }
-
-    while (!stack.isEmpty())
-    {
-        const QPoint pt = stack.pop();
-        const QPoint neighbours[4] = { pt + QPoint(-1, 0), pt + QPoint(1, 0),
-                                       pt + QPoint(0, -1), pt + QPoint(0, 1) };
-        for (const QPoint& n : neighbours)
-        {
-            if (!bounds.contains(n))
-                continue;
-            if (alpha.constScanLine(n.y())[n.x()] >= 16)
-                continue;
-            if (visited.scanLine(n.y())[n.x()])
-                continue;
-            visited.scanLine(n.y())[n.x()] = 1;
-            stack.push(n);
-        }
-    }
-
-    // 线外连通域 → 实心包裹色
-    const QRgb premul = qPremultiply(qRgb(qRed(color), qGreen(color), qBlue(color)));
-    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
-    {
-        const uchar* vLine = visited.constScanLine(y);
-        QRgb* rLine = reinterpret_cast<QRgb*>(result.scanLine(y));
-        for (int x = bounds.left(); x <= bounds.right(); ++x)
-            if (vLine[x])
-                rLine[x] = premul;
-    }
+    // 描边形式（用户指定）：沿线稿包围盒边缘一圈保护色。
+    // 连通背景接触描边即归透明组；描边厚 3px 保证闭缝模糊下仍是有效种子
+    QPainter painter(&result);
+    QPen pen(QColor(color), 3);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(box.adjusted(-1, -1, 1, 1));
+    painter.end();
     return result;
 }
 

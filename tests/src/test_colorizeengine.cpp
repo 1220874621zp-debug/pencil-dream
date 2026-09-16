@@ -1172,7 +1172,8 @@ TEST_CASE("Colorize StrokeUndoOnColorize")
 
 TEST_CASE("Colorize BackgroundWrap")
 {
-    // 自动背景包裹：线稿外泛洪填保护色（标透明）→ 平涂时框内着色、框外透明
+    // 自动背景包裹（描边形式）：沿线稿包围盒描一圈保护色（标透明）
+    // → 平涂时连通背景接触描边即整体归透明、框内按色点着色
     const QSize size(160, 120);
     QImage lineArt = makeLineArt(size, [](QPainter& p) {
         QPen pen(Qt::black, 2);
@@ -1182,10 +1183,23 @@ TEST_CASE("Colorize BackgroundWrap")
     const QRgb protect = QColor(120, 120, 120).rgba();
 
     QImage wrap = Colorize::makeBackgroundWrap(lineArt, lineArt.rect(), protect);
-    REQUIRE(qAlpha(wrap.pixel(80, 55)) == 0);   // 框中心：不包裹
-    REQUIRE(qAlpha(wrap.pixel(10, 10)) == 255); // 框外角落：包裹
-    REQUIRE(nonPremul(wrap, 10, 10) == protect);
-    REQUIRE(qAlpha(wrap.pixel(150, 100)) == 255);
+    // 描边只出现在线稿包围盒边缘：中心与远处背景均无笔画
+    REQUIRE(qAlpha(wrap.pixel(80, 55)) == 0);  // 框中心：不描
+    REQUIRE(qAlpha(wrap.pixel(10, 10)) == 0);  // 框外远处：不描
+    REQUIRE(qAlpha(wrap.pixel(150, 100)) == 0);
+    // 描边矩形 ≈ 线稿包围盒（外扩不超过描边厚度+2）
+    const QRect lineBox = contentRect(lineArt);
+    const QRect wrapBox = contentRect(wrap);
+    REQUIRE(!lineBox.isEmpty());
+    REQUIRE(!wrapBox.isEmpty());
+    REQUIRE(wrapBox.width() >= lineBox.width());
+    REQUIRE(wrapBox.width() - lineBox.width() <= 10);
+    REQUIRE(wrapBox.height() >= lineBox.height());
+    REQUIRE(wrapBox.height() - lineBox.height() <= 10);
+    REQUIRE(qAbs(wrapBox.center().x() - lineBox.center().x()) <= 3);
+    REQUIRE(qAbs(wrapBox.center().y() - lineBox.center().y()) <= 3);
+    // 描边上有保护色像素（取线稿包围盒上边缘中点向外 2px）
+    REQUIRE(qAlpha(wrap.pixel(lineBox.center().x(), lineBox.top() - 2)) == 255);
 
     // 合并色点后平涂：框内红、框外不着色（透明保护语义）
     QImage strokes = wrap;
