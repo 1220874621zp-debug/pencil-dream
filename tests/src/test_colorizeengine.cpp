@@ -1636,3 +1636,107 @@ TEST_CASE("Colorize OneSeedPerRegion")
     }
 }
 
+
+TEST_CASE("Colorize MixedStrokeColors")
+{
+    // 复刻 actioncommands::propagateColorizeStrokes 管线（软笔叠色变体场景），
+    // 打印传播帧笔画实际出现的颜色——定位"传播后列表颜色变多"
+    Object* object = new Object;
+    object->init();
+    LayerBitmap* lineArtLayer = object->addNewBitmapLayer();
+    auto* colorizeLayer = static_cast<LayerColorize*>(object->addNewColorizeLayer());
+
+    auto drawGuy = [](BitmapImage* img, const QPoint& c) {
+        img->drawEllipse(QRectF(c.x() - 20, c.y() - 14, 40, 28),
+                         QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                         QPainter::CompositionMode_SourceOver, false);
+        img->drawEllipse(QRectF(c.x() - 12, c.y() - 30, 24, 20),
+                         QPen(Qt::black, 2), QBrush(Qt::NoBrush),
+                         QPainter::CompositionMode_SourceOver, false);
+    };
+    auto* line1 = lineArtLayer->getBitmapImageAtFrame(1);
+    drawGuy(line1, QPoint(60, 60));
+
+    auto* frame1 = colorizeLayer->getColorizeImageAtFrame(1);
+    REQUIRE(frame1 != nullptr);
+    // 半透明叠色：红(α150)叠黄 → 混出橙/砖红变体（用户真实场景）
+    frame1->drawLine(QPointF(50, 55), QPointF(64, 55),
+                     QPen(QColor(255, 215, 0, 255), 6), QPainter::CompositionMode_SourceOver, false);
+    frame1->drawLine(QPointF(56, 55), QPointF(66, 55),
+                     QPen(QColor(255, 0, 0, 150), 6), QPainter::CompositionMode_SourceOver, false);
+    frame1->drawLine(QPointF(46, 68), QPointF(58, 68),
+                     QPen(QColor(0, 170, 60, 255), 4), QPainter::CompositionMode_SourceOver, false);
+
+    colorizeLayer->setTransparentColor(QColor(0, 170, 60).rgba());
+    REQUIRE(colorizeLayer->updateColoringAtFrame(1, lineArtLayer, 1));
+    QImage coloring = frame1->coloringImage();
+    QSet<QRgb> coloringColors;
+    for (int y = 0; y < coloring.height(); ++y)
+        for (int x = 0; x < coloring.width(); ++x)
+        {
+            const QRgb px = coloring.pixel(x, y);
+            if (qAlpha(px) > 0) coloringColors.insert(qUnpremultiply(px));
+        }
+    // 混合橙 (255,89,0) 必须被并回母色：着色结果只允许红/黄
+    const QRgb redMaster = QColor(255, 0, 0).rgba();
+    const QRgb yellowMaster = QColor(255, 215, 0).rgba();
+    for (QRgb c : coloringColors)
+    {
+        INFO("着色结果出现非母色" << QColor(c).name());
+        REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster)));
+    }
+
+    // 传播到帧2（管线同 action）
+    auto* lineFrame2 = static_cast<BitmapImage*>(lineArtLayer->getKeyFrameAt(2));
+    if (lineFrame2 == nullptr)
+    {
+        auto* nf = new BitmapImage;
+        drawGuy(nf, QPoint(72, 52));
+        lineArtLayer->addKeyFrame(2, nf);
+        lineFrame2 = nf;
+    }
+    const QRect canvas = (line1->bounds() | frame1->coloringBounds() | lineFrame2->bounds()).adjusted(-16, -16, 16, 16);
+    auto flatten = [&canvas](BitmapImage& bmp) {
+        QImage img(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter p(&img);
+        p.drawImage(bmp.bounds().topLeft() - canvas.topLeft(),
+                    bmp.image()->convertToFormat(QImage::Format_ARGB32_Premultiplied));
+        p.end();
+        return img;
+    };
+    QImage coloringFlat(canvas.size(), QImage::Format_ARGB32_Premultiplied);
+    coloringFlat.fill(Qt::transparent);
+    {
+        QPainter p(&coloringFlat);
+        p.drawImage(frame1->coloringBounds().topLeft() - canvas.topLeft(), frame1->coloringImage());
+        p.end();
+    }
+    QImage transported = Colorize::transportStrokesByRegions(
+        flatten(*line1), coloringFlat, flatten(*lineFrame2),
+        QRect(0, 0, canvas.width(), canvas.height()),
+        Colorize::FilteringOptions(),
+        colorizeLayer->transparentColor(), colorizeLayer->hasTransparentColor());
+    const QImage wrap = Colorize::makeBackgroundWrap(
+        flatten(*lineFrame2), QRect(0, 0, canvas.width(), canvas.height()),
+        colorizeLayer->transparentColor());
+    QPainter wp(&transported);
+    wp.drawImage(0, 0, wrap);
+    wp.end();
+
+    QSet<QRgb> transportedColors;
+    for (int y = 0; y < transported.height(); ++y)
+        for (int x = 0; x < transported.width(); ++x)
+        {
+            const QRgb px = transported.pixel(x, y);
+            if (qAlpha(px) > 0) transportedColors.insert(qUnpremultiply(px));
+        }
+    // 传播标记只允许母色+透明标记色（混合色不外溢到其它帧）
+    const QRgb greenTransp = QColor(0, 170, 60).rgba();
+    for (QRgb c : transportedColors)
+    {
+        INFO("传播标记出现非母色" << QColor(c).name());
+        REQUIRE((Colorize::similarColors(c, redMaster) || Colorize::similarColors(c, yellowMaster) || c == greenTransp));
+    }
+
+}

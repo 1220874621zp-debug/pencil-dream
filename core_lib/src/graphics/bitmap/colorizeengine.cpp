@@ -1355,6 +1355,20 @@ void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& op
                 break;
             }
         }
+        if (master == nullptr && merged.size() >= 2)
+        {
+            // 孤色：贴近两母色连线段 = 半透明叠色混出的中间产物，并入
+            QVector<QRgb> palette;
+            QVector<bool> skipAsTarget;
+            for (const KeyStroke& m : merged)
+            {
+                palette.append(m.color);
+                skipAsTarget.append(m.color != options.transparentColor ? false : options.hasTransparentColor);
+            }
+            const int idx = mixedColorMasterIndex(stroke.color, palette, skipAsTarget);
+            if (idx >= 0)
+                master = &merged[idx];
+        }
         if (master == nullptr)
         {
             merged.append(stroke);
@@ -1378,6 +1392,51 @@ void mergeVariantStrokes(QVector<KeyStroke>& strokes, const FilteringOptions& op
 }
 
 namespace {
+/*
+ * 孤色（与所有母色色相都差>12°）若贴近任意两母色的 RGB 连线段
+ * （距离² ≤ MERGE_COLOR_DIST_SQ），判为半透明叠色混出的中间产物
+ * （如红叠黄混橙），返回应并入的母色下标（skipAsTarget 标记者如
+ * 透明组不作并入目标，但可作线段端点）；真正独立的新颜色返回 -1。
+ */
+int mixedColorMasterIndex(QRgb c, const QVector<QRgb>& palette, const QVector<bool>& skipAsTarget)
+{
+    auto distSqToSegment = [](int cx, int cy, int cz, QRgb a, QRgb b) {
+        const int ax = qRed(a), ay = qGreen(a), az = qBlue(a);
+        const int bx = qRed(b), by = qGreen(b), bz = qBlue(b);
+        const int abx = bx - ax, aby = by - ay, abz = bz - az;
+        const qint64 lenSq = qint64(abx) * abx + qint64(aby) * aby + qint64(abz) * abz;
+        qint64 t = 0;
+        if (lenSq > 0)
+        {
+            t = (qint64(cx - ax) * abx + qint64(cy - ay) * aby + qint64(cz - az) * abz) * 255 / lenSq;
+            t = qBound<qint64>(0, t, 255);
+        }
+        const int px = ax + int(t * abx / 255), py = ay + int(t * aby / 255), pz = az + int(t * abz / 255);
+        const int dx = cx - px, dy = cy - py, dz = cz - pz;
+        return dx * dx + dy * dy + dz * dz;
+    };
+
+    int bestIdx = -1;
+    int bestDist = MERGE_COLOR_DIST_SQ;
+    for (int i = 0; i < palette.size(); ++i)
+    {
+        if (skipAsTarget[i])
+            continue;
+        for (int j = 0; j < palette.size(); ++j)
+        {
+            if (i == j)
+                continue;
+            const int d = distSqToSegment(qRed(c), qGreen(c), qBlue(c), palette[i], palette[j]);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                bestIdx = i;
+            }
+        }
+    }
+    return bestIdx;
+}
+
 /*
  * 每封闭区域只保留一组有色种子：区域内种子覆盖最大者胜出，其余
  * 有色种子在该区域内清零。同区域多色点是分水岭多色斑的直接来源
@@ -1803,13 +1862,27 @@ QImage transportStrokesByRegions(const QImage& lineArtA,
     if (majors.isEmpty())
         return result;
 
-    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者），
-    // 无相似则原样返回
+    // 归一到主色表：majors 按面积降序，取第一个相似主色（=面积最大者）；
+    // 无相似的孤色若贴近两主色连线段（叠色混合产物）并入较近主色，
+    // 真独立色原样返回（防旧缓存着色结果带入混合色）
     const auto normalizeColor = [&majors](QRgb c) {
         for (const MajorColor& m : majors)
         {
             if (similarColors(m.color, c))
                 return m.color;
+        }
+        if (majors.size() >= 2)
+        {
+            QVector<QRgb> palette;
+            QVector<bool> noSkip;
+            for (const MajorColor& m : majors)
+            {
+                palette.append(m.color);
+                noSkip.append(false);
+            }
+            const int idx = mixedColorMasterIndex(c, palette, noSkip);
+            if (idx >= 0)
+                return majors[idx].color;
         }
         return c;
     };
