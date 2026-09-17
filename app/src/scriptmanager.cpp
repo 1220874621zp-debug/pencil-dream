@@ -22,6 +22,7 @@ namespace
 // 首次运行释放到脚本目录的内置示例（:/scripts/<名字> → scriptsPath()/<名字>，不覆盖）
 const char* kBuiltinScripts[] = {
     "scaleKeyFramesToCanvas.js",
+    "cropKeyFramesToContent.js",
 };
 } // namespace
 

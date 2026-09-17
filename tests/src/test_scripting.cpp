@@ -11,6 +11,8 @@
 
 #include <QDir>
 #include <QFile>
+#include <QLine>
+#include <QPen>
 #include <QTemporaryDir>
 
 // 脚本系统端到端：QJSEngine 装载 → registerCommand → runCommand
@@ -83,6 +85,26 @@ registerCommand("测试缩放", function () {
         }
     }
     pencil.endUndoGroup();
+});
+)JS";
+
+// 与「按实际像素裁剪关键帧」示例脚本同核心：每帧裁到自己内容边框，空帧跳过
+const char* kCropScript = R"JS(
+registerCommand("测试裁剪", function () {
+    var idx = pencil.activeLayerIndex();
+    var pos = pencil.keyFramePositions(idx);
+    var done = 0, skipped = 0;
+    pencil.beginUndoGroup("测试：脚本裁剪");
+    for (var i = 0; i < pos.length; i++) {
+        var b = pencil.keyFrameBounds(idx, pos[i]);
+        if (!b || !b.width || !b.height) { skipped++; continue; }
+        if (!pencil.cropKeyFrame(idx, pos[i], b.x, b.y, b.width, b.height)) {
+            throw "cropKeyFrame 失败：" + pos[i];
+        }
+        done++;
+    }
+    pencil.endUndoGroup();
+    log("done=" + done + " skipped=" + skipped);
 });
 )JS";
 
@@ -160,6 +182,82 @@ TEST_CASE("ScriptHost scale all keyframes in one undo step")
     editor->undoRedo()->redo();
     REQUIRE(frame1->bounds().width() == bounds1Before.width() * 2);
     REQUIRE(frame5->bounds().width() == bounds5Before.width() * 2);
+
+    delete editor;
+}
+
+TEST_CASE("ScriptHost crop all keyframes to content bounds")
+{
+    LayerBitmap* layer = nullptr;
+    Editor* editor = makeEditorWithTwoFrames(&layer);
+    auto* frame1 = static_cast<BitmapImage*>(layer->getKeyFrameAt(1));
+    auto* frame5 = static_cast<BitmapImage*>(layer->getKeyFrameAt(5));
+
+    // 用“带透明边距的图像 + mMinBound=true”整体替换两帧，模拟文件导入的线稿
+    // （文件导入帧 mMinBound=true，bounds() 查询会跳过 autoCrop，透明边距得以保留；
+    //  手画帧 mMinBound=false 一查 bounds() 就被自动裁掉，垫不出边距）
+    // 注意 operator= 会连 KeyFrame 元数据（pos 等）一起替换，必须 setPos 回原位，
+    // 否则 key->pos() 与层内 map 键脱节，脚本的 keyFramePositions 全是 -1
+    auto makePadded = [](int keyPos, const QRect& imageRect, const QLine& lineInImage) -> BitmapImage
+    {
+        QImage img(imageRect.size(), QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter p(&img);
+        QPen pen(QColor(255, 0, 0, 255));
+        pen.setWidth(5);
+        p.setPen(pen);
+        p.drawLine(lineInImage);
+        p.end();
+        BitmapImage frame(imageRect.topLeft(), img);
+        frame.setPos(keyPos);
+        frame.enableAutoCrop(true); // 与 LayerBitmap::createKeyFrame 创建的帧一致
+        return frame;
+    };
+    *frame1 = makePadded(1, QRect(-500, -400, 1000, 800), QLine(397, 347, 463, 383)); // 线全局(-103,-53)~(-37,-17)
+    *frame5 = makePadded(5, QRect(-600, -500, 1200, 1000), QLine(510, 440, 570, 470)); // 线全局(-90,-60)~(-30,-30)
+    REQUIRE(frame1->bounds() == QRect(-500, -400, 1000, 800));
+    REQUIRE(frame5->bounds() == QRect(-600, -500, 1200, 1000));
+    const QRgb sampleBefore = frame1->constScanLine(-100, -50);
+    REQUIRE(sampleBefore != 0);
+
+    // 第三个关键帧为空：应被跳过而非报错
+    editor->scrubTo(10);
+    REQUIRE(layer->addNewKeyFrameAt(10));
+
+    QTemporaryDir tmp;
+    const QString jsPath = QDir(tmp.path()).filePath("crop.js");
+    QFile file(jsPath);
+    REQUIRE(file.open(QIODevice::WriteOnly));
+    file.write(kCropScript);
+    file.close();
+
+    ScriptHost host(editor, nullptr);
+    REQUIRE(host.loadScript(jsPath).isEmpty());
+
+    const QString runError = host.runCommand(QStringLiteral("测试裁剪"));
+    INFO(runError.toStdString());
+    REQUIRE(runError.isEmpty());
+
+    // 两帧各自收紧到内容边框（图像 bounds == 内容实际边框）
+    const QVariantMap cb1 = host.keyFrameBounds(0, 1);
+    REQUIRE(cb1.value(QStringLiteral("width")).toInt() > 0);
+    const QRect expected1(cb1.value(QStringLiteral("x")).toInt(),
+                          cb1.value(QStringLiteral("y")).toInt(),
+                          cb1.value(QStringLiteral("width")).toInt(),
+                          cb1.value(QStringLiteral("height")).toInt());
+    REQUIRE(frame1->bounds() == expected1);
+    REQUIRE(frame1->bounds().width() < 1000);
+    REQUIRE(static_cast<BitmapImage*>(layer->getKeyFrameAt(5))->bounds().width() < 1200);
+
+    // 内容像素原位保留（画布显示不变），空帧未被触碰
+    REQUIRE(frame1->constScanLine(-100, -50) == sampleBefore);
+    REQUIRE(static_cast<BitmapImage*>(layer->getKeyFrameAt(10))->bounds().isEmpty());
+
+    // 撤销组：一步回滚两个关键帧到带透明边距的状态
+    editor->undoRedo()->undo();
+    REQUIRE(frame1->bounds() == QRect(-500, -400, 1000, 800));
+    REQUIRE(frame5->bounds() == QRect(-600, -500, 1200, 1000));
+    REQUIRE(frame1->constScanLine(-100, -50) == sampleBefore);
 
     delete editor;
 }

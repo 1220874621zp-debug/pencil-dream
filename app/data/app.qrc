@@ -127,5 +127,6 @@
     </qresource>
     <qresource prefix="/">
         <file>scripts/scaleKeyFramesToCanvas.js</file>
+        <file>scripts/cropKeyFramesToContent.js</file>
     </qresource>
 </RCC>

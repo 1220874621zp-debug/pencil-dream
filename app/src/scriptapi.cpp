@@ -294,13 +294,11 @@ QVariantMap ScriptHost::keyFrameBounds(int layerIndex, int pos) const
 
 // ---- 修改 API ----
 
-bool ScriptHost::scaleKeyFrame(int layerIndex, int pos, double scale,
-                               double anchorX, double anchorY,
-                               double dstX, double dstY)
+bool ScriptHost::modifyKeyFrameWithUndo(int layerIndex, int pos, const QString& undoText,
+                                        const std::function<void(BitmapImage*)>& mutate)
 {
     Layer* layer = mEditor->object()->getLayer(layerIndex);
     if (layer == nullptr || !layer->isBitmapKind()) { return false; }
-    if (!qIsFinite(scale) || scale <= 0) { return false; }
 
     auto* bitmapLayer = static_cast<LayerBitmap*>(layer);
     BitmapImage* bitmap = bitmapLayer->getBitmapImageAtFrame(pos);
@@ -309,28 +307,16 @@ bool ScriptHost::scaleKeyFrame(int layerIndex, int pos, double scale,
 
     const QImage* image = bitmap->image();
     if (image == nullptr || image->isNull()) { return false; }
-    const QRect bounds = bitmap->bounds();
-    if (bounds.isEmpty()) { return false; }
+    if (bitmap->bounds().isEmpty()) { return false; }
 
     // 撤销：显式双快照（操作任意关键帧，不经“当前帧”快照链）
     const BitmapImage undoSnapshot = *bitmap;
 
-    // 整幅等比缩放（平滑插值），再定位到目标锚点：
-    // 期望 topLeft = dst − (anchor − 原 topLeft) × scale
-    BitmapImage scaled = bitmap->transformed(bounds, QTransform::fromScale(scale, scale), true);
-    const QPointF wantTopLeft = QPointF(dstX, dstY)
-            - QPointF(anchorX - bounds.left(), anchorY - bounds.top()) * scale;
-    scaled.moveTopLeft(wantTopLeft.toPoint());
-
-    bitmap->clear();
-    bitmap->paste(&scaled, QPainter::CompositionMode_SourceOver);
+    mutate(bitmap);
 
     const BitmapImage redoSnapshot = *bitmap;
     auto* command = new BitmapReplaceCommand(&undoSnapshot, &redoSnapshot, layer->id(),
-                                             mUndoMacroLabel.isEmpty()
-                                                 ? QStringLiteral("脚本：缩放关键帧")
-                                                 : mUndoMacroLabel,
-                                             mEditor, mUndoMacro);
+                                             undoText, mEditor, mUndoMacro);
     if (mUndoMacro == nullptr)
     {
         mEditor->undoRedo()->pushUndoCommand(command);
@@ -343,6 +329,51 @@ bool ScriptHost::scaleKeyFrame(int layerIndex, int pos, double scale,
         mTouchedFrames.append(pos);
     }
     return true;
+}
+
+bool ScriptHost::scaleKeyFrame(int layerIndex, int pos, double scale,
+                               double anchorX, double anchorY,
+                               double dstX, double dstY)
+{
+    if (!qIsFinite(scale) || scale <= 0) { return false; }
+
+    // 整幅等比缩放（平滑插值），再定位到目标锚点：
+    // 期望 topLeft = dst − (anchor − 原 topLeft) × scale
+    return modifyKeyFrameWithUndo(layerIndex, pos,
+                                  mUndoMacroLabel.isEmpty()
+                                      ? QStringLiteral("脚本：缩放关键帧")
+                                      : mUndoMacroLabel,
+                                  [scale, anchorX, anchorY, dstX, dstY](BitmapImage* bitmap)
+    {
+        const QRect bounds = bitmap->bounds();
+        BitmapImage scaled = bitmap->transformed(bounds, QTransform::fromScale(scale, scale), true);
+        const QPointF wantTopLeft = QPointF(dstX, dstY)
+                - QPointF(anchorX - bounds.left(), anchorY - bounds.top()) * scale;
+        scaled.moveTopLeft(wantTopLeft.toPoint());
+
+        bitmap->clear();
+        bitmap->paste(&scaled, QPainter::CompositionMode_SourceOver);
+    });
+}
+
+bool ScriptHost::cropKeyFrame(int layerIndex, int pos,
+                              double x, double y, double width, double height)
+{
+    if (!qIsFinite(x) || !qIsFinite(y) || !qIsFinite(width) || !qIsFinite(height)) { return false; }
+    const QRect wantedRect(QPoint(qRound(x), qRound(y)), QSize(qRound(width), qRound(height)));
+    if (wantedRect.isEmpty()) { return false; }
+
+    // copy() 的 topLeft 保留全局坐标，clear+paste 回贴 → 内容像素位置不变，仅收紧边界
+    return modifyKeyFrameWithUndo(layerIndex, pos,
+                                  mUndoMacroLabel.isEmpty()
+                                      ? QStringLiteral("脚本：裁剪关键帧")
+                                      : mUndoMacroLabel,
+                                  [wantedRect](BitmapImage* bitmap)
+    {
+        BitmapImage cropped = bitmap->copy(wantedRect);
+        bitmap->clear();
+        bitmap->paste(&cropped, QPainter::CompositionMode_SourceOver);
+    });
 }
 
 bool ScriptHost::beginUndoGroup(const QString& label)

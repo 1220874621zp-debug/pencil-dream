@@ -16,10 +16,13 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <functional>
+
 class QJSEngine;
 class Editor;
 class QWidget;
 class QUndoCommand;
+class BitmapImage;
 
 class ScriptHost : public QObject
 {
@@ -92,6 +95,14 @@ public:
                                    double anchorX, double anchorY,
                                    double dstX, double dstY);
 
+    /**
+     * 把一个位图关键帧的图像裁剪到全局矩形 (x,y,w,h)（画布坐标系，
+     * 与 keyFrameBounds 的返回值直接配套）。内容像素位置不变，
+     * 仅收紧图像边界与尺寸（去透明边距）。修改进撤销栈（同撤销组规则）。
+     */
+    Q_INVOKABLE bool cropKeyFrame(int layerIndex, int pos,
+                                  double x, double y, double width, double height);
+
     // 撤销组：组内所有修改并入单步撤销（Ctrl+Z 一次回滚）
     Q_INVOKABLE bool beginUndoGroup(const QString& label);
     Q_INVOKABLE bool endUndoGroup();
@@ -104,6 +115,11 @@ public:
 
 private:
     void installApi();
+
+    /** 位图关键帧修改骨架：校验+加载+双快照+mutator+撤销命令（组内并入/组外单步）
+     *  +数据失效与 touchedFrames 记录。mutator 直接改传入的 BitmapImage 内容。 */
+    bool modifyKeyFrameWithUndo(int layerIndex, int pos, const QString& undoText,
+                                const std::function<void(BitmapImage*)>& mutate);
 
     Editor* mEditor = nullptr;
     QWidget* mDialogParent = nullptr;
