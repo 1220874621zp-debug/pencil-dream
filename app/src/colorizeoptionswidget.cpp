@@ -31,6 +31,7 @@ GNU General Public License for more details.
 #include <QVBoxLayout>
 
 #include "editor.h"
+#include "colormanager.h"
 #include "layer.h"
 #include "layercolorize.h"
 #include "colorizeimage.h"
@@ -323,17 +324,25 @@ void ColorizeOptionsWidget::refreshColors()
         button->setFixedSize(QSize(22, 22));
         button->setAutoRaise(true);
         const bool isTransparent = layer->hasTransparentColor() && layer->transparentColor() == color;
-        button->setToolTip(isTransparent ? tr("Transparent (stays unfilled)") : QColor(color).name());
+        button->setToolTip((isTransparent ? tr("Transparent (stays unfilled)") : QColor(color).name())
+                           + tr("\nClick to paint with this color"));
         QString style = QString("QToolButton { background: %1; border: 1px solid #666; }").arg(QColor(color).name());
         if (isTransparent)
             style += "QToolButton { border: 2px dashed #F5A623; }";
-        if (mSelectedColor < 0)
-            mSelectedColor = color; // 默认选中第一个
+        // 默认选中第一个非透明色：传播的透明包裹常是面积最大色（列表
+        // 按面积降序），选中它再落笔 = 涂透明色，用户观感即"选不了色、
+        // 一直是透明色"；全为透明时才退回选第一个
+        if (mSelectedColor < 0 && (!isTransparent || i == colors.size() - 1))
+            mSelectedColor = color;
         if (static_cast<QRgb>(mSelectedColor) == color)
             style += "QToolButton { border: 2px solid #fff; }";
         button->setStyleSheet(style);
         connect(button, &QToolButton::clicked, this, [this, color]() {
             mSelectedColor = color;
+            // Krita 语义：选中 Key Strokes 色 = 切换笔刷当前色。面板
+            // 选色不联动落笔色的话，"点色块换色重涂"全程画旧色（旧色
+            // 为透明标记色时笔画全然无效）
+            mEditor->color()->setFrontColor(QColor(color));
             refreshColors();
         });
         mColorsRow->insertWidget(mColorsRow->count() - 1, button); // 弹簧前插入
