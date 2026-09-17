@@ -49,6 +49,7 @@ private:
     QAction* mCommandsSeparator = nullptr;
     QList<ScriptHost*> mHosts;
     QList<ScriptCommandEntry> mCommands;
+    QStringList mLastOutput;   // 最近一次脚本运行的 log（「查看脚本输出」回看）
 };
 
 #endif // SCRIPTMANAGER_H

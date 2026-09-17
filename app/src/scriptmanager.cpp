@@ -35,11 +35,14 @@ ScriptManager::ScriptManager(Editor* editor, QWidget* dialogParent, QObject* par
     mMenu->setSeparatorsCollapsible(false);
 
     QAction* outputAction = mMenu->addAction(tr("查看脚本输出"));
-    outputAction->setStatusTip(tr("查看上一次脚本运行的 log 输出"));
+    outputAction->setStatusTip(tr("查看上一次脚本运行的 log 输出（脚本静默执行，结果在这里回看）"));
     connect(outputAction, &QAction::triggered, this, [this]
     {
         // 未运行过脚本时给一条可操作的提示，而不是空框
-        showOutput(tr("脚本输出"), { tr("还没有脚本输出。运行脚本后，脚本里 log() 的内容会显示在这里。") });
+        showOutput(tr("脚本输出"),
+                   mLastOutput.isEmpty()
+                       ? QStringList{ tr("还没有脚本输出。脚本运行后，脚本里 log() 的内容会显示在这里。") }
+                       : mLastOutput);
     });
 
     QAction* reloadAction = mMenu->addAction(tr("重新载入脚本"));
@@ -74,17 +77,18 @@ void ScriptManager::ensureScriptsDir()
     {
         dir.mkpath(path);
     }
+    // 内置脚本每次启动覆盖释放：保证修复/改进能送达用户脚本目录。
+    // 要定制内置脚本请先复制改名，否则升级时会被覆盖。
     for (const char* name : kBuiltinScripts)
     {
-        const QString target = path + QLatin1Char('/') + QString::fromLatin1(name);
-        if (QFile::exists(target)) { continue; }
         QFile src(QStringLiteral(":/scripts/") + QString::fromLatin1(name));
         if (src.open(QIODevice::ReadOnly))
         {
-            QFile dst(target);
-            if (dst.open(QIODevice::WriteOnly))
+            const QByteArray data = src.readAll();
+            QFile dst(path + QLatin1Char('/') + QString::fromLatin1(name));
+            if (dst.open(QIODevice::WriteOnly | QIODevice::Truncate))
             {
-                dst.write(src.readAll());
+                dst.write(data);
             }
         }
     }
@@ -198,10 +202,9 @@ void ScriptManager::runCommand(int commandIndex)
         }
         QMessageBox::warning(mDialogParent, tr("脚本错误"), text);
     }
-    else if (!output.isEmpty())
-    {
-        showOutput(tr("脚本输出"), output);
-    }
+    // 成功时静默完成（不弹确认框）；log 输出进调试日志与 mLastOutput，
+    // 可用菜单「脚本 → 查看脚本输出」回看最近一次的结果
+    mLastOutput = output;
 }
 
 void ScriptManager::showOutput(const QString& title, const QStringList& lines)

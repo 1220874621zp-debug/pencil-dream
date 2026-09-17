@@ -6,6 +6,7 @@
 
 #include <QJSEngine>
 #include <QQmlEngine>
+#include <QDebug>
 #include <QFile>
 #include <QMessageBox>
 #include <QTransform>
@@ -62,8 +63,9 @@ QString layerTypeToString(Layer::LAYER_TYPE type)
     }
 }
 
-/** 内容实际包围盒（非透明像素），图像局部坐标；空图返回空矩形 */
-QRect contentBounds(const QImage& image)
+/** 内容实际包围盒（alpha 达到 minAlpha 的像素），图像局部坐标；空图返回空矩形。
+ *  minAlpha 阈值用于滤掉转线稿/扫描件背景上的微透明噪点。 */
+QRect contentBounds(const QImage& image, int minAlpha)
 {
     int minX = INT_MAX, minY = INT_MAX, maxX = -1, maxY = -1;
     const int w = image.width(), h = image.height();
@@ -72,7 +74,8 @@ QRect contentBounds(const QImage& image)
         const QRgb* line = reinterpret_cast<const QRgb*>(image.constScanLine(y));
         for (int x = 0; x < w; ++x)
         {
-            if (qAlpha(line[x]) != 0)
+            const int alpha = qAlpha(line[x]);
+            if (alpha != 0 && alpha >= minAlpha)
             {
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
@@ -266,7 +269,7 @@ QVariantMap ScriptHost::canvasRect() const
     return map;
 }
 
-QVariantMap ScriptHost::keyFrameBounds(int layerIndex, int pos) const
+QVariantMap ScriptHost::keyFrameBounds(int layerIndex, int pos, int minAlpha) const
 {
     QVariantMap map;
     Layer* layer = mEditor->object()->getLayer(layerIndex);
@@ -280,7 +283,7 @@ QVariantMap ScriptHost::keyFrameBounds(int layerIndex, int pos) const
     const QImage* image = bitmap->image();
     if (image == nullptr || image->isNull()) { return map; }
 
-    const QRect local = contentBounds(*image);
+    const QRect local = contentBounds(*image, qMax(1, minAlpha));
     if (local.isEmpty()) { return map; }
 
     // 图像局部坐标 → 画布全局坐标（图像 topLeft 来自 bounds，可能含历史偏移）
@@ -415,6 +418,8 @@ void ScriptHost::registerCommand(const QString& label, const QJSValue& fn)
 void ScriptHost::log(const QString& message)
 {
     mOutputBuffer.append(message);
+    // 同步进调试日志：GUI 无控制台，用户回报日志时能看到脚本执行详情
+    qDebug() << "[script]" << message;
 }
 
 void ScriptHost::alertBox(const QString& message)

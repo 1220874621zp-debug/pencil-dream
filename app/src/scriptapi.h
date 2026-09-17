@@ -83,8 +83,10 @@ public:
     Q_INVOKABLE QVariantMap canvasRect() const;
 
     /** 关键帧内容实际包围盒（非透明像素）{x,y,width,height}，画布全局坐标；
-     *  空帧或非位图关键帧返回 undefined（JS 侧 null）。 */
-    Q_INVOKABLE QVariantMap keyFrameBounds(int layerIndex, int pos) const;
+     *  空帧或非位图关键帧返回 undefined（JS 侧 null）。
+     *  minAlpha：低于该 alpha 的像素视为透明噪声不计入（转线稿/扫描件背景
+     *  常散布 alpha 1~10 的微透明噪点，alpha!=0 判定会把边框撑到原图大小）。 */
+    Q_INVOKABLE QVariantMap keyFrameBounds(int layerIndex, int pos, int minAlpha = 8) const;
 
     /**
      * 等比缩放一个位图关键帧的整幅图像，并平移使内容锚点 (anchorX,anchorY)

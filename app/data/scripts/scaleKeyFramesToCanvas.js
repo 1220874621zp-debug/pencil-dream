@@ -1,6 +1,7 @@
-// Pencil Dream 脚本：批量缩放图层所有关键帧（按图形边框自动匹配画布宽或高）
+// Pencil Dream 内置脚本：批量缩放图层所有关键帧（按图形边框自动匹配画布宽或高）
 //
 // 用法：选中一个位图（或填色）图层 → 菜单「脚本 → 批量缩放关键帧适配画布」。
+// 脚本静默执行：结果进 log（菜单「脚本 → 查看脚本输出」回看），出错才弹窗。
 //
 // 逻辑：
 //   1. 计算该图层所有关键帧内容边框（非透明像素包围盒）的并集；
@@ -10,10 +11,11 @@
 //   3. 全部关键帧用同一比例等比缩放（帧间不抖动），并集中心对齐画布中心；
 //   4. 整个操作合并为一步撤销（Ctrl+Z 一次回滚）。
 //
-// 本文件位于脚本文件夹（菜单「脚本 → 打开脚本文件夹」），可直接修改后
-// 用「脚本 → 重新载入脚本」生效，无需重启。
+// 本文件为内置脚本，升级时会被程序覆盖释放；要定制请复制改名后修改，
+// 再用菜单「脚本 → 重新载入脚本」生效。
 
-var MODE = "fit"; // "fit" = 完整放入画布；"fill" = 铺满画布（超出被裁）
+var MODE = "fit";      // "fit" = 完整放入画布；"fill" = 铺满画布（超出被裁）
+var MIN_ALPHA = 8;     // 低于该 alpha 的像素视为透明噪声（转线稿背景噪点）
 
 registerCommand("批量缩放关键帧适配画布", function () {
     var idx = pencil.activeLayerIndex();
@@ -38,7 +40,7 @@ registerCommand("批量缩放关键帧适配画布", function () {
     // 注：keyFrameBounds 对空帧/无内容帧返回空，JS 侧表现为无 width 字段
     var ux = 0, uy = 0, uw = 0, uh = 0, hasContent = false;
     for (var i = 0; i < positions.length; i++) {
-        var b = pencil.keyFrameBounds(idx, positions[i]);
+        var b = pencil.keyFrameBounds(idx, positions[i], MIN_ALPHA);
         if (!b || !b.width || !b.height || b.width <= 0 || b.height <= 0) { continue; }
         if (!hasContent) {
             ux = b.x; uy = b.y; uw = b.width; uh = b.height;
@@ -64,7 +66,7 @@ registerCommand("批量缩放关键帧适配画布", function () {
     var edge = fill ? (sx >= sy ? "宽" : "高") : (sx <= sy ? "宽" : "高");
 
     if (Math.abs(scale - 1) < 1e-9) {
-        alert("内容已经是目标大小（按" + edge + "匹配画布），无需缩放。");
+        log("内容已经是目标大小（按" + edge + "匹配画布），无需缩放。");
         return;
     }
 
@@ -80,13 +82,9 @@ registerCommand("批量缩放关键帧适配画布", function () {
     pencil.beginUndoGroup("脚本：批量缩放关键帧（" + MODE + "）");
     var done = 0;
     for (var j = 0; j < positions.length; j++) {
-        if (pencil.scaleKeyFrame(idx, positions[j], scale, anchorX, anchorY, dstX, dstY)) {
-            done++;
-        }
+        if (pencil.scaleKeyFrame(idx, positions[j], scale, anchorX, anchorY, dstX, dstY)) done++;
     }
     pencil.endUndoGroup();
 
-    log("已缩放 " + done + "/" + positions.length + " 个关键帧。");
-    alert("完成：已缩放 " + done + " 个关键帧，按画布" + edge + "匹配（比例 "
-        + scale.toFixed(3) + "，Ctrl+Z 可一次撤销）。");
+    log("已缩放 " + done + "/" + positions.length + " 个关键帧（Ctrl+Z 可一次撤销）。");
 });

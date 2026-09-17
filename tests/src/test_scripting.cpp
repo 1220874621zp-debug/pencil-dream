@@ -209,6 +209,11 @@ TEST_CASE("ScriptHost crop all keyframes to content bounds")
         p.setPen(pen);
         p.drawLine(lineInImage);
         p.end();
+        // 四角撒微透明噪点（模拟转线稿背景噪声，alpha=3 < 默认阈值 8）
+        img.setPixel(0, 0, qPremultiply(qRgba(255, 255, 255, 3)));
+        img.setPixel(img.width() - 1, 0, qPremultiply(qRgba(255, 255, 255, 3)));
+        img.setPixel(0, img.height() - 1, qPremultiply(qRgba(255, 255, 255, 3)));
+        img.setPixel(img.width() - 1, img.height() - 1, qPremultiply(qRgba(255, 255, 255, 3)));
         BitmapImage frame(imageRect.topLeft(), img);
         frame.setPos(keyPos);
         frame.enableAutoCrop(true); // 与 LayerBitmap::createKeyFrame 创建的帧一致
@@ -229,6 +234,15 @@ TEST_CASE("ScriptHost crop all keyframes to content bounds")
     editor->scrubTo(1);
     editor->selectAll();
     REQUIRE(editor->select()->mySelectionRect() == QRectF(-500, -400, 1000, 800));
+
+    // 噪声阈值：默认 8 滤掉四角 alpha=3 噪点（边框=线框）；minAlpha=0 时噪点撑满全图
+    ScriptHost probeHost(editor, nullptr);
+    const int lineW = probeHost.keyFrameBounds(0, 1).value(QStringLiteral("width")).toInt();
+    REQUIRE(lineW > 0);
+    REQUIRE(lineW < 100);
+    const QVariantMap noisy = probeHost.keyFrameBounds(0, 1, 0);
+    REQUIRE(noisy.value(QStringLiteral("width")).toInt() == 1000);
+    REQUIRE(noisy.value(QStringLiteral("height")).toInt() == 800);
 
     QTemporaryDir tmp;
     const QString jsPath = QDir(tmp.path()).filePath("crop.js");
