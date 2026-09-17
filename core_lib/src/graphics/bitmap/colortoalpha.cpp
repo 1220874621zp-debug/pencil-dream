@@ -19,55 +19,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 */
 #include "colortoalpha.h"
+#include "colordistance.h"
 
 #include <QImage>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 
 namespace
 {
-
-struct LabF
-{
-    double L = 0.0;
-    double a = 0.0;
-    double b = 0.0;
-};
-
-// sRGB 分量 → 线性光（256 级 LUT，避免每像素 3 次 pow）
-const std::array<double, 256>& srgbLinearLut()
-{
-    static const std::array<double, 256> lut = [] {
-        std::array<double, 256> v{};
-        for (int i = 0; i < 256; ++i)
-        {
-            const double c = i / 255.0;
-            v[i] = c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
-        }
-        return v;
-    }();
-    return lut;
-}
-
-// sRGB → CIELab（D65 白点，标准公式）
-LabF rgbToLab(const int r, const int g, const int b)
-{
-    const auto& lut = srgbLinearLut();
-    const double R = lut[r], G = lut[g], B = lut[b];
-
-    const double X = 0.4124564 * R + 0.3575761 * G + 0.1804375 * B;
-    const double Y = 0.2126729 * R + 0.7151522 * G + 0.0721750 * B;
-    const double Z = 0.0193339 * R + 0.1191920 * G + 0.9503041 * B;
-
-    constexpr double Xn = 0.95047, Yn = 1.0, Zn = 1.08883;
-    const auto f = [](const double t) {
-        return t > 0.008856 ? std::cbrt(t) : 7.787 * t + 16.0 / 116.0;
-    };
-    const double fx = f(X / Xn), fy = f(Y / Yn), fz = f(Z / Zn);
-    return { 116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz) };
-}
 
 // 预乘分量 → 直通（与 holefiller 的 lift 同式）
 int liftChannel(const int premul, const int alpha)
@@ -96,7 +56,7 @@ int apply(QImage& img, const ColorToAlphaParams& params)
     const int tr = qRed(params.targetColor);
     const int tg = qGreen(params.targetColor);
     const int tb = qBlue(params.targetColor);
-    const LabF targetLab = rgbToLab(tr, tg, tb);
+    const ColorDistance::LabF targetLab = ColorDistance::rgbToLab(tr, tg, tb);
 
     int changed = 0;
 
@@ -122,11 +82,8 @@ int apply(QImage& img, const ColorToAlphaParams& params)
             }
             else
             {
-                const LabF lab = rgbToLab(r, g, b);
-                const double dL = lab.L - targetLab.L;
-                const double da = lab.a - targetLab.a;
-                const double db = lab.b - targetLab.b;
-                dE = std::min(255.0, std::sqrt(dL * dL + da * da + db * db));
+                const ColorDistance::LabF lab = ColorDistance::rgbToLab(r, g, b);
+                dE = std::min(255.0, ColorDistance::deltaE(lab, targetLab));
             }
 
             // 线性坡道：≥阈值全保留，否则按 ΔE/阈值渐变

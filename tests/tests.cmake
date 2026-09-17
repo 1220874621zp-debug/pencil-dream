@@ -35,6 +35,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_onionalign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_holefiller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_colortoalpha.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layersplitter.cpp
 )
 
 set(TEST_RESOURCES

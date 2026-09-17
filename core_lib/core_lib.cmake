@@ -21,6 +21,8 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/gapmap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/holefiller.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/colortoalpha.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/colordistance.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/layersplitter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushcurve.h
@@ -136,6 +138,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/gapmap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/holefiller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/colortoalpha.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/layersplitter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushengine.cpp

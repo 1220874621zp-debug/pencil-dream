@@ -145,6 +145,10 @@ public:
     void invalidateColorizeBelow(int layerIndex, int frameNumber);
     Layer* takeLayer(int layerId); // Note: transfer ownership of the layer
 
+    /** 在 index 处插入图层（保留其原有 id，供撤销命令挂回用；index 越界时钳制）。
+     *  与 addLayer 的区别：addLayer 追加到末尾并重新分配 id。 */
+    bool insertLayer(int index, Layer* layer);
+
     bool swapLayers(int i, int j);
 
     /** Insert-style layer move: the layer at fromIndex is placed at toIndex,

@@ -25,6 +25,7 @@ GNU General Public License for more details.
 #include <QFile>
 #include <QStandardPaths>
 #include <QFileDialog>
+#include <limits>
 
 #include "pencildef.h"
 #include "editor.h"
@@ -54,6 +55,7 @@ GNU General Public License for more details.
 #include "colorizeupdatemanager.h"
 #include "holefiller.h"
 #include "colortoalpha.h"
+#include "layersplitter.h"
 #include "soundclip.h"
 #include "camera.h"
 
@@ -1218,28 +1220,221 @@ Status ActionCommands::applyColorToAlpha(const ColorToAlphaParams& params, bool 
     }
 
     // 批量：图层全部关键帧，单状态单步撤销
+    QVector<BitmapImage*> bitmaps;
+    bitmapLayer->foreachKeyFrame([&](KeyFrame* key) {
+        bitmaps.append(static_cast<BitmapImage*>(key));
+    });
+
+    QProgressDialog progress(tr("正在处理颜色转为透明度…"), tr("取消"), 0, bitmaps.size(), mParent);
+    progress.setWindowTitle(tipTitle);
+    progress.setWindowModality(Qt::WindowModal);
+
     const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
     int changedFrames = 0;
-    bitmapLayer->foreachKeyFrame([&](KeyFrame* key) {
-        auto* bitmap = static_cast<BitmapImage*>(key);
+    int done = 0;
+    bool canceled = false;
+
+    for (BitmapImage* bitmap : bitmaps)
+    {
         QImage* img = bitmap->image();
-        if (img == nullptr)
-            return;
-        if (ColorToAlpha::apply(*img, params) > 0)
+        if (img != nullptr && ColorToAlpha::apply(*img, params) > 0)
         {
             bitmap->setModified(true);
             mEditor->setModified(mEditor->layers()->currentLayerIndex(), bitmap->pos());
             ++changedFrames;
         }
-    });
+        ++done;
+        progress.setValue(done);
+        QApplication::processEvents();
+        if (progress.wasCanceled())
+        {
+            canceled = true;
+            break;
+        }
+    }
 
     if (changedFrames == 0)
     {
-        QMessageBox::information(mParent, tipTitle, tr("没有符合条件的像素，图像未改变。"));
+        QMessageBox::information(mParent, tipTitle,
+                                 canceled ? tr("已取消，没有帧被处理。") : tr("没有符合条件的像素，图像未改变。"));
         return Status::OK;
     }
 
     mEditor->undoRedo()->record(saveStateId, tr("颜色转为透明度（全部关键帧）", "Undo step text"));
+    if (canceled)
+    {
+        QMessageBox::information(mParent, tipTitle,
+                                 tr("完成 %1/%2 帧，已取消。已处理的帧可 Ctrl+Z 撤销。").arg(done).arg(bitmaps.size()));
+    }
+    return Status::OK;
+}
+
+Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool allKeyFrames)
+{
+    const QString tipTitle = tr("拆分图层颜色");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (!layer->isBitmapKind())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("拆分图层颜色只能在位图族图层（位图/填色）上使用。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法处理。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+
+    // 收集要处理的源关键帧（pos + 位图）
+    struct FrameRef { int pos = 0; BitmapImage* bitmap = nullptr; };
+    QVector<FrameRef> frames;
+    if (allKeyFrames)
+    {
+        bitmapLayer->foreachKeyFrame([&](KeyFrame* key) {
+            frames.append({ key->pos(), static_cast<BitmapImage*>(key) });
+        });
+        if (frames.isEmpty())
+        {
+            QMessageBox::information(mParent, tipTitle, tr("当前图层没有关键帧。"));
+            return Status::CANCELED;
+        }
+    }
+    else
+    {
+        // 与画布落笔同源：循环层编辑的是显示帧背后的关键帧（所见即所编辑）
+        BitmapImage* bitmap = static_cast<BitmapImage*>(
+            bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+        if (bitmap == nullptr)
+        {
+            QMessageBox::information(mParent, tipTitle, tr("当前帧没有可处理的位图内容。"));
+            return Status::CANCELED;
+        }
+        frames.append({ bitmap->pos(), bitmap });
+    }
+
+    Object* object = mEditor->object();
+    const int sourceIndex = mEditor->layers()->currentLayerIndex();
+    int nextInsertIndex = sourceIndex + 1; // 新层插源层上方（索引大者渲染在上）
+
+    QProgressDialog progress(tr("正在拆分图层颜色…"), tr("取消"), 0, frames.size(), mParent);
+    progress.setWindowTitle(tipTitle);
+    progress.setWindowModality(Qt::WindowModal);
+    if (frames.size() < 2)
+    {
+        progress.setMinimumDuration(std::numeric_limits<int>::max()); // 单帧不弹进度框
+    }
+
+    LayerSplitter splitter(params);
+    QVector<LayerBitmap*> bucketLayers; // 桶索引 → 新层（惰性建）
+    bool aborted = false;
+    QString abortReason;
+    int done = 0;
+
+    for (const FrameRef& frame : frames)
+    {
+        QImage* img = frame.bitmap->image();
+        if (img != nullptr)
+        {
+            if (!splitter.processFrame(*img))
+            {
+                aborted = true;
+                abortReason = tr("颜色种类超过上限（256），已中止。建议调大“颜色模糊度”后重试。");
+                break;
+            }
+
+            // 分发当前帧各桶画布到对应新层（与源帧同坐标系 topLeft）
+            for (int bIdx = 0; bIdx < splitter.bucketCount(); ++bIdx)
+            {
+                QImage piece = splitter.takeBucketImage(bIdx);
+                if (piece.isNull())
+                    continue;
+
+                while (bucketLayers.size() <= bIdx)
+                {
+                    auto* newLayer = new LayerBitmap(object->getUniqueLayerID());
+                    const QRgb key = splitter.bucketKeyColor(bucketLayers.size());
+                    newLayer->setName(tr("拆分-#%1").arg(QString::number(key & 0xFFFFFF, 16).rightJustified(6, QChar('0')).toUpper()));
+                    object->insertLayer(nextInsertIndex++, newLayer);
+                    bucketLayers.append(newLayer);
+                }
+
+                auto* newBitmap = new BitmapImage(frame.bitmap->topLeft(), piece);
+                bucketLayers[bIdx]->addKeyFrame(frame.pos, newBitmap);
+                newBitmap->setModified(true);
+                mEditor->setModified(object->getIndex(bucketLayers[bIdx]), frame.pos);
+            }
+        }
+
+        ++done;
+        progress.setValue(done);
+        QApplication::processEvents();
+        if (progress.wasCanceled())
+        {
+            aborted = true;
+            abortReason = tr("已取消。");
+            break;
+        }
+    }
+
+    if (bucketLayers.isEmpty())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("没有可拆分的不透明像素。"));
+        return Status::OK;
+    }
+
+    // 终排序：面积大者在上=最高索引。摘出后按面积升序回插（最小的先占低索引，最大的最后落在最上）
+    if (params.sortLayers && !aborted)
+    {
+        const std::vector<int> order = splitter.sortedBucketOrder(); // 面积降序
+        QList<LayerBitmap*> taken;
+        taken.reserve(bucketLayers.size());
+        for (LayerBitmap* created : bucketLayers)
+        {
+            object->takeLayer(created->id());
+            taken.append(created);
+        }
+        bucketLayers.clear();
+        int insertAt = sourceIndex + 1;
+        for (auto it = order.rbegin(); it != order.rend(); ++it) // 升序回插
+        {
+            object->insertLayer(insertAt++, taken[*it]);
+        }
+        for (int bi : order) // 输出表保持面积降序（末位=最高索引）
+        {
+            bucketLayers.append(taken[bi]);
+        }
+    }
+
+    if (params.hideOriginal)
+    {
+        bitmapLayer->setVisible(false);
+    }
+
+    mEditor->undoRedo()->pushUndoCommand(
+        new SplitLayerCommand(mEditor, QList<Layer*>(bucketLayers.begin(), bucketLayers.end()),
+                              bitmapLayer->id(), params.hideOriginal, tipTitle));
+
+    // 选中最高处的新层并刷新（命令入栈的首次 redo 已被跳过，刷新由动作侧完成）
+    Layer* topLayer = object->getLayer(sourceIndex + bucketLayers.size());
+    if (topLayer != nullptr)
+    {
+        mEditor->layers()->setCurrentLayer(topLayer);
+    }
+    mEditor->scrubTo(mEditor->currentFrame());
+    emit mEditor->updateTimeLine();
+    mEditor->getScribbleArea()->onLayerChanged();
+
+    if (aborted)
+    {
+        QMessageBox::information(mParent, tipTitle,
+                                 tr("完成 %1/%2 帧。%3\n可 Ctrl+Z 撤销本次拆分。").arg(done).arg(frames.size()).arg(abortReason));
+    }
     return Status::OK;
 }
 

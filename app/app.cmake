@@ -10,6 +10,7 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colortoalphadialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/layersplitdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/referencecardpanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/exposuresheetpanel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/builtinworkspaces.h
@@ -83,6 +84,7 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/tvptoolsdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/colortoalphadialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/layersplitdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/referencecardpanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/exposuresheetpanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/builtinworkspaces.cpp

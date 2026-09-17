@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include "filetype.h"
 
 struct ColorToAlphaParams;
+struct LayerSplitParams;
 
 class Editor;
 class QWidget;
@@ -93,6 +94,9 @@ public:
     /** 颜色转透明度（Krita Color to Alpha 移植）：接近目标色的像素转透明、按感知色差渐变；
         allKeyFrames=false 只处理当前显示帧背后的关键帧，=true 处理图层全部关键帧 */
     Status applyColorToAlpha(const ColorToAlphaParams& params, bool allKeyFrames);
+    /** 拆分图层颜色（Krita Split Layer 移植）：按颜色把图层拆成多个新图层；
+        allKeyFrames=true 时同色跨帧归同一层；单步撤销 */
+    Status splitLayerByColor(const LayerSplitParams& params, bool allKeyFrames);
     /** 跨帧传播填色：把填色层当前帧的色点块匹配搬运到后续帧块（缺帧自动补）并批量平涂 */
     Status propagateColorizeStrokes();
     /** 清除帧：清空当前选中图层画布上的所有像素（保留帧结构，可撤销） */

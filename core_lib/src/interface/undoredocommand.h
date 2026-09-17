@@ -195,4 +195,35 @@ private:
     bool roundPixels;
 };
 
+/** 拆分图层颜色：一次性新建多个图层（含各自关键帧）的单步撤销命令。
+ *  调用方先建好层并插入 object（redo 态），命令 undo 时摘层（接管所有权）、
+ *  redo 时按记录的原索引挂回；析构时删除仍被摘下的层（文档切换防泄漏）。
+ *  hideOriginal 时同步快照源层可见性。 */
+class SplitLayerCommand : public UndoRedoCommand
+{
+public:
+    SplitLayerCommand(Editor* editor,
+                      const QList<Layer*>& createdLayers,
+                      int sourceLayerId,
+                      bool hideOriginal,
+                      const QString& description,
+                      QUndoCommand* parent = nullptr);
+    ~SplitLayerCommand() override;
+
+    void undo() override;
+    void redo() override;
+
+private:
+    void detachLayers();
+    void attachLayers();
+    void refreshUi(int currentLayerId);
+
+    QList<Layer*> mCreatedLayers;
+    QList<int> mCreatedLayerIds;
+    QList<int> mAttachIndices;   // 构造时各新层在 object 中的索引（redo 挂回位置）
+    int mSourceLayerId = -1;
+    bool mHideOriginal = false;
+    bool mLayersAttached = true; // 摘下态归命令所有
+};
+
 #endif // UNDOREDOCOMMAND_H

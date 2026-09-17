@@ -84,7 +84,10 @@ GNU General Public License for more details.
 #include "pegbaralignmentdialog.h"
 #include "addtransparencytopaperdialog.h"
 #include "colortoalphadialog.h"
+#include "layersplitdialog.h"
 #include "repositionframesdialog.h"
+#include "bitmapimage.h"
+#include "layerbitmap.h"
 
 #include "errordialog.h"
 #include "filedialog.h"
@@ -603,10 +606,37 @@ void MainWindow2::createMenus()
     QAction* colorToAlphaAction = filterMenu->addAction(tr("颜色转为透明度..."));
     colorToAlphaAction->setStatusTip(tr("把接近目标颜色的像素转为透明（白底扫描件去底提线），按感知色差渐变保留抗锯齿边缘"));
     connect(colorToAlphaAction, &QAction::triggered, this, [this] {
-        ColorToAlphaDialog dialog(this);
+        // 预览源：当前帧缩略图（尽力获取，取不到则对话框不带预览）
+        QImage previewSrc;
+        Layer* layer = mEditor->layers()->currentLayer();
+        if (layer != nullptr && layer->isBitmapKind())
+        {
+            auto* bitmapLayer = static_cast<LayerBitmap*>(layer);
+            BitmapImage* bitmap = static_cast<BitmapImage*>(
+                bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+            if (bitmap != nullptr)
+            {
+                QImage* img = bitmap->image();
+                if (img != nullptr && !img->isNull())
+                {
+                    QSize size = img->size();
+                    size.scale(280, 160, Qt::KeepAspectRatio);
+                    previewSrc = img->scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+                }
+            }
+        }
+        ColorToAlphaDialog dialog(previewSrc, this);
         if (dialog.exec() != QDialog::Accepted)
             return;
         mCommands->applyColorToAlpha(dialog.params(), dialog.applyToAllKeyFrames());
+    });
+    QAction* layerSplitAction = filterMenu->addAction(tr("拆分图层颜色..."));
+    layerSplitAction->setStatusTip(tr("按颜色把当前图层拆分成多个新图层（平涂上色稿一键分层），同色跨帧归同一层"));
+    connect(layerSplitAction, &QAction::triggered, this, [this] {
+        LayerSplitDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted)
+            return;
+        mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     ui->menuBar->insertMenu(mWorkspaceMenu->menuAction(), filterMenu);
 }

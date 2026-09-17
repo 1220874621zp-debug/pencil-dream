@@ -467,6 +467,19 @@ Layer* Object::takeLayer(int layerId)
     return layer;
 }
 
+bool Object::insertLayer(int index, Layer* layer)
+{
+    if (layer == nullptr || mLayers.contains(layer))
+    {
+        return false;
+    }
+    if (index < 0) { index = 0; }
+    if (index > mLayers.size()) { index = mLayers.size(); }
+    mLayers.insert(index, layer);
+    ++mLayerStructureGeneration;
+    return true;
+}
+
 bool Object::swapLayers(int i, int j)
 {
     bool canSwap = canSwapLayers(i, j);

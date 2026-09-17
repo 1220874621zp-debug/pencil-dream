@@ -18,47 +18,37 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 */
-#ifndef COLORTOALPHADIALOG_H
-#define COLORTOALPHADIALOG_H
+#ifndef LAYERSPLITDIALOG_H
+#define LAYERSPLITDIALOG_H
 
 #include <QDialog>
-#include <QImage>
-#include <QRgb>
 
-#include "colortoalpha.h"
+#include "layersplitter.h"
 
+class QCheckBox;
 class QDoubleSpinBox;
-class QLabel;
-class QPushButton;
 class QRadioButton;
 class QSlider;
 
-/** 颜色转透明度参数对话框（Krita Color to Alpha 移植）。
- *  传入当前帧缩略图时提供棋盘格底实时预览。 */
-class ColorToAlphaDialog : public QDialog
+/** 拆分图层颜色参数对话框（Krita Split Layer 移植） */
+class LayerSplitDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit ColorToAlphaDialog(const QImage& previewSource = QImage(), QWidget* parent = nullptr);
+    explicit LayerSplitDialog(QWidget* parent = nullptr);
 
-    ColorToAlphaParams params() const;
+    LayerSplitParams params() const;
     bool applyToAllKeyFrames() const;
 
 private:
-    void pickTargetColor();
-    void updateColorButton();
-    void updatePreview();
-
-    QPushButton* mColorButton = nullptr;
-    QSlider* mThresholdSlider = nullptr;
-    QDoubleSpinBox* mThresholdSpin = nullptr;
+    QSlider* mFuzzinessSlider = nullptr;
+    QDoubleSpinBox* mFuzzinessSpin = nullptr;
+    QCheckBox* mDisregardOpacityCheck = nullptr;
+    QCheckBox* mSortLayersCheck = nullptr;
+    QCheckBox* mHideOriginalCheck = nullptr;
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
-    QLabel* mPreviewLabel = nullptr;
-
-    QImage mPreviewSource; // 缩略后的当前帧（空=无预览）
-    QRgb mTargetColor = qRgb(255, 255, 255);
 };
 
-#endif // COLORTOALPHADIALOG_H
+#endif // LAYERSPLITDIALOG_H
