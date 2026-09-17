@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include <QDebug>
 #include <QPointer>
 #include <QThreadPool>
+#include <QTimer>
 
 #include "editor.h"
 #include "object.h"
@@ -70,6 +71,19 @@ ColorizeUpdateManager::~ColorizeUpdateManager()
 
 bool ColorizeUpdateManager::init()
 {
+    // 着色缓存只是内存产物、不随工程存盘：重开工程后全部为空。这里把
+    // 工程载入/切帧/帧内容修改统一接到防抖懒扫描，让过期帧自动补算——
+    // 否则传播后的几百帧在重开工程后填充全丢（画布一直透明），手涂
+    // 修正也没有任何反馈
+    mScanTimer = new QTimer(this);
+    mScanTimer->setSingleShot(true);
+    mScanTimer->setInterval(200);
+    connect(mScanTimer, &QTimer::timeout, this, &ColorizeUpdateManager::scanCurrentFrame);
+
+    Editor* e = editor();
+    connect(e, &Editor::objectLoaded, this, [this]() { requestVisibleUpdates(); });
+    connect(e, &Editor::scrubbed, this, [this](int) { requestVisibleUpdates(); });
+    connect(e, &Editor::frameModified, this, [this](int) { requestVisibleUpdates(); });
     return true;
 }
 
@@ -86,6 +100,13 @@ Status ColorizeUpdateManager::save(Object* object)
 }
 
 void ColorizeUpdateManager::requestVisibleUpdates()
+{
+    if (mShutdown) { return; }
+    // 防抖归并：落笔/播放拖动会高频触发，静止 200ms 后才真正扫描入队
+    mScanTimer->start();
+}
+
+void ColorizeUpdateManager::scanCurrentFrame()
 {
     if (mShutdown) { return; }
 

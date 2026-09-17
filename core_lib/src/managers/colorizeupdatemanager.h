@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QSet>
 
 class LayerColorize;
+class QTimer;
 
 /*
  * 智能填色后台计算管理器：
@@ -42,10 +43,11 @@ public:
     Status load(Object*) override;
     Status save(Object*) override;
 
-    /** 渲染期懒触发：当前帧上所有可见填色层的过期帧入队 */
+    /** 渲染期懒触发（防抖 200ms）：当前帧上所有可见填色层的过期帧入队。
+     *  着色缓存不存盘，重开工程/切帧/落笔后由它自动补算，恢复填充显示 */
     void requestVisibleUpdates();
 
-    /** 手动触发某层某帧（覆盖帧解析为关键帧） */
+    /** 手动触发某层某帧（覆盖帧解析为关键帧），立即入队不防抖 */
     void requestUpdate(LayerColorize* layer, int frameNumber);
 
 signals:
@@ -56,10 +58,12 @@ private slots:
     void applyResult(int layerId, int keyPos, const QImage& result, const QRect& bounds);
 
 private:
+    void scanCurrentFrame();
     void enqueueJob(LayerColorize* layer, int frameNumber);
     bool takeJobRecord(int layerId, int keyPos);
 
     QSet<QPair<int, int>> mInFlight;
+    QTimer* mScanTimer = nullptr;
     bool mShutdown = false;
 
     friend class ColorizeUpdateRunnable;
