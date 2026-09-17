@@ -30,6 +30,14 @@ namespace PlatformHandler
 
     bool isDarkMode() { return false; }
 
+    bool raiseWindowsOfProcessIfNamed(qint64 pid, const QString& exeName)
+    {
+        Q_UNUSED(pid)
+        Q_UNUSED(exeName)
+        // 未实现：调用方会按「非存活实例」处理（清陈旧锁重试）
+        return false;
+    }
+
     void initialise()
     {
         /* If running as an AppImage, sets GStreamer environment variables to ensure

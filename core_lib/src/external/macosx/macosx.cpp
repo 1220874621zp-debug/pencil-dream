@@ -37,6 +37,14 @@ namespace PlatformHandler
         return MacOSXNative::isDarkMode();
     }
 
+    bool raiseWindowsOfProcessIfNamed(qint64 pid, const QString& exeName)
+    {
+        Q_UNUSED(pid)
+        Q_UNUSED(exeName)
+        // 未实现：调用方会按「非存活实例」处理（清陈旧锁重试）
+        return false;
+    }
+
     void initialise()
     {
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)

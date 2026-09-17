@@ -28,7 +28,6 @@ GNU General Public License for more details.
 #include <QLockFile>
 #include <QStandardPaths>
 #include <QDir>
-#include <QMessageBox>
 
 #include "commandlineexporter.h"
 #include "commandlineparser.h"
@@ -116,11 +115,24 @@ bool Pencil2D::isInstanceOpen()
     mProcessLock.reset(new QLockFile(appDir.absoluteFilePath("pencil2d-process.lock")));
     if (!mProcessLock->tryLock(10))
     {
-        QMessageBox::StandardButton clickedButton = QMessageBox::warning(nullptr, tr("Warning"), tr("An instance of Pencil2D is already open. Running multiple instances of Pencil2D simultaneously is not recommended and could potentially result in data loss and other unexpected behavior."), QMessageBox::Close | QMessageBox::Open, QMessageBox::Close);
-        if (clickedButton != QMessageBox::Open)
+        qint64 pid = 0;
+        QString lockAppName, lockHost;
+        mProcessLock->getLockInfo(&pid, &lockAppName, &lockHost);
+        if (pid > 0 && PlatformHandler::raiseWindowsOfProcessIfNamed(pid, QStringLiteral("pencil2d.exe")))
         {
+            // 确有存活实例：把它的窗口拉到前台后安静退出。旧版在这里弹
+            // 「不推荐多开」警告框且默认按钮=关闭——快速连点快捷方式时，
+            // 弹窗被当成「点了没反应」，按默认键则整个静默退出
             return true;
         }
+        // 锁里的进程已不在（崩溃/强杀残留）或 PID 被别的程序复用：
+        // 清掉陈旧锁重试一次，别让用户永远点不开
+        mProcessLock->removeStaleLockFile();
+        if (mProcessLock->tryLock(100))
+        {
+            return false;
+        }
+        return true;
     }
     return false;
 }

@@ -19,7 +19,9 @@ GNU General Public License for more details.
 
 #include <ctime>
 #include <QDebug>
+#include <QDateTime>
 #include <QDir>
+#include <QFileInfo>
 #include <QVersionNumber>
 #include "qminiz.h"
 #include "fileformat.h"
@@ -872,6 +874,11 @@ QStringList FileManager::searchForUnsavedProjects()
     const QStringList nameFilter("*_" PFF_TMP_DECOMPRESS_EXT "_*"); // match name pattern like "Default_Y2xD_0a4e44e9"
     QStringList entries = pencil2DTempDir.entryList(nameFilter, QDir::Dirs | QDir::Readable);
 
+    // 顺带清垃圾：崩溃/强杀会留下工作目录（~Object 才会删），不可恢复的
+    // 空壳超过七天直接删——否则 %TEMP% 里越积越多，启动扫描一天比一天慢。
+    // 可恢复的（data 里有 png/xml）交给恢复流程，不动
+    const qint64 junkCutoffSec = QDateTime::currentSecsSinceEpoch() - 7 * 24 * 60 * 60;
+
     QStringList recoverables;
     for (const QString& path : entries)
     {
@@ -880,6 +887,10 @@ QStringList FileManager::searchForUnsavedProjects()
         {
             qDebug() << "Found debris at" << fullPath;
             recoverables.append(fullPath);
+        }
+        else if (QFileInfo(fullPath).lastModified().toSecsSinceEpoch() < junkCutoffSec)
+        {
+            QDir(fullPath).removeRecursively();
         }
     }
     return recoverables;

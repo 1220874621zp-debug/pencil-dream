@@ -19,16 +19,70 @@ GNU General Public License for more details.
 #include "platformhandler.h"
 
 #include <QCoreApplication>
+#include <QFileInfo>
 #include <QSettings>
 
 #include <ShObjIdl.h>
+#include <windows.h>
 
 #include "pencildef.h"
+
+namespace
+{
+    struct EnumWindowsArg
+    {
+        DWORD pid = 0;
+    };
+
+    BOOL CALLBACK raiseWindowProc(HWND hwnd, LPARAM lParam)
+    {
+        auto* arg = reinterpret_cast<EnumWindowsArg*>(lParam);
+        DWORD pid = 0;
+        GetWindowThreadProcessId(hwnd, &pid);
+        if (pid != arg->pid || !IsWindowVisible(hwnd))
+        {
+            return TRUE;
+        }
+        if (IsIconic(hwnd))
+        {
+            ShowWindow(hwnd, SW_RESTORE);
+        }
+        SetForegroundWindow(hwnd);
+        return TRUE;
+    }
+}
 
 namespace PlatformHandler
 {
     void configurePlatformSpecificSettings() {}
     bool isDarkMode() { return false; }
+
+    bool raiseWindowsOfProcessIfNamed(qint64 pid, const QString& exeName)
+    {
+        const DWORD winPid = static_cast<DWORD>(pid);
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, winPid);
+        if (process == NULL)
+        {
+            return false;
+        }
+        WCHAR imagePath[MAX_PATH] = {};
+        DWORD size = MAX_PATH;
+        const BOOL ok = QueryFullProcessImageNameW(process, 0, imagePath, &size);
+        CloseHandle(process);
+        if (!ok)
+        {
+            return false;
+        }
+        const QString baseName = QFileInfo(QString::fromWCharArray(imagePath, size)).fileName();
+        if (baseName.compare(exeName, Qt::CaseInsensitive) != 0)
+        {
+            return false;
+        }
+        EnumWindowsArg arg { winPid };
+        EnumWindows(raiseWindowProc, reinterpret_cast<LPARAM>(&arg));
+        return true;
+    }
+
     void initialise()
     {
 #if _WIN32_WINNT >= _WIN32_WINNT_WIN7
