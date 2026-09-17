@@ -37,6 +37,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_colortoalpha.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layersplitter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_scripting.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layerconvert.cpp
     # 脚本系统（app 层）：测试直接编入 ScriptHost 实现
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptapi.cpp
 )

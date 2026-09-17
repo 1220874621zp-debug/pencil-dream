@@ -537,6 +537,7 @@ void ScribbleArea::keyEventForSelection(QKeyEvent* event)
         mEditor->deselectAll();
         return;
     case Qt::Key_Backspace:
+    case Qt::Key_Delete: // 主键盘 Delete 与退格同义（套索/框选后删除选中像素）
         deleteSelection();
         mEditor->deselectAll();
         return;

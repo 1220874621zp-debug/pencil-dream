@@ -203,6 +203,10 @@ public: //slots
     void swapLayers(int i, int j);
     bool canSwapLayers(int layerIndexLeft, int layerIndexRight) const;
 
+    /** 填色图层 → 颜料（位图）图层：逐帧烘焙当前着色结果为普通位图关键帧，
+     *  换壳单步撤销（新层沿用旧层 id，组关系保持）。当前层须为填色层。 */
+    bool convertColorizeLayerToBitmap();
+
     void backup(const QString& undoText);
     bool backup(int layerNumber, int frameNumber, const QString& undoText);
 

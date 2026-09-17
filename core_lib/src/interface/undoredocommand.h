@@ -195,4 +195,30 @@ private:
     bool roundPixels;
 };
 
+/** 图层换壳（如填色图层 → 颜料/位图图层）：单步撤销命令。
+ *  新层沿用旧层 id——组关系与外部 id 引用保持不变；调用方构造前完成
+ *  「摘旧层、原索引挂新层」（同 id 任何时刻只有一层在册）。
+ *  undo 时摘新层（接管所有权）挂旧层，redo 反之；析构删除仍被摘下的层。 */
+class ConvertLayerCommand : public UndoRedoCommand
+{
+public:
+    ConvertLayerCommand(Editor* editor,
+                        Layer* newLayer,
+                        Layer* oldLayer,
+                        int index,
+                        const QString& description,
+                        QUndoCommand* parent = nullptr);
+    ~ConvertLayerCommand() override;
+    void undo() override;
+    void redo() override;
+
+private:
+    void refreshUi();
+
+    Layer* mNewLayer = nullptr;
+    Layer* mOldLayer = nullptr;
+    int mIndex = 0;
+    bool mNewAttached = true;    // 摘下态：未挂靠的那层归命令所有
+};
+
 #endif // UNDOREDOCOMMAND_H

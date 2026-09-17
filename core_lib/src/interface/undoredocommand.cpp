@@ -349,3 +349,66 @@ void TransformCommand::apply(const QRectF& selectionRect,
 
     selectMan->calculateSelectionTransformation();
 }
+
+ConvertLayerCommand::ConvertLayerCommand(Editor* editor,
+                                         Layer* newLayer,
+                                         Layer* oldLayer,
+                                         int index,
+                                         const QString& description,
+                                         QUndoCommand* parent)
+    : UndoRedoCommand(editor, parent)
+    , mNewLayer(newLayer)
+    , mOldLayer(oldLayer)
+    , mIndex(index)
+{
+    setText(description);
+}
+
+ConvertLayerCommand::~ConvertLayerCommand()
+{
+    // 摘下态的那层归命令所有（挂靠态归 object；文档切换 clearStack 防泄漏）
+    if (!mNewAttached)
+    {
+        delete mNewLayer;
+    }
+    else
+    {
+        delete mOldLayer;
+    }
+}
+
+void ConvertLayerCommand::refreshUi()
+{
+    Layer* current = editor()->layers()->findLayerById(mNewLayer->id());
+    if (current != nullptr)
+    {
+        editor()->layers()->setCurrentLayer(current);
+    }
+    editor()->scrubTo(editor()->currentFrame());
+    emit editor()->updateTimeLine();
+    editor()->getScribbleArea()->onLayerChanged();
+}
+
+void ConvertLayerCommand::undo()
+{
+    UndoRedoCommand::undo();
+
+    // 摘新挂旧（同 id，任何时刻只有一层在册）
+    editor()->object()->takeLayer(mNewLayer->id());
+    editor()->object()->insertLayer(mIndex, mOldLayer);
+    mNewAttached = false;
+    refreshUi();
+}
+
+void ConvertLayerCommand::redo()
+{
+    UndoRedoCommand::redo();
+
+    // 命令入栈时的自动 redo：换壳结果已由调用方应用
+    if (isFirstRedo()) { setFirstRedo(false); return; }
+
+    editor()->object()->takeLayer(mOldLayer->id());
+    editor()->object()->insertLayer(mIndex, mNewLayer);
+    mNewAttached = true;
+    refreshUi();
+}

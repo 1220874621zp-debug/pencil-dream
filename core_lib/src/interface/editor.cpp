@@ -28,6 +28,8 @@ GNU General Public License for more details.
 #include "camera.h"
 #include "layerbitmap.h"
 #include "layercamera.h"
+#include "layercolorize.h"
+#include "colorizeimage.h"
 #include "undoredocommand.h"
 #include "layerlayoutcommand.h"
 
@@ -967,6 +969,64 @@ void Editor::switchVisibilityOfLayer(int layerNumber)
     mScribbleArea->onLayerChanged();
 
     emit updateTimeLine();
+}
+
+bool Editor::convertColorizeLayerToBitmap()
+{
+    Layer* layer = layers()->currentLayer();
+    if (layer == nullptr || layer->type() != Layer::COLORIZE) { return false; }
+
+    auto* colorizeLayer = static_cast<LayerColorize*>(layer);
+    const int index = layers()->currentLayerIndex();
+    const quint32 structureGeneration = mObject->layerStructureGeneration();
+
+    // 新层沿用旧层 id：组关系与外部 id 引用保持不变（同 id 任何时刻只有一层在册）
+    auto* bitmapLayer = new LayerBitmap(colorizeLayer->id());
+    bitmapLayer->setName(colorizeLayer->name());
+    bitmapLayer->setVisible(colorizeLayer->visible());
+    bitmapLayer->setOpacity(colorizeLayer->opacity());
+
+    // 逐帧烘焙：过期帧同步重算着色（与导出路径同源），着色结果固化为位图关键帧
+    colorizeLayer->foreachKeyFrame([&](KeyFrame* key)
+    {
+        const int pos = key->pos();
+        auto* frame = static_cast<ColorizeImage*>(key);
+        frame->loadFile();
+        if (frame->needsUpdate() || frame->computedStructureGeneration() != structureGeneration)
+        {
+            colorizeLayer->updateColoringAtFrame(pos,
+                                                 mObject->getColorizeSourceLayer(index, pos),
+                                                 structureGeneration);
+        }
+        auto* cached = colorizeLayer->getLastColorizeImageAtFrame(pos);
+        if (cached != nullptr && !cached->coloringImage().isNull())
+        {
+            auto* newFrame = new BitmapImage(cached->coloringBounds().topLeft(), cached->coloringImage());
+            newFrame->setPos(pos);
+            bitmapLayer->addKeyFrame(pos, newFrame);
+        }
+        else
+        {
+            // 无着色内容的帧也建空关键帧：保持时间轴曝光结构不变
+            auto* newFrame = new BitmapImage();
+            newFrame->setPos(pos);
+            bitmapLayer->addKeyFrame(pos, newFrame);
+        }
+    });
+
+    // 换壳：摘旧挂新（原索引），一步撤销
+    Layer* oldLayer = mObject->takeLayer(colorizeLayer->id());
+    mObject->insertLayer(index, bitmapLayer);
+    undoRedo()->pushUndoCommand(
+        new ConvertLayerCommand(this, bitmapLayer, oldLayer, index, tr("转换成颜料图层")));
+
+    // 层对象已换：旧选区失效；切到新层并刷新
+    deselectAll();
+    layers()->setCurrentLayer(index);
+    scrubTo(currentFrame());
+    emit updateTimeLine();
+    mScribbleArea->onLayerChanged();
+    return true;
 }
 
 void Editor::swapLayers(int i, int j)

@@ -3862,6 +3862,13 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         }
     }
 
+    // 填色图层 → 颜料（位图）图层：烘焙当前着色结果，脱离动态计算
+    QAction* convertColorizeAction = nullptr;
+    if (layer->type() == Layer::COLORIZE)
+    {
+        convertColorizeAction = menu.addAction(tr("转换成颜料图层"));
+    }
+
     menu.addSeparator();
     QAction* deleteLayerAction = menu.addAction(tr("删除图层…"));
 
@@ -3915,6 +3922,13 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         // 与删除同链：先置为当前层，统一走 ActionCommands 的守卫与确认
         mEditor->layers()->setCurrentLayer(layerIndex);
         Q_EMIT mergeDownRequested(layerIndex);
+        return;
+    }
+
+    if (chosen == convertColorizeAction && convertColorizeAction != nullptr)
+    {
+        mEditor->layers()->setCurrentLayer(layerIndex);
+        mEditor->convertColorizeLayerToBitmap();
         return;
     }
 
