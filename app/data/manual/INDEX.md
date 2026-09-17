@@ -5,3 +5,7 @@
 ### 导入与导出
 
 - [导入图像序列与图像预设集的区别](import-export/import-image-sequence.md)
+
+### 智能填色
+
+- [填色图层（智能填色）使用指南](colorize/colorize-layer.md)
