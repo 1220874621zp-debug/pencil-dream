@@ -209,11 +209,12 @@ TEST_CASE("ScriptHost crop all keyframes to content bounds")
         p.setPen(pen);
         p.drawLine(lineInImage);
         p.end();
-        // 四角撒微透明噪点（模拟转线稿背景噪声，alpha=3 < 默认阈值 8）
+        // 四角撒微透明噪点（模拟转线稿背景噪声）：
+        // alpha=3（微噪）与 alpha=40（渐变灰雾），都低于默认阈值 64
         img.setPixel(0, 0, qPremultiply(qRgba(255, 255, 255, 3)));
-        img.setPixel(img.width() - 1, 0, qPremultiply(qRgba(255, 255, 255, 3)));
+        img.setPixel(img.width() - 1, 0, qPremultiply(qRgba(255, 255, 255, 40)));
         img.setPixel(0, img.height() - 1, qPremultiply(qRgba(255, 255, 255, 3)));
-        img.setPixel(img.width() - 1, img.height() - 1, qPremultiply(qRgba(255, 255, 255, 3)));
+        img.setPixel(img.width() - 1, img.height() - 1, qPremultiply(qRgba(255, 255, 255, 40)));
         BitmapImage frame(imageRect.topLeft(), img);
         frame.setPos(keyPos);
         frame.enableAutoCrop(true); // 与 LayerBitmap::createKeyFrame 创建的帧一致

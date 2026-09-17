@@ -13,9 +13,16 @@
 // 脚本静默执行：结果进 log（菜单「脚本 → 查看脚本输出」回看），出错才弹窗。
 // 本文件为内置脚本，升级时会被程序覆盖释放；要定制请复制改名后修改，
 // 再用菜单「脚本 → 重新载入脚本」生效。
+//
+// ——校准方法（重要）——
+// 如果裁出来的边框还是接近原图大小，说明内容周围有转线稿留下的低不透明度
+// 灰雾（alpha 几十的像素铺满画面）。把 MIN_ALPHA 往上调（64 → 96 → 128 …）
+// 直到边框收进线稿主体；调完「重新载入脚本」即生效，无须重启。
+// 不确定时先设 DRY_RUN = true 试运行：只打印每帧将裁成的边框，不动数据，
+// 看数字合适后改回 false 真正裁剪。
 
-var MIN_ALPHA = 8; // 低于该 alpha 的像素视为透明噪声：转线稿/扫描件背景常散布
-                   // alpha 1~10 的微透明噪点，按 alpha!=0 判定会把边框撑到原图大小
+var MIN_ALPHA = 64; // 低于该 alpha 的像素视为透明噪声（0 = 严格按非零判定）
+var DRY_RUN = false; // true = 只打印边框不实际裁剪（校准用）
 
 registerCommand("按实际像素裁剪关键帧", function () {
     var idx = pencil.activeLayerIndex();
@@ -28,7 +35,8 @@ registerCommand("按实际像素裁剪关键帧", function () {
         alert("请在位图（或填色）图层上运行，当前图层类型：" + type);
         return;
     }
-    log("图层：" + pencil.layerName(idx) + "，噪声阈值 alpha≥" + MIN_ALPHA);
+    log("图层：" + pencil.layerName(idx) + "，噪声阈值 alpha≥" + MIN_ALPHA
+        + (DRY_RUN ? "（试运行，不实际裁剪）" : ""));
 
     var positions = pencil.keyFramePositions(idx);
     if (positions.length === 0) {
@@ -36,7 +44,7 @@ registerCommand("按实际像素裁剪关键帧", function () {
         return;
     }
 
-    pencil.beginUndoGroup("脚本：按实际像素裁剪关键帧");
+    if (!DRY_RUN) { pencil.beginUndoGroup("脚本：按实际像素裁剪关键帧"); }
     var done = 0, skipped = 0;
     var minWidth = 0, minHeight = 0, maxWidth = 0, maxHeight = 0;
     for (var i = 0; i < positions.length; i++) {
@@ -47,23 +55,29 @@ registerCommand("按实际像素裁剪关键帧", function () {
             log("第 " + pos + " 帧：空帧，跳过");
             continue;
         }
-        if (pencil.cropKeyFrame(idx, pos, b.x, b.y, b.width, b.height)) {
+        if (DRY_RUN) {
+            done++;
+            log("第 " + pos + " 帧：将裁剪为 " + b.width + "×" + b.height + "@(" + b.x + "," + b.y + ")");
+        } else if (pencil.cropKeyFrame(idx, pos, b.x, b.y, b.width, b.height)) {
             done++;
             log("第 " + pos + " 帧：裁剪为 " + b.width + "×" + b.height + "@(" + b.x + "," + b.y + ")");
+        }
+        if (done > 0) {
             if (b.width > maxWidth) maxWidth = b.width;
             if (b.height > maxHeight) maxHeight = b.height;
             if (minWidth === 0 || b.width < minWidth) minWidth = b.width;
             if (minHeight === 0 || b.height < minHeight) minHeight = b.height;
         }
     }
-    pencil.endUndoGroup();
+    if (!DRY_RUN) { pencil.endUndoGroup(); }
 
     if (done === 0) {
         log("没有可裁剪的帧（所有关键帧都是空的）。");
         return;
     }
-    log("共裁剪 " + done + " 帧，帧尺寸范围 "
+    log((DRY_RUN ? "试运行：共 " : "共裁剪 ") + done + " 帧，帧尺寸范围 "
         + minWidth + "~" + maxWidth + " × " + minHeight + "~" + maxHeight
         + (skipped > 0 ? "，跳过空帧 " + skipped + " 个" : "")
-        + "，内容位置不变（Ctrl+Z 可一次撤销）。");
+        + (DRY_RUN ? "。数字合适后把 DRY_RUN 改回 false 再跑。"
+                   : "，内容位置不变（Ctrl+Z 可一次撤销）。"));
 });

@@ -15,7 +15,7 @@
 // 再用菜单「脚本 → 重新载入脚本」生效。
 
 var MODE = "fit";      // "fit" = 完整放入画布；"fill" = 铺满画布（超出被裁）
-var MIN_ALPHA = 8;     // 低于该 alpha 的像素视为透明噪声（转线稿背景噪点）
+var MIN_ALPHA = 64;    // 低于该 alpha 的像素视为透明噪声（转线稿背景灰雾）
 
 registerCommand("批量缩放关键帧适配画布", function () {
     var idx = pencil.activeLayerIndex();
