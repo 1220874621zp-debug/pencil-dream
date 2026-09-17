@@ -68,19 +68,228 @@ Status MovieImporter::run(const QString &filePath, int fps, FileType type,
     }
     mEditor->addTemporaryDir(mTempDir);
 
-    if (type != FileType::SOUND)
+    if (type == FileType::MOVIE)
     {
-        Status st = Status::FAIL;
-        st.setTitle(tr("Unknown error"));
-        st.setDescription(tr("不支持的导入类型:此路径只处理音频导入。"));
-        return st;
+        // 视频转序列:ffmpeg 逐帧拆成 PNG 后按位图关键帧导入(参考视频层之外的另一条正式导入路径)
+        int frames = 0;
+        STATUS_CHECK(estimateFrames(filePath, fps, &frames));
+
+        if (mEditor->currentFrame() + frames > MaxFramesBound)
+        {
+            status = Status::FAIL;
+            status.setTitle(tr("导入的视频过大"));
+            status.setDescription(tr("视频片段太长。Pencil Dream 最多容纳 %1 帧，而这段视频约会占到第 %2 帧。请缩短视频后重试。")
+                                 .arg(MaxFramesBound)
+                                 .arg(mEditor->currentFrame() + frames));
+            return status;
+        }
+
+        if (frames > 200)
+        {
+            bool canProceed = askPermission();
+            if (!canProceed) { return Status::CANCELED; }
+        }
+
+        auto progressCallback = [&progress, this](int prog) -> bool
+        {
+            progress(prog); return !mCanceled;
+        };
+        auto progressMsgCallback = [&progressMessage](QString message)
+        {
+            progressMessage(message);
+        };
+        return importMovieVideo(filePath, fps, frames, progressCallback, progressMsgCallback);
+    }
+    else if (type == FileType::SOUND)
+    {
+        return importMovieAudio(filePath, [&progress, this](int prog) -> bool
+        {
+            progress(prog); return !mCanceled;
+        });
     }
 
+    Status st = Status::FAIL;
+    st.setTitle(tr("Unknown error"));
+    st.setDescription(tr("不支持的导入类型:此路径只处理视频或音频导入。"));
+    return st;
+}
 
-    return importMovieAudio(filePath, [&progress, this](int prog) -> bool
+Status MovieImporter::estimateFrames(const QString &filePath, int fps, int *frameEstimate)
+{
+    Status status = Status::OK;
+    DebugDetails dd;
+
+    // --------- Import all the temporary frames ----------
+    STATUS_CHECK(verifyFFmpegExists());
+    QString ffmpegPath = ffmpegLocation();
+    dd << "ffmpeg path:" << ffmpegPath;
+
+    // Get frame estimate
+    int frames = -1;
+    bool ok = true;
+    QString ffprobePath = ffprobeLocation();
+    dd << "ffprobe path:" << ffprobePath;
+    if (QFileInfo::exists(ffprobePath))
+    {
+        QStringList probeArgs = {"-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath};
+        QProcess ffprobe;
+        ffprobe.setReadChannel(QProcess::StandardOutput);
+        ffprobe.start(ffprobePath, probeArgs);
+        ffprobe.waitForFinished();
+        if (ffprobe.exitStatus() == QProcess::NormalExit && ffprobe.exitCode() == 0)
+        {
+            QString output(ffprobe.readAll());
+            double seconds = output.toDouble(&ok);
+            if (ok)
+            {
+                frames = qCeil(seconds * fps);
+            }
+            else
+            {
+                ffprobe.setReadChannel(QProcess::StandardError);
+                dd << "FFprobe output could not be parsed"
+                   << "stdout:"
+                   << output
+                   << "stderr:"
+                   << ffprobe.readAll();
+            }
+        }
+        else
+        {
+            ffprobe.setProcessChannelMode(QProcess::MergedChannels);
+            dd << "FFprobe did not exit normally"
+               << QString("Exit status: ").append(ffprobe.exitStatus() == QProcess::NormalExit ? "NormalExit" : "CrashExit")
+               << QString("Exit code: %1").arg(ffprobe.exitCode())
+               << "Output:"
+               << ffprobe.readAll();
+        }
+        if (frames < 0)
+        {
+            qDebug() << "ffprobe execution failed. Details:";
+            qDebug() << dd.str();
+        }
+    }
+    if (frames < 0)
+    {
+        // Fallback to ffmpeg
+        QStringList probeArgs = {"-i", filePath};
+        QProcess ffmpeg;
+        // FFmpeg writes to stderr only for some reason, so we just read both channels together
+        ffmpeg.setProcessChannelMode(QProcess::MergedChannels);
+        ffmpeg.start(ffmpegPath, probeArgs);
+        if (ffmpeg.waitForStarted() == true)
+        {
+            int index = -1;
+            while (ffmpeg.state() == QProcess::Running)
+            {
+                if (!ffmpeg.waitForReadyRead()) break;
+
+                QString output(ffmpeg.readAll());
+                QStringList sList = output.split(QRegularExpression("[\r\n]"), Qt::SkipEmptyParts);
+                for (const QString& s : sList)
+                {
+                    index = s.indexOf("Duration: ");
+                    if (index >= 0)
+                    {
+                        QString format("hh:mm:ss.zzz");
+                        QString durationString = s.mid(index + 10, format.length()-1) + "0";
+                        int curFrames = qCeil(QTime(0, 0).msecsTo(QTime::fromString(durationString, format)) / 1000.0 * fps);
+                        frames = qMax(frames, curFrames);
+
+                        // We've got what we need, stop running
+                        ffmpeg.terminate();
+                        ffmpeg.waitForFinished(3000);
+                        if (ffmpeg.state() == QProcess::Running) ffmpeg.kill();
+                        ffmpeg.waitForFinished();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (frames < 0)
+    {
+        status = Status::FAIL;
+        status.setTitle(tr("加载视频失败"));
+        status.setDescription(tr("无法从指定视频取得时长。请确认导入的是有效的视频文件。"));
+        status.setDetails(dd);
+        return status;
+    }
+
+    *frameEstimate = frames;
+    return status;
+}
+
+Status MovieImporter::importMovieVideo(const QString &filePath, int fps, int frameEstimate,
+                                       std::function<bool(int)> progress,
+                                       std::function<void(QString)> progressMessage)
+{
+    Status status = Status::OK;
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer->type() != Layer::BITMAP)
+    {
+        status = Status::FAIL;
+        status.setTitle(tr("仅限位图层"));
+        status.setDescription(tr("只能往位图层导入视频帧。"));
+        return status;
+    }
+
+    QStringList args = {"-i", filePath};
+    args << "-r" << QString::number(fps);
+    args << QDir(mTempDir->path()).filePath("%05d.png");
+
+    status = MovieExporter::executeFFmpeg(ffmpegLocation(), args, [&progress, frameEstimate, this] (int frame) {
+        progress(qFloor(qMin(frame / static_cast<double>(frameEstimate), 1.0) * 50)); return !mCanceled; }
+    );
+
+    if (!status.ok() && status != Status::CANCELED) { return status; }
+
+    if (mCanceled) return Status::CANCELED;
+
+    progressMessage(tr("视频处理完毕，正在添加帧..."));
+
+    progress(50);
+
+    return generateFrames([this, &progress](int prog) -> bool
     {
         progress(prog); return !mCanceled;
     });
+}
+
+Status MovieImporter::generateFrames(std::function<bool(int)> progress)
+{
+    Status status = Status::OK;
+    int i = 1;
+    QDir tempDir(mTempDir->path());
+    auto amountOfFrames = tempDir.count();
+    QString currentFile(tempDir.filePath(QString("%1.png").arg(i, 5, 10, QChar('0'))));
+
+    ImportImageConfig importImageConfig;
+    importImageConfig.positionType = ImportImageConfig::CenterOfCameraFollowed;
+    while (QFileInfo::exists(currentFile))
+    {
+        status = mEditor->importImage(currentFile, importImageConfig);
+
+        if (!status.ok()) {
+            break;
+        }
+
+        if (mCanceled) return Status::CANCELED;
+        progress(qFloor(50 + i / static_cast<qreal>(amountOfFrames) * 50));
+        i++;
+        currentFile = tempDir.filePath(QString("%1.png").arg(i, 5, 10, QChar('0')));
+    }
+
+    if (!QFileInfo::exists(tempDir.filePath("00001.png"))) {
+        status = Status::FAIL;
+        status.setTitle(tr("导入失败"));
+        status.setDescription(tr("找不到内部生成文件，导入未成功。"));
+        return status;
+    }
+
+    return status;
 }
 Status MovieImporter::importMovieAudio(const QString& filePath, std::function<bool(int)> progress)
 {

@@ -5757,6 +5757,11 @@ Read the instructions and try again</source>
     </message>
     <message>
         <location filename="../app/ui/mainwindow2.ui" line="424"/>
+        <source>Movie Video to Sequence...</source>
+        <translation>导入视频并转换成序列...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/mainwindow2.ui" line="429"/>
         <source>Reference Video...</source>
         <translation>导入参考视频...</translation>
     </message>
@@ -7934,6 +7939,12 @@ or cancel</source>
         <source>Import Image Predefined Set</source>
         <comment>Shortcut</comment>
         <translation>导入预定义图片集</translation>
+    </message>
+    <message>
+        <location filename="../app/src/shortcutspage.cpp" line="341"/>
+        <source>Import Movie Video to Sequence</source>
+        <comment>Shortcut</comment>
+        <translation>导入视频并转换成序列</translation>
     </message>
     <message>
         <source>Import Movie Video</source>

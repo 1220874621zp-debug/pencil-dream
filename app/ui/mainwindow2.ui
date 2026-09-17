@@ -82,6 +82,7 @@
      <addaction name="actionImport_Image"/>
      <addaction name="actionImport_ImageSeq"/>
      <addaction name="actionImport_ImageSeqNum"/>
+     <addaction name="actionImport_MovieVideo"/>
      <addaction name="actionImport_ReferenceVideo"/>
      <addaction name="actionImport_AnimatedImage"/>
      <addaction name="actionImportLayers_from_pclx"/>
@@ -417,6 +418,11 @@
   <action name="actionImport_ImageSeq">
    <property name="text">
     <string>Image Sequence...</string>
+   </property>
+  </action>
+  <action name="actionImport_MovieVideo">
+   <property name="text">
+    <string>Movie Video to Sequence...</string>
    </property>
   </action>
   <action name="actionImport_ReferenceVideo">

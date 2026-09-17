@@ -33,16 +33,16 @@ public:
     MovieImporter(QObject* parent);
     virtual ~MovieImporter();
 
-    void setCore(Editor* editor) { mEditor = editor; }
+    void setCore(Editor* editor) { mEditor = editor; }
 
     /**
      * @param filePath Path to the video file.
      * @param fps Frames per second to import at.
-     * @param type FileType to import, must be SOUND (video frames import was replaced by the reference-video layer)
+     * @param type FileType to import: MOVIE = 逐帧拆成位图关键帧(视频转序列), SOUND = 抽取音轨
      * @param progress a function that returns and notify the progress
      * @param progressMessage a function that returns and change the progress message
      * @param askPermission a function that when called, could would be used to notify UI for permission
-     * @return whether the run suceeded, failed or canceled
+     * @return whether the run suucceeded, failed or canceled
      */
     Status run(const QString& filePath, int fps, FileType type,
                std::function<void(int)> progress,
@@ -53,7 +53,12 @@ public:
 
 private:
 
+    Status estimateFrames(const QString& filePath, int fps, int* frameEstimate);
     Status verifyFFmpegExists();
+    Status importMovieVideo(const QString& filePath, int fps, int frameEstimate,
+                            std::function<bool(int)> progress,
+                            std::function<void(QString)> progressMessage);
+    Status generateFrames(std::function<bool(int)> progress);
     Status importMovieAudio(const QString& filePath, std::function<bool(int)> progress);
 
     Editor* mEditor = nullptr;

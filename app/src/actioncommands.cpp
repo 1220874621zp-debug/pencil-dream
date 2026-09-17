@@ -248,6 +248,72 @@ Status ActionCommands::importReferenceVideo()
     return Status::OK;
 }
 
+Status ActionCommands::importMovieVideo()
+{
+    // 视频转序列:ffmpeg 逐帧拆成 PNG 导入位图层(区别于参考视频层的链接式导入)
+    if (!ensureFFmpegAvailable())
+    {
+        return Status::SAFE;
+    }
+
+    QString filePath = FileDialog::getOpenFileName(mParent, FileType::MOVIE);
+    if (filePath.isEmpty())
+    {
+        return Status::FAIL;
+    }
+
+    // 当前层非位图层时自动创建位图层作为导入目标(与声音导入自动建层同款)
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr || layer->type() != Layer::BITMAP)
+    {
+        mEditor->layers()->createBitmapLayer(mEditor->layers()->nameSuggestLayer(tr("Bitmap Layer", "Default name on creating a bitmap layer")));
+    }
+
+    // Show a progress dialog, as this can take a while if you have lots of images.
+    QProgressDialog progressDialog(tr("正在导入视频..."), tr("中止"), 0, 100, mParent);
+    hideQuestionMark(progressDialog);
+    progressDialog.setWindowModality(Qt::WindowModal);
+    progressDialog.setMinimumWidth(250);
+    progressDialog.show();
+
+    QMessageBox information(mParent);
+    information.setIcon(QMessageBox::Warning);
+    information.setText(tr("要导入的帧数很多，这可能需要较长时间。确定继续吗？"));
+    information.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    information.setDefaultButton(QMessageBox::Yes);
+
+    MovieImporter importer(this);
+    importer.setCore(mEditor);
+
+    connect(&progressDialog, &QProgressDialog::canceled, &importer, &MovieImporter::cancel);
+
+    Status st = importer.run(filePath, mEditor->playback()->fps(), FileType::MOVIE, [&progressDialog](int prog) {
+        progressDialog.setValue(prog);
+        QApplication::processEvents();
+    }, [&progressDialog](QString progMessage) {
+        progressDialog.setLabelText(progMessage);
+    }, [&information]() {
+
+        int ret = information.exec();
+        return ret == QMessageBox::Yes;
+    });
+
+    if (!st.ok() && st != Status::CANCELED)
+    {
+        ErrorDialog errorDialog(st.title(), st.description(), st.details().html(), mParent);
+        errorDialog.exec();
+        return Status::SAFE;
+    }
+
+    mEditor->layers()->notifyAnimationLengthChanged();
+    emit mEditor->framesModified();
+
+    progressDialog.setValue(100);
+    progressDialog.close();
+
+    return Status::OK;
+}
+
 Status ActionCommands::importSound(FileType type)
 {
     Layer* layer = mEditor->layers()->currentLayer();
