@@ -7,6 +7,7 @@
 #include "layermanager.h"
 #include "bitmapimage.h"
 #include "undoredomanager.h"
+#include "selectionmanager.h"
 #include "scriptapi.h"
 
 #include <QDir>
@@ -224,6 +225,11 @@ TEST_CASE("ScriptHost crop all keyframes to content bounds")
     editor->scrubTo(10);
     REQUIRE(layer->addNewKeyFrameAt(10));
 
+    // 建立旧选区（变形/移动工具的变换框寄生其上）：帧1 的大框
+    editor->scrubTo(1);
+    editor->selectAll();
+    REQUIRE(editor->select()->mySelectionRect() == QRectF(-500, -400, 1000, 800));
+
     QTemporaryDir tmp;
     const QString jsPath = QDir(tmp.path()).filePath("crop.js");
     QFile file(jsPath);
@@ -252,6 +258,11 @@ TEST_CASE("ScriptHost crop all keyframes to content bounds")
     // 内容像素原位保留（画布显示不变），空帧未被触碰
     REQUIRE(frame1->constScanLine(-100, -50) == sampleBefore);
     REQUIRE(static_cast<BitmapImage*>(layer->getKeyFrameAt(10))->bounds().isEmpty());
+
+    // 选区失效：脚本改帧后旧大框被清除；再次全选按新内容边框重建
+    REQUIRE(editor->select()->mySelectionRect().isNull());
+    editor->selectAll();
+    REQUIRE(editor->select()->mySelectionRect() == QRectF(expected1));
 
     // 撤销组：一步回滚两个关键帧到带透明边距的状态
     editor->undoRedo()->undo();

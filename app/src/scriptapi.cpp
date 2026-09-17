@@ -328,6 +328,11 @@ bool ScriptHost::modifyKeyFrameWithUndo(int layerIndex, int pos, const QString& 
     {
         mTouchedFrames.append(pos);
     }
+
+    // 选区失效：变形/移动工具的变换框寄生在 SelectionManager 的选区上，
+    // 改了帧内容后旧矩形与新图像不再对应（裁剪后仍显示原图尺寸的框）——
+    // 清除选区，用户下次全选（Ctrl+A）时按新内容边框重建
+    mEditor->deselectAll();
     return true;
 }
 
