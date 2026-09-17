@@ -42,6 +42,7 @@ class BrushPresetPanel;
 class ReferenceCardPanel;
 class ExposureSheetPanel;
 class RecentFileMenu;
+class ScriptManager;
 class ActionCommands;
 class ImportImageSeqDialog;
 class UndoRedoCommand;
@@ -172,6 +173,9 @@ private:
     void deleteWorkspace(const QString& name);
     void applyDefaultWorkspace();
     QMenu* mWorkspaceMenu = nullptr;
+
+    // JS 脚本系统（菜单「脚本」：扫描 %APPDATA%/Pencil2D/Pencil2D/scripts 下的 .js）
+    ScriptManager* mScriptManager = nullptr;
 
     void changePlayState(bool isPlaying);
 

@@ -125,4 +125,7 @@
     <qresource prefix="/app">
         <file>pencil2d_quick_guide.pdf</file>
     </qresource>
+    <qresource prefix="/">
+        <file>scripts/scaleKeyFramesToCanvas.js</file>
+    </qresource>
 </RCC>

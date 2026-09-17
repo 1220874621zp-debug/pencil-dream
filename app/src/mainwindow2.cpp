@@ -72,6 +72,7 @@ GNU General Public License for more details.
 #include "referencecardpanel.h"
 #include "exposuresheetpanel.h"
 #include "builtinworkspaces.h"
+#include "scriptmanager.h"
 #include "tooloptionwidget.h"
 #include "colorizeoptionswidget.h"
 #include "preferencesdialog.h"
@@ -618,6 +619,11 @@ void MainWindow2::createMenus()
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     ui->menuBar->insertMenu(mWorkspaceMenu->menuAction(), filterMenu);
+
+    //--- Script Menu ---
+    // JS 脚本（QJSEngine，与 friction 脚本系统同款）：固定项 + 脚本注册的命令
+    mScriptManager = new ScriptManager(mEditor, this, this);
+    ui->menuBar->insertMenu(ui->menuHelp->menuAction(), mScriptManager->menu());
 }
 
 void MainWindow2::replaceUndoRedoActions()

@@ -36,6 +36,9 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_holefiller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_colortoalpha.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_layersplitter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_scripting.cpp
+    # 脚本系统（app 层）：测试直接编入 ScriptHost 实现
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptapi.cpp
 )
 
 set(TEST_RESOURCES
@@ -57,6 +60,7 @@ add_executable(pencil2d_tests
 target_include_directories(pencil2d_tests PRIVATE
     ${CORE_LIB_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src
 )
 
 # Link libraries
@@ -67,6 +71,7 @@ target_link_libraries(pencil2d_tests PRIVATE
     Qt6::Xml
     Qt6::Multimedia
     Qt6::Svg
+    Qt6::Qml # QJSEngine（脚本系统测试）
 )
 
 # Platform-specific libraries

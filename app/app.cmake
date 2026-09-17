@@ -62,6 +62,8 @@ set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcppage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcp/mcpserver.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcp/mcpdispatcher.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptapi.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptmanager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/spinslider.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/statusbar.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/timecontrols.h
@@ -138,6 +140,8 @@ set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcppage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcp/mcpserver.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/mcp/mcpdispatcher.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptapi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/scriptmanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/spinslider.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/statusbar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/strokeoptionswidget.cpp
@@ -306,6 +310,7 @@ target_link_libraries(pencil2d PRIVATE
     Qt6::Multimedia
     Qt6::Svg
     Qt6::Network
+    Qt6::Qml # QJSEngine（脚本系统）
 )
 
 # Platform-specific libraries
