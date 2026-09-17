@@ -21,7 +21,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # Set version
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "0.0.0.0")
+    set(APP_VERSION "1.0.0")
 endif()
 
 message(STATUS "App Version: ${APP_VERSION}")
