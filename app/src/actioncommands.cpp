@@ -25,6 +25,7 @@ GNU General Public License for more details.
 #include <QFile>
 #include <QStandardPaths>
 #include <QFileDialog>
+#include <QSet>
 #include <limits>
 
 #include "pencildef.h"
@@ -56,6 +57,9 @@ GNU General Public License for more details.
 #include "holefiller.h"
 #include "colortoalpha.h"
 #include "layersplitter.h"
+#include "colordistance.h"
+#include "colorref.h"
+#include "layerlayoutcommand.h"
 #include "soundclip.h"
 #include "camera.h"
 
@@ -1322,6 +1326,30 @@ Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool al
     const int sourceIndex = mEditor->layers()->currentLayerIndex();
     int nextInsertIndex = sourceIndex + 1; // 新层插源层上方（索引大者渲染在上）
 
+    // 拆分前分组快照（撤销用；须在任何结构改动前捕获）
+    const LayerOrderCommand::GroupSnapshot undoGroups = LayerOrderCommand::captureGroups(object);
+
+    // 色板最接近色名（ΔE≤30 命中，否则空）
+    const auto paletteNameFor = [this, object](const QRgb key) -> QString {
+        const int count = object->getColorCount();
+        if (count == 0) { return QString(); }
+        const ColorDistance::LabF keyLab = ColorDistance::rgbToLab(key);
+        QString best;
+        double bestDist = 30.0;
+        for (int i = 0; i < count; ++i)
+        {
+            const ColorRef ref = object->getColor(i);
+            if (!ref.color.isValid()) { continue; }
+            const double dist = ColorDistance::deltaE(ColorDistance::rgbToLab(ref.color.rgb()), keyLab);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = ref.name;
+            }
+        }
+        return best;
+    };
+
     QProgressDialog progress(tr("正在拆分图层颜色…"), tr("取消"), 0, frames.size(), mParent);
     progress.setWindowTitle(tipTitle);
     progress.setWindowModality(Qt::WindowModal);
@@ -1332,6 +1360,7 @@ Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool al
 
     LayerSplitter splitter(params);
     QVector<LayerBitmap*> bucketLayers; // 桶索引 → 新层（惰性建）
+    QSet<QString> usedSwatchNames;      // 色板名去重（多个桶命中同一色名时后者回退色值）
     bool aborted = false;
     QString abortReason;
     int done = 0;
@@ -1359,7 +1388,18 @@ Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool al
                 {
                     auto* newLayer = new LayerBitmap(object->getUniqueLayerID());
                     const QRgb key = splitter.bucketKeyColor(bucketLayers.size());
-                    newLayer->setName(tr("拆分-#%1").arg(QString::number(key & 0xFFFFFF, 16).rightJustified(6, QChar('0')).toUpper()));
+                    const QString hex = QString::number(key & 0xFFFFFF, 16).rightJustified(6, QChar('0')).toUpper();
+                    QString name = tr("拆分-#%1").arg(hex);
+                    if (params.usePaletteNames)
+                    {
+                        const QString swatch = paletteNameFor(key);
+                        if (!swatch.isEmpty() && !usedSwatchNames.contains(swatch))
+                        {
+                            name = tr("拆分-%1").arg(swatch);
+                            usedSwatchNames.insert(swatch);
+                        }
+                    }
+                    newLayer->setName(name);
                     object->insertLayer(nextInsertIndex++, newLayer);
                     bucketLayers.append(newLayer);
                 }
@@ -1411,6 +1451,16 @@ Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool al
         }
     }
 
+    // 新层整体入组「拆分」（连续组模型：成员恒相邻，插入序已满足）
+    if (params.putInGroup && !bucketLayers.isEmpty())
+    {
+        const int groupId = object->createLayerGroup(tr("拆分"));
+        for (LayerBitmap* created : bucketLayers)
+        {
+            created->setGroupId(groupId);
+        }
+    }
+
     if (params.hideOriginal)
     {
         bitmapLayer->setVisible(false);
@@ -1418,7 +1468,7 @@ Status ActionCommands::splitLayerByColor(const LayerSplitParams& params, bool al
 
     mEditor->undoRedo()->pushUndoCommand(
         new SplitLayerCommand(mEditor, QList<Layer*>(bucketLayers.begin(), bucketLayers.end()),
-                              bitmapLayer->id(), params.hideOriginal, tipTitle));
+                              bitmapLayer->id(), params.hideOriginal, undoGroups, tipTitle));
 
     // 选中最高处的新层并刷新（命令入栈的首次 redo 已被跳过，刷新由动作侧完成）
     Layer* topLayer = object->getLayer(sourceIndex + bucketLayers.size());

@@ -14,6 +14,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 */
+#include <algorithm>
+
 #include "layerlayoutcommand.h"
 
 #include "editor.h"
@@ -165,4 +167,115 @@ void LayerOrderCommand::redo()
     if (isFirstRedo()) { setFirstRedo(false); return; }
 
     apply(mRedoOrder, mRedoGroups);
+}
+
+SplitLayerCommand::SplitLayerCommand(Editor* editor,
+                                     const QList<Layer*>& createdLayers,
+                                     int sourceLayerId,
+                                     bool hideOriginal,
+                                     const LayerOrderCommand::GroupSnapshot& undoGroups,
+                                     const QString& description,
+                                     QUndoCommand* parent)
+    : UndoRedoCommand(editor, parent)
+    , mCreatedLayers(createdLayers)
+    , mSourceLayerId(sourceLayerId)
+    , mHideOriginal(hideOriginal)
+    , mUndoGroups(undoGroups)
+    , mRedoGroups(LayerOrderCommand::captureGroups(editor->object()))
+{
+    for (Layer* layer : createdLayers)
+    {
+        mCreatedLayerIds.append(layer->id());
+        mAttachIndices.append(editor->object()->getIndex(layer));
+    }
+    setText(description);
+}
+
+SplitLayerCommand::~SplitLayerCommand()
+{
+    if (!mLayersAttached)
+    {
+        // 摘下态：所有权归命令（文档切换 clearStack 时防泄漏；挂载态归 object）
+        for (Layer* layer : mCreatedLayers) { delete layer; }
+    }
+}
+
+void SplitLayerCommand::detachLayers()
+{
+    for (int id : mCreatedLayerIds)
+    {
+        Layer* layer = editor()->object()->takeLayer(id);
+        Q_UNUSED(layer);
+    }
+    mLayersAttached = false;
+}
+
+void SplitLayerCommand::attachLayers()
+{
+    // 按构造时记录的索引升序挂回（新层原本连续占据源层上方位置）
+    QList<QPair<int, Layer*>> pairs;
+    for (int i = 0; i < mCreatedLayers.size(); ++i)
+    {
+        pairs.append(qMakePair(mAttachIndices[i], mCreatedLayers[i]));
+    }
+    std::sort(pairs.begin(), pairs.end(), [](const QPair<int, Layer*>& x, const QPair<int, Layer*>& y) {
+        return x.first < y.first;
+    });
+    for (const auto& pair : pairs)
+    {
+        editor()->object()->insertLayer(pair.first, pair.second);
+    }
+    mLayersAttached = true;
+}
+
+void SplitLayerCommand::applyGroups(const LayerOrderCommand::GroupSnapshot& groups)
+{
+    if (!groups.valid) { return; }
+    editor()->object()->applyLayerGroupState(groups.layerGroupId, groups.groups, groups.nextGroupId);
+}
+
+void SplitLayerCommand::refreshUi(int currentLayerId)
+{
+    Layer* current = editor()->layers()->findLayerById(currentLayerId);
+    if (current != nullptr)
+    {
+        editor()->layers()->setCurrentLayer(current);
+    }
+    editor()->scrubTo(editor()->currentFrame());
+    emit editor()->updateTimeLine();
+    editor()->getScribbleArea()->onLayerChanged();
+}
+
+void SplitLayerCommand::undo()
+{
+    UndoRedoCommand::undo();
+
+    detachLayers();
+    applyGroups(mUndoGroups); // 还原拆分前分组（含撤掉"拆分"组）
+
+    Layer* source = editor()->layers()->findLayerById(mSourceLayerId);
+    if (mHideOriginal && source != nullptr)
+    {
+        source->setVisible(true);
+    }
+    refreshUi(mSourceLayerId);
+}
+
+void SplitLayerCommand::redo()
+{
+    UndoRedoCommand::redo();
+
+    // 命令入栈时的自动 redo：拆分结果已由调用方应用
+    if (isFirstRedo()) { setFirstRedo(false); return; }
+
+    attachLayers();
+    applyGroups(mRedoGroups); // 重放拆分后分组
+
+    Layer* source = editor()->layers()->findLayerById(mSourceLayerId);
+    if (mHideOriginal && source != nullptr)
+    {
+        source->setVisible(false);
+    }
+    // 回到最上方的新建层（mCreatedLayers 末位=挂回后最高索引）
+    refreshUi(mCreatedLayerIds.isEmpty() ? mSourceLayerId : mCreatedLayerIds.last());
 }

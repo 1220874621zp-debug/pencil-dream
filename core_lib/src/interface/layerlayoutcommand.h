@@ -98,4 +98,40 @@ private:
     GroupSnapshot mRedoGroups;
 };
 
+/** 拆分图层颜色：一次性新建多个图层（含各自关键帧）的单步撤销命令。
+ *  调用方先建好层、完成分组并插入 object（redo 态），命令 undo 时摘层
+ *  （接管所有权）并还原拆分前的分组快照，redo 时按记录的原索引挂回并
+ *  重放拆分后的分组快照；析构时删除仍被摘下的层（文档切换防泄漏）。
+ *  hideOriginal 时同步快照源层可见性。 */
+class SplitLayerCommand : public UndoRedoCommand
+{
+public:
+    SplitLayerCommand(Editor* editor,
+                      const QList<Layer*>& createdLayers,
+                      int sourceLayerId,
+                      bool hideOriginal,
+                      const LayerOrderCommand::GroupSnapshot& undoGroups,
+                      const QString& description,
+                      QUndoCommand* parent = nullptr);
+    ~SplitLayerCommand() override;
+
+    void undo() override;
+    void redo() override;
+
+private:
+    void detachLayers();
+    void attachLayers();
+    void applyGroups(const LayerOrderCommand::GroupSnapshot& groups);
+    void refreshUi(int currentLayerId);
+
+    QList<Layer*> mCreatedLayers;
+    QList<int> mCreatedLayerIds;
+    QList<int> mAttachIndices;   // 构造时各新层在 object 中的索引（redo 挂回位置）
+    int mSourceLayerId = -1;
+    bool mHideOriginal = false;
+    bool mLayersAttached = true; // 摘下态归命令所有
+    LayerOrderCommand::GroupSnapshot mUndoGroups; // 拆分前分组状态（调用方拆分前捕获传入）
+    LayerOrderCommand::GroupSnapshot mRedoGroups; // 拆分后分组状态（构造时捕获）
+};
+
 #endif // LAYERLAYOUTCOMMAND_H

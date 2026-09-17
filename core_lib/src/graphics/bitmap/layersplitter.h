@@ -36,6 +36,10 @@ struct LayerSplitParams
 
     // 动作级选项（算法不使用）：拆完隐藏源图层
     bool hideOriginal = false;
+    // 动作级选项：新层全部放进「拆分」组
+    bool putInGroup = true;
+    // 动作级选项：用调色板最接近色（ΔE≤30）命名新层，无相近色回退色值
+    bool usePaletteNames = true;
 };
 
 /** 拆分图层颜色：Krita「Split Layer」移植（贪心顺序聚类）。

@@ -30,7 +30,8 @@ class QDoubleSpinBox;
 class QRadioButton;
 class QSlider;
 
-/** 拆分图层颜色参数对话框（Krita Split Layer 移植） */
+/** 拆分图层颜色参数对话框（Krita Split Layer 移植）。
+ *  参数经 QSettings 记忆上次取值。 */
 class LayerSplitDialog : public QDialog
 {
     Q_OBJECT
@@ -41,12 +42,20 @@ public:
     LayerSplitParams params() const;
     bool applyToAllKeyFrames() const;
 
+public slots:
+    void accept() override;
+
 private:
+    void loadSettings();
+    void saveSettings() const;
+
     QSlider* mFuzzinessSlider = nullptr;
     QDoubleSpinBox* mFuzzinessSpin = nullptr;
     QCheckBox* mDisregardOpacityCheck = nullptr;
     QCheckBox* mSortLayersCheck = nullptr;
     QCheckBox* mHideOriginalCheck = nullptr;
+    QCheckBox* mPutInGroupCheck = nullptr;
+    QCheckBox* mPaletteNameCheck = nullptr;
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
 };
