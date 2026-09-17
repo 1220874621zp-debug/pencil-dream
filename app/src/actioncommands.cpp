@@ -53,6 +53,7 @@ GNU General Public License for more details.
 #include "colorizeimage.h"
 #include "colorizeupdatemanager.h"
 #include "holefiller.h"
+#include "colortoalpha.h"
 #include "soundclip.h"
 #include "camera.h"
 
@@ -1163,6 +1164,82 @@ Status ActionCommands::fillHolesOnCurrentFrame()
 
     mEditor->setModified(mEditor->currentLayerIndex(), mEditor->currentFrame());
     mEditor->undoRedo()->record(saveStateId, tr("镂空检测填充", "Undo step text"));
+    return Status::OK;
+}
+
+Status ActionCommands::applyColorToAlpha(const ColorToAlphaParams& params, bool allKeyFrames)
+{
+    const QString tipTitle = tr("颜色转为透明度");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (!layer->isBitmapKind())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("颜色转为透明度只能在位图族图层（位图/填色）上使用。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法处理。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+
+    if (!allKeyFrames)
+    {
+        // 与画布落笔同源：循环层编辑的是显示帧背后的关键帧（所见即所编辑）
+        BitmapImage* bitmap = static_cast<BitmapImage*>(
+            bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+        if (bitmap == nullptr)
+        {
+            QMessageBox::information(mParent, tipTitle, tr("当前帧没有可处理的位图内容。"));
+            return Status::CANCELED;
+        }
+
+        const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+        QImage* img = bitmap->image();
+        Q_CHECK_PTR(img);
+        const int changed = ColorToAlpha::apply(*img, params);
+        if (changed == 0)
+        {
+            // 无变化不进撤销栈
+            QMessageBox::information(mParent, tipTitle, tr("没有符合条件的像素，图像未改变。"));
+            return Status::OK;
+        }
+        bitmap->setModified(true);
+        // 数据失效传实际关键帧 pos（循环层显示帧≠数据帧）
+        mEditor->setModified(mEditor->layers()->currentLayerIndex(), bitmap->pos());
+        mEditor->undoRedo()->record(saveStateId, tr("颜色转为透明度", "Undo step text"));
+        return Status::OK;
+    }
+
+    // 批量：图层全部关键帧，单状态单步撤销
+    const SAVESTATE_ID saveStateId = mEditor->undoRedo()->createState(UndoRedoRecordType::KEYFRAME_MODIFY);
+    int changedFrames = 0;
+    bitmapLayer->foreachKeyFrame([&](KeyFrame* key) {
+        auto* bitmap = static_cast<BitmapImage*>(key);
+        QImage* img = bitmap->image();
+        if (img == nullptr)
+            return;
+        if (ColorToAlpha::apply(*img, params) > 0)
+        {
+            bitmap->setModified(true);
+            mEditor->setModified(mEditor->layers()->currentLayerIndex(), bitmap->pos());
+            ++changedFrames;
+        }
+    });
+
+    if (changedFrames == 0)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("没有符合条件的像素，图像未改变。"));
+        return Status::OK;
+    }
+
+    mEditor->undoRedo()->record(saveStateId, tr("颜色转为透明度（全部关键帧）", "Undo step text"));
     return Status::OK;
 }
 

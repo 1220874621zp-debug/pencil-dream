@@ -21,6 +21,8 @@ GNU General Public License for more details.
 #include "pencilerror.h"
 #include "filetype.h"
 
+struct ColorToAlphaParams;
+
 class Editor;
 class QWidget;
 class ExportMovieDialog;
@@ -88,6 +90,9 @@ public:
     Status mergeLayerDown();
     /** 镂空检测：一键检测并填充当前帧线稿的封闭镂空/细缝（各像素取最近不透明像素的颜色） */
     Status fillHolesOnCurrentFrame();
+    /** 颜色转透明度（Krita Color to Alpha 移植）：接近目标色的像素转透明、按感知色差渐变；
+        allKeyFrames=false 只处理当前显示帧背后的关键帧，=true 处理图层全部关键帧 */
+    Status applyColorToAlpha(const ColorToAlphaParams& params, bool allKeyFrames);
     /** 跨帧传播填色：把填色层当前帧的色点块匹配搬运到后续帧块（缺帧自动补）并批量平涂 */
     Status propagateColorizeStrokes();
     /** 清除帧：清空当前选中图层画布上的所有像素（保留帧结构，可撤销） */

@@ -83,6 +83,7 @@ GNU General Public License for more details.
 #include "onionskinwidget.h"
 #include "pegbaralignmentdialog.h"
 #include "addtransparencytopaperdialog.h"
+#include "colortoalphadialog.h"
 #include "repositionframesdialog.h"
 
 #include "errordialog.h"
@@ -596,6 +597,18 @@ void MainWindow2::createMenus()
     mWorkspaceMenu = new QMenu(tr("工作区"), this);
     connect(mWorkspaceMenu, &QMenu::aboutToShow, this, &MainWindow2::rebuildWorkspaceMenu);
     ui->menuBar->insertMenu(ui->menuHelp->menuAction(), mWorkspaceMenu);
+
+    //--- Filter Menu ---
+    QMenu* filterMenu = new QMenu(tr("滤镜"), this);
+    QAction* colorToAlphaAction = filterMenu->addAction(tr("颜色转为透明度..."));
+    colorToAlphaAction->setStatusTip(tr("把接近目标颜色的像素转为透明（白底扫描件去底提线），按感知色差渐变保留抗锯齿边缘"));
+    connect(colorToAlphaAction, &QAction::triggered, this, [this] {
+        ColorToAlphaDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted)
+            return;
+        mCommands->applyColorToAlpha(dialog.params(), dialog.applyToAllKeyFrames());
+    });
+    ui->menuBar->insertMenu(mWorkspaceMenu->menuAction(), filterMenu);
 }
 
 void MainWindow2::replaceUndoRedoActions()
