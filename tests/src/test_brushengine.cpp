@@ -18,10 +18,13 @@ GNU General Public License for more details.
 
 #include <QDir>
 #include <QImage>
+#include <QPainter>
+#include <QPen>
 #include <QTemporaryDir>
 #include <QThread>
 
 #include "brush/brushengine.h"
+#include "brush/maskedstrokecompositor.h"
 #include "brush/brushpresetstore.h"
 #include "editor.h"
 #include "interface/scribblearea.h"
@@ -591,4 +594,413 @@ TEST_CASE("EraserTool preset application")
 
     // 台架各部件与全局单例（PixmapCache/QSettings 等）有交叉引用，
     // 进程退出时统一回收，测试内不手动 delete
+}
+
+// ===================== v2 扩展：图像笔尖 / 双笔尖 / 纹理 / 图案颜色源 =====================
+
+namespace
+{
+
+// 白底 + 中心黑竖条（书法笔尖的最小模型：黑=不透明）
+QImage makeCalligraphyTip(int w, int h, int inkWidth)
+{
+    QImage tip(w, h, QImage::Format_ARGB32);
+    tip.fill(Qt::white);
+    QPainter p(&tip);
+    p.setPen(QPen(QColor(0, 0, 0), inkWidth));
+    p.drawLine(w / 2, 0, w / 2, h - 1);
+    p.end();
+    return tip;
+}
+
+QImage renderSingleDab(const BrushSettings& s, const QPointF& at, qreal pressure, QImage& layer)
+{
+    BrushEngine engine;
+    engine.setSettings(s);
+    const auto painter = [&layer](const BrushEngine::DabRequest& dab) {
+        DabPasteParams params;
+        params.opacity = dab.opacity;
+        params.flow = dab.flow;
+        params.buildup = dab.buildup;
+        params.blendMode = dab.blendMode;
+        params.perPixelColor = dab.perPixelColor;
+        washBlendImage(layer, dab.dab, dab.topLeft, params);
+    };
+    engine.beginStroke(at, pressure, QColor(200, 30, 30), painter);
+    engine.endStroke();
+    return layer;
+}
+
+QRect nonZeroBounds(const QImage& image)
+{
+    int x0 = image.width(), x1 = -1, y0 = image.height(), y1 = -1;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qAlpha(image.pixel(x, y)) > 8) {
+                x0 = qMin(x0, x); x1 = qMax(x1, x);
+                y0 = qMin(y0, y); y1 = qMax(y1, y);
+            }
+        }
+    }
+    return x1 < 0 ? QRect() : QRect(QPoint(x0, y0), QPoint(x1, y1));
+}
+
+} // namespace
+
+TEST_CASE("Image tip dab generation")
+{
+    SECTION("mask direction: black ink paints, white background stays transparent")
+    {
+        BrushSettings s;
+        s.tipImage = makeCalligraphyTip(32, 64, 12);
+        s.tipShape = BrushSettings::TipShape::Image;
+        s.bakeTipMask();
+        REQUIRE(!s.tipMask.isNull());
+        // 烘焙：黑(0)→alpha 255，白(255)→alpha 0（Krita ALPHAMASK：(255-灰)×α/255）
+        REQUIRE(s.tipMask.pixel(16, 32) != 0);
+        REQUIRE(s.tipMask.pixel(2, 2) == 0);
+
+        s.diameter = 64.0;
+        s.pressureSize = false;
+        s.opacity = 1.0;
+        s.flow = 1.0;
+        QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        renderSingleDab(s, QPointF(100, 100), 1.0, layer);
+        const QRect bbox = nonZeroBounds(layer);
+        REQUIRE(!bbox.isEmpty());
+        // 黑竖条被画出来（中心有墨），尺寸≈diameter
+        REQUIRE(bbox.width() <= 40);
+        REQUIRE(bbox.height() > 45);
+        REQUIRE(qAlpha(layer.pixel(100, 100)) > 200);
+        REQUIRE(qAlpha(layer.pixel(100, 30)) == 0); // 笔尖上端之外
+    }
+
+    SECTION("diameter scales the tip, angle rotates the bbox")
+    {
+        BrushSettings s;
+        s.tipImage = makeCalligraphyTip(16, 64, 6); // 纵长笔尖
+        s.tipShape = BrushSettings::TipShape::Image;
+        s.bakeTipMask();
+        s.pressureSize = false;
+        s.opacity = 1.0;
+        s.flow = 1.0;
+        s.diameter = 60.0;
+
+        QImage a(200, 200, QImage::Format_ARGB32_Premultiplied);
+        a.fill(Qt::transparent);
+        renderSingleDab(s, QPointF(100, 100), 1.0, a);
+        const QRect bbox0 = nonZeroBounds(a);
+        REQUIRE(bbox0.height() > bbox0.width() * 2);
+
+        s.angle = 90.0;
+        QImage b(200, 200, QImage::Format_ARGB32_Premultiplied);
+        b.fill(Qt::transparent);
+        renderSingleDab(s, QPointF(100, 100), 1.0, b);
+        const QRect bbox90 = nonZeroBounds(b);
+        REQUIRE(bbox90.width() > bbox90.height() * 2);
+    }
+
+    SECTION("ratio squeezes vertically")
+    {
+        BrushSettings s;
+        s.tipImage = makeCalligraphyTip(32, 64, 10);
+        s.tipShape = BrushSettings::TipShape::Image;
+        s.bakeTipMask();
+        s.pressureSize = false;
+        s.diameter = 64.0;
+        s.ratio = 0.5;
+        QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        renderSingleDab(s, QPointF(100, 100), 1.0, layer);
+        const QRect bbox = nonZeroBounds(layer);
+        REQUIRE(bbox.height() < 35); // 纵向被压缩到一半
+    }
+}
+
+TEST_CASE("BrushSettings v2 XML roundtrip with embedded images")
+{
+    BrushSettings s;
+    s.name = "墨沁T";
+    s.tipImage = makeCalligraphyTip(20, 50, 8);
+    s.tipShape = BrushSettings::TipShape::Image;
+    s.bakeTipMask();
+    s.diameter = 118.0;
+    s.texture.pattern = QImage(16, 16, QImage::Format_ARGB32);
+    s.texture.pattern.fill(QColor(120, 130, 140));
+    s.texture.mode = 15;
+    s.texture.strength = 0.19;
+    s.texture.contrast = 0.83;
+    s.texture.bake();
+    s.texture.enabled = true;
+    s.colorSource = BrushSettings::ColorSource::Pattern;
+    s.mask.enabled = true;
+    s.mask.sizeCoeff = 0.325;
+    s.mask.mode = BrushMaskSettings::Mode::Burn;
+    s.mask.sub = std::make_unique<BrushSettings>();
+    s.mask.sub->diameter = 17.0;
+    s.mask.sub->spacing = 0.08;
+    s.mask.sub->tipShape = BrushSettings::TipShape::Circle;
+
+    const QString xml = s.toXMLString();
+    BrushSettings out;
+    REQUIRE(BrushSettings::fromXMLString(xml, out));
+
+    REQUIRE(out.tipShape == BrushSettings::TipShape::Image);
+    REQUIRE(out.tipImage.size() == s.tipImage.size());
+    REQUIRE(out.tipMask.size() == s.tipMask.size());
+    REQUIRE(out.tipMask.pixel(10, 25) == s.tipMask.pixel(10, 25));
+    REQUIRE(out.diameter == Approx(118.0));
+    REQUIRE(out.texture.enabled == true);
+    REQUIRE(out.texture.mode == 15);
+    REQUIRE(out.texture.strength == Approx(0.19));
+    REQUIRE(!out.texture.bakedMask.isNull());
+    REQUIRE(out.colorSource == BrushSettings::ColorSource::Pattern);
+    REQUIRE(out.mask.enabled == true);
+    REQUIRE(out.mask.sizeCoeff == Approx(0.325));
+    REQUIRE(out.mask.mode == BrushMaskSettings::Mode::Burn);
+    REQUIRE(out.mask.sub != nullptr);
+    REQUIRE(out.mask.sub->diameter == Approx(17.0));
+    REQUIRE(out.mask.sub->spacing == Approx(0.08));
+
+    // v1 预设（无新元素）向后兼容
+    BrushSettings legacy;
+    legacy.name = "旧笔刷";
+    legacy.diameter = 30.0;
+    BrushSettings legacyOut;
+    REQUIRE(BrushSettings::fromXMLString(legacy.toXMLString(), legacyOut));
+    REQUIRE(legacyOut.tipShape == BrushSettings::TipShape::Circle);
+    REQUIRE(legacyOut.mask.enabled == false);
+    REQUIRE(legacyOut.texture.enabled == false);
+}
+
+TEST_CASE("MaskedStrokeCompositor formulas")
+{
+    using Mode = BrushMaskSettings::Mode;
+    SECTION("burn alpha semantics")
+    {
+        // dst=1 是稳定点；src=0 → 0；src=1 → dst
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::Burn, 1.0, 1.0) == Approx(1.0));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::Burn, 0.0, 0.5) == Approx(0.0));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::Burn, 1.0, 0.5) == Approx(0.5));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::Burn, 0.5, 0.75) == Approx(0.5));
+    }
+    SECTION("hard mix")
+    {
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMix, 0.6, 0.5) == Approx(1.0));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMix, 0.4, 0.5) == Approx(0.0));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMix, 0.0, 1.0) == Approx(0.0));
+    }
+    SECTION("hard mix softer is the antialiased variant")
+    {
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMixSofter, 0.5, 0.5) == Approx(0.5));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMixSofter, 1.0, 0.5) == Approx(1.0));
+        REQUIRE(MaskedStrokeCompositor::maskOp(Mode::HardMixSofter, 0.0, 0.5) == Approx(0.0).margin(0.02));
+    }
+    SECTION("texture ops (strength variants)")
+    {
+        // LINEAR_HEIGHT_PHOTOSHOP(15)：m=dst*10*s，max((1-src)*m, m-src)
+        REQUIRE(MaskedStrokeCompositor::textureOp(15, 0.8, 0.5, 0.19) == Approx(0.19).epsilon(0.02));
+        REQUIRE(MaskedStrokeCompositor::textureOp(15, 0.5, 0.6, 1.0) == Approx(1.0));
+        // HARD_MIX_SOFTER(11)：clamp(3*dst*s - 2*(1-src))
+        REQUIRE(MaskedStrokeCompositor::textureOp(11, 0.5, 0.5, 1.0) == Approx(0.5));
+        REQUIRE(MaskedStrokeCompositor::textureOp(11, 0.2, 0.5, 0.5) == Approx(0.0).margin(0.02));
+        // HEIGHT(12)：s'=0.99s；dst/(1-s') - (src+(1-s'))
+        REQUIRE(MaskedStrokeCompositor::textureOp(12, 1.0, 0.001, 1.0) == Approx(0.0).margin(0.02));
+        REQUIRE(MaskedStrokeCompositor::textureOp(12, 0.5, 0.5, 1.0) == Approx(1.0));
+    }
+}
+
+TEST_CASE("MaskedStrokeCompositor stroke integration")
+{
+    // 10x10 主 dab alpha≈128；6x6 副 dab（alpha=255 白，仅 (0,0) 角透明
+    // ——extent 含整个 dab 矩形，角上属于"范围内未覆盖"）
+    QImage mainDab(10, 10, QImage::Format_ARGB32_Premultiplied);
+    mainDab.fill(qPremultiply(qRgba(200, 30, 30, 128)));
+    QImage maskDabImg(6, 6, QImage::Format_ARGB32_Premultiplied);
+    maskDabImg.fill(qPremultiply(qRgba(255, 255, 255, 255)));
+    maskDabImg.setPixel(0, 0, 0);
+
+    DabPasteParams params; // 默认 wash/满流量
+
+    SECTION("main pixels outside mask extent survive; inside extent uncovered get burned away")
+    {
+        MaskedStrokeCompositor compositor;
+        compositor.begin(BrushMaskSettings::Mode::Burn);
+        compositor.mainDab(mainDab, QPoint(0, 0), params);
+        // 副笔尖尚未出现：合成 = 原样主笔迹
+        QPoint origin;
+        QImage region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
+        REQUIRE(origin == QPoint(0, 0));
+        REQUIRE(qAlpha(region.pixel(1, 1)) > 100);
+
+        // 副笔尖盖在中间 (2,2)-(7,7)：范围外保留，范围内未覆盖处被 burn 清零
+        compositor.maskDab(maskDabImg, QPoint(2, 2));
+        region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
+        REQUIRE(qAlpha(region.pixel(1, 1)) > 100);   // 范围外：主笔迹原样
+        REQUIRE(qAlpha(region.pixel(4, 4)) > 100);   // 覆盖处：burn(1, dst)=dst
+        REQUIRE(qAlpha(region.pixel(2, 2)) < 15);    // 范围内未覆盖（dab 边角 alpha 低）→ burn(src≈0,dst)≈0
+    }
+
+    SECTION("hard mix keeps only covered pixels")
+    {
+        MaskedStrokeCompositor compositor;
+        compositor.begin(BrushMaskSettings::Mode::HardMix);
+        compositor.mainDab(mainDab, QPoint(0, 0), params);
+        compositor.maskDab(maskDabImg, QPoint(0, 0));
+        QPoint origin;
+        const QImage region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
+        // 覆盖满的 (3,3)：src=1 → hard mix(1, 0.5)=1
+        REQUIRE(qAlpha(region.pixel(3, 3)) > 240);
+    }
+
+    SECTION("accumulation is functional: later main dabs recover erased pixels")
+    {
+        MaskedStrokeCompositor compositor;
+        compositor.begin(BrushMaskSettings::Mode::Burn);
+        compositor.maskDab(maskDabImg, QPoint(0, 0));
+        compositor.mainDab(mainDab, QPoint(0, 0), params);
+        compositor.mainDab(mainDab, QPoint(0, 0), params); // 同位置第二枚（wash 收敛封顶）
+        QPoint origin;
+        const QImage region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
+        REQUIRE(qAlpha(region.pixel(3, 3)) > 100); // 函数式合成：始终从累积态重算
+    }
+}
+
+TEST_CASE("Pattern color source recolors dabs by canvas position")
+{
+    // 4x4 图案：左半红右半蓝
+    QImage pattern(4, 4, QImage::Format_ARGB32);
+    pattern.fill(Qt::red);
+    for (int y = 0; y < 4; ++y) {
+        for (int x = 2; x < 4; ++x) {
+            pattern.setPixel(x, y, qRgb(0, 0, 255));
+        }
+    }
+
+    BrushSettings s;
+    s.tipShape = BrushSettings::TipShape::Circle;
+    s.diameter = 20.0;
+    s.pressureSize = false;
+    s.opacity = 1.0;
+    s.flow = 1.0;
+    s.texture.pattern = pattern;
+    s.texture.bake();
+    s.colorSource = BrushSettings::ColorSource::Pattern;
+
+    QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+    layer.fill(Qt::transparent);
+    BrushEngine engine;
+    engine.setSettings(s);
+    const auto painter = [&layer](const BrushEngine::DabRequest& dab) {
+        DabPasteParams params;
+        params.opacity = dab.opacity;
+        params.flow = dab.flow;
+        params.buildup = dab.buildup;
+        params.blendMode = dab.blendMode;
+        params.perPixelColor = dab.perPixelColor;
+        washBlendImage(layer, dab.dab, dab.topLeft, params);
+    };
+    engine.beginStroke(QPointF(100, 100), 1.0, QColor(255, 255, 255), painter);
+    engine.endStroke();
+
+    const QRgb center = layer.pixel(100, 100);
+    REQUIRE(qAlpha(center) > 200);
+    // 100 % 4 = 0 → 红侧
+    REQUIRE(qRed(center) > 180);
+    REQUIRE(qBlue(center) < 80);
+    // 102 % 4 = 2 → 蓝侧
+    const QRgb blueSide = layer.pixel(102, 100);
+    REQUIRE(qBlue(blueSide) > 150);
+    REQUIRE(qRed(blueSide) < 100);
+}
+
+TEST_CASE("Texture modulates dab alpha by canvas-anchored pattern")
+{
+    BrushSettings s;
+    s.tipShape = BrushSettings::TipShape::Circle;
+    s.diameter = 30.0;
+    s.pressureSize = false;
+    s.opacity = 1.0;
+    s.flow = 1.0;
+
+    // 2x2 棋盘纹理：黑(1)白(0)交替（bake 后 mask ≈ 255/0 交替）
+    QImage pattern(2, 2, QImage::Format_ARGB32);
+    pattern.setPixel(0, 0, qRgb(0, 0, 0));
+    pattern.setPixel(1, 1, qRgb(0, 0, 0));
+    pattern.setPixel(1, 0, qRgb(255, 255, 255));
+    pattern.setPixel(0, 1, qRgb(255, 255, 255));
+    s.texture.pattern = pattern;
+    s.texture.mode = 12; // HEIGHT：strength=1 时 dst/(0.01) - (src+0.01) → src=1 处≈1，src=0 处=0
+    s.texture.strength = 1.0;
+    s.texture.bake();
+    s.texture.enabled = true;
+
+    QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+    layer.fill(Qt::transparent);
+    renderSingleDab(s, QPointF(100, 100), 1.0, layer);
+    const QRect bbox = nonZeroBounds(layer);
+    REQUIRE(!bbox.isEmpty());
+    // HEIGHT 公式对 src=0 输出 0、src=1 输出 clamp(100·dst-1.01)=1 → 棋盘镂空
+    int holes = 0, filled = 0;
+    for (int y = bbox.top(); y <= bbox.bottom(); ++y) {
+        for (int x = bbox.left(); x <= bbox.right(); ++x) {
+            if ((x % 2 == 0) == (y % 2 == 0)) {
+                if (qAlpha(layer.pixel(x, y)) == 0) ++holes;
+            } else {
+                if (qAlpha(layer.pixel(x, y)) > 100) ++filled;
+            }
+        }
+    }
+    REQUIRE(holes > 20);
+    REQUIRE(filled > 20);
+}
+
+TEST_CASE("BrushEngine renderStrokePreview with masked brush")
+{
+    BrushSettings s;
+    s.tipShape = BrushSettings::TipShape::Circle;
+    s.diameter = 40.0;
+    s.opacity = 1.0;
+    s.flow = 1.0;
+    s.mask.enabled = true;
+    s.mask.mode = BrushMaskSettings::Mode::Burn;
+    s.mask.sizeCoeff = 0.5;
+    s.mask.sub = std::make_unique<BrushSettings>();
+    s.mask.sub->diameter = 20.0;
+    s.mask.sub->hardness = 1.0;
+    s.mask.sub->spacing = 0.1;
+
+    const QImage preview = BrushEngine::renderStrokePreview(s, QSize(128, 96));
+    REQUIRE(!preview.isNull());
+    // 有内容且不完全透明（合成路径没把整条笔迹烧没）
+    int painted = 0;
+    for (int y = 0; y < preview.height(); ++y) {
+        for (int x = 0; x < preview.width(); ++x) {
+            if (qAlpha(preview.pixel(x, y)) > 8) ++painted;
+        }
+    }
+    REQUIRE(painted > 100);
+}
+
+// 手动验证台架：设置 BRUSH_PREVIEW_DIR=<目录> 后跑该用例，目录里每个 .pbp
+// 都会用真实引擎渲染 256x192 预览并写出 <名字>_pencil.png（常规跑跳过）
+TEST_CASE("Brush preset preview export (manual)")
+{
+    const QString dir = qEnvironmentVariable("BRUSH_PREVIEW_DIR");
+    if (dir.isEmpty()) {
+        return;
+    }
+    QDir d(dir);
+    const auto entries = d.entryList(QStringList() << "*.pbp", QDir::Files);
+    REQUIRE(entries.size() > 0);
+    for (const QString& f : entries) {
+        BrushSettings s;
+        QImage thumb;
+        REQUIRE(BrushPresetStore::readPresetFile(d.filePath(f), s, thumb));
+        const QImage preview = BrushEngine::renderStrokePreview(s, QSize(256, 192));
+        REQUIRE(!preview.isNull());
+        const QString out = d.filePath(f).chopped(4) + "_pencil.png";
+        REQUIRE(preview.save(out));
+    }
 }

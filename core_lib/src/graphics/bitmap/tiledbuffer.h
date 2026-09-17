@@ -66,6 +66,8 @@ public:
     void drawBrush(QPointF point, qreal brushWidth, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);
     /** Stamps a pre-rendered brush dab at the integer-aligned top-left (Krita 式合成：涂抹/叠加/流量/混合/擦除) */
     void drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params);
+    /** 区域像素整块替换（双笔尖合成结果的权威写入：region 即最终内容，非叠加） */
+    void blitRegion(const QImage& region, const QPoint& topLeft);
     /** 混合笔刷：new(x)=lerp(缓冲(x), 图层+缓冲采样(x−Δ), rate·mask(x))，Krita smudge 语义 */
     void smudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
                    qreal rate, const QImage& layerImage, const QPoint& layerOrigin);

@@ -131,6 +131,7 @@ void BrushTool::pointerPressEvent(PointerEvent *event)
     if (layer->isBitmapKind())
     {
         syncEngineSettings();
+        syncMaskEngineSettings();
         // 镜像绘画对称中心 = 视口中心（画布坐标）
         if (mEngine.settings().mirrorX || mEngine.settings().mirrorY) {
             mEngine.setMirrorCenter(mEditor->view()->mapScreenToCanvas(
@@ -138,6 +139,12 @@ void BrushTool::pointerPressEvent(PointerEvent *event)
         }
         mEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
                             mEditor->color()->frontColor(), dabPainter());
+        if (maskStrokeEnabled()) {
+            // 双笔尖：ScribbleArea 切换到合成路由，副引擎白色同轨迹作画
+            mScribbleArea->beginMaskedStroke(mPresetExtras.mask.mode);
+            mMaskEngine.beginStroke(getCurrentPoint(), mInterpolator.getPressure(),
+                                    Qt::white, maskDabPainter());
+        }
         if (mEngine.settings().airbrushEnabled) {
             mAirbrushTimer.start();
         }
@@ -187,8 +194,10 @@ void BrushTool::pointerReleaseEvent(PointerEvent *event)
         drawStroke();
     }
 
-    endStroke();
+    endStroke();                       // 落层（瓦片已是双笔尖合成结果）
     mEngine.endStroke();
+    mMaskEngine.endStroke();
+    mScribbleArea->endMaskedStroke();
     mAirbrushTimer.stop();
 
     StrokeTool::pointerReleaseEvent(event);
@@ -201,8 +210,12 @@ void BrushTool::paintAt(QPointF point)
     if (layer->isBitmapKind())
     {
         syncEngineSettings();
+        syncMaskEngineSettings();
         mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
         mEngine.dabAt(point, mCurrentPressure, dabPainter());
+        if (maskStrokeEnabled()) {
+            mMaskEngine.dabAt(point, mCurrentPressure, maskDabPainter());
+        }
     }
 }
 
@@ -215,8 +228,12 @@ void BrushTool::drawStroke()
     if (layer->isBitmapKind())
     {
         syncEngineSettings();
+        syncMaskEngineSettings();
         mCurrentWidth = mEngine.dabDiameterAt(mCurrentPressure);
         mEngine.strokeTo(getCurrentPoint(), mCurrentPressure, dabPainter());
+        if (maskStrokeEnabled()) {
+            mMaskEngine.strokeTo(getCurrentPoint(), mCurrentPressure, maskDabPainter());
+        }
     }
 }
 
@@ -255,7 +272,28 @@ void BrushTool::applyBrushOptions(const BrushSettings& options)
 void BrushTool::persistUserOptions()
 {
     QSettings brushOptions(PENCIL2D, PENCIL2D);
-    brushOptions.setValue("BrushOptions/BRUSH", currentBrushSettings().toXMLString());
+    // 内嵌的笔尖/纹理图不进注册表（MB 级 XML）：持久化只存参数，图像笔尖/
+    // 双笔尖/纹理重启后回到关闭态——想长期保留请另存为预设（预设面板），
+    // 会话内切工具不受影响（参数驻留 mPresetExtras）
+    BrushSettings lite = currentBrushSettings();
+    lite.tipImage = QImage();
+    lite.tipMask = QImage();
+    if (lite.tipShape == BrushSettings::TipShape::Image) {
+        lite.tipShape = BrushSettings::TipShape::Circle;
+    }
+    lite.texture = BrushTextureSettings();
+    lite.colorSource = BrushSettings::ColorSource::Plain;
+    if (lite.mask.sub) {
+        BrushSettings& sub = *lite.mask.sub;
+        sub.tipImage = QImage();
+        sub.tipMask = QImage();
+        if (sub.tipShape == BrushSettings::TipShape::Image) {
+            sub.tipShape = BrushSettings::TipShape::Circle;
+        }
+        sub.texture = BrushTextureSettings();
+        sub.colorSource = BrushSettings::ColorSource::Plain;
+    }
+    brushOptions.setValue("BrushOptions/BRUSH", lite.toXMLString());
 }
 
 BrushSettings BrushTool::currentBrushSettings()
@@ -275,6 +313,35 @@ void BrushTool::syncEngineSettings()
     mEngine.setSettings(merged);
 }
 
+bool BrushTool::maskStrokeEnabled() const
+{
+    return mEngine.settings().mask.enabled
+           && mEngine.settings().mask.sub != nullptr
+           && mScribbleArea != nullptr;
+}
+
+void BrushTool::syncMaskEngineSettings()
+{
+    if (!maskStrokeEnabled()) {
+        return;
+    }
+    // 副笔刷 = 预设的 Mask/Sub；直径 = 主直径 × MasterSizeCoeff（Krita
+    // createMaskingSettings）。纹理/颜色源/镜像/嵌套双笔尖只挂主笔刷。
+    BrushSettings sub = *mEngine.settings().mask.sub;
+    sub.diameter = qBound(1.0, mEngine.settings().diameter * mEngine.settings().mask.sizeCoeff, 600.0);
+    sub.eraser = false;
+    sub.mirrorX = sub.mirrorY = false;
+    sub.scatter = 0.0;
+    sub.airbrushEnabled = false;
+    sub.texture = BrushTextureSettings();
+    sub.colorSource = BrushSettings::ColorSource::Plain;
+    sub.mask.enabled = false;
+    sub.mask.sub.reset();
+    sub.pressureSize = sub.pressureSize && mSettings.pressureEnabled();
+    sub.pressureOpacity = sub.pressureOpacity && mSettings.pressureEnabled();
+    mMaskEngine.setSettings(sub);
+}
+
 BrushEngine::DabPainter BrushTool::dabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
@@ -283,6 +350,14 @@ BrushEngine::DabPainter BrushTool::dabPainter() const
         params.flow = dab.flow;
         params.buildup = dab.buildup;
         params.blendMode = dab.blendMode;
+        params.perPixelColor = dab.perPixelColor;
         mScribbleArea->drawDab(dab.dab, dab.topLeft, params);
+    };
+}
+
+BrushEngine::DabPainter BrushTool::maskDabPainter() const
+{
+    return [this](const BrushEngine::DabRequest& dab) {
+        mScribbleArea->drawMaskDab(dab.dab, dab.topLeft);
     };
 }

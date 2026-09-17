@@ -23,9 +23,15 @@ GNU General Public License for more details.
 #include <QRandomGenerator>
 
 #include "graphics/bitmap/washblend.h"
+#include "maskedstrokecompositor.h"
 
 namespace
 {
+
+inline int floorMod(int n, int m)
+{
+    return ((n % m) + m) % m;
+}
 
 // 参考 Krita KisCircleMaskGenerator::valueAt / KisRectMaskGenerator：
 // 返回归一化距离 n（0=中心，>=1=笔尖外）
@@ -54,6 +60,10 @@ qreal normalizedDistanceAA(qreal dx, qreal dy, qreal rx, qreal ry,
     return qSqrt(nx * nx + ny * ny);
 }
 
+/** 图像笔尖 dab（定义见下；掩码经 QTransform 缩放/旋转后上色） */
+QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
+                         qreal diameter, qreal subPixelX, qreal subPixelY);
+
 /**
  * 生成一个上好色的 dab 图。
  * 数学移植自 Krita 圆形/矩形掩码生成器：
@@ -66,6 +76,9 @@ qreal normalizedDistanceAA(qreal dx, qreal dy, qreal rx, qreal ry,
 QImage makeDabImage(const BrushSettings& settings, const QColor& color,
                     qreal diameter, qreal subPixelX, qreal subPixelY)
 {
+    if (settings.tipShape == BrushSettings::TipShape::Image && !settings.tipMask.isNull()) {
+        return makeImageDabImage(settings, color, diameter, subPixelX, subPixelY);
+    }
     const qreal major = qMax<qreal>(1, diameter);
     const qreal minor = qMax<qreal>(1, qRound(diameter * settings.ratio));
     const qreal rad = qDegreesToRadians(settings.angle);
@@ -121,6 +134,63 @@ QImage makeDabImage(const BrushSettings& settings, const QColor& color,
 
             const int a = qRound(alpha * 255.0 * ca / 255.0);
             line[px] = qPremultiply(qRgba(cr, cg, cb, a));
+        }
+    }
+    return dab;
+}
+
+/**
+ * 图像笔尖 dab（Krita png_brush/预定义笔尖的移植）。
+ * tipMask 是"白色按掩码预乘"的 ARGB 图（alpha=掩码）。变换矩阵与 Krita
+ * KisQImagePyramid::baseBrushTransform 同构：以图像中心为基准，先非均匀
+ * 缩放（scale=直径/max(tipW,tipH)，ratio 压纵向）再旋转，子像素偏移烤进
+ * 平移；SmoothPixmapTransform 做双线性重采样。缩放/旋转后外接矩形定图
+ * 尺寸（保持偶数对齐落点），上色 = 掩码 alpha × 笔色。
+ */
+QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
+                         qreal diameter, qreal subPixelX, qreal subPixelY)
+{
+    const QImage& tip = settings.tipMask;
+    const qreal tipMax = qMax<qreal>(1, qMax(tip.width(), tip.height()));
+    const qreal scale = qMax<qreal>(0.001, diameter) / tipMax;
+    const qreal rad = qDegreesToRadians(settings.angle);
+    const qreal cosA = qAbs(qCos(rad));
+    const qreal sinA = qAbs(qSin(rad));
+    const qreal w = tip.width() * scale;
+    const qreal h = tip.height() * scale * settings.ratio;
+
+    int imgW = qCeil(w * cosA + h * sinA) + 2;
+    int imgH = qCeil(w * sinA + h * cosA) + 2;
+    if (imgW & 1) ++imgW;
+    if (imgH & 1) ++imgH;
+
+    QImage alphaImg(imgW, imgH, QImage::Format_ARGB32_Premultiplied);
+    alphaImg.fill(Qt::transparent);
+    {
+        QPainter painter(&alphaImg);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform);
+        painter.translate(imgW * 0.5 + subPixelX, imgH * 0.5 + subPixelY);
+        painter.rotate(settings.angle);
+        painter.scale(scale, scale * settings.ratio);
+        painter.translate(-tip.width() * 0.5, -tip.height() * 0.5);
+        painter.drawImage(QPointF(0.0, 0.0), tip);
+    }
+
+    const int cr = color.red();
+    const int cg = color.green();
+    const int cb = color.blue();
+    const int ca = color.alpha();
+    QImage dab(imgW, imgH, QImage::Format_ARGB32_Premultiplied);
+    dab.fill(Qt::transparent);
+    for (int py = 0; py < imgH; ++py) {
+        const QRgb* src = reinterpret_cast<const QRgb*>(alphaImg.constScanLine(py));
+        QRgb* line = reinterpret_cast<QRgb*>(dab.scanLine(py));
+        for (int px = 0; px < imgW; ++px, ++src, ++line) {
+            const int a = qAlpha(*src);
+            if (a == 0) {
+                continue;
+            }
+            *line = qPremultiply(qRgba(cr, cg, cb, a * ca / 255));
         }
     }
     return dab;
@@ -249,17 +319,20 @@ void BrushEngine::emitDab(const QImage& dab, const QPoint& topLeft, qreal pressu
                           const DabPainter& painter)
 {
     DabRequest request;
-    request.dab = dab;
+    request.dab = positionAppliedDab(dab, topLeft);
     request.topLeft = topLeft;
     request.opacity = dabOpacityAt(pressure);
     request.flow = qBound(0.01, mSettings.flow, 1.0);
     request.buildup = mSettings.paintingMode == BrushSettings::PaintingMode::Buildup;
     request.blendMode = static_cast<int>(mSettings.blendMode);
+    request.perPixelColor = mSettings.colorSource == BrushSettings::ColorSource::Pattern;
     painter(request);
 
-    // 镜像绘画：围绕对称中心再盖一枚翻转发（Krita mirror）
+    // 镜像绘画：围绕对称中心再盖一枚翻转发（Krita mirror）。
+    // 纹理/图案按画布位置生效 → 对翻转后的 dab 在其落点重新应用位置效果
     if (mMirrorCenterValid && (mSettings.mirrorX || mSettings.mirrorY)) {
         DabRequest mirror = request;
+        mirror.dab = dab;
         QPoint tl = topLeft;
         if (mSettings.mirrorX) {
             tl.setX(qRound(2.0 * mMirrorCenter.x()) - (topLeft.x() + dab.width()));
@@ -270,8 +343,66 @@ void BrushEngine::emitDab(const QImage& dab, const QPoint& topLeft, qreal pressu
             mirror.dab = mirror.dab.mirrored(false, true);
         }
         mirror.topLeft = tl;
+        mirror.dab = positionAppliedDab(mirror.dab, tl);
         painter(mirror);
     }
+}
+
+QImage BrushEngine::positionAppliedDab(const QImage& dab, const QPoint& topLeft) const
+{
+    const bool textureOn = mSettings.texture.enabled && !mSettings.texture.bakedMask.isNull();
+    const bool patternOn = mSettings.colorSource == BrushSettings::ColorSource::Pattern
+                           && !mSettings.texture.pattern.isNull();
+    if (!textureOn && !patternOn) {
+        return dab;
+    }
+
+    // 纹理/图案都锚定画布坐标：按 dab 落点平铺采样（Krita offset % maskSize）
+    const QImage& texMask = mSettings.texture.bakedMask;
+    const QImage& pattern = mSettings.texture.pattern;
+    const int tw = textureOn ? texMask.width() : 1;
+    const int th = textureOn ? texMask.height() : 1;
+    const int pw = patternOn ? pattern.width() : 1;
+    const int ph = patternOn ? pattern.height() : 1;
+
+    QImage out = dab.copy();
+    for (int y = 0; y < out.height(); ++y) {
+        QRgb* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+        const int canvasY = topLeft.y() + y;
+        for (int x = 0; x < out.width(); ++x, ++line) {
+            const int a = qAlpha(*line);
+            if (a == 0) {
+                continue;
+            }
+            const int canvasX = topLeft.x() + x;
+            int newA = a;
+            if (textureOn) {
+                const int tx = floorMod(canvasX - mSettings.texture.offsetX, tw);
+                const int ty = floorMod(canvasY - mSettings.texture.offsetY, th);
+                const qreal src = texMask.constScanLine(ty)[tx] / 255.0;
+                newA = qRound(MaskedStrokeCompositor::textureOp(
+                                  mSettings.texture.mode, src, a / 255.0,
+                                  mSettings.texture.strength) * 255.0);
+                if (newA <= 0) {
+                    *line = 0;
+                    continue;
+                }
+            }
+            if (patternOn) {
+                // 图案颜色源（KoPatternColorSource）：颜色 = 图案在该画布位置的像素
+                const QRgb pc = reinterpret_cast<const QRgb*>(
+                    pattern.constScanLine(floorMod(canvasY, ph)))[floorMod(canvasX, pw)];
+                *line = qPremultiply(qRgba(qRed(pc), qGreen(pc), qBlue(pc), newA));
+            } else if (newA != a) {
+                const qreal s = newA / qreal(a);
+                *line = qPremultiply(qRgba(qRound(qRed(*line) * s),
+                                           qRound(qGreen(*line) * s),
+                                           qRound(qBlue(*line) * s),
+                                           newA));
+            }
+        }
+    }
+    return out;
 }
 
 QPointF BrushEngine::scatterOffset(qreal diameter) const
@@ -339,6 +470,7 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
         params.flow = dab.flow;
         params.buildup = dab.buildup;
         params.blendMode = dab.blendMode;
+        params.perPixelColor = dab.perPixelColor;
         washBlendImage(strokeLayer, dab.dab, dab.topLeft, params);
     };
 
@@ -348,18 +480,51 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
                  0.58 * size.width(), 1.06 * size.height(),
                  0.90 * size.width(), 0.30 * size.height());
 
-    const int samples = 80;
-    engine.mStrokeActive = true;
+    const auto runStroke = [&path, &size](BrushEngine& engine, const DabPainter& painter) {
+        const int samples = 80;
+        engine.mStrokeActive = true;
+        engine.mLastPoint = path.pointAtPercent(0.0);
+        engine.mLastPressure = 0.15;
+        engine.paintDab(engine.mLastPoint, 0.15, painter);
+        engine.mRemainingDistance = engine.spacingFor(engine.dabDiameterAt(0.15));
+        for (int i = 1; i <= samples; ++i) {
+            const qreal t = qreal(i) / samples;
+            const qreal pressure = 0.15 + 0.85 * qSin(t * M_PI);
+            engine.strokeTo(path.pointAtPercent(t), pressure, painter);
+        }
+    };
     engine.mColor = QColor(238, 238, 238);
-    engine.mLastPoint = path.pointAtPercent(0.0);
-    engine.mLastPressure = 0.15;
-    engine.paintDab(engine.mLastPoint, 0.15, painter);
-    engine.mRemainingDistance = engine.spacingFor(engine.dabDiameterAt(0.15));
+    runStroke(engine, painter);
 
-    for (int i = 1; i <= samples; ++i) {
-        const qreal t = qreal(i) / samples;
-        const qreal pressure = 0.15 + 0.85 * qSin(t * M_PI);
-        engine.strokeTo(path.pointAtPercent(t), pressure, painter);
+    // 双笔尖：副笔尖沿同一轨迹画白色 union 覆盖层，对主笔迹做 alpha 复合
+    // （KisMaskingBrushRenderer::updateProjection 的预览版）
+    if (settings.mask.enabled && settings.mask.sub) {
+        QImage cover(size, QImage::Format_ARGB32_Premultiplied);
+        cover.fill(Qt::transparent);
+        BrushEngine maskEngine;
+        BrushSettings sub = *settings.mask.sub;
+        sub.diameter = qMax(1.0, preview.diameter * settings.mask.sizeCoeff);
+        sub.scatter = 0.0;
+        sub.airbrushEnabled = false;
+        sub.mirrorX = sub.mirrorY = false;
+        sub.eraser = false;
+        sub.texture = BrushTextureSettings();
+        sub.colorSource = BrushSettings::ColorSource::Plain;
+        sub.mask.enabled = false;
+        sub.mask.sub.reset();
+        maskEngine.setSettings(sub);
+
+        const auto coverPainter = [&cover](const DabRequest& dab) {
+            DabPasteParams params;
+            params.opacity = 1.0;
+            params.flow = 1.0;
+            params.buildup = true;
+            washBlendImage(cover, dab.dab, dab.topLeft, params);
+        };
+        maskEngine.mColor = Qt::white;
+        runStroke(maskEngine, coverPainter);
+
+        MaskedStrokeCompositor::applyMaskOpToImage(strokeLayer, cover, settings.mask.mode);
     }
 
     QPainter composer(&image);

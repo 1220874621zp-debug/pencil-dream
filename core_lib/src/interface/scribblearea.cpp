@@ -983,11 +983,13 @@ void ScribbleArea::paintBitmapBuffer()
     }
 
     mTiledBuffer.clear();
+    mMaskCompositor.clear();
 }
 
 void ScribbleArea::clearDrawingBuffer()
 {
     mTiledBuffer.clear();
+    mMaskCompositor.clear();
 }
 
 void ScribbleArea::handleDrawingOnEmptyFrame()
@@ -1353,7 +1355,41 @@ void ScribbleArea::drawBrush(QPointF thePoint, qreal brushWidth, qreal mOffset, 
 
 void ScribbleArea::drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params)
 {
+    if (mMaskCompositor.active()) {
+        // 双笔尖：主 dab 落纯净主缓冲，重合成受影响区域写回显示瓦片
+        mMaskCompositor.mainDab(dab, topLeft, params);
+        composeRegionToTiles(QRect(topLeft, dab.size()));
+        return;
+    }
     mTiledBuffer.drawDab(dab, topLeft, params);
+}
+
+void ScribbleArea::beginMaskedStroke(BrushMaskSettings::Mode mode)
+{
+    mMaskCompositor.begin(mode);
+}
+
+void ScribbleArea::endMaskedStroke()
+{
+    mMaskCompositor.end();
+}
+
+void ScribbleArea::drawMaskDab(const QImage& dab, const QPoint& topLeft)
+{
+    if (!mMaskCompositor.active()) {
+        return;
+    }
+    mMaskCompositor.maskDab(dab, topLeft);
+    composeRegionToTiles(QRect(topLeft, dab.size()));
+}
+
+void ScribbleArea::composeRegionToTiles(const QRect& rect)
+{
+    QPoint origin;
+    const QImage region = mMaskCompositor.composedRegion(rect, origin);
+    if (!region.isNull()) {
+        mTiledBuffer.blitRegion(region, origin);
+    }
 }
 
 void ScribbleArea::drawSmudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,

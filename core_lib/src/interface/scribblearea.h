@@ -32,6 +32,7 @@ GNU General Public License for more details.
 #include "movemode.h"
 #include "pencildef.h"
 #include "bitmapimage.h"
+#include "brush/maskedstrokecompositor.h"
 #include "canvaspainter.h"
 #include "overlaypainter.h"
 #include "preferencemanager.h"
@@ -190,6 +191,11 @@ public:
     void drawBrush(QPointF thePoint, qreal brushWidth, qreal offset, QColor fillColor, QPainter::CompositionMode compMode, qreal opacity, bool usingFeather = true, bool useAA = false);
     /** 笔刷引擎专用：把一个上好色的 dab 盖到绘制缓冲（Krita 式合成参数，整数对齐） */
     void drawDab(const QImage& dab, const QPoint& topLeft, const DabPasteParams& params);
+    /** 双笔尖（Krita MaskingBrush）：开笔时启用合成路由，副笔尖 dab 走 drawMaskDab */
+    void beginMaskedStroke(BrushMaskSettings::Mode mode);
+    void endMaskedStroke();
+    /** 副笔尖覆盖 dab（白色 union 累积进蒙版，随后增量重合成显示区） */
+    void drawMaskDab(const QImage& dab, const QPoint& topLeft);
     /** 混合笔刷：图层+缓冲采样回写（工具每笔缓存图层图与原点，避免逐 dab autoCrop） */
     void drawSmudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
                        qreal rate, const QImage& layerImage, const QPoint& layerOrigin);
@@ -213,6 +219,10 @@ public:
 
     TiledBuffer mTiledBuffer;
 private:
+
+    /** 双笔尖合成：主笔迹纯净缓冲 + 覆盖蒙版 → 合成结果写回 mTiledBuffer 瓦片 */
+    void composeRegionToTiles(const QRect& rect);
+    MaskedStrokeCompositor mMaskCompositor;
 
     /** Invalidate the layer pixmap and camera painter caches.
      * Call this in most situations where the layer rendering order is affected.

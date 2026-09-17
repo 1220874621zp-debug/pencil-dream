@@ -16,6 +16,8 @@ GNU General Public License for more details.
 */
 #include "tiledbuffer.h"
 
+#include <cstring>
+
 #include <QPainterPath>
 #include <QtMath>
 
@@ -174,8 +176,43 @@ void TiledBuffer::drawDab(const QImage& dab, const QPoint& topLeft, const DabPas
     }
 }
 
-void TiledBuffer::drawImage(const QImage& image, const QRect& imageBounds, QPainter::CompositionMode cm, bool antialiasing) {
-    const float tileSize = UNIFORM_TILE_SIZE;
+void TiledBuffer::blitRegion(const QImage& region, const QPoint& topLeft)
+{
+    if (region.isNull()) {
+        return;
+    }
+    Q_ASSERT(region.format() == QImage::Format_ARGB32_Premultiplied);
+    const qreal tileSize = UNIFORM_TILE_SIZE;
+    const QRect regionRect(topLeft, region.size());
+
+    const int xLeft = qFloor(regionRect.left() / tileSize);
+    const int xRight = qFloor(regionRect.right() / tileSize);
+    const int yTop = qFloor(regionRect.top() / tileSize);
+    const int yBottom = qFloor(regionRect.bottom() / tileSize);
+
+    for (int tileY = yTop; tileY <= yBottom; ++tileY) {
+        for (int tileX = xLeft; tileX <= xRight; ++tileX) {
+            Tile* tile = getTileFromIndex({ tileX, tileY });
+            QImage tileImage = tile->pixmap().toImage();
+            const QRect dst = regionRect.intersected(
+                QRect(tile->pos(), QSize(UNIFORM_TILE_SIZE, UNIFORM_TILE_SIZE)));
+            if (dst.isEmpty()) {
+                continue;
+            }
+            const int sx = dst.left() - topLeft.x();
+            const int sy = dst.top() - topLeft.y();
+            for (int y = 0; y < dst.height(); ++y) {
+                const QRgb* src = reinterpret_cast<const QRgb*>(region.constScanLine(sy + y)) + sx;
+                QRgb* dstLine = reinterpret_cast<QRgb*>(tileImage.scanLine(dst.top() - tile->pos().y() + y)) + (dst.left() - tile->pos().x());
+                memcpy(dstLine, src, sizeof(QRgb) * dst.width());
+            }
+            tile->pixmap() = QPixmap::fromImage(tileImage);
+            mTileBounds.extend(tile->bounds());
+        }
+    }
+}
+
+void TiledBuffer::drawImage(const QImage& image, const QRect& imageBounds, QPainter::CompositionMode cm, bool antialiasing) {    const float tileSize = UNIFORM_TILE_SIZE;
     const float imageXRad = image.width();
     const float imageYRad = image.height();
     // Gather the number of tiles that fits the size of the brush width

@@ -49,6 +49,13 @@ public:
 private:
     class BaseTool* currentPresetCapableTool() const;
     void applyFromWidgets();
+    static int maskModeToCombo(BrushMaskSettings::Mode mode);
+    static BrushMaskSettings::Mode comboToMaskMode(int index);
+    static int textureModeToCombo(int kritaMode);
+    static int comboToTextureMode(int index);
+    void importTipImage(bool subTip);
+    void clearTipImage(bool subTip);
+    void importTexture();
 
     Editor* mEditor = nullptr;
 
@@ -59,6 +66,25 @@ private:
     SpinSlider* mHardnessSlider = nullptr;
     SpinSlider* mRatioSlider = nullptr;
     SpinSlider* mAngleSlider = nullptr;
+    QWidget* mTipImageRow = nullptr;         // 图像笔尖（Krita png_brush）
+    class QPushButton* mTipImageButton = nullptr;
+    class QPushButton* mTipImageClearButton = nullptr;
+
+    // 双笔尖（Krita MaskingBrush）
+    QGroupBox* mMaskGroup = nullptr;
+    QCheckBox* mMaskBox = nullptr;
+    QComboBox* mMaskModeCombo = nullptr;
+    SpinSlider* mMaskCoeffSlider = nullptr;
+    QPushButton* mMaskTipButton = nullptr;
+    QPushButton* mMaskTipClearButton = nullptr;
+
+    // 纹理 + 图案颜色源（Krita KisTextureOption / KoPatternColorSource）
+    QGroupBox* mTextureGroup = nullptr;
+    QCheckBox* mTextureBox = nullptr;
+    QComboBox* mTextureModeCombo = nullptr;
+    SpinSlider* mTextureStrengthSlider = nullptr;
+    QPushButton* mTextureButton = nullptr;
+    QCheckBox* mPatternColorBox = nullptr;
 
     // 描边
     QCheckBox* mAutoSpacingBox = nullptr;

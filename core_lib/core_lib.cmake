@@ -26,6 +26,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushcurve.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/maskedstrokecompositor.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushengine.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushpresetstore.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushsettings.h
@@ -142,6 +143,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/bitmap/tiledbuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushengine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/maskedstrokecompositor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushpresetstore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/brush/brushsettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/graphics/vector/colorref.cpp

@@ -52,6 +52,7 @@ public:
         qreal flow = 1.0;    // 该 dab 的流量
         bool buildup = false; // 叠加模式（false=涂抹收敛）
         int blendMode = 0;    // 笔尖混合模式（见 BrushSettings::BlendMode）
+        bool perPixelColor = false; // 图案颜色源：dab 各像素颜色不同（合成侧逐像素取源色）
     };
 
     using DabPainter = std::function<void(const DabRequest&)>;
@@ -88,6 +89,8 @@ private:
     void paintDab(const QPointF& point, qreal pressure, const DabPainter& painter);
     const QImage& cachedDab(quint32 cacheKey, qreal diameter, qreal subPixelX, qreal subPixelY);
     void emitDab(const QImage& dab, const QPoint& topLeft, qreal pressure, const DabPainter& painter);
+    /** 纹理/图案颜色源等"按画布位置"生效的效果（KisTextureOption/KoPatternColorSource） */
+    QImage positionAppliedDab(const QImage& dab, const QPoint& topLeft) const;
     QPointF scatterOffset(qreal diameter) const;
 
     BrushSettings mSettings;

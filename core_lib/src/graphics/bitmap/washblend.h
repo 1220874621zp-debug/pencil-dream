@@ -42,6 +42,7 @@ struct DabPasteParams
     qreal flow = 1.0;     // 流量 0..1
     bool buildup = false; // false=涂抹(Wash) true=叠加(Buildup)
     int blendMode = 0;    // 0=正常 1=正片叠底 2=滤色
+    bool perPixelColor = false; // true=逐像素取源色（图案颜色源：dab 各像素颜色不同）
 };
 
 inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft,
@@ -66,22 +67,26 @@ inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft
         return;
     }
 
-    // 从最不透明的源像素反推笔色（src = qPremultiply(color, a) 的整数近似）
-    const QRgb* srcBits = reinterpret_cast<const QRgb*>(src.constBits());
-    const int srcCount = src.width() * src.height();
-    int best = 0;
-    for (int i = 1; i < srcCount; ++i) {
-        if (qAlpha(srcBits[i]) > qAlpha(srcBits[best])) {
-            best = i;
+    // 从最不透明的源像素反推笔色（src = qPremultiply(color, a) 的整数近似）；
+    // 逐像素源色模式（图案颜色源）跳过：颜色在循环内按像素取
+    int colR = 255, colG = 255, colB = 255;
+    if (!params.perPixelColor) {
+        const QRgb* srcBits = reinterpret_cast<const QRgb*>(src.constBits());
+        const int srcCount = src.width() * src.height();
+        int best = 0;
+        for (int i = 1; i < srcCount; ++i) {
+            if (qAlpha(srcBits[i]) > qAlpha(srcBits[best])) {
+                best = i;
+            }
         }
+        if (qAlpha(srcBits[best]) <= 0) {
+            return;
+        }
+        const int maxAlpha = qAlpha(srcBits[best]);
+        colR = qRound(qBound(0.0, ((srcBits[best] >> 16) & 0xFF) * 255.0 / maxAlpha, 255.0));
+        colG = qRound(qBound(0.0, ((srcBits[best] >> 8) & 0xFF) * 255.0 / maxAlpha, 255.0));
+        colB = qRound(qBound(0.0, (srcBits[best] & 0xFF) * 255.0 / maxAlpha, 255.0));
     }
-    if (qAlpha(srcBits[best]) <= 0) {
-        return;
-    }
-    const int maxAlpha = qAlpha(srcBits[best]);
-    const int colR = qRound(qBound(0.0, ((srcBits[best] >> 16) & 0xFF) * 255.0 / maxAlpha, 255.0));
-    const int colG = qRound(qBound(0.0, ((srcBits[best] >> 8) & 0xFF) * 255.0 / maxAlpha, 255.0));
-    const int colB = qRound(qBound(0.0, (srcBits[best] & 0xFF) * 255.0 / maxAlpha, 255.0));
 
     for (int y = y0; y < y1; ++y) {
         const QRgb* s = reinterpret_cast<const QRgb*>(src.constScanLine(y - topLeft.y())) + (x0 - topLeft.x());
@@ -100,6 +105,16 @@ inline void washBlendImage(QImage& dst, const QImage& src, const QPoint& topLeft
 
             // 笔尖混合模式：对底色混合出本 dab 的源色
             int sr = colR, sg = colG, sb = colB;
+            if (params.perPixelColor) {
+                // 图案颜色源：源色 = 该像素的非预乘颜色
+                const QRgb sp = *s;
+                const int spa = qAlpha(sp);
+                if (spa > 0) {
+                    sr = qRound(qBound(0.0, qRed(sp) * 255.0 / spa, 255.0));
+                    sg = qRound(qBound(0.0, qGreen(sp) * 255.0 / spa, 255.0));
+                    sb = qRound(qBound(0.0, qBlue(sp) * 255.0 / spa, 255.0));
+                }
+            }
             if (params.blendMode != 0 && dA > 0) {
                 // 目标非预乘色
                 const int ur = qRound(qRed(dp) * 255.0 / dA);

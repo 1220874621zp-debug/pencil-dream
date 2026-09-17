@@ -70,12 +70,17 @@ protected:
 
 private:
     void syncEngineSettings();
+    void syncMaskEngineSettings();
     void persistUserOptions();
     BrushEngine::DabPainter dabPainter() const;
+    BrushEngine::DabPainter maskDabPainter() const;
+    bool maskStrokeEnabled() const;
 
     // 预设里超出工具属性范围的参数（笔尖形状/扁率/角度/间距/曲线等）
     BrushSettings mPresetExtras;
     BrushEngine mEngine;
+    // 双笔尖（Krita MaskingBrush）：副笔尖引擎，与主引擎同轨迹独立撒 dab
+    BrushEngine mMaskEngine;
     QTimer mAirbrushTimer;
     bool mUserOptionsRestored = false;
 
