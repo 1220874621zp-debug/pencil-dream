@@ -19,6 +19,7 @@
 #include <functional>
 
 class QJSEngine;
+class QProgressDialog;
 class Editor;
 class QWidget;
 class QUndoCommand;
@@ -109,6 +110,11 @@ public:
     Q_INVOKABLE bool beginUndoGroup(const QString& label);
     Q_INVOKABLE bool endUndoGroup();
 
+    // 进度条（批量任务的反馈； setValue 返回 false = 用户点了取消，脚本应中断）
+    Q_INVOKABLE void progressBegin(int maximum, const QString& label);
+    Q_INVOKABLE bool progressSetValue(int value);
+    Q_INVOKABLE void progressEnd();
+
     // ---- JS API：顶层胶水函数的后端 ----
     Q_INVOKABLE void registerCommand(const QString& label, const QJSValue& fn);
     Q_INVOKABLE void log(const QString& message);
@@ -132,6 +138,7 @@ private:
     QList<int> mTouchedFrames;
     QUndoCommand* mUndoMacro = nullptr;        // 未闭合的撤销组（空壳宏命令）
     QString mUndoMacroLabel;
+    QProgressDialog* mProgress = nullptr;      // 批量任务进度条（脚本忘了收也有安全网）
 };
 
 #endif // SCRIPTAPI_H

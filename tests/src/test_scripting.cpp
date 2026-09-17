@@ -96,7 +96,9 @@ registerCommand("测试裁剪", function () {
     var pos = pencil.keyFramePositions(idx);
     var done = 0, skipped = 0;
     pencil.beginUndoGroup("测试：脚本裁剪");
+    pencil.progressBegin(pos.length, "正在裁剪…");
     for (var i = 0; i < pos.length; i++) {
+        if (!pencil.progressSetValue(i)) { throw "意外取消"; }
         var b = pencil.keyFrameBounds(idx, pos[i]);
         if (!b || !b.width || !b.height) { skipped++; continue; }
         if (!pencil.cropKeyFrame(idx, pos[i], b.x, b.y, b.width, b.height)) {
@@ -104,6 +106,7 @@ registerCommand("测试裁剪", function () {
         }
         done++;
     }
+    pencil.progressEnd();
     pencil.endUndoGroup();
     log("done=" + done + " skipped=" + skipped);
 });

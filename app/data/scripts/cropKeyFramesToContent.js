@@ -45,9 +45,11 @@ registerCommand("按实际像素裁剪关键帧", function () {
     }
 
     if (!DRY_RUN) { pencil.beginUndoGroup("脚本：按实际像素裁剪关键帧"); }
-    var done = 0, skipped = 0;
+    pencil.progressBegin(positions.length, "正在按实际像素裁剪关键帧…");
+    var done = 0, skipped = 0, canceled = false;
     var minWidth = 0, minHeight = 0, maxWidth = 0, maxHeight = 0;
     for (var i = 0; i < positions.length; i++) {
+        if (!pencil.progressSetValue(i)) { canceled = true; break; }
         var pos = positions[i];
         var b = pencil.keyFrameBounds(idx, pos, MIN_ALPHA);
         if (!b || !b.width || !b.height || b.width <= 0 || b.height <= 0) {
@@ -69,6 +71,7 @@ registerCommand("按实际像素裁剪关键帧", function () {
             if (minHeight === 0 || b.height < minHeight) minHeight = b.height;
         }
     }
+    pencil.progressEnd();
     if (!DRY_RUN) { pencil.endUndoGroup(); }
 
     if (done === 0) {
@@ -78,6 +81,7 @@ registerCommand("按实际像素裁剪关键帧", function () {
     log((DRY_RUN ? "试运行：共 " : "共裁剪 ") + done + " 帧，帧尺寸范围 "
         + minWidth + "~" + maxWidth + " × " + minHeight + "~" + maxHeight
         + (skipped > 0 ? "，跳过空帧 " + skipped + " 个" : "")
-        + (DRY_RUN ? "。数字合适后把 DRY_RUN 改回 false 再跑。"
-                   : "，内容位置不变（Ctrl+Z 可一次撤销）。"));
+        + (canceled ? "。已取消，已处理的帧可 Ctrl+Z 撤销。"
+                    : (DRY_RUN ? "。数字合适后把 DRY_RUN 改回 false 再跑。"
+                               : "，内容位置不变（Ctrl+Z 可一次撤销）。")));
 });

@@ -6,9 +6,11 @@
 
 #include <QJSEngine>
 #include <QQmlEngine>
+#include <QApplication>
 #include <QDebug>
 #include <QFile>
 #include <QMessageBox>
+#include <QProgressDialog>
 #include <QTransform>
 #include <QtMath>
 
@@ -101,6 +103,7 @@ ScriptHost::ScriptHost(Editor* editor, QWidget* dialogParent, QObject* parent)
 
 ScriptHost::~ScriptHost()
 {
+    progressEnd();
     // QJSValue 不得比引擎活得久：先释放 JS 回调，再删引擎
     mCommands.clear();
     // 未闭合的撤销组里只有已构造未入栈的子命令，整树删除即可
@@ -158,10 +161,11 @@ QString ScriptHost::runCommand(const QString& label)
         {
             const QJSValue wrapper = mEngine->globalObject().property(QStringLiteral("__pencilSafeCall"));
             const QJSValue result = wrapper.call(QJSValueList{ entry.second });
+            // 安全网：脚本异常或忘记收尾时，关闭进度条并收口撤销组
+            forceCloseUndoGroup();
+            progressEnd();
             if (!result.isNull())
             {
-                // 异常时命令可能已改数据：撤销组强制收口，保证已做修改仍可一次撤销
-                forceCloseUndoGroup();
                 return QStringLiteral("脚本出错：%1").arg(result.toString());
             }
             return QString();
@@ -405,6 +409,33 @@ bool ScriptHost::endUndoGroup()
     }
     mEditor->undoRedo()->pushUndoCommand(macro);
     return true;
+}
+
+void ScriptHost::progressBegin(int maximum, const QString& label)
+{
+    progressEnd();
+    mProgress = new QProgressDialog(label, tr("取消"), 0, qMax(1, maximum), mDialogParent);
+    mProgress->setWindowTitle(tr("脚本"));
+    mProgress->setWindowModality(Qt::WindowModal);
+    mProgress->setMinimumDuration(0); // 立即显示：脚本通常已经在前置校验后直接进入循环
+    mProgress->setValue(0);
+}
+
+bool ScriptHost::progressSetValue(int value)
+{
+    if (mProgress == nullptr) { return true; }
+    mProgress->setValue(value);
+    // 同步处理事件：刷新进度条绘制并响应取消点击（批量滤镜同款做法）
+    QApplication::processEvents();
+    return !mProgress->wasCanceled();
+}
+
+void ScriptHost::progressEnd()
+{
+    if (mProgress == nullptr) { return; }
+    mProgress->cancel(); // 立即隐藏
+    mProgress->deleteLater();
+    mProgress = nullptr;
 }
 
 // ---- 顶层胶水后端 ----

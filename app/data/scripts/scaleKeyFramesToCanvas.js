@@ -38,8 +38,11 @@ registerCommand("批量缩放关键帧适配画布", function () {
 
     // 所有关键帧内容边框的并集（统一比例，帧间不抖动）
     // 注：keyFrameBounds 对空帧/无内容帧返回空，JS 侧表现为无 width 字段
-    var ux = 0, uy = 0, uw = 0, uh = 0, hasContent = false;
+    // 进度分两段：先扫描边框（每帧一次），再逐帧缩放
+    pencil.progressBegin(positions.length * 2, "正在计算内容边框…");
+    var ux = 0, uy = 0, uw = 0, uh = 0, hasContent = false, canceled = false;
     for (var i = 0; i < positions.length; i++) {
+        if (!pencil.progressSetValue(i)) { canceled = true; break; }
         var b = pencil.keyFrameBounds(idx, positions[i], MIN_ALPHA);
         if (!b || !b.width || !b.height || b.width <= 0 || b.height <= 0) { continue; }
         if (!hasContent) {
@@ -53,7 +56,13 @@ registerCommand("批量缩放关键帧适配画布", function () {
         }
     }
     if (!hasContent) {
+        pencil.progressEnd();
         alert("该图层所有关键帧都是空的，没有可缩放的内容。");
+        return;
+    }
+    if (canceled) {
+        pencil.progressEnd();
+        log("已取消。");
         return;
     }
 
@@ -66,6 +75,7 @@ registerCommand("批量缩放关键帧适配画布", function () {
     var edge = fill ? (sx >= sy ? "宽" : "高") : (sx <= sy ? "宽" : "高");
 
     if (Math.abs(scale - 1) < 1e-9) {
+        pencil.progressEnd();
         log("内容已经是目标大小（按" + edge + "匹配画布），无需缩放。");
         return;
     }
@@ -82,9 +92,12 @@ registerCommand("批量缩放关键帧适配画布", function () {
     pencil.beginUndoGroup("脚本：批量缩放关键帧（" + MODE + "）");
     var done = 0;
     for (var j = 0; j < positions.length; j++) {
+        if (!pencil.progressSetValue(positions.length + j)) { canceled = true; break; }
         if (pencil.scaleKeyFrame(idx, positions[j], scale, anchorX, anchorY, dstX, dstY)) done++;
     }
     pencil.endUndoGroup();
+    pencil.progressEnd();
 
-    log("已缩放 " + done + "/" + positions.length + " 个关键帧（Ctrl+Z 可一次撤销）。");
+    log("已缩放 " + done + "/" + positions.length + " 个关键帧"
+        + (canceled ? "（已取消，已处理的帧可 Ctrl+Z 撤销）" : "（Ctrl+Z 可一次撤销）"));
 });
