@@ -5,6 +5,7 @@
 # Set sources
 set(APP_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/usermanualdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/ocaexportdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.h
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.h
@@ -81,6 +82,7 @@ set(APP_HEADERS
 
 set(APP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/aboutdialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/src/usermanualdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/ocaexportdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/actioncommands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/app/src/addtransparencytopaperdialog.cpp
@@ -195,6 +197,7 @@ set(APP_FORMS
 
 set(APP_RESOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/app/data/app.qrc
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/data/manual/manual.qrc
 )
 
 # Translation files

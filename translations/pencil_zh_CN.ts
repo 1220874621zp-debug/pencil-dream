@@ -5189,6 +5189,11 @@ Read the instructions and try again</source>
         <translation>帮助</translation>
     </message>
     <message>
+        <location filename="../app/ui/mainwindow2.ui" line="321"/>
+        <source>User Manual...</source>
+        <translation>使用说明...</translation>
+    </message>
+    <message>
         <location filename="../app/ui/mainwindow2.ui" line="326"/>
         <source>Windows</source>
         <translation>窗口</translation>

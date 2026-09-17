@@ -35,6 +35,7 @@ class ToolOptionWidget;
 class TimeLine;
 class ToolBoxDockWidget;
 class PreferencesDialog;
+class UserManualDialog;
 class PreviewWidget;
 class ColorBox;
 class ColorInspector;
@@ -105,6 +106,7 @@ public:
 
     void setOpacity(int opacity);
     void preferences();
+    void showUserManual();
 
     void openStartupFile(const QString& filename);
     void openFile(const QString& filename);
@@ -206,6 +208,7 @@ private:
     ToolBoxDockWidget*        mToolBox = nullptr;
     RecentFileMenu*       mRecentFileMenu = nullptr;
     PreferencesDialog*    mPrefDialog = nullptr;
+    UserManualDialog*     mUserManualDialog = nullptr;
     //PreviewWidget*      mPreview = nullptr;
     TimeLine*             mTimeLine = nullptr;
     ColorInspector*       mColorInspector = nullptr;

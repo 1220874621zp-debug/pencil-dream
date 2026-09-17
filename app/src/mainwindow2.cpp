@@ -76,6 +76,7 @@ GNU General Public License for more details.
 #include "tooloptionwidget.h"
 #include "colorizeoptionswidget.h"
 #include "preferencesdialog.h"
+#include "usermanualdialog.h"
 #include "ocaexportdialog.h"
 #include "layercamera.h"
 #include "ocaexporter.h"
@@ -586,6 +587,7 @@ void MainWindow2::createMenus()
     bindPreferenceSetting(ui->actionLockWindows, prefs, SETTING::LAYOUT_LOCK);
 
     //--- Help Menu ---
+    connect(ui->actionUserManual, &QAction::triggered, this, &MainWindow2::showUserManual);
     connect(ui->actionOpen_Temporary_Directory, &QAction::triggered, mCommands, &ActionCommands::openTemporaryDirectory);
     connect(ui->actionAbout, &QAction::triggered, mCommands, &ActionCommands::about);
 
@@ -1229,6 +1231,21 @@ void MainWindow2::preferences()
     });
 
     mPrefDialog->show();
+}
+
+void MainWindow2::showUserManual()
+{
+    if (mUserManualDialog)
+    {
+        mUserManualDialog->activateWindow();
+        mUserManualDialog->raise();
+        return;
+    }
+    mUserManualDialog = new UserManualDialog(this);
+    mUserManualDialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(mUserManualDialog, &QDialog::finished, [&] { mUserManualDialog = nullptr; });
+
+    mUserManualDialog->show();
 }
 
 void MainWindow2::resetAndDockAllSubWidgets()
