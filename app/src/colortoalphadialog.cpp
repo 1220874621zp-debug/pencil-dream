@@ -31,59 +31,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QSlider>
 #include <QVBoxLayout>
 
-namespace
-{
-
-// 结果叠棋盘格底显示（预览用，8px 格）
-QImage checkerComposite(const QImage& premulSrc)
-{
-    QImage out(premulSrc.size(), QImage::Format_ARGB32);
-    for (int y = 0; y < premulSrc.height(); ++y)
-    {
-        const QRgb* src = reinterpret_cast<const QRgb*>(premulSrc.scanLine(y));
-        auto* dst = reinterpret_cast<QRgb*>(out.scanLine(y));
-        for (int x = 0; x < premulSrc.width(); ++x)
-        {
-            const int a = qAlpha(src[x]);
-            if (a == 0)
-            {
-                dst[x] = ((x / 8 + y / 8) % 2 == 0) ? qRgb(0xF2, 0xF2, 0xF2) : qRgb(0xD9, 0xD9, 0xD9);
-                continue;
-            }
-            const auto lift = [a](const int v) { return qMin(255, (v * 255 + a / 2) / a); };
-            const double af = a / 255.0;
-            const QRgb base = ((x / 8 + y / 8) % 2 == 0) ? qRgb(0xF2, 0xF2, 0xF2) : qRgb(0xD9, 0xD9, 0xD9);
-            const auto mix = [af](const int c, const int t) {
-                return qRound(c * af + t * (1.0 - af));
-            };
-            dst[x] = qRgb(mix(lift(qRed(src[x])), qRed(base)),
-                          mix(lift(qGreen(src[x])), qGreen(base)),
-                          mix(lift(qBlue(src[x])), qBlue(base)));
-        }
-    }
-    return out;
-}
-
-} // namespace
-
-ColorToAlphaDialog::ColorToAlphaDialog(const QImage& previewSource, QWidget* parent)
+ColorToAlphaDialog::ColorToAlphaDialog(QWidget* parent)
     : QDialog(parent)
-    , mPreviewSource(previewSource)
 {
     setWindowTitle(tr("颜色转为透明度"));
     setModal(true);
 
     auto* rootLayout = new QVBoxLayout(this);
-
-    // 预览（棋盘格底）
-    if (!mPreviewSource.isNull())
-    {
-        mPreviewLabel = new QLabel(this);
-        mPreviewLabel->setAlignment(Qt::AlignCenter);
-        mPreviewLabel->setMinimumSize(280, 160);
-        mPreviewLabel->setStyleSheet(QStringLiteral("border: 1px solid #888888; background: #FFFFFF;"));
-        rootLayout->addWidget(mPreviewLabel);
-    }
 
     // 目标颜色
     auto* colorLayout = new QGridLayout;
@@ -141,7 +95,6 @@ ColorToAlphaDialog::ColorToAlphaDialog(const QImage& previewSource, QWidget* par
         const int pos = qRound(value);
         if (mThresholdSlider->value() != pos)
             mThresholdSlider->setValue(pos);
-        updatePreview();
     });
 
     // 作用范围
@@ -158,8 +111,6 @@ ColorToAlphaDialog::ColorToAlphaDialog(const QImage& previewSource, QWidget* par
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     rootLayout->addWidget(buttons);
-
-    updatePreview();
 }
 
 ColorToAlphaParams ColorToAlphaDialog::params() const
@@ -182,7 +133,6 @@ void ColorToAlphaDialog::pickTargetColor()
     {
         mTargetColor = picked.rgb();
         updateColorButton();
-        updatePreview();
     }
 }
 
@@ -192,15 +142,4 @@ void ColorToAlphaDialog::updateColorButton()
     mColorButton->setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid #888888;")
                                     .arg(c.name()));
     mColorButton->setText(c.name().toUpper());
-}
-
-void ColorToAlphaDialog::updatePreview()
-{
-    if (mPreviewLabel == nullptr || mPreviewSource.isNull())
-        return;
-
-    // 对缩略图跑同一算法后叠棋盘格（每次 ~6 万像素，毫秒级）
-    QImage preview = mPreviewSource;
-    ColorToAlpha::apply(preview, params());
-    mPreviewLabel->setPixmap(QPixmap::fromImage(checkerComposite(preview)));
 }
