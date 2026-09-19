@@ -2397,6 +2397,11 @@ void MainWindow2::createToolbars()
         }
     }
 
+    // 导入图片：风景照图标(用户指定)，动作复用菜单项 actionImport_Image
+    ui->actionImport_Image->setIcon(QIcon(":/icons/themes/playful/misc/import-image.svg"));
+    ui->actionImport_Image->setToolTip(tr("导入图片..."));
+    mMainToolbar->addAction(ui->actionImport_Image);
+
     // 导入视频参考：文档+播放图标(用户指定)，动作复用菜单项 actionImport_ReferenceVideo
     ui->actionImport_ReferenceVideo->setIcon(QIcon(":/icons/themes/playful/misc/import-refvideo.svg"));
     ui->actionImport_ReferenceVideo->setToolTip(tr("导入参考视频..."));
