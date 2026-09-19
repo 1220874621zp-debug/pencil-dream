@@ -155,7 +155,7 @@ void StrokeTool::startStroke(PointerEvent::InputType inputType)
 {
     if (emptyFrameActionEnabled())
     {
-        mScribbleArea->handleDrawingOnEmptyFrame();
+        mScribbleArea->handleDrawingOnEmptyFrame(emptyFrameActionOverride());
     }
 
     mFirstDraw = true;

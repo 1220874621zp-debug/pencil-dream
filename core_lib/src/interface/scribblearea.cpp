@@ -993,7 +993,7 @@ void ScribbleArea::clearDrawingBuffer()
     mMaskCompositor.clear();
 }
 
-void ScribbleArea::handleDrawingOnEmptyFrame()
+void ScribbleArea::handleDrawingOnEmptyFrame(int forcedAction)
 {
     auto layer = mEditor->layers()->currentLayer();
 
@@ -1010,7 +1010,8 @@ void ScribbleArea::handleDrawingOnEmptyFrame()
     if (layer->getKeyFrameAt(frameNumber)) { return; }
 
     // Drawing on an empty frame; take action based on preference.
-    int action = mPrefs->getInt(SETTING::DRAW_ON_EMPTY_FRAME_ACTION);
+    int action = forcedAction >= 0 ? forcedAction
+                                    : mPrefs->getInt(SETTING::DRAW_ON_EMPTY_FRAME_ACTION);
     auto previousKeyFrame = layer->getKeyFrameWhichCovers(frameNumber);
     switch (action)
     {

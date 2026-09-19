@@ -289,6 +289,7 @@
     <addaction name="actionBucket"/>
     <addaction name="actionEyedropper"/>
     <addaction name="actionBrush"/>
+    <addaction name="actionPanto"/>
     <addaction name="actionSmudge"/>
     <addaction name="separator"/>
     <addaction name="actionResetToolsDefault"/>
@@ -704,6 +705,15 @@
    </property>
    <property name="text">
     <string>Onion Align</string>
+   </property>
+  </action>
+  <action name="actionPanto">
+   <property name="icon">
+    <iconset resource="../data/app.qrc">
+     <normaloff>:/icons/themes/playful/tools/tool-panto.svg</normaloff>:/icons/themes/playful/tools/tool-panto.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Panto</string>
    </property>
   </action>
   <action name="actionSelect">

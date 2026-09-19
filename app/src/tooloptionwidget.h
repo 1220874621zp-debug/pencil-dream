@@ -34,6 +34,7 @@ class ColorizeOptionsWidget;
 class StrokeOptionsWidget;
 class TransformOptionsWidget;
 class OnionAlignOptionsWidget;
+class PantoOptionsWidget;
 
 class ToolOptionWidget : public BaseDockWidget
 {
@@ -69,6 +70,7 @@ private:
     class BrushOptionsWidget* mBrushOptionsWidget = nullptr;
     TransformOptionsWidget* mTransformOptionsWidget = nullptr;
     OnionAlignOptionsWidget* mOnionAlignOptionsWidget = nullptr;
+    PantoOptionsWidget* mPantoOptionsWidget = nullptr;
 };
 
 #endif // TOOLOPTIONDOCKWIDGET_H

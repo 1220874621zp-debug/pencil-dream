@@ -54,6 +54,7 @@ class ScribbleArea : public QWidget
     friend class MoveTool;
     friend class SmudgeTool;
     friend class BucketTool;
+    friend class PantoTool;
 
 public:
     ScribbleArea(QWidget* parent);
@@ -212,7 +213,9 @@ public:
 
     /// Call this when starting to use a paint tool. Checks whether we are drawing
     /// on an empty frame, and if so, takes action according to use preference.
-    void handleDrawingOnEmptyFrame();
+    /// forcedAction: 传入 DRAW_ON_EMPTY_FRAME_ACTION 枚举值可覆盖全局偏好
+    /// （Panto 恒建新键——KEEP 会把笔画画进取样源帧造成自污染），-1=跟随偏好
+    void handleDrawingOnEmptyFrame(int forcedAction = -1);
 
     /** 整清画布帧缓存并重绘（后台着色结果回贴等覆盖多帧的场景用） */
     void invalidateCanvasCache();

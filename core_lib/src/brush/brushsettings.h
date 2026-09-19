@@ -118,7 +118,9 @@ struct BrushSettings
     enum class ColorSource
     {
         Plain,    // 纯色（前景色）
-        Pattern   // 图案上色：按 dab 画布坐标平铺采样纹理图案作为笔色（Krita KoPatternColorSource）
+        Pattern,  // 图案上色：按 dab 画布坐标平铺采样纹理图案作为笔色（Krita KoPatternColorSource）
+        Clone     // 仿制上色（Panto）：按"画布坐标−偏移−源图原点"从源图采样，越界透明不平铺；
+                  // 源图经 BrushEngine::setCloneSource 由工具层起笔时快照注入（不入预设 XML）
     };
 
     // ---- 笔尖 ----

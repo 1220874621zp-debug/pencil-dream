@@ -84,6 +84,7 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/erasertool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/eyedroppertool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/onionaligntool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/pantotool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/handtool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/movetool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/penciltool.h
@@ -202,6 +203,7 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/erasertool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/eyedroppertool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/onionaligntool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/pantotool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/handtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/movetool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/tool/penciltool.cpp

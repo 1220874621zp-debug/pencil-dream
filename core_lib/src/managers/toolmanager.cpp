@@ -29,6 +29,7 @@ GNU General Public License for more details.
 #include "handtool.h"
 #include "movetool.h"
 #include "onionaligntool.h"
+#include "pantotool.h"
 #include "lassotool.h"
 #include "deformtool.h"
 #include "polylinetool.h"
@@ -61,6 +62,7 @@ bool ToolManager::init()
     mToolSetHash.insert(HAND, new HandTool(this));
     mToolSetHash.insert(MOVE, new MoveTool(this));
     mToolSetHash.insert(ONION_ALIGN, new OnionAlignTool(this));
+    mToolSetHash.insert(PANTO, new PantoTool(this));
     mToolSetHash.insert(POLYLINE, new PolylineTool(this));
     mToolSetHash.insert(SELECT, new SelectTool(this));
     mToolSetHash.insert(LASSO, new LassoTool(this));

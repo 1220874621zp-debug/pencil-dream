@@ -44,6 +44,7 @@ QString BaseTool::TypeName(ToolType type)
         map[BRUSH] = tr("Brush");
         map[CAMERA] = tr("Camera");
         map[ONION_ALIGN] = tr("洋葱皮对位");
+        map[PANTO] = tr("仿制图章");
         map[LASSO] = tr("Lasso");
         map[DEFORM] = tr("Deform");
     }

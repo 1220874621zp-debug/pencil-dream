@@ -52,6 +52,7 @@ enum ToolType : int
     LASSO,
     DEFORM,
     ONION_ALIGN,
+    PANTO,
     TOOL_TYPE_COUNT
 };
 
@@ -199,6 +200,7 @@ const static int MaxFramesBound = 9999;
 #define CMD_TOOL_EYEDROPPER "CmdToolEyedropper"
 #define CMD_TOOL_ERASER "CmdToolEraser"
 #define CMD_TOOL_ONION_ALIGN "CmdToolOnionAlign"
+#define CMD_TOOL_PANTO "CmdToolPanto"
 #define CMD_TOOL_LASSO "CmdToolLasso"
 #define CMD_TOOL_DEFORM "CmdToolDeform"
 #define CMD_RESET_ALL_TOOLS "CmdResetAllTools"

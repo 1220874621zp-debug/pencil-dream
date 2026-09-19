@@ -163,6 +163,9 @@ void StatusBar::updateToolStatus(ToolType tool)
         case ONION_ALIGN:
             mToolLabel->setText(tr("拖动洋葱皮红/蓝幽灵像对位参考；Ctrl+拖动=绕幽灵中心旋转（Shift 吸附步进），Shift+拖动=缩放；双击=前后帧中心自动对齐；Alt+点击=归零该侧，Alt+点空白=清空全部。"));
             break;
+        case PANTO:
+            mToolLabel->setText(tr("仿制图章（Panto）：把取样源的像素刷到当前帧——源=上一帧/下一帧（与灯桌同源）/当前帧/剪贴板；Alt+拖动=定义偏移向量，Alt+点击=设定跟随源点；偏移模式在工具选项；空白帧自动新建关键帧，不破坏原画。"));
+            break;
         default:
             Q_ASSERT(false);
     }
@@ -184,7 +187,8 @@ void StatusBar::updateToolStatus(ToolType tool)
         ":icons/themes/playful/tools/tool-brush.svg",
         ":icons/themes/playful/tools/tool-lasso.svg", // Lasso
         ":icons/themes/playful/tools/tool-deform.svg", // Deform
-        ":icons/themes/playful/tools/tool-onionalign.svg"
+        ":icons/themes/playful/tools/tool-onionalign.svg",
+        ":icons/themes/playful/tools/tool-panto.svg" // Panto
     };
     const qreal dpr = devicePixelRatioF();
     const int iconPx = qRound(18 * dpr);

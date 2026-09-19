@@ -525,6 +525,7 @@ void MainWindow2::createMenus()
     toolsActionGroup->addAction(ui->actionLasso);
     toolsActionGroup->addAction(ui->actionDeform);
     toolsActionGroup->addAction(ui->actionBrush);
+    toolsActionGroup->addAction(ui->actionPanto);
     toolsActionGroup->addAction(ui->actionPolyline);
     toolsActionGroup->addAction(ui->actionSmudge);
     toolsActionGroup->addAction(ui->actionPen);
@@ -542,6 +543,7 @@ void MainWindow2::createMenus()
         else if (action == ui->actionLasso) mToolBox->setActiveTool(LASSO);
         else if (action == ui->actionDeform) mToolBox->setActiveTool(DEFORM);
         else if (action == ui->actionBrush) mToolBox->setActiveTool(BRUSH);
+        else if (action == ui->actionPanto) mToolBox->setActiveTool(PANTO);
         else if (action == ui->actionPolyline) mToolBox->setActiveTool(POLYLINE);
         else if (action == ui->actionSmudge) mToolBox->setActiveTool(SMUDGE);
         else if (action == ui->actionPen) mToolBox->setActiveTool(PEN);
@@ -1781,6 +1783,7 @@ void MainWindow2::setupKeyboardShortcuts()
     ui->actionLasso->setShortcut(cmdKeySeq(CMD_TOOL_LASSO));
     ui->actionDeform->setShortcut(cmdKeySeq(CMD_TOOL_DEFORM));
     ui->actionBrush->setShortcut(cmdKeySeq(CMD_TOOL_BRUSH));
+    ui->actionPanto->setShortcut(cmdKeySeq(CMD_TOOL_PANTO));
     ui->actionPolyline->setShortcut(cmdKeySeq(CMD_TOOL_POLYLINE));
     ui->actionSmudge->setShortcut(cmdKeySeq(CMD_TOOL_SMUDGE));
     ui->actionPen->setShortcut(cmdKeySeq(CMD_TOOL_PEN));
@@ -1798,6 +1801,7 @@ void MainWindow2::setupKeyboardShortcuts()
     ui->actionLasso->installEventFilter(shortcutFilter);
     ui->actionDeform->installEventFilter(shortcutFilter);
     ui->actionBrush->installEventFilter(shortcutFilter);
+    ui->actionPanto->installEventFilter(shortcutFilter);
     ui->actionPolyline->installEventFilter(shortcutFilter);
     ui->actionSmudge->installEventFilter(shortcutFilter);
     ui->actionPen->installEventFilter(shortcutFilter);

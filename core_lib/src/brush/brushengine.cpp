@@ -315,6 +315,17 @@ void BrushEngine::paintDab(const QPointF& point, qreal pressure, const DabPainte
     mLastDabTimeMs = mStrokeTimer.elapsed();
 }
 
+void BrushEngine::setCloneSource(const QImage& source, const QPoint& sourceTopLeft,
+                                 const QPointF& offset)
+{
+    // 采样按非预乘通道取色（qRed/qGreen/qBlue/qAlpha 为真值，与 Pattern 同式）；
+    // BitmapImage 内部是 ARGB32_Premultiplied，这里统一转出
+    mCloneSource = source.isNull() ? QImage()
+                                   : source.convertToFormat(QImage::Format_ARGB32);
+    mCloneTopLeft = sourceTopLeft;
+    mCloneOffset = offset;
+}
+
 void BrushEngine::emitDab(const QImage& dab, const QPoint& topLeft, qreal pressure,
                           const DabPainter& painter)
 {
@@ -325,7 +336,8 @@ void BrushEngine::emitDab(const QImage& dab, const QPoint& topLeft, qreal pressu
     request.flow = qBound(0.01, mSettings.flow, 1.0);
     request.buildup = mSettings.paintingMode == BrushSettings::PaintingMode::Buildup;
     request.blendMode = static_cast<int>(mSettings.blendMode);
-    request.perPixelColor = mSettings.colorSource == BrushSettings::ColorSource::Pattern;
+    request.perPixelColor = mSettings.colorSource == BrushSettings::ColorSource::Pattern
+                            || mSettings.colorSource == BrushSettings::ColorSource::Clone;
     painter(request);
 
     // 镜像绘画：围绕对称中心再盖一枚翻转发（Krita mirror）。
@@ -353,7 +365,9 @@ QImage BrushEngine::positionAppliedDab(const QImage& dab, const QPoint& topLeft)
     const bool textureOn = mSettings.texture.enabled && !mSettings.texture.bakedMask.isNull();
     const bool patternOn = mSettings.colorSource == BrushSettings::ColorSource::Pattern
                            && !mSettings.texture.pattern.isNull();
-    if (!textureOn && !patternOn) {
+    const bool cloneOn = mSettings.colorSource == BrushSettings::ColorSource::Clone
+                         && !mCloneSource.isNull();
+    if (!textureOn && !patternOn && !cloneOn) {
         return dab;
     }
 
@@ -364,6 +378,8 @@ QImage BrushEngine::positionAppliedDab(const QImage& dab, const QPoint& topLeft)
     const int th = textureOn ? texMask.height() : 1;
     const int pw = patternOn ? pattern.width() : 1;
     const int ph = patternOn ? pattern.height() : 1;
+    const int cloneOx = qRound(mCloneOffset.x()) + mCloneTopLeft.x();
+    const int cloneOy = qRound(mCloneOffset.y()) + mCloneTopLeft.y();
 
     QImage out = dab.copy();
     for (int y = 0; y < out.height(); ++y) {
@@ -388,7 +404,24 @@ QImage BrushEngine::positionAppliedDab(const QImage& dab, const QPoint& topLeft)
                     continue;
                 }
             }
-            if (patternOn) {
+            if (cloneOn) {
+                // 仿制颜色源（Panto）：源图按 画布坐标−偏移−原点 带界采样，
+                // 越界透明（不平铺）；alpha = 笔尖墨量 × 源像素 alpha
+                const int sx = canvasX - cloneOx;
+                const int sy = canvasY - cloneOy;
+                if (sx < 0 || sy < 0 || sx >= mCloneSource.width() || sy >= mCloneSource.height()) {
+                    *line = 0;
+                    continue;
+                }
+                const QRgb sc = reinterpret_cast<const QRgb*>(
+                    mCloneSource.constScanLine(sy))[sx];
+                const int na = newA * qAlpha(sc) / 255;
+                if (na <= 0) {
+                    *line = 0;
+                    continue;
+                }
+                *line = qPremultiply(qRgba(qRed(sc), qGreen(sc), qBlue(sc), na));
+            } else if (patternOn) {
                 // 图案颜色源（KoPatternColorSource）：颜色 = 图案在该画布位置的像素
                 const QRgb pc = reinterpret_cast<const QRgb*>(
                     pattern.constScanLine(floorMod(canvasY, ph)))[floorMod(canvasX, pw)];

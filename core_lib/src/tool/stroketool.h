@@ -113,6 +113,11 @@ protected:
     /// Returns true by default.
     virtual bool emptyFrameActionEnabled();
 
+    /// 空白帧下笔的强制行为（DRAW_ON_EMPTY_FRAME_ACTION 枚举值）；-1=跟随全局偏好。
+    /// Panto 覆写为 CREATE_NEW_KEY：KEEP 偏好会把笔画画进前一关键帧——那往往
+    /// 正是取样源（自污染），且违背"只改当前帧局部"的工具承诺
+    virtual int emptyFrameActionOverride() const { return -1; }
+
     bool mCanvasCursorEnabled = false;
     QPointF mLastPixel { 0, 0 };
 

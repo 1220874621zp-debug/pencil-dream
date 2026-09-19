@@ -63,6 +63,11 @@ public:
     /** 镜像绘画的对称中心（画布坐标）；不设置则镜像不生效 */
     void setMirrorCenter(const QPointF& center) { mMirrorCenter = center; mMirrorCenterValid = true; }
 
+    /** Panto 仿制源：颜色 = 源图在 (画布坐标 − 偏移 − 源图原点) 的像素，越界透明。
+     *  源图由工具层起笔时深拷贝快照注入（与编辑中的帧隔离），引擎保持无状态 */
+    void setCloneSource(const QImage& source, const QPoint& sourceTopLeft, const QPointF& offset);
+    void clearCloneSource() { mCloneSource = QImage(); }
+
     /** 混合笔刷模式：起笔只定位不作画（Krita smudge 首 dab 行为），
      *  采样/拖尾公式由宿主在 DabPainter 回调里实现 */
     void setSmudgeMode(bool on) { mSmudgeMode = on; }
@@ -96,6 +101,10 @@ private:
     BrushSettings mSettings;
     QColor mColor;
     QHash<quint32, QImage> mDabCache;
+
+    QImage mCloneSource;        // 仿制源图（Format_ARGB32，非预乘通道直接采样）
+    QPoint mCloneTopLeft;       // 源图原点（画布坐标）
+    QPointF mCloneOffset;       // 采样偏移（目标 − 源，画布坐标）
 
     bool mStrokeActive = false;
     QPointF mLastPoint;

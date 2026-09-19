@@ -28,6 +28,7 @@ GNU General Public License for more details.
 
 #include "brushtool.h"
 #include "erasertool.h"
+#include "pantotool.h"
 #include "editor.h"
 #include "managers/toolmanager.h"
 #include "pencildef.h"
@@ -146,6 +147,10 @@ void BrushPresetPanel::initUI()
                 tool->initPresetExtras(preset);
             }
         }
+        // Panto 同步装载预设参数（仿制图章的笔尖/压感/纹理 = 当前选中笔刷）
+        if (PantoTool* panto = dynamic_cast<PantoTool*>(editor()->tools()->getTool(PANTO))) {
+            panto->initPresetExtras(preset);
+        }
     }
 }
 
@@ -201,15 +206,28 @@ void BrushPresetPanel::onSelectionChanged()
     }
     // 点预设即切到对应工具：橡皮预设→橡皮，其余→画笔。
     // 程序默认工具是铅笔（不走笔刷引擎），不主动切换的话预设改了也看不出效果
+    // 例外：仿制图章（Panto）激活时点画笔预设，参数直接喂给 Panto 不抢工具
+    // ——TVP 式"Panto 绑定自定义笔刷"的等价物
     const ToolType target = mStore.presets()[index].settings.eraser ? ERASER : BRUSH;
-    editor()->tools()->setCurrentTool(target);
-    if (target == ERASER) {
-        if (EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER))) {
-            tool->applyBrushPreset(mStore.presets()[index].settings);
+    BaseTool* current = editor()->tools()->currentTool();
+    if (!mStore.presets()[index].settings.eraser
+        && current != nullptr && current->type() == PANTO)
+    {
+        if (PantoTool* panto = dynamic_cast<PantoTool*>(current)) {
+            panto->applyBrushPreset(mStore.presets()[index].settings);
         }
-    } else {
-        if (BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH))) {
-            tool->applyBrushPreset(mStore.presets()[index].settings);
+    }
+    else
+    {
+        editor()->tools()->setCurrentTool(target);
+        if (target == ERASER) {
+            if (EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER))) {
+                tool->applyBrushPreset(mStore.presets()[index].settings);
+            }
+        } else {
+            if (BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH))) {
+                tool->applyBrushPreset(mStore.presets()[index].settings);
+            }
         }
     }
     QSettings settings(PENCIL2D, PENCIL2D);
@@ -223,7 +241,9 @@ void BrushPresetPanel::onCreatePreset()
         return;
     }
     // 橡皮工具激活时新建的是橡皮预设（eraser 标记随保存进文件）
-    const BrushSettings currentSettings = (current->type() == ERASER)
+    const BrushSettings currentSettings = (current->type() == PANTO)
+        ? dynamic_cast<PantoTool*>(current)->currentBrushSettings()
+        : (current->type() == ERASER)
         ? dynamic_cast<EraserTool*>(current)->currentBrushSettings()
         : dynamic_cast<BrushTool*>(current)->currentBrushSettings();
     bool ok = false;
@@ -325,9 +345,10 @@ BaseTool* BrushPresetPanel::currentPresetTool()
     if (!editor()) {
         return nullptr;
     }
-    // 预设按当前工具取参数：画笔与橡皮都走笔刷引擎；其余工具退回画笔
+    // 预设按当前工具取参数：画笔与橡皮都走笔刷引擎；Panto（仿制图章）同样
+    // 走引擎（存档前剥掉 Clone 语义）；其余工具退回画笔
     BaseTool* tool = editor()->tools()->currentTool();
-    if (tool && (tool->type() == BRUSH || tool->type() == ERASER)) {
+    if (tool && (tool->type() == BRUSH || tool->type() == ERASER || tool->type() == PANTO)) {
         return tool;
     }
     return editor()->tools()->getTool(BRUSH);

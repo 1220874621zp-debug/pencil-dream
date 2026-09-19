@@ -124,6 +124,7 @@ void ToolBoxWidget::initUI()
     ui->polylineButton->setStyleSheet(sStyle);
     ui->bucketButton->setStyleSheet(sStyle);
     ui->brushButton->setStyleSheet(sStyle);
+    ui->pantoButton->setStyleSheet(sStyle);
     ui->eyedropperButton->setStyleSheet(sStyle);
     ui->smudgeButton->setStyleSheet(sStyle);
 #endif
@@ -144,6 +145,8 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_BUCKET ) ) );
     ui->brushButton->setToolTip( tr( "Brush Tool (%1): Paint smooth stroke with a brush" )
         .arg( GetToolTips( CMD_TOOL_BRUSH ) ) );
+    ui->pantoButton->setToolTip( tr( "仿制图章工具 (%1)：从上一帧/下一帧/当前帧/剪贴板取样，把像素刷到当前帧（只改局部不破坏整图）；Alt+拖动=定义偏移" )
+        .arg( GetToolTips( CMD_TOOL_PANTO ) ) );
     ui->eyedropperButton->setToolTip( tr( "Eyedropper Tool (%1): "
             "Set color from the stage<br>[ALT] for instant access" )
         .arg( GetToolTips( CMD_TOOL_EYEDROPPER ) ) );
@@ -169,6 +172,8 @@ void ToolBoxWidget::initUI()
         .arg( GetToolTips( CMD_TOOL_BUCKET ) ) );
     ui->brushButton->setWhatsThis( tr( "Brush Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_BRUSH ) ) );
+    ui->pantoButton->setWhatsThis( tr( "仿制图章工具 (%1)" )
+        .arg( GetToolTips( CMD_TOOL_PANTO ) ) );
     ui->eyedropperButton->setWhatsThis( tr( "Eyedropper Tool (%1)" )
         .arg( GetToolTips( CMD_TOOL_EYEDROPPER ) ) );
     ui->smudgeButton->setWhatsThis( tr( "Smudge Tool (%1)" )
@@ -186,6 +191,7 @@ void ToolBoxWidget::initUI()
     connect(ui->bucketButton, &QToolButton::clicked, this, &ToolBoxWidget::bucketOn);
     connect(ui->eyedropperButton, &QToolButton::clicked, this, &ToolBoxWidget::eyedropperOn);
     connect(ui->brushButton, &QToolButton::clicked, this, &ToolBoxWidget::brushOn);
+    connect(ui->pantoButton, &QToolButton::clicked, this, &ToolBoxWidget::pantoOn);
     connect(ui->smudgeButton, &QToolButton::clicked, this, &ToolBoxWidget::smudgeOn);
 
     mFlowlayout = new ToolBoxLayout(nullptr, 3,3,3);
@@ -201,6 +207,7 @@ void ToolBoxWidget::initUI()
     mFlowlayout->addWidget(ui->bucketButton);
     mFlowlayout->addWidget(ui->eyedropperButton);
     mFlowlayout->addWidget(ui->brushButton);
+    mFlowlayout->addWidget(ui->pantoButton);
     mFlowlayout->addWidget(ui->smudgeButton);
 
     delete ui->scrollAreaWidgetContents_2->layout();
@@ -234,6 +241,7 @@ void ToolBoxWidget::initUI()
     buttonGroup->addButton(ui->bucketButton);
     buttonGroup->addButton(ui->eyedropperButton);
     buttonGroup->addButton(ui->brushButton);
+    buttonGroup->addButton(ui->pantoButton);
     buttonGroup->addButton(ui->smudgeButton);
 
     // 工具组（PS 式）：套索按钮 = 套索/矩形选择；变换按钮 = 移动(默认直显)/变形(长按菜单)
@@ -285,6 +293,9 @@ void ToolBoxWidget::setActiveTool(ToolType toolType)
     switch (toolType) {
     case ToolType::BRUSH:
         brushOn();
+        break;
+    case ToolType::PANTO:
+        pantoOn();
         break;
     case ToolType::PEN:
         penOn();
@@ -404,6 +415,11 @@ void ToolBoxWidget::brushOn()
     toolOn(BRUSH, ui->brushButton);
 }
 
+void ToolBoxWidget::pantoOn()
+{
+    toolOn(PANTO, ui->pantoButton);
+}
+
 void ToolBoxWidget::smudgeOn()
 {
     toolOn(SMUDGE, ui->smudgeButton);
@@ -422,6 +438,7 @@ void ToolBoxWidget::deselectAllTools()
     ui->bucketButton->setChecked(false);
     ui->eyedropperButton->setChecked(false);
     ui->brushButton->setChecked(false);
+    ui->pantoButton->setChecked(false);
     ui->smudgeButton->setChecked(false);
 }
 

@@ -915,6 +915,116 @@ TEST_CASE("Pattern color source recolors dabs by canvas position")
     REQUIRE(qRed(blueSide) < 100);
 }
 
+TEST_CASE("Clone color source samples source image by offset")
+{
+    // 8x8 源图：左半红右半蓝（右半 alpha 可调），画布原点由用例指定
+    const auto makeSource = [](int rightAlpha = 255) {
+        QImage source(8, 8, QImage::Format_ARGB32);
+        for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+                source.setPixel(x, y, x < 4 ? qRgb(255, 0, 0)
+                                             : qRgba(0, 0, 255, rightAlpha));
+            }
+        }
+        return source;
+    };
+
+    BrushSettings s;
+    s.tipShape = BrushSettings::TipShape::Circle;
+    s.diameter = 20.0;
+    s.pressureSize = false;
+    s.opacity = 1.0;
+    s.flow = 1.0;
+    s.colorSource = BrushSettings::ColorSource::Clone;
+
+    const auto stamp = [&s](const QImage& source, const QPoint& origin, const QPointF& offset,
+                            const QPointF& at, QImage& layer, int times = 1) {
+        BrushEngine engine;
+        engine.setSettings(s);
+        engine.setCloneSource(source, origin, offset);
+        const auto painter = [&layer](const BrushEngine::DabRequest& dab) {
+            DabPasteParams params;
+            params.opacity = dab.opacity;
+            params.flow = dab.flow;
+            params.buildup = dab.buildup;
+            params.blendMode = dab.blendMode;
+            params.perPixelColor = dab.perPixelColor;
+            washBlendImage(layer, dab.dab, dab.topLeft, params);
+        };
+        for (int i = 0; i < times; ++i) {
+            engine.beginStroke(at, 1.0, QColor(255, 255, 255), painter);
+            engine.endStroke();
+        }
+    };
+
+    SECTION("in-place sampling takes source colors, not tiled")
+    {
+        QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        // 源图覆盖画布 96..103：中心(100,100)→局部(4,4)蓝侧；(97,97)→局部(1,1)红侧
+        stamp(makeSource(), QPoint(96, 96), QPointF(0, 0), QPointF(100, 100), layer);
+
+        const QRgb center = layer.pixel(100, 100);
+        REQUIRE(qAlpha(center) > 200);
+        REQUIRE(qBlue(center) > 150);
+        REQUIRE(qRed(center) < 100);
+        const QRgb redSide = layer.pixel(97, 97);
+        REQUIRE(qAlpha(redSide) > 200);
+        REQUIRE(qRed(redSide) > 180);
+        REQUIRE(qBlue(redSide) < 80);
+    }
+
+    SECTION("outside the source stays transparent (no tiling)")
+    {
+        QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        // 源图远离落点：整枚 dab 采样越界 → 无墨（与 Pattern 平铺的本质差别）
+        stamp(makeSource(), QPoint(150, 150), QPointF(0, 0), QPointF(100, 100), layer);
+        REQUIRE(nonZeroBounds(layer).isEmpty());
+    }
+
+    SECTION("offset shifts the sampling window")
+    {
+        QImage shifted(200, 200, QImage::Format_ARGB32_Premultiplied);
+        shifted.fill(Qt::transparent);
+        // 偏移(10,0)：画布(110,100) → 局部(4,4)蓝侧
+        stamp(makeSource(), QPoint(96, 96), QPointF(10, 0), QPointF(110, 100), shifted);
+        REQUIRE(qAlpha(shifted.pixel(110, 100)) > 200);
+        REQUIRE(qBlue(shifted.pixel(110, 100)) > 150);
+
+        QImage noShift(200, 200, QImage::Format_ARGB32_Premultiplied);
+        noShift.fill(Qt::transparent);
+        // 同一落点不偏移：中心采样局部(14,4)越界 → 中心无墨
+        // （dab 左缘与源窗口重叠的部分仍会画出，窗口语义正确）
+        stamp(makeSource(), QPoint(96, 96), QPointF(0, 0), QPointF(110, 100), noShift);
+        REQUIRE(qAlpha(noShift.pixel(110, 100)) == 0);
+    }
+
+    SECTION("source alpha multiplies dab alpha")
+    {
+        QImage layer(200, 200, QImage::Format_ARGB32_Premultiplied);
+        layer.fill(Qt::transparent);
+        // 右半 alpha=128：中心墨量 = 笔尖255 × 源128 / 255 ≈ 128
+        stamp(makeSource(128), QPoint(96, 96), QPointF(0, 0), QPointF(100, 100), layer);
+        const QRgb center = layer.pixel(100, 100);
+        REQUIRE(qAlpha(center) > 100);
+        REQUIRE(qAlpha(center) < 156);
+        REQUIRE(qBlue(center) > 100);
+    }
+
+    SECTION("wash: repeated dabbing does not deepen")
+    {
+        s.opacity = 0.6;
+        QImage once(200, 200, QImage::Format_ARGB32_Premultiplied);
+        once.fill(Qt::transparent);
+        stamp(makeSource(), QPoint(96, 96), QPointF(0, 0), QPointF(100, 100), once, 1);
+        QImage twice(200, 200, QImage::Format_ARGB32_Premultiplied);
+        twice.fill(Qt::transparent);
+        stamp(makeSource(), QPoint(96, 96), QPointF(0, 0), QPointF(100, 100), twice, 2);
+        REQUIRE(qAlpha(twice.pixel(100, 100)) == Approx(qAlpha(once.pixel(100, 100))).margin(2));
+    }
+}
+
 TEST_CASE("Texture modulates dab alpha by canvas-anchored pattern")
 {
     BrushSettings s;
