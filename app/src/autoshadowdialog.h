@@ -62,13 +62,14 @@ private:
     QDoubleSpinBox* mAngleSpin = nullptr;
     QDoubleSpinBox* mDistanceSpin = nullptr;
     QDoubleSpinBox* mRangeSpin = nullptr;
+    QDoubleSpinBox* mBlurSpin = nullptr;
+    QDoubleSpinBox* mDisplaceSpin = nullptr;
     QRadioButton* mSingleLevelRadio = nullptr;
     QRadioButton* mTwoLevelRadio = nullptr;
     QLabel* mSecondLabel = nullptr;
     QSlider* mSecondSlider = nullptr;
     QDoubleSpinBox* mSecondSpin = nullptr;
     QDoubleSpinBox* mOpacitySpin = nullptr;
-    QDoubleSpinBox* mChokeSpin = nullptr;
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
 

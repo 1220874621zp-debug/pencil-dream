@@ -96,8 +96,8 @@ public:
     /** 颜色转透明度（Krita Color to Alpha 移植）：接近目标色的像素转透明、按感知色差渐变；
         allKeyFrames=false 只处理当前显示帧背后的关键帧，=true 处理图层全部关键帧 */
     Status applyColorToAlpha(const ColorToAlphaParams& params, bool allKeyFrames);
-    /** 自动上阴影（CSP Shading Assist 程序化近似）：径向渐变光场+色调分离+阻塞，
-        给平涂画面叠赛璐璐阴影；allKeyFrames=false 只处理当前显示帧背后的关键帧，
+    /** 自动上阴影（CSP Shading Assist 程序化近似，AE 流程实现）：复制层填充+模糊+圆形遮罩+
+        置换贴图+轨道遮罩翻转；allKeyFrames=false 只处理当前显示帧背后的关键帧，
         =true 处理图层全部关键帧；逐帧双快照精确撤销 */
     Status applyAutoShadow(const AutoShadowParams& params, bool allKeyFrames);
     /** 拆分图层颜色（Krita Split Layer 移植）：按颜色把图层拆成多个新图层；

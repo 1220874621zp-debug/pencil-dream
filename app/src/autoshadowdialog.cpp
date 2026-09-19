@@ -46,7 +46,7 @@ namespace
 constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
-/** 像素参数按预览缩放同比（角度/颜色/浓度不随缩放）；
+/** 像素参数按预览缩放同比（角度/颜色/透明度不随缩放）；
     几何场（光源距离）同比缩放后与实跑光场一致 */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
@@ -54,7 +54,8 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
     q.shadowRange = std::max(2, qRound(p.shadowRange * s));
     if (p.secondLevelRange > 0)
         q.secondLevelRange = std::max(q.shadowRange + 2, qRound(p.secondLevelRange * s));
-    q.choke = qRound(p.choke * s);
+    q.blurRadius = qRound(p.blurRadius * s);
+    q.displaceStrength = qRound(p.displaceStrength * s);
     q.lightDistance = std::max(50, qRound(p.lightDistance * s));
     return q;
 }
@@ -88,12 +89,15 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mDistanceSpin = addSliderRow(tr("光源距离："), 100, 5000, 600,
         tr("光源到画面中心的距离（像素）：近=圆形径向渐变，远=接近平行条带。"));
     mRangeSpin = addSliderRow(tr("阴影范围："), 4, 120, 40,
-        tr("离光源多远开始出现阴影（像素）：径向渐变距离超过该值的像素进入阴影。"
+        tr("圆形遮罩半径（像素）：到光源的距离超过该值的区域开始出现阴影。"
            "值越大阴影越退向远离光源一侧。"));
+    mBlurSpin = addSliderRow(tr("模糊："), 0, 40, 12,
+        tr("阴影层的高斯模糊半径（像素）：软化阴影边界并微微外扩，也决定遮罩边缘的羽化宽度。"));
+    mDisplaceSpin = addSliderRow(tr("置换强度："), 0, 30, 8,
+        tr("按原图亮度置换阴影边界的强度（像素）：暗线处边界向一侧推移，阴影贴合线稿起伏而非完美圆弧。"
+           "建议不超过模糊值，模糊会垫住置换的采样越界。"));
     mOpacitySpin = addSliderRow(tr("阴影浓度："), 10, 100, 45,
-        tr("阴影色以正片叠底方式叠加的强度（百分比）。"));
-    mChokeSpin = addSliderRow(tr("阻塞："), 0, 8, 2,
-        tr("阴影边界向外膨胀的像素数：让阴影咬进线条、不留亮缝，也不会溢出内容边界。"));
+        tr("阴影层的透明度（百分比），以普通合成叠在原图上。"));
 
     // 阴影颜色
     auto* colorLayout = new QGridLayout;
@@ -104,7 +108,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     colorLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     colorLayout->addWidget(colorLabel, 0, 0);
     mColorButton = new QPushButton(this);
-    mColorButton->setToolTip(tr("点击选择阴影色（正片叠底，建议选偏紫/偏蓝的暗色）"));
+    mColorButton->setToolTip(tr("点击选择阴影色（普通合成叠色，建议选偏紫/偏蓝的暗色）"));
     mColorButton->setAutoDefault(false);
     connect(mColorButton, &QPushButton::clicked, this, &AutoShadowDialog::pickShadowColor);
     colorLayout->addWidget(mColorButton, 1, 0);
@@ -116,7 +120,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     auto* levelLayout = new QVBoxLayout(levelBox);
     mSingleLevelRadio = new QRadioButton(tr("单层阴影"), levelBox);
     mSingleLevelRadio->setChecked(true);
-    mTwoLevelRadio = new QRadioButton(tr("双层阴影（远端断层更暗）"), levelBox);
+    mTwoLevelRadio = new QRadioButton(tr("双层阴影（两层叠加更暗）"), levelBox);
     levelLayout->addWidget(mSingleLevelRadio);
     levelLayout->addWidget(mTwoLevelRadio);
 
@@ -132,7 +136,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mSecondSpin->setValue(64);
     mSecondSpin->setFixedWidth(96);
     mSecondSpin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    mSecondSpin->setToolTip(tr("到光源的距离超过该值的像素压到第二档（更暗），须大于阴影范围。"));
+    mSecondSpin->setToolTip(tr("第二层圆形遮罩半径（像素）：超出该值的区域再叠一层阴影，须大于阴影范围。"));
     auto* secondLayout = new QGridLayout;
     secondLayout->setHorizontalSpacing(8);
     secondLayout->setContentsMargins(0, 0, 0, 0);
@@ -200,10 +204,11 @@ AutoShadowParams AutoShadowDialog::params() const
     p.lightAngle = qRound(mAngleSpin->value());
     p.lightDistance = qRound(mDistanceSpin->value());
     p.shadowRange = qRound(mRangeSpin->value());
+    p.blurRadius = qRound(mBlurSpin->value());
+    p.displaceStrength = qRound(mDisplaceSpin->value());
     p.secondLevelRange = mTwoLevelRadio->isChecked() ? qRound(mSecondSpin->value()) : 0;
     p.shadowColor = mShadowColor;
     p.shadowOpacity = qRound(mOpacitySpin->value());
-    p.choke = qRound(mChokeSpin->value());
     return p;
 }
 
