@@ -416,6 +416,106 @@ void TimeLineCells::showCameraMenu(QPoint pos)
     menu.exec(mapToGlobal(pos));
 }
 
+void TimeLineCells::showInstanceMenu(QPoint pos)
+{
+    const int frameNumber = getFrameNumber(pos.x());
+    const Layer* curLayer = mEditor->layers()->currentLayer();
+
+    // 仅位图层关键帧块上弹菜单（相机层另有自己的块菜单）
+    if (curLayer == nullptr || curLayer->type() != Layer::BITMAP
+            || !curLayer->keyExists(frameNumber))
+    {
+        return;
+    }
+
+    auto bitmapLayer = const_cast<LayerBitmap*>(static_cast<const LayerBitmap*>(curLayer));
+    auto frame = static_cast<BitmapImage*>(bitmapLayer->getKeyFrameAt(frameNumber));
+
+    QMenu menu(this);
+    QAction* createAction = menu.addAction(tr("创建实例…"));
+    QAction* breakAction = nullptr;
+    QAction* jumpAction = nullptr;
+    if (frame->isInstanceShared())
+    {
+        breakAction = menu.addAction(tr("解除实例"));
+        jumpAction = menu.addAction(tr("跳到下一处实例"));
+    }
+
+    update();
+    QAction* chosen = menu.exec(mapToGlobal(pos));
+
+    if (chosen == createAction)
+    {
+        // 进入放置态：左键点同层空位落成，右键或无效点击取消
+        mInstancePlacing = true;
+        mInstanceSourceLayerId = curLayer->id();
+        mInstanceSourcePos = frameNumber;
+        mInstanceGhostPos = -1;
+    }
+    else if (chosen == breakAction)
+    {
+        mEditor->breakFrameInstance(bitmapLayer, frameNumber);
+    }
+    else if (chosen == jumpAction)
+    {
+        const std::vector<int> group = bitmapLayer->instanceGroupPositions(frameNumber);
+        if (group.size() > 1)
+        {
+            // 环形跳到组内下一个成员
+            const auto it = std::find(group.begin(), group.end(), frameNumber);
+            const int next = (it == group.end() || it + 1 == group.end()) ? group.front() : *(it + 1);
+            mEditor->scrubTo(next);
+        }
+    }
+    update();
+}
+
+void TimeLineCells::paintInstancePreview(QPainter& painter) const
+{
+    if (!mInstancePlacing) return;
+
+    Layer* srcLayer = mEditor->layers()->findLayerById(mInstanceSourceLayerId);
+    if (srcLayer == nullptr) return;
+
+    int srcIndex = -1;
+    const int layerCount = mEditor->object()->getLayerCount();
+    for (int i = 0; i < layerCount; ++i)
+    {
+        if (mEditor->object()->getLayer(i) == srcLayer) { srcIndex = i; break; }
+    }
+    if (srcIndex < 0) return;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    // 源块虚线描边：提醒正在复制的原画
+    KeyFrame* srcKey = srcLayer->getKeyFrameAt(mInstanceSourcePos);
+    if (srcKey != nullptr)
+    {
+        const int blockLen = blockLengthFor(srcLayer, srcKey);
+        const int standardWidth = mFrameSize - 2;
+        const qreal srcLeft = getFrameX(mInstanceSourcePos) - standardWidth;
+        const qreal srcW = standardWidth + (blockLen - 1) * mFrameSize;
+        painter.setPen(QPen(Theme::Accent, 1.6, Qt::DashLine));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(QRectF(srcLeft, getLayerY(srcIndex) + 1.0, srcW, mLayerHeight - 4.0), 5.0, 5.0);
+    }
+
+    // 落位格幽灵框：光标所在列（同层空位=可落，画满格高亮；否则灰框提示不可落）
+    if (mInstanceGhostPos >= 1)
+    {
+        const qreal ghostLeft = getFrameX(mInstanceGhostPos) - mFrameSize;
+        const bool sameLayer = (mLayerPosMoveY == srcIndex);
+        const bool droppable = sameLayer && !srcLayer->keyExists(mInstanceGhostPos);
+        QColor fill = droppable ? QColor(0xE8, 0x38, 0x5A, 36) : QColor(120, 120, 130, 30);
+        painter.setPen(QPen(droppable ? Theme::Accent : QColor(120, 120, 130), 1.6, Qt::DashLine));
+        painter.setBrush(fill);
+        painter.drawRoundedRect(QRectF(ghostLeft, getLayerY(srcIndex) + 2.0, mFrameSize, mLayerHeight - 6.0), 4.0, 4.0);
+    }
+
+    painter.restore();
+}
+
 void TimeLineCells::drawContent()
 {
     if (mCache == nullptr)
@@ -1139,6 +1239,34 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(QColor(0xF5, 0x9E, 0x0B));
                 painter.drawEllipse(QRectF(recLeft + recWidth - 12.0, recTop + recHeight - 12.0, 5.0, 5.0));
+            }
+        }
+
+        // 实例帧角标：右下角链环（同组成员共用同一张原画，改一处全组同步）
+        if (layer->type() == Layer::BITMAP)
+        {
+            auto bitmapKey = static_cast<BitmapImage*>(key);
+            if (bitmapKey->isInstanceShared())
+            {
+                const QPointF c(recLeft + recWidth - 10.0, recTop + recHeight - 10.0);
+                painter.setPen(QPen(Theme::Accent, 1.3));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawEllipse(QPointF(c.x() - 3.0, c.y()), 3.0, 3.0);
+                painter.drawEllipse(QPointF(c.x() + 3.0, c.y()), 3.0, 3.0);
+            }
+        }
+
+        // 实例同组提示：悬停任一成员，全组描主题色细边
+        if (mInstanceHoverPos >= 0 && mInstanceHoverLayerId == layer->id()
+                && layer->type() == Layer::BITMAP)
+        {
+            KeyFrame* hoverKey = layer->getKeyFrameAt(mInstanceHoverPos);
+            if (hoverKey != nullptr
+                    && static_cast<BitmapImage*>(key)->sharesDataWith(static_cast<BitmapImage*>(hoverKey)))
+            {
+                painter.setPen(QPen(Theme::Accent, 1.5));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRoundedRect(QRectF(recLeft + 1.0, recTop + 1.0, recWidth - 2.0, recHeight - 2.0), 5.0, 5.0);
             }
         }
 
@@ -2448,6 +2576,9 @@ void TimeLineCells::paintEvent(QPaintEvent*)
 
         // "+" handle drag-create preview
         paintPlusPreview(painter);
+
+        // 实例放置态幽灵框
+        paintInstancePreview(painter);
     }
 
     if (mType == TIMELINE_CELL_TYPE::Tracks)
@@ -2622,6 +2753,29 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
     mPlusPreviewCount = 0;
 
     primaryButton = event->button();
+
+    // 实例放置态优先拦截：左键点同层空位=落成实例；其它任何点击=取消
+    if (mInstancePlacing && mType == TIMELINE_CELL_TYPE::Tracks)
+    {
+        mInstancePlacing = false;
+        mInstanceGhostPos = -1;
+        if (event->button() == Qt::LeftButton)
+        {
+            const int targetPos = qMax(1, frameNumber);
+            Layer* srcLayer = mEditor->layers()->findLayerById(mInstanceSourceLayerId);
+            const bool sameLayer = (layerNumber >= 0 && layerNumber < mEditor->object()->getLayerCount()
+                                    && mEditor->object()->getLayer(layerNumber) == srcLayer);
+            if (srcLayer != nullptr && sameLayer && !srcLayer->keyExists(targetPos))
+            {
+                mEditor->createFrameInstance(srcLayer, mInstanceSourcePos, targetPos);
+            }
+        }
+        mInstanceSourceLayerId = -1;
+        mInstanceSourcePos = -1;
+        update();
+        event->accept();
+        return;
+    }
 
     switch (mType)
     {
@@ -2914,6 +3068,15 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 
                     Layer *currentLayer = mEditor->object()->getLayer(layerNumber);
 
+                    // 位图层关键帧右键：实例帧菜单（相机层另有块菜单，其它层维持原行为）
+                    if (event->button() == Qt::RightButton
+                            && currentLayer->type() == Layer::BITMAP
+                            && currentLayer->keyExists(frameNumber))
+                    {
+                        showInstanceMenu(event->pos());
+                        break;
+                    }
+
                     // Check if we are using the alt key
                     if (event->modifiers() == Qt::AltModifier)
                     {
@@ -3103,6 +3266,41 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
 
     mFramePosMoveX = getFrameNumber(mMouseMoveX);
     mLayerPosMoveY = getLayerNumber(event->pos().y());
+
+    // 实例放置态：幽灵框跟随光标所在列（列变化才重绘）
+    if (mInstancePlacing && mType == TIMELINE_CELL_TYPE::Tracks)
+    {
+        const int ghost = qMax(1, mFramePosMoveX);
+        if (ghost != mInstanceGhostPos) { mInstanceGhostPos = ghost; update(); }
+    }
+
+    // 实例悬停提示：落在实例块上时记位置，同组兄弟块描边（无手势时才跟踪）
+    if (mType == TIMELINE_CELL_TYPE::Tracks && primaryButton == Qt::NoButton
+            && !mTrimming && !mPlusCreating && !mInstancePlacing)
+    {
+        int newHoverPos = -1;
+        int newHoverLayerId = -1;
+        if (mLayerPosMoveY >= 0 && mLayerPosMoveY < mEditor->object()->getLayerCount())
+        {
+            Layer* hoverLayer = mEditor->object()->getLayer(mLayerPosMoveY);
+            if (hoverLayer != nullptr && hoverLayer->type() == Layer::BITMAP
+                    && hoverLayer->keyExists(mFramePosMoveX))
+            {
+                auto hoverBitmap = static_cast<BitmapImage*>(hoverLayer->getKeyFrameAt(mFramePosMoveX));
+                if (hoverBitmap->isInstanceShared())
+                {
+                    newHoverPos = mFramePosMoveX;
+                    newHoverLayerId = hoverLayer->id();
+                }
+            }
+        }
+        if (newHoverPos != mInstanceHoverPos || newHoverLayerId != mInstanceHoverLayerId)
+        {
+            mInstanceHoverPos = newHoverPos;
+            mInstanceHoverLayerId = newHoverLayerId;
+            update();
+        }
+    }
 
     // TVP-style hover feedback: <-> over block edges, + over the create handle
     if (mType == TIMELINE_CELL_TYPE::Tracks && primaryButton == Qt::NoButton && !mTrimming && !mPlusCreating)
@@ -4153,6 +4351,12 @@ void TimeLineCells::onDidLeaveWidget()
     // Reset last known frame pos to avoid wrong UI states when leaving the widget
     mFramePosMoveX = 0;
     mMousePos = QPoint(-1000, -1000); // 悬停揭示（相机图标下的关键帧）随之复位
+    if (mInstanceHoverPos != -1)
+    {
+        mInstanceHoverPos = -1;
+        mInstanceHoverLayerId = -1;
+        update(); // 实例同组描边随离开消除
+    }
     if (mHoverRevealActive)
     {
         mHoverRevealActive = false;

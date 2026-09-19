@@ -374,6 +374,32 @@ void ScribbleArea::onFrameModified(int frameNumber)
         invalidatePainterCaches();
     }
     invalidateCacheForFrame(frameNumber);
+
+    // 实例帧：同组其它成员的显示缓存一并失效（成员位置可能停着修改前的
+    // 旧渲染，跳帧过去会显示陈旧画面）。逐成员直调底层失效，不回调
+    // onFrameModified 以免递归
+    Layer* curLayer = mEditor->layers()->currentLayer();
+    if (curLayer != nullptr && curLayer->isBitmapKind())
+    {
+        auto bitmapLayer = static_cast<LayerBitmap*>(curLayer);
+        BitmapImage* edited = static_cast<BitmapImage*>(
+                    bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(frameNumber)));
+        if (edited != nullptr && edited->isInstanceShared())
+        {
+            for (int memberPos : bitmapLayer->instanceGroupPositions(edited->pos()))
+            {
+                if (memberPos == frameNumber) { continue; }
+                invalidateCacheForFrame(memberPos);
+                if (mPrefs->isOn(SETTING::PREV_ONION) || mPrefs->isOn(SETTING::NEXT_ONION)) {
+                    invalidateOnionSkinsCacheAround(memberPos);
+                }
+            }
+            if (mPrefs->isOn(SETTING::PREV_ONION) || mPrefs->isOn(SETTING::NEXT_ONION)) {
+                invalidatePainterCaches();
+            }
+        }
+    }
+
     updateFrame();
 }
 

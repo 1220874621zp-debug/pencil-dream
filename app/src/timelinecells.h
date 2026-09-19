@@ -160,6 +160,11 @@ private:
     /** Returns the layer index whose trailing "+" handle is under the position, or -1. */
     int hitTestPlusHandle(const QPoint& pos) const;
     void paintPlusPreview(QPainter& painter) const;
+
+    /** 位图层帧块右键菜单：创建实例/解除实例/跳到下一处实例。 */
+    void showInstanceMenu(QPoint pos);
+    /** 实例放置态幽灵框（跟随光标的落位预览）。 */
+    void paintInstancePreview(QPainter& painter) const;
     QPixmap thumbnailFor(const Layer* layer, int framePos) const;
     /** Move the selected frames of the source layer to the target layer (same type only).
      *  Returns false (without touching anything) when the drop is impossible. */
@@ -283,6 +288,16 @@ private:
     // Trailing "+" handle drag-create (TVP-style)
     bool mPlusCreating = false;
     int mPlusPreviewCount = 0;
+
+    // 实例帧放置态：右键「创建实例…」启动，左键点同层空位落成，右键/无效点击取消
+    bool mInstancePlacing = false;
+    int mInstanceSourceLayerId = -1;
+    int mInstanceSourcePos = -1;
+    int mInstanceGhostPos = -1;
+
+    // 实例悬停提示：悬停在实例块上时，同组成员位置描主题色边
+    int mInstanceHoverPos = -1;
+    int mInstanceHoverLayerId = -1;
 
     // Cross-layer drag & drop
     int mDropTargetLayer = -1;

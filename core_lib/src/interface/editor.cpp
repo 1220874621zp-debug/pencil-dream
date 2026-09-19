@@ -395,6 +395,25 @@ void Editor::setModified(int layerNumber, int frameNumber)
     }
 
     emit frameModified(frameNumber);
+
+    // 实例帧：数据置脏与 frameModified（缩略图等按帧刷新方）广播到同组
+    // 其它成员位置。像素层共享块已同步，不广播的话成员位置的时间轴
+    // 缩略图会停在旧内容
+    if (layer->isBitmapKind())
+    {
+        auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+        BitmapImage* edited = static_cast<BitmapImage*>(
+                    bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(frameNumber)));
+        if (edited != nullptr && edited->isInstanceShared())
+        {
+            for (int memberPos : bitmapLayer->instanceGroupPositions(edited->pos()))
+            {
+                if (memberPos == frameNumber) { continue; }
+                layer->setModified(memberPos, true);
+                emit frameModified(memberPos);
+            }
+        }
+    }
 }
 
 void Editor::clipboardChanged()
