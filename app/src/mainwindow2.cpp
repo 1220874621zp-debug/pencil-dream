@@ -32,6 +32,15 @@ GNU General Public License for more details.
 #include <QTabletEvent>
 #include <QStandardPaths>
 #include <QDateTime>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QFileInfo>
+#include <QImageReader>
+#include <QMimeData>
+#include <QSet>
+#include <QSettings>
+#include <QUrl>
 #include <QLabel>
 #include <QClipboard>
 #include <QToolBar>
@@ -131,6 +140,8 @@ MainWindow2::MainWindow2(QWidget* parent) :
     ui(new Ui::MainWindow2)
 {
     ui->setupUi(this);
+
+    setAcceptDrops(true); // 拖拽图片/工程文件直接进画布
 
 
     // Initialize order
@@ -1121,6 +1132,117 @@ void MainWindow2::importImage()
         ErrorDialog errorDialog(st.title(), st.description(), st.details().html());
         errorDialog.exec();
         return;
+    }
+
+    ui->scribbleArea->updateFrame();
+    mTimeLine->updateContent();
+}
+
+namespace
+{
+
+/** QImage 可读的本地图片后缀（png/jpg/bmp/webp/tif 等，随 Qt 插件能力走） */
+bool hasImageSuffix(const QString& path)
+{
+    static const QSet<QString> suffixes = []() {
+        QSet<QString> set;
+        const auto formats = QImageReader::supportedImageFormats();
+        for (const QByteArray& format : formats)
+            set.insert(QString::fromLatin1(format).toLower());
+        return set;
+    }();
+    const QString suffix = QFileInfo(path).suffix().toLower();
+    return !suffix.isEmpty() && suffixes.contains(suffix);
+}
+
+/** 拖进来的东西里有没有可接收的本地文件（图片或 .pclx 工程） */
+bool containsDroppableFile(const QMimeData* mime)
+{
+    if (mime == nullptr || !mime->hasUrls())
+        return false;
+    for (const QUrl& url : mime->urls())
+    {
+        if (!url.isLocalFile())
+            continue;
+        const QString path = url.toLocalFile();
+        if (hasImageSuffix(path) || path.endsWith(".pclx", Qt::CaseInsensitive))
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+void MainWindow2::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (containsDroppableFile(event->mimeData()))
+        event->acceptProposedAction();
+}
+
+void MainWindow2::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (containsDroppableFile(event->mimeData()))
+        event->acceptProposedAction();
+}
+
+void MainWindow2::dropEvent(QDropEvent* event)
+{
+    if (event->mimeData() == nullptr || !event->mimeData()->hasUrls())
+        return;
+
+    QString projectFile;
+    QStringList imageFiles;
+    for (const QUrl& url : event->mimeData()->urls())
+    {
+        if (!url.isLocalFile())
+            continue;
+        const QString path = url.toLocalFile();
+        if (!QFile::exists(path))
+            continue;
+        if (projectFile.isEmpty() && path.endsWith(".pclx", Qt::CaseInsensitive))
+            projectFile = path;
+        else if (hasImageSuffix(path))
+            imageFiles.append(path);
+    }
+    if (projectFile.isEmpty() && imageFiles.isEmpty())
+        return;
+
+    event->acceptProposedAction();
+
+    // 拖工程文件 = 打开工程（同 RecentFileMenu 入口，自带未保存确认）
+    if (!projectFile.isEmpty())
+    {
+        openFile(projectFile);
+        return;
+    }
+
+    // 图片直接导入：沿用「导入图片」位置对话框的记忆选择（同 IMPORT_REPOSITION_TYPE 设置键），不弹窗
+    ImportImageConfig importConfig;
+    int positionIndex = QSettings(PENCIL2D, PENCIL2D).value(IMPORT_REPOSITION_TYPE, 0).toInt();
+    if ((positionIndex == 2 || positionIndex == 3)
+        && mEditor->layers()->getCameraLayerBelow(mEditor->currentLayerIndex()) == nullptr)
+    {
+        positionIndex = 0; // 记忆了相机位但下方没有相机层：回退视野中心（对话框里该项本就禁用）
+    }
+    switch (positionIndex)
+    {
+    case 1: importConfig.positionType = ImportImageConfig::CenterOfCanvas; break;
+    case 2: importConfig.positionType = ImportImageConfig::CenterOfCamera; break;
+    case 3: importConfig.positionType = ImportImageConfig::CenterOfCameraFollowed; break;
+    default: importConfig.positionType = ImportImageConfig::CenterOfView; break;
+    }
+    if (importConfig.positionType == ImportImageConfig::CenterOfCamera)
+        importConfig.importFrame = mEditor->currentFrame();
+
+    for (const QString& path : imageFiles)
+    {
+        Status st = mEditor->importImage(path, importConfig);
+        if (!st.ok())
+        {
+            ErrorDialog errorDialog(st.title(), st.description(), st.details().html());
+            errorDialog.exec();
+            break;
+        }
     }
 
     ui->scribbleArea->updateFrame();

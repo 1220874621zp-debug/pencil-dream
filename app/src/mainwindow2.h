@@ -127,6 +127,9 @@ protected:
     bool event(QEvent*) override;
     void showEvent(QShowEvent*) override;
     void resizeEvent(QResizeEvent*) override;
+    void dragEnterEvent(QDragEnterEvent*) override;
+    void dragMoveEvent(QDragMoveEvent*) override;
+    void dropEvent(QDropEvent*) override;
 
 private slots:
     void updateCopyCutPasteEnabled();
