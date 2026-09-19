@@ -636,7 +636,7 @@ void MainWindow2::createMenus()
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
-    autoShadowAction->setStatusTip(tr("按 AE 流程给平涂画面自动叠阴影：复制层填充阴影色+高斯模糊+圆形遮罩+置换贴图+轨道遮罩翻转，可单层/双层，可批量整层处理"));
+    autoShadowAction->setStatusTip(tr("按 CSP 参数模型自动叠阴影：径向光场+置换贴合线稿，三阈值切四色阶、每阶独立色+混合模式（正片叠底/线性加深），色调分离/平滑两种映射，可批量整层处理"));
     connect(autoShadowAction, &QAction::triggered, this, [this] {
         AutoShadowDialog dialog(mEditor, this);
         if (dialog.exec() != QDialog::Accepted)

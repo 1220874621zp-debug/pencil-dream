@@ -31,105 +31,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 namespace
 {
 
-constexpr int ALPHA_MIN = 16; // α≥此值视为不透明内容（掩膜/包围盒判定）
+constexpr int ALPHA_MIN = 16; // α≥此值视为不透明内容
 
 int clampInt(const int v, const int lo, const int hi)
 {
     return std::min(hi, std::max(lo, v));
 }
 
-/** ── 效果2：高斯模糊 ── 3 次盒式模糊近似高斯（分离前缀和，O(N) 与半径无关） */
-
-std::vector<int> boxesForGauss(const float sigma, const int boxCount)
+float smoothStep(const float e0, const float e1, const float x)
 {
-    const float wIdeal = std::sqrt((12.0f * sigma * sigma / static_cast<float>(boxCount)) + 1.0f);
-    int wl = static_cast<int>(std::floor(wIdeal));
-    if (wl % 2 == 0)
-        --wl;
-    if (wl < 1)
-        wl = 1;
-    const int wu = wl + 2;
-    const float mIdeal = (12.0f * sigma * sigma
-                          - static_cast<float>(boxCount) * wl * wl
-                          - static_cast<float>(boxCount) * wl
-                          - static_cast<float>(boxCount) / 4.0f)
-                         / static_cast<float>(-4 * wl - 4);
-    const int m = static_cast<int>(std::round(mIdeal));
-    std::vector<int> sizes;
-    for (int i = 0; i < boxCount; ++i)
-        sizes.push_back(i < m ? wl : wu);
-    return sizes;
+    if (e1 <= e0)
+        return x < e0 ? 0.0f : 1.0f;
+    const float t = std::min(1.0f, std::max(0.0f, (x - e0) / (e1 - e0)));
+    return t * t * (3.0f - 2.0f * t);
 }
 
-void boxBlurH(const std::vector<float>& src, std::vector<float>& dst, const int w, const int h, const int r)
-{
-    if (r <= 0)
-    {
-        dst = src;
-        return;
-    }
-    const float inv = 1.0f / static_cast<float>(2 * r + 1);
-    for (int y = 0; y < h; ++y)
-    {
-        const float* line = &src[static_cast<size_t>(y) * w];
-        float* out = &dst[static_cast<size_t>(y) * w];
-        float acc = line[0] * static_cast<float>(r + 1);
-        for (int i = 1; i <= r; ++i)
-            acc += line[std::min(i, w - 1)];
-        for (int x = 0; x < w; ++x)
-        {
-            out[x] = acc * inv;
-            acc += line[std::min(x + r + 1, w - 1)] - line[std::max(x - r, 0)];
-        }
-    }
-}
-
-void boxBlurV(const std::vector<float>& src, std::vector<float>& dst, const int w, const int h, const int r)
-{
-    if (r <= 0)
-    {
-        dst = src;
-        return;
-    }
-    const float inv = 1.0f / static_cast<float>(2 * r + 1);
-    for (int x = 0; x < w; ++x)
-    {
-        float acc = src[static_cast<size_t>(x)] * static_cast<float>(r + 1);
-        for (int i = 1; i <= r; ++i)
-            acc += src[static_cast<size_t>(std::min(i, h - 1)) * w + x];
-        for (int y = 0; y < h; ++y)
-        {
-            dst[static_cast<size_t>(y) * w + x] = acc * inv;
-            acc += src[static_cast<size_t>(std::min(y + r + 1, h - 1)) * w + x]
-                 - src[static_cast<size_t>(std::max(y - r, 0)) * w + x];
-        }
-    }
-}
-
-void gaussBlurAlpha(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const float sigma)
-{
-    const std::vector<int> boxes = boxesForGauss(sigma, 3);
-    for (const int size : boxes)
-    {
-        const int r = (size - 1) / 2;
-        if (r <= 0)
-            continue;
-        boxBlurH(buf, tmp, w, h, r);
-        boxBlurV(tmp, buf, w, h, r);
-    }
-}
-
-/** ── 效果3：圆形遮罩 ── smoothstep 羽化；圆内=1（露出底下原图），圆外=0 */
-float circleMask(const double dist, const double radius, const float feather)
-{
-    if (feather < 1.0f)
-        return dist < radius ? 1.0f : 0.0f;
-    const float t = std::min(1.0f, std::max(0.0f,
-        static_cast<float>((dist - (radius - feather * 0.5)) / feather)));
-    return 1.0f - t * t * (3.0f - 2.0f * t);
-}
-
-/** ── 效果4：置换贴图 ── 双线性采样（边界钳位） */
+/** 双线性采样（边界钳位） */
 float bilinearSample(const std::vector<float>& buf, const int w, const int h, double x, double y)
 {
     x = std::min(static_cast<double>(w - 1), std::max(0.0, x));
@@ -147,6 +64,26 @@ float bilinearSample(const std::vector<float>& buf, const int w, const int h, do
     return static_cast<float>((a * (1.0 - fx) + b * fx) * (1.0 - fy) + (c * (1.0 - fx) + d * fx) * fy);
 }
 
+/** 单通道混合（预乘域）：mode 决定公式，返回混合后的预乘分量（浮点，外层统一加权后再取整） */
+double blendChannel(const int premul, const int alpha, const int s, const AutoShadowBlendMode mode)
+{
+    switch (mode)
+    {
+    case AutoShadowBlendMode::Multiply:
+        return premul * static_cast<double>(s) / 255.0;
+    case AutoShadowBlendMode::Normal:
+        return s * static_cast<double>(alpha) / 255.0;
+    case AutoShadowBlendMode::LinearBurn:
+    {
+        if (alpha >= 255)
+            return std::max(0, premul + s - 255);
+        const int straight = std::min(255, (premul * 255 + alpha / 2) / alpha);
+        return std::max(0, std::min(255, straight + s - 255)) * static_cast<double>(alpha) / 255.0;
+    }
+    }
+    return premul;
+}
+
 } // namespace
 
 namespace AutoShadow
@@ -161,25 +98,33 @@ int apply(QImage& img, const AutoShadowParams& params)
     if (w <= 0 || h <= 0)
         return 0;
 
-    const int range = clampInt(params.shadowRange, 2, 400);
-    int second = params.secondLevelRange;
-    if (second > 0)
-        second = clampInt(second, range + 2, 800);
-    const bool hasSecond = second > 0;
-    const int blur = clampInt(params.blurRadius, 0, 200);
-    const int displace = clampInt(params.displaceStrength, 0, 100);
-    const double opacity = clampInt(params.shadowOpacity, 1, 100) / 100.0;
+    // 阈值清洗：递增且落在 1..100（乱序输入按就近可用值收敛，预览与实跑同规则）
+    const int t1 = clampInt(params.thresholds[0], 1, 98);
+    const int t2 = clampInt(params.thresholds[1], t1 + 1, 99);
+    const int t3 = clampInt(params.thresholds[2], t2 + 1, 100);
+    const double t1f = t1, t2f = t2, t3f = t3;
 
     const double angleRad = qDegreesToRadians(static_cast<double>(((params.lightAngle % 360) + 360) % 360));
     const double dirX = std::cos(angleRad);
     const double dirY = -std::sin(angleRad); // 屏幕 y 向下，数学角逆时针
     const double dist = std::max(50.0, static_cast<double>(params.lightDistance));
+    const int displace = clampInt(params.displaceStrength, 0, 100);
+    const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
+
+    // 色带（反转=镜像）
+    AutoShadowLevel levels[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        const AutoShadowLevel& src = params.levels[params.invertLevels ? 3 - i : i];
+        levels[i].color = src.color;
+        levels[i].mode = src.mode;
+    }
 
     const size_t count = static_cast<size_t>(w) * h;
 
-    // ── 效果1：实体化「填充+降透明度」副本——颜色恒 S，只需求 α 场与亮度场
-    std::vector<float> alphaF(count, 0.0f);   // 副本 α（原图 α）
-    std::vector<float> lumaF(count, 0.5f);    // 置换贴图：原图直通亮度，透明处中性 0.5
+    // α 场 + 亮度场 + 包围盒
+    std::vector<uint8_t> contentMask(count, 0);
+    std::vector<float> lumaF(count, 0.5f); // 置换贴图：直通亮度，透明处中性 0.5
     int minX = w, minY = h, maxX = -1, maxY = -1;
     for (int y = 0; y < h; ++y)
     {
@@ -191,7 +136,7 @@ int apply(QImage& img, const AutoShadowParams& params)
             const int a = qAlpha(px);
             if (a < ALPHA_MIN)
                 continue;
-            alphaF[row + x] = a / 255.0f;
+            contentMask[row + x] = 1;
             const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
             lumaF[row + x] = (0.299f * lift(qRed(px)) + 0.587f * lift(qGreen(px)) + 0.114f * lift(qBlue(px))) / 255.0f;
             minX = std::min(minX, x);
@@ -203,7 +148,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     if (maxX < 0)
         return 0;
 
-    // 光源点 = 内容中心 + 极坐标(角度, 距离)；r0 = 内容上离光源最近点（遮罩半径基准）
+    // ── 场生成段：g = 到光源距离 − r0（内容最近点归零），置换后按内容最大值归一化到 0..100
     const double lightX = (minX + maxX) / 2.0 + dirX * dist;
     const double lightY = (minY + maxY) / 2.0 + dirY * dist;
     double minD2 = std::numeric_limits<double>::max();
@@ -213,7 +158,7 @@ int apply(QImage& img, const AutoShadowParams& params)
         const double dy = y - lightY;
         for (int x = minX; x <= maxX; ++x)
         {
-            if (alphaF[row + x] <= 0.0f)
+            if (contentMask[row + x] == 0)
                 continue;
             const double dx = x - lightX;
             const double d2 = dx * dx + dy * dy;
@@ -222,64 +167,57 @@ int apply(QImage& img, const AutoShadowParams& params)
         }
     }
     const double r0 = std::sqrt(minD2);
-    const double radius1 = r0 + range;
-    const double radius2 = r0 + second;
-    const float feather = static_cast<float>(blur);
 
-    // ── 效果2：高斯模糊副本 α（羽化来源，也是置换采样的越界垫边）
-    std::vector<float> blurAlpha = alphaF;
-    if (blur > 0)
+    std::vector<float> field(count, 0.0f);
+    double fieldMax = 0.0;
+    for (int y = 0; y < h; ++y)
     {
-        std::vector<float> tmp(count);
-        gaussBlurAlpha(blurAlpha, tmp, w, h, std::max(1.0f, blur / 2.0f));
+        const size_t row = static_cast<size_t>(y) * w;
+        const double dy = y - lightY;
+        for (int x = 0; x < w; ++x)
+        {
+            const double dx = x - lightX;
+            field[row + x] = static_cast<float>(std::max(0.0, std::sqrt(dx * dx + dy * dy) - r0));
+        }
+    }
+    for (int y = minY; y <= maxY; ++y)
+    {
+        const size_t row = static_cast<size_t>(y) * w;
+        for (int x = minX; x <= maxX; ++x)
+        {
+            if (contentMask[row + x] != 0)
+                fieldMax = std::max(fieldMax, static_cast<double>(field[row + x]));
+        }
+    }
+    if (fieldMax <= 0.0)
+        fieldMax = 1.0;
+    const double normScale = 100.0 / fieldMax;
+
+    // 置换（贴图=原图亮度，双轴等强度）→ 归一化场值 F∈[0,100]
+    std::vector<float> fieldNorm(count, 0.0f);
+    for (int y = 0; y < h; ++y)
+    {
+        const size_t row = static_cast<size_t>(y) * w;
+        for (int x = 0; x < w; ++x)
+        {
+            double g = field[row + x];
+            if (displace > 0)
+            {
+                const double off = static_cast<double>(displace) * (lumaF[row + x] - 0.5) * 2.0;
+                if (off != 0.0)
+                    g = bilinearSample(field, w, h, x + off, y + off);
+            }
+            fieldNorm[row + x] = static_cast<float>(std::min(100.0, std::max(0.0, g * normScale)));
+        }
     }
 
-    // ── 效果3+4：圆形遮罩（add 相交）→ 置换（贴图=原图亮度，双轴等强度）
-    const auto buildMatte = [&](const double radius) {
-        std::vector<float> matte(count, 0.0f);
-        for (int y = minY; y <= maxY; ++y)
-        {
-            const size_t row = static_cast<size_t>(y) * w;
-            const double dy = y - lightY;
-            for (int x = minX; x <= maxX; ++x)
-            {
-                const float a = blurAlpha[row + x];
-                if (a <= 0.0f)
-                    continue;
-                const double dx = x - lightX;
-                matte[row + x] = a * circleMask(std::sqrt(dx * dx + dy * dy), radius, feather);
-            }
-        }
-        if (displace > 0)
-        {
-            std::vector<float> displaced(count, 0.0f);
-            const double strength = static_cast<double>(displace);
-            for (int y = 0; y < h; ++y)
-            {
-                const size_t row = static_cast<size_t>(y) * w;
-                for (int x = 0; x < w; ++x)
-                {
-                    const double off = strength * (lumaF[row + x] - 0.5) * 2.0;
-                    if (off == 0.0)
-                    {
-                        displaced[row + x] = matte[row + x];
-                        continue;
-                    }
-                    displaced[row + x] = bilinearSample(matte, w, h, x + off, y + off);
-                }
-            }
-            matte.swap(displaced);
-        }
-        return matte;
+    // ── 映射段：权重（色调分离=smoothstep阶跃 / 平滑=分段线性）→ 各阶混合按权重加权
+    const double levelS[4][3] = {
+        { qRed(levels[0].color), qGreen(levels[0].color), qBlue(levels[0].color) },
+        { qRed(levels[1].color), qGreen(levels[1].color), qBlue(levels[1].color) },
+        { qRed(levels[2].color), qGreen(levels[2].color), qBlue(levels[2].color) },
+        { qRed(levels[3].color), qGreen(levels[3].color), qBlue(levels[3].color) },
     };
-
-    const std::vector<float> matte1 = buildMatte(radius1);
-    const std::vector<float> matte2 = hasSecond ? buildMatte(radius2) : std::vector<float>();
-
-    // ── 效果5：轨道遮罩翻转 + 整合——α原×O×(1−matte)，双层同色叠加 a=1−(1−a1)(1−a2)
-    const double sR = qRed(params.shadowColor);
-    const double sG = qGreen(params.shadowColor);
-    const double sB = qBlue(params.shadowColor);
 
     int changed = 0;
     for (int y = 0; y < h; ++y)
@@ -288,26 +226,50 @@ int apply(QImage& img, const AutoShadowParams& params)
         const size_t row = static_cast<size_t>(y) * w;
         for (int x = 0; x < w; ++x)
         {
-            const float alpha = alphaF[row + x];
-            if (alpha <= 0.0f)
-                continue; // 副本 α 裁回内容：阴影不出轮廓
-            const float m1 = matte1[row + x];
-            double shadowA = alpha * opacity * (1.0 - m1);
-            if (hasSecond)
-            {
-                const double a2 = alpha * opacity * (1.0 - matte2[row + x]);
-                shadowA = 1.0 - (1.0 - shadowA) * (1.0 - a2);
-            }
-            if (shadowA <= 0.0)
+            if (contentMask[row + x] == 0)
                 continue;
-
+            const float F = fieldNorm[row + x];
             const QRgb px = line[x];
-            const double keep = 1.0 - shadowA;
-            const int outA = qRound(shadowA * 255.0 + qAlpha(px) * keep);
-            const QRgb out = qRgba(qRound(sR * shadowA + qRed(px) * keep),
-                                   qRound(sG * shadowA + qGreen(px) * keep),
-                                   qRound(sB * shadowA + qBlue(px) * keep),
-                                   std::min(255, outA));
+            const int alpha = qAlpha(px);
+
+            // 色阶权重 w0..w3（和恒为 1）：三条越界进度 s1/s2/s3 链式组合
+            //   s1: 场值 0→t1（色阶1→2）、s2: t1→t2（2→3）、s3: t2→t3（3→4）
+            //   色调分离 = smoothstep 过渡（feather=0 即硬阶跃）；平滑 = 线性坡道（连续梯度映射）
+            double s1, s2, s3;
+            const auto ramp = [](const double lo, const double hi, const double v) {
+                return std::min(1.0, std::max(0.0, (v - lo) / (hi - lo)));
+            };
+            if (params.smooth)
+            {
+                s1 = ramp(0.0, t1f, F);
+                s2 = ramp(t1f, t2f, F);
+                s3 = ramp(t2f, t3f, F);
+            }
+            else
+            {
+                const float half = feather * 0.5f;
+                s1 = smoothStep(t1f - half, t1f + half, F);
+                s2 = smoothStep(t2f - half, t2f + half, F);
+                s3 = smoothStep(t3f - half, t3f + half, F);
+            }
+            const double w[4] = {
+                1.0 - s1,
+                s1 * (1.0 - s2),
+                s2 * (1.0 - s3),
+                s3,
+            };
+
+            // 各阶独立混合后按权重加权（模式不同也能连续过渡），一次取整
+            double outR = 0.0, outG = 0.0, outB = 0.0;
+            for (int i = 0; i < 4; ++i)
+            {
+                if (w[i] <= 0.0)
+                    continue;
+                outR += w[i] * blendChannel(qRed(px), alpha, static_cast<int>(levelS[i][0]), levels[i].mode);
+                outG += w[i] * blendChannel(qGreen(px), alpha, static_cast<int>(levelS[i][1]), levels[i].mode);
+                outB += w[i] * blendChannel(qBlue(px), alpha, static_cast<int>(levelS[i][2]), levels[i].mode);
+            }
+            const QRgb out = qRgba(qRound(outR), qRound(outG), qRound(outB), alpha);
             if (out != px)
             {
                 line[x] = out;

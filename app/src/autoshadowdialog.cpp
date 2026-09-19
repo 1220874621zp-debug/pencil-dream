@@ -26,7 +26,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "layerbitmap.h"
 #include "layermanager.h"
 
+#include <QCheckBox>
 #include <QColorDialog>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QEvent>
@@ -37,6 +39,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSlider>
+#include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -46,15 +49,10 @@ namespace
 constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
-/** 像素参数按预览缩放同比（角度/颜色/透明度不随缩放）；
-    几何场（光源距离）同比缩放后与实跑光场一致 */
+/** 像素参数按预览缩放同比（角度/颜色/阈值/羽化是场值单位，不随缩放） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
-    q.shadowRange = std::max(2, qRound(p.shadowRange * s));
-    if (p.secondLevelRange > 0)
-        q.secondLevelRange = std::max(q.shadowRange + 2, qRound(p.secondLevelRange * s));
-    q.blurRadius = qRound(p.blurRadius * s);
     q.displaceStrength = qRound(p.displaceStrength * s);
     q.lightDistance = std::max(50, qRound(p.lightDistance * s));
     return q;
@@ -68,6 +66,12 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 {
     setWindowTitle(tr("自动上阴影"));
     setModal(true);
+
+    // 默认色带：受光暖黄→橙→洋红→背光蓝紫（CSP 截图同款暖到冷序列）
+    mLevels[0] = { qRgb(255, 244, 186), AutoShadowBlendMode::Multiply };
+    mLevels[1] = { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply };
+    mLevels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
+    mLevels[3] = { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply };
 
     // 参数变动防抖：拖滑杆连续触发，只在停顿后重算一次预览
     mPreviewTimer = new QTimer(this);
@@ -83,90 +87,119 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     mParamColumn->setSpacing(6);
 
-    // 滑杆+输入框参数行（数值守卫防环，输入框是唯一数据源——同 ColorToAlphaDialog 范式）
-    mAngleSpin = addSliderRow(tr("光源角度："), 0, 359, 135,
-        tr("光源方向（度）：0=右 90=上 135=左上 180=左 270=下。默认左上光。"));
-    mDistanceSpin = addSliderRow(tr("光源距离："), 100, 5000, 600,
-        tr("光源到画面中心的距离（像素）：近=圆形径向渐变，远=接近平行条带。"));
-    mRangeSpin = addSliderRow(tr("阴影范围："), 4, 120, 40,
-        tr("圆形遮罩半径（像素）：到光源的距离超过该值的区域开始出现阴影。"
-           "值越大阴影越退向远离光源一侧。"));
-    mBlurSpin = addSliderRow(tr("模糊："), 0, 40, 12,
-        tr("阴影层的高斯模糊半径（像素）：软化阴影边界并微微外扩，也决定遮罩边缘的羽化宽度。"));
-    mDisplaceSpin = addSliderRow(tr("置换强度："), 0, 30, 8,
-        tr("按原图亮度置换阴影边界的强度（像素）：暗线处边界向一侧推移，阴影贴合线稿起伏而非完美圆弧。"
-           "建议不超过模糊值，模糊会垫住置换的采样越界。"));
-    mOpacitySpin = addSliderRow(tr("阴影浓度："), 10, 100, 45,
-        tr("阴影层的透明度（百分比），以普通合成叠在原图上。"));
+    // ── 场生成段参数 ──
+    QDoubleSpinBox* angleSpin = nullptr;
+    QSlider* angleSlider = nullptr;
+    addSliderRow(tr("光源角度："), 0, 359, 135,
+        tr("光源方向（度）：0=右 90=上 135=左上 180=左 270=下。默认左上光。"), angleSpin, angleSlider);
+    mAngleSpin = angleSpin;
 
-    // 阴影颜色
-    auto* colorLayout = new QGridLayout;
-    colorLayout->setHorizontalSpacing(8);
-    colorLayout->setVerticalSpacing(2);
-    colorLayout->setContentsMargins(0, 0, 0, 0);
-    auto* colorLabel = new QLabel(tr("阴影颜色："), this);
-    colorLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    colorLayout->addWidget(colorLabel, 0, 0);
-    mColorButton = new QPushButton(this);
-    mColorButton->setToolTip(tr("点击选择阴影色（普通合成叠色，建议选偏紫/偏蓝的暗色）"));
-    mColorButton->setAutoDefault(false);
-    connect(mColorButton, &QPushButton::clicked, this, &AutoShadowDialog::pickShadowColor);
-    colorLayout->addWidget(mColorButton, 1, 0);
-    mParamColumn->addLayout(colorLayout);
-    updateColorButton();
+    QDoubleSpinBox* distanceSpin = nullptr;
+    QSlider* distanceSlider = nullptr;
+    addSliderRow(tr("光源距离："), 100, 5000, 600,
+        tr("光源到画面中心的距离（像素）：近=色阶边界弯成圆弧，远=接近平直。"), distanceSpin, distanceSlider);
+    mDistanceSpin = distanceSpin;
 
-    // 阴影层级：单层/双层（双层=更深的凹陷压得更暗）
-    auto* levelBox = new QGroupBox(tr("阴影层级"), this);
-    auto* levelLayout = new QVBoxLayout(levelBox);
-    mSingleLevelRadio = new QRadioButton(tr("单层阴影"), levelBox);
-    mSingleLevelRadio->setChecked(true);
-    mTwoLevelRadio = new QRadioButton(tr("双层阴影（两层叠加更暗）"), levelBox);
-    levelLayout->addWidget(mSingleLevelRadio);
-    levelLayout->addWidget(mTwoLevelRadio);
+    QDoubleSpinBox* displaceSpin = nullptr;
+    QSlider* displaceSlider = nullptr;
+    addSliderRow(tr("置换强度："), 0, 30, 8,
+        tr("按原图亮度置换场采样点的强度（像素）：暗线处边界推移，色阶边界贴合线稿起伏而非完美圆弧。"),
+        displaceSpin, displaceSlider);
+    mDisplaceSpin = displaceSpin;
 
-    mSecondLabel = new QLabel(tr("第二层阈值："), levelBox);
-    mSecondLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    levelLayout->addWidget(mSecondLabel);
-    mSecondSlider = new QSlider(Qt::Horizontal, levelBox);
-    mSecondSlider->setRange(6, 200);
-    mSecondSlider->setValue(64);
-    mSecondSpin = new QDoubleSpinBox(levelBox);
-    mSecondSpin->setDecimals(0);
-    mSecondSpin->setRange(6, 200);
-    mSecondSpin->setValue(64);
-    mSecondSpin->setFixedWidth(96);
-    mSecondSpin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    mSecondSpin->setToolTip(tr("第二层圆形遮罩半径（像素）：超出该值的区域再叠一层阴影，须大于阴影范围。"));
-    auto* secondLayout = new QGridLayout;
-    secondLayout->setHorizontalSpacing(8);
-    secondLayout->setContentsMargins(0, 0, 0, 0);
-    secondLayout->addWidget(mSecondSlider, 0, 0);
-    secondLayout->addWidget(mSecondSpin, 0, 1);
-    levelLayout->addLayout(secondLayout);
+    QSlider* featherSlider = nullptr;
+    addSliderRow(tr("边缘羽化："), 0, 50, 0,
+        tr("色调分离模式下色阶边界的过渡带宽（场值单位）：0=硬边赛璐璐，越大越软。平滑阴影模式下无效。"),
+        mFeatherSpin, featherSlider);
+    mFeatherSlider = featherSlider;
+
+    // ── 映射段参数（CSP 色调设置）──
+    auto* typeRow = new QGridLayout;
+    typeRow->setHorizontalSpacing(8);
+    typeRow->setContentsMargins(0, 0, 0, 0);
+    auto* typeLabel = new QLabel(tr("阴影类型："), this);
+    typeRow->addWidget(typeLabel, 0, 0);
+    mTypeCombo = new QComboBox(this);
+    mTypeCombo->addItem(tr("色调分离阴影"));
+    mTypeCombo->addItem(tr("平滑阴影"));
+    mTypeCombo->setToolTip(tr("色调分离=按阈值切分硬边色阶（赛璐璐）；平滑=色带连续渐变映射。"));
+    typeRow->addWidget(mTypeCombo, 0, 1);
+    mParamColumn->addLayout(typeRow);
+
+    mInvertCheck = new QCheckBox(tr("反转应用色阶的顺序"), this);
+    mInvertCheck->setToolTip(tr("色带 1↔4 镜像：光源换到另一侧时无需重调四组颜色。"));
+    connect(mInvertCheck, &QCheckBox::toggled, this, [this] { schedulePreview(); });
+    mParamColumn->addWidget(mInvertCheck);
+
+    // 色阶阈值：三游标切四阶（归一化场值 0..100）
+    auto* thresholdRow = new QGridLayout;
+    thresholdRow->setHorizontalSpacing(8);
+    thresholdRow->setContentsMargins(0, 0, 0, 0);
+    auto* thresholdLabel = new QLabel(tr("色阶阈值："), this);
+    thresholdLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    thresholdRow->addWidget(thresholdLabel, 0, 0);
+    const int thresholdDefaults[3] = { 20, 45, 80 };
+    for (int i = 0; i < 3; ++i)
+    {
+        mThresholdSpins[i] = new QSpinBox(this);
+        mThresholdSpins[i]->setRange(1, 100);
+        mThresholdSpins[i]->setValue(thresholdDefaults[i]);
+        mThresholdSpins[i]->setFixedWidth(64);
+        mThresholdSpins[i]->setToolTip(tr("光场值（0=离光源最近，100=最远）超过该阈值进入下一色阶。三个阈值须递增，乱序会就近收敛。"));
+        thresholdRow->addWidget(mThresholdSpins[i], 0, i + 1);
+        connect(mThresholdSpins[i], &QSpinBox::valueChanged, this, [this](int) { schedulePreview(); });
+    }
+    thresholdRow->setColumnStretch(4, 1);
+    mParamColumn->addLayout(thresholdRow);
+
+    // 色阶颜色：4 行，每行 独立色 + 独立混合模式
+    auto* levelBox = new QGroupBox(tr("色阶颜色（近光→背光）"), this);
+    auto* levelLayout = new QGridLayout(levelBox);
+    levelLayout->setHorizontalSpacing(8);
+    levelLayout->setVerticalSpacing(2);
+    const char* modeNames[3] = { "正常", "正片叠底", "线性加深" };
+    for (int i = 0; i < 4; ++i)
+    {
+        auto* levelLabel = new QLabel(tr("色阶 %1：").arg(i + 1), levelBox);
+        levelLayout->addWidget(levelLabel, i, 0);
+
+        mLevelButtons[i] = new QPushButton(levelBox);
+        mLevelButtons[i]->setAutoDefault(false);
+        mLevelButtons[i]->setToolTip(tr("该色阶的颜色。乘性混合下选越浅的颜色该阶越淡。"));
+        const int levelIndex = i;
+        connect(mLevelButtons[i], &QPushButton::clicked, this, [this, levelIndex] {
+            pickLevelColor(levelIndex);
+        });
+        levelLayout->addWidget(mLevelButtons[i], i, 1);
+        updateLevelButton(i);
+
+        mLevelCombos[i] = new QComboBox(levelBox);
+        for (const char* modeName : modeNames)
+            mLevelCombos[i]->addItem(tr(modeName));
+        mLevelCombos[i]->setCurrentIndex(static_cast<int>(mLevels[i].mode));
+        mLevelCombos[i]->setToolTip(tr("该色阶与原图的混合模式：正片叠底/线性加深=压暗保细节（CSP 常用），正常=直接换色。"));
+        connect(mLevelCombos[i], &QComboBox::currentIndexChanged, this, [this, levelIndex](const int index) {
+            mLevels[levelIndex].mode = static_cast<AutoShadowBlendMode>(index);
+            schedulePreview();
+        });
+        levelLayout->addWidget(mLevelCombos[i], i, 2);
+    }
+    levelLayout->setColumnStretch(1, 1);
     mParamColumn->addWidget(levelBox);
 
-    connect(mSecondSlider, &QSlider::valueChanged, this, [this](const int value) {
-        if (qRound(mSecondSpin->value()) != value)
-            mSecondSpin->setValue(value);
-    });
-    connect(mSecondSpin, &QDoubleSpinBox::valueChanged, this, [this](const double value) {
-        const int pos = qRound(value);
-        if (mSecondSlider->value() != pos)
-            mSecondSlider->setValue(pos);
-    });
-    const auto syncSecondEnabled = [this] {
-        const bool twoLevel = mTwoLevelRadio->isChecked();
-        mSecondLabel->setEnabled(twoLevel);
-        mSecondSlider->setEnabled(twoLevel);
-        mSecondSpin->setEnabled(twoLevel);
+    // 羽化只在色调分离模式下有意义
+    const auto syncFeatherEnabled = [this] {
+        const bool posterized = mTypeCombo->currentIndex() == 0;
+        mFeatherSpin->setEnabled(posterized);
+        mFeatherSlider->setEnabled(posterized);
     };
-    connect(mSingleLevelRadio, &QRadioButton::toggled, this, syncSecondEnabled);
-    connect(mTwoLevelRadio, &QRadioButton::toggled, this, syncSecondEnabled);
-    connect(mTwoLevelRadio, &QRadioButton::toggled, this, [this] { schedulePreview(); });
-    connect(mSecondSpin, &QDoubleSpinBox::valueChanged, this, [this](double) { schedulePreview(); });
-    syncSecondEnabled();
+    connect(mTypeCombo, &QComboBox::currentIndexChanged, this, [this, syncFeatherEnabled] {
+        syncFeatherEnabled();
+        schedulePreview();
+    });
+    syncFeatherEnabled();
 
-    // 作用范围
+    // ── 作用范围 ──
     auto* scopeBox = new QGroupBox(tr("作用范围"), this);
     auto* scopeLayout = new QVBoxLayout(scopeBox);
     mCurrentFrameRadio = new QRadioButton(tr("仅当前帧"), scopeBox);
@@ -203,12 +236,14 @@ AutoShadowParams AutoShadowDialog::params() const
     AutoShadowParams p;
     p.lightAngle = qRound(mAngleSpin->value());
     p.lightDistance = qRound(mDistanceSpin->value());
-    p.shadowRange = qRound(mRangeSpin->value());
-    p.blurRadius = qRound(mBlurSpin->value());
     p.displaceStrength = qRound(mDisplaceSpin->value());
-    p.secondLevelRange = mTwoLevelRadio->isChecked() ? qRound(mSecondSpin->value()) : 0;
-    p.shadowColor = mShadowColor;
-    p.shadowOpacity = qRound(mOpacitySpin->value());
+    for (int i = 0; i < 3; ++i)
+        p.thresholds[i] = mThresholdSpins[i]->value();
+    p.edgeFeather = qRound(mFeatherSpin->value());
+    p.smooth = mTypeCombo->currentIndex() == 1;
+    p.invertLevels = mInvertCheck->isChecked();
+    for (int i = 0; i < 4; ++i)
+        p.levels[i] = mLevels[i];
     return p;
 }
 
@@ -228,8 +263,9 @@ bool AutoShadowDialog::eventFilter(QObject* watched, QEvent* event)
     return QDialog::eventFilter(watched, event);
 }
 
-QDoubleSpinBox* AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
-                                               const int defV, const QString& tip)
+void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
+                                    const int defV, const QString& tip,
+                                    QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
 {
     auto* grid = new QGridLayout;
     grid->setHorizontalSpacing(8);
@@ -266,7 +302,27 @@ QDoubleSpinBox* AutoShadowDialog::addSliderRow(const QString& labelText, const i
             slider->setValue(pos);
     });
     connect(spin, &QDoubleSpinBox::valueChanged, this, [this](double) { schedulePreview(); });
-    return spin;
+    spinOut = spin;
+    sliderOut = slider;
+}
+
+void AutoShadowDialog::pickLevelColor(const int levelIndex)
+{
+    const QColor picked = QColorDialog::getColor(QColor(mLevels[levelIndex].color), this, tr("选择色阶颜色"));
+    if (picked.isValid())
+    {
+        mLevels[levelIndex].color = picked.rgb();
+        updateLevelButton(levelIndex);
+        schedulePreview();
+    }
+}
+
+void AutoShadowDialog::updateLevelButton(const int levelIndex)
+{
+    const QColor c(mLevels[levelIndex].color);
+    mLevelButtons[levelIndex]->setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid #888888;")
+                                                 .arg(c.name()));
+    mLevelButtons[levelIndex]->setText(c.name().toUpper());
 }
 
 void AutoShadowDialog::grabPreviewSource()
@@ -325,23 +381,4 @@ void AutoShadowDialog::renderPreview()
     QImage preview = mScaledSource; // COW 拷贝，apply 就地改写
     AutoShadow::apply(preview, scaledForPreview(params(), mPreviewScale));
     mPreviewLabel->setPixmap(QPixmap::fromImage(preview));
-}
-
-void AutoShadowDialog::pickShadowColor()
-{
-    const QColor picked = QColorDialog::getColor(QColor(mShadowColor), this, tr("选择阴影颜色"));
-    if (picked.isValid())
-    {
-        mShadowColor = picked.rgb();
-        updateColorButton();
-        schedulePreview();
-    }
-}
-
-void AutoShadowDialog::updateColorButton()
-{
-    const QColor c(mShadowColor);
-    mColorButton->setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid #888888;")
-                                    .arg(c.name()));
-    mColorButton->setText(c.name().toUpper());
 }

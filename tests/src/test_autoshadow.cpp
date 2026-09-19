@@ -47,35 +47,31 @@ void fillWhiteRect(QImage& img, const int x0, const int y0, const int x1, const 
     }
 }
 
-// 不透明白色圆盘
-void fillWhiteDisc(QImage& img, const double cx, const double cy, const double r)
-{
-    for (int y = static_cast<int>(cy - r) - 1; y <= static_cast<int>(cy + r) + 1; ++y)
-    {
-        if (y < 0 || y >= img.height())
-            continue;
-        QRgb* line = reinterpret_cast<QRgb*>(img.scanLine(y));
-        for (int x = static_cast<int>(cx - r) - 1; x <= static_cast<int>(cx + r) + 1; ++x)
-        {
-            if (x < 0 || x >= img.width())
-                continue;
-            const double dx = x - cx;
-            const double dy = y - cy;
-            if (dx * dx + dy * dy <= r * r)
-                line[x] = qRgb(255, 255, 255);
-        }
-    }
-}
-
-// 关闭模糊与置换的极端参数：黑影 100% 透明度，阴影像素=纯黑、其余=原样
-AutoShadowParams blackFullParams()
+// 极端参数基线：无置换、四阶全为白色正片叠底（= 全图不变）
+AutoShadowParams plainParams()
 {
     AutoShadowParams p;
-    p.shadowColor = qRgb(0, 0, 0);
-    p.shadowOpacity = 100;
-    p.blurRadius = 0;
     p.displaceStrength = 0;
+    for (int i = 0; i < 4; ++i)
+        p.levels[i] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
     return p;
+}
+
+// 远光（90°，5000px）竖条测试通用几何：条 x[10,19] y[10,89]，
+// 场值 v(y)≈y-10，内容最大场值≈79.002（底部外侧角），F=100·v/79.002≈1.2658·(y-10)
+AutoShadowParams farLightParams()
+{
+    AutoShadowParams p = plainParams();
+    p.lightAngle = 90;
+    p.lightDistance = 5000;
+    return p;
+}
+
+QImage farLightImage()
+{
+    QImage img = makeImage(30, 100);
+    fillWhiteRect(img, 10, 10, 19, 89);
+    return img;
 }
 
 } // namespace
@@ -93,142 +89,160 @@ TEST_CASE("AutoShadow-empty-image")
     REQUIRE(AutoShadow::apply(img, AutoShadowParams{}) == 0);
 }
 
-TEST_CASE("AutoShadow-far-light-hard-circle")
+TEST_CASE("AutoShadow-white-levels-noop")
 {
-    // 竖长白条 x[10,19] y[10,89]，远光正上方（90°，5000px）：羽化=0 的硬圆遮罩，
-    // 半径 = r0+范围，边界是以光源为圆心的圆弧：光轴两列（x=14/15）y=31 起入影，
-    // 外侧八列离光更远 y=30 即越阈 → 59 行整宽 + 第 30 行 8 像素
-    QImage img = makeImage(30, 100);
-    fillWhiteRect(img, 10, 10, 19, 89);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
-    p.shadowRange = 20;
-
-    const int changed = AutoShadow::apply(img, p);
-    REQUIRE(changed == 10 * 59 + 8);
-    REQUIRE(img.pixel(15, 15) == qRgb(255, 255, 255));   // 近光端：matte=1 露出原图
-    REQUIRE(img.pixel(15, 29) == qRgb(255, 255, 255));   // 阈值前一行
-    REQUIRE(img.pixel(15, 30) == qRgb(255, 255, 255));   // 光轴列：v=20-ε 恰在圆内
-    REQUIRE(img.pixel(10, 30) == qRgb(0, 0, 0));         // 外侧列：v=20+ε 已出圆（圆弧）
-    REQUIRE(img.pixel(15, 31) == qRgb(0, 0, 0));         // 光轴列第一行阴影
-    REQUIRE(img.pixel(15, 89) == qRgb(0, 0, 0));         // 远端
-    REQUIRE(img.pixel(5, 60) == 0);                      // 掩膜外透明像素不动（副本α裁回内容）
+    QImage img = farLightImage();
+    REQUIRE(AutoShadow::apply(img, farLightParams()) == 0); // 四阶全白正片叠底=无变化
 }
 
-TEST_CASE("AutoShadow-near-light-arc-boundary")
+TEST_CASE("AutoShadow-four-bands-posterized")
 {
-    // 方块 x[10,49] y[10,49]，近光右侧（0°，100px）：圆形遮罩弯成圆弧——
-    // 左边缘中点离光近（v≈39）、四角离光远（v≈40.5）：角部入影而中点仍受光
-    QImage img = makeImage(60, 60);
-    fillWhiteRect(img, 10, 10, 49, 49);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 0;
-    p.lightDistance = 100;
-    p.shadowRange = 40;
+    // 阈值[20,45,80]切四阶（硬边）：F≈1.2658·(y-10) → 边界 y≈25.8/45.6/73.2
+    // 阶1=白正片叠底(不变255) 阶2=黑正片叠底(0) 阶3=灰128正片叠底(128) 阶4=白线性加深(255)
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(255, 255, 255), AutoShadowBlendMode::LinearBurn };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(49, 30) == qRgb(255, 255, 255));   // 右边缘（r0 零点）
-    REQUIRE(img.pixel(10, 30) == qRgb(255, 255, 255));   // 左边缘中点：v≈39 < 40
-    REQUIRE(img.pixel(10, 11) == qRgb(0, 0, 0));         // 左上角：v≈40.4 ≥ 40
-    REQUIRE(img.pixel(10, 49) == qRgb(0, 0, 0));         // 左下角：v≈40.6 ≥ 40
+    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // F≈12.7 阶1
+    REQUIRE(img.pixel(15, 30) == qRgb(0, 0, 0));         // F≈25.3 阶2
+    REQUIRE(img.pixel(15, 60) == qRgb(128, 128, 128));   // F≈63.3 阶3
+    REQUIRE(img.pixel(15, 80) == qRgb(255, 255, 255));   // F≈88.6 阶4（线性加深+白=不变）
+    REQUIRE(img.pixel(5, 60) == 0);                      // 透明像素不动
+    const QRgb px = img.pixel(15, 30);
+    REQUIRE(qAlpha(px) == 255);                          // 乘性混合不动 α
 }
 
-TEST_CASE("AutoShadow-point-light-on-disc")
+TEST_CASE("AutoShadow-invert-level-order")
 {
-    // 圆盘 (40,30) r=12，点光右侧 200px：右缘是 r0 零点（露出原图），左半盘出圆入影
-    QImage img = makeImage(60, 60);
-    fillWhiteDisc(img, 40, 30, 12);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 0;
-    p.lightDistance = 200;
-    p.shadowRange = 10;
+    // 反转=色带 1↔4 镜像：阶1↔阶4、阶2↔阶3 互换
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(255, 255, 255), AutoShadowBlendMode::LinearBurn };
+    p.invertLevels = true;
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(52, 30) == qRgb(255, 255, 255));   // 右缘：v=0
-    REQUIRE(img.pixel(30, 30) == qRgb(0, 0, 0));         // 左侧：v=22 ≥ 10
+    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // 原》阶4→白线性加深
+    REQUIRE(img.pixel(15, 30) == qRgb(128, 128, 128));   // 原》阶3→灰128
+    REQUIRE(img.pixel(15, 60) == qRgb(0, 0, 0));         // 原》阶2→黑
+    REQUIRE(img.pixel(15, 80) == qRgb(255, 255, 255));   // 原》阶1→白正片叠底
 }
 
-TEST_CASE("AutoShadow-blur-feathers-boundary")
+TEST_CASE("AutoShadow-linear-burn-mode")
 {
-    // 宽白条 x[10,49] y[10,89]（宽度>3次盒式级联的有效核宽，中心模糊后仍实心 1），
-    // 远光上方，模糊 10 = 遮罩羽化宽：边界从硬切变成 smoothstep 过渡带（v∈[15,25]）
-    QImage img = makeImage(60, 100);
-    fillWhiteRect(img, 10, 10, 49, 89);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
-    p.shadowRange = 20;
-    p.blurRadius = 10;
+    // 阈值压到 [1,2,3]：除顶部一行外全落阶4；红色线性加深：白底 → 纯红
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.thresholds[0] = 1;
+    p.thresholds[1] = 2;
+    p.thresholds[2] = 3;
+    p.levels[3] = { qRgb(255, 0, 0), AutoShadowBlendMode::LinearBurn };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(30, 25) == qRgb(255, 255, 255));   // v=15：羽化带下沿内，全亮
-    const QRgb mid = img.pixel(30, 30);                  // v=20：羽化中点半影
-    REQUIRE(qRed(mid) >= 126);
-    REQUIRE(qRed(mid) <= 130);
-    REQUIRE(img.pixel(30, 35) == qRgb(0, 0, 0));         // v=25：羽化带上沿外，全影
-    REQUIRE(img.pixel(9, 50) == 0);                      // 轮廓外透明不动（模糊外扩不产生阴影）
+    REQUIRE(img.pixel(15, 10) == qRgb(255, 255, 255));   // F=0 阶1
+    REQUIRE(img.pixel(15, 50) == qRgb(255, 0, 0));       // 阶4：R 255+255-255，G/B 255+0-255=0
 }
 
-TEST_CASE("AutoShadow-displace-warps-boundary")
+TEST_CASE("AutoShadow-normal-mode")
 {
-    // 宽白条 x[10,39] y[10,89]，远光上方，范围 40（无置换时边界约在 v=40）。
-    // 置换贴图=原图亮度：全白 → off=+8，遮罩采样点向右下偏移——
-    // (22,45) 的采样点 (30,53) 已出圆（v≈43），matte≈0 → 提前入影
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.thresholds[0] = 1;
+    p.thresholds[1] = 2;
+    p.thresholds[2] = 3;
+    p.levels[3] = { qRgb(0, 255, 0), AutoShadowBlendMode::Normal };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 50) == qRgb(0, 255, 0));       // 正常=直通色替换
+    REQUIRE(qAlpha(img.pixel(15, 50)) == 255);           // α 仍不动
+}
+
+TEST_CASE("AutoShadow-smooth-gradient")
+{
+    // 平滑=连续梯度映射：s1=F/t1 线性、段内线性插值；阶4=灰64正片叠底(→64)
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.smooth = true;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 10) == qRgb(255, 255, 255));   // F=0 → 纯阶1
+    const int r20 = qRed(img.pixel(15, 20));             // F≈12.66：w1=1-F/20 → ≈94
+    REQUIRE(r20 >= 92);
+    REQUIRE(r20 <= 96);
+    const int r35 = qRed(img.pixel(15, 35));             // F≈31.64：段[t1,t2]插值黑→128 ≈60
+    REQUIRE(r35 >= 58);
+    REQUIRE(r35 <= 62);
+    REQUIRE(img.pixel(15, 89) == qRgb(64, 64, 64));      // 条底行 F≈100 → 纯阶4
+}
+
+TEST_CASE("AutoShadow-edge-feather")
+{
+    // 羽化 20（场值）：t1 两侧 [t1-10, t1+10]=[10,30] smoothstep 过渡
+    QImage img = farLightImage();
+    AutoShadowParams p = farLightParams();
+    p.edgeFeather = 20;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 15) == qRgb(255, 255, 255));   // F≈6.3：过渡带外
+    const int r20 = qRed(img.pixel(15, 20));             // F≈12.7：带内浅影 ≈243
+    REQUIRE(r20 >= 240);
+    REQUIRE(r20 <= 246);
+    const int r = qRed(img.pixel(15, 26));               // F≈20.25 ≈ 阈值中心 → ≈123
+    REQUIRE(r >= 121);
+    REQUIRE(r <= 125);
+    REQUIRE(img.pixel(15, 35) == qRgb(0, 0, 0));         // F≈31.6：过渡带外全黑
+}
+
+TEST_CASE("AutoShadow-displace-warps-field")
+{
+    // 宽白条 x[10,39]，置换=按原图亮度偏移场采样：全白 off=+8 向右下采样——
+    // (22,45) 原场值 F≈44.3（阶2 黑）；采样点 (30,53) 场值 F≈54.4（阶3 灰128）
     QImage plain = makeImage(50, 100);
     fillWhiteRect(plain, 10, 10, 39, 89);
     QImage displaced = plain;
 
-    AutoShadowParams p = blackFullParams();
+    AutoShadowParams p = plainParams();
     p.lightAngle = 90;
     p.lightDistance = 5000;
-    p.shadowRange = 40;
-    p.blurRadius = 8;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
 
-    AutoShadow::apply(plain, p);                          // 对照：无置换
-    REQUIRE(plain.pixel(22, 45) == qRgb(255, 255, 255)); // v≈35：圆内
+    AutoShadow::apply(plain, p);
+    REQUIRE(plain.pixel(22, 45) == qRgb(0, 0, 0));       // 对照：无置换落阶2
 
     p.displaceStrength = 8;
     REQUIRE(AutoShadow::apply(displaced, p) > 0);
-    REQUIRE(qRed(displaced.pixel(22, 45)) < 32);         // 采样偏移后 matte≈0：提前入影
+    REQUIRE(displaced.pixel(22, 45) == qRgb(128, 128, 128)); // 采样偏移后落阶3
 }
 
-TEST_CASE("AutoShadow-two-levels")
+TEST_CASE("AutoShadow-near-light-arc-boundary")
 {
-    // 两圈遮罩同色叠加：单圈 a=0.4 → 153；双圈 1-(1-0.4)^2=0.64 → 255×0.36=92
-    QImage img = makeImage(30, 100);
-    fillWhiteRect(img, 10, 10, 19, 89);
+    // 方块 x[10,49] y[10,49]，近光右侧（0°，100px）：场弯成圆弧——
+    // 左边缘中点 F≈96.1、四角 F≈99.6：阈值取 [96,97,98] 后分属不同色阶（平行光下不可能）
+    QImage img = makeImage(60, 60);
+    fillWhiteRect(img, 10, 10, 49, 49);
 
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
-    p.shadowRange = 15;
-    p.secondLevelRange = 50;
-    p.shadowOpacity = 40;
+    AutoShadowParams p = plainParams();
+    p.lightAngle = 0;
+    p.lightDistance = 100;
+    p.thresholds[0] = 96;
+    p.thresholds[1] = 97;
+    p.thresholds[2] = 98;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // v≈10 < 15：两圈圆内全露原图
-    REQUIRE(img.pixel(15, 30) == qRgb(153, 153, 153));   // 第一圈外、第二圈内：单层
-    REQUIRE(img.pixel(15, 70) == qRgb(92, 92, 92));      // 两圈之外：叠加 0.64
-}
-
-TEST_CASE("AutoShadow-alpha-preserved")
-{
-    QImage img = makeImage(30, 100);
-    fillWhiteRect(img, 10, 10, 19, 89);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
-    p.shadowRange = 20;
-    p.shadowOpacity = 50;
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    const QRgb px = img.pixel(15, 60);
-    REQUIRE(qAlpha(px) == 255);                          // over 合成到不透明底：α 恒不透明
-    REQUIRE(qRed(px) == 128);                            // 0×0.5+255×0.5=127.5→qRound=128
+    REQUIRE(img.pixel(49, 30) == qRgb(255, 255, 255));   // 右边缘：F≈0 阶1
+    REQUIRE(img.pixel(10, 30) == qRgb(0, 0, 0));         // 左边缘中点：F≈96.1 落 [96,97) 阶2
+    REQUIRE(img.pixel(10, 11) == qRgb(64, 64, 64));      // 左上角：F≈99.6 ≥98 阶4
+    REQUIRE(img.pixel(10, 49) == qRgb(64, 64, 64));      // 左下角同
 }

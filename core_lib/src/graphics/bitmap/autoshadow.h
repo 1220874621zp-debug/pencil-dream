@@ -25,33 +25,54 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 class QImage;
 
+/** 色阶混合模式（对原图做乘性/替换式混合，CSP 自动阴影同款语义） */
+enum class AutoShadowBlendMode
+{
+    Normal,      // 正常：直通色按该像素 α 替换
+    Multiply,    // 正片叠底：c·s/255，压暗保细节
+    LinearBurn,  // 线性加深：c+s−255，比正片叠底更沉
+};
+
+/** 一个色阶：独立颜色 + 独立混合模式 */
+struct AutoShadowLevel
+{
+    QRgb color = qRgb(255, 255, 255);
+    AutoShadowBlendMode mode = AutoShadowBlendMode::Multiply;
+};
+
 struct AutoShadowParams
 {
     int lightAngle = 135;                     // 0..359 光源方向角（数学角、逆时针：0=右 90=上 135=左上 270=下）
-    int lightDistance = 600;                  // 光源到内容中心的像素距离：近=圆形遮罩弯度高，远=接近平直
-    int shadowRange = 40;                     // 圆形遮罩半径（以内容最近点为 0）：到光源超出该值开始出现阴影（px）
-    int blurRadius = 12;                      // 高斯模糊半径：副本轮廓与遮罩边界的羽化（px）
-    int displaceStrength = 8;                 // 置换强度：按原图亮度置换遮罩采样点，边界贴合线稿起伏（px）
-    int secondLevelRange = 0;                 // 第二层遮罩半径（px），0 = 单层；>0 时须大于 shadowRange
-    QRgb shadowColor = qRgb(150, 130, 200);   // 填充用的阴影色
-    int shadowOpacity = 45;                   // 0..100 阴影层透明度
+    int lightDistance = 600;                  // 光源到内容中心的像素距离：近=场弯成圆弧，远=接近平直
+    int displaceStrength = 8;                 // 置换强度：按原图亮度置换场采样点，色阶边界贴合线稿起伏（px）
+    int thresholds[3] = { 20, 45, 80 };       // 色阶阈值：归一化场值 0..100，递增，切出 4 个色阶
+    int edgeFeather = 0;                      // 色调分离模式下阈值过渡带宽（场值单位），0=硬边
+    bool smooth = false;                      // false=色调分离阴影（分阶），true=平滑阴影（连续梯度映射）
+    bool invertLevels = false;                // 反转应用色阶的顺序（色带 1↔4 镜像）
+    // 默认色带：受光暖黄→橙→洋红→背光蓝紫（CSP 截图同款暖到冷序列）
+    AutoShadowLevel levels[4] = {
+        { qRgb(255, 244, 186), AutoShadowBlendMode::Multiply },
+        { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply },
+        { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn },
+        { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply },
+    };
 };
 
-/** 自动上阴影：按 AE 合成语义实现（底层=原图，上层=阴影副本，五步效果链）。
+/** 自动上阴影：CSP「自动阴影」参数模型的两段式实现。
 
- * 流程（AE 语义 → C++）：
- *  1. 复制输入源 + 填充阴影色 + 降低透明度：副本颜色恒为 S、透明度 O，
- *     且保留原图 α（轨道遮罩翻转后阴影只落在内容上，不出轮廓）。
- *  2. 高斯模糊：对副本 α 场做 3 次盒式模糊（近似高斯，O(N) 与半径无关），
- *     轮廓外扩羽化；随后圆形遮罩的羽化宽度也取该半径。
- *  3. 圆形遮罩（add 相交）：以光源点为圆心、r0+shadowRange 为半径（r0=内容上
- *     离光源最近点的距离），smoothstep 羽化；圆内 matte=1（露出底下的原图）、
- *     圆外 matte=0。光源近则边界弯成圆弧、远则接近平直。
- *  4. 置换贴图（贴图=原图亮度）：M'(p) = M(p + 强度×(亮度−0.5)×2)，双轴同强度、
- *     双线性采样；阴影边界随线稿明暗起伏，不再是完美几何圆。
- *  5. 轨道遮罩翻转：阴影 α = α原图×O×(1−M')——matte 空处（远光侧）显阴影色，
- *     matte 实处露出底下的原图；双层=两圈遮罩 a=1−(1−a1)(1−a2)；
- *     最后以普通 over（填充+透明度的合成语义）叠回原图：α 不降、透明像素不动。
+ * ── 场生成段（径向渐变充当光源）──
+ *  1. 光场 g(p) = p 到光源点的距离 − r0（r0=内容上离光源最近点，归零起步），
+ *     按内容最大场值归一化到 0..100（阈值与画幅/角色大小无关）。
+ *  2. 置换贴图（贴图=原图亮度）：F(p) = g(p + 强度×(亮度−0.5)×2)，双轴等强度、
+ *     双线性采样；色阶边界随线稿明暗起伏。场在全图有定义，置换无越界漏光问题。
+ *
+ * ── 映射段（CSP 色调设置）──
+ *  3. 阈值 [t1,t2,t3] 把场切成 4 个色阶；每阶独立颜色+混合模式（正常/正片叠底/
+ *     线性加深），反转=色带镜像（1↔4）。
+ *  4. 权重统一框架：色调分离=阶跃权重（edgeFeather>0 时阈值两侧 smoothstep 过渡）；
+ *     平滑=相邻色阶间分段线性插值（连续梯度映射）。out = Σ wᵢ·blend(原图, 色阶ᵢ)，
+ *     混合按各阶模式独立计算后按权重混合，模式不同也能连续过渡。
+ *  5. 只作用于不透明内容像素（α≥16），α 不变，透明像素不动。
  *
  * img 原地修改，须为 Format_ARGB32_Premultiplied。
  * 返回被修改的像素数（0 = 无变化）。

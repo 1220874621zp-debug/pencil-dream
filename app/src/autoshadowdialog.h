@@ -27,16 +27,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "autoshadow.h"
 
+class QCheckBox;
+class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
 class QRadioButton;
 class QSlider;
+class QSpinBox;
 class QTimer;
 class QVBoxLayout;
 class Editor;
 
-/** 自动上阴影参数对话框：左参数右预览（当前位图帧实时预览，点击预览切原图对比） */
+/** 自动上阴影参数对话框（CSP 参数模型）：左参数右预览。
+    光源/置换控制场生成段；阈值/类型/色阶控制映射段（4 阶独立色+混合模式）。 */
 class AutoShadowDialog : public QDialog
 {
     Q_OBJECT
@@ -50,30 +54,29 @@ public:
     bool applyToAllKeyFrames() const;
 
 private:
-    void pickShadowColor();
-    void updateColorButton();
-    QDoubleSpinBox* addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip);
-
+    void addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip,
+                      QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
+    void pickLevelColor(const int levelIndex);
+    void updateLevelButton(const int levelIndex);
     void grabPreviewSource();
     void schedulePreview();
     void renderPreview();
 
-    QPushButton* mColorButton = nullptr;
+    QVBoxLayout* mParamColumn = nullptr;
+
     QDoubleSpinBox* mAngleSpin = nullptr;
     QDoubleSpinBox* mDistanceSpin = nullptr;
-    QDoubleSpinBox* mRangeSpin = nullptr;
-    QDoubleSpinBox* mBlurSpin = nullptr;
     QDoubleSpinBox* mDisplaceSpin = nullptr;
-    QRadioButton* mSingleLevelRadio = nullptr;
-    QRadioButton* mTwoLevelRadio = nullptr;
-    QLabel* mSecondLabel = nullptr;
-    QSlider* mSecondSlider = nullptr;
-    QDoubleSpinBox* mSecondSpin = nullptr;
-    QDoubleSpinBox* mOpacitySpin = nullptr;
+    QDoubleSpinBox* mFeatherSpin = nullptr;
+    QSlider* mFeatherSlider = nullptr;
+    QComboBox* mTypeCombo = nullptr;
+    QCheckBox* mInvertCheck = nullptr;
+    QSpinBox* mThresholdSpins[3] = { nullptr, nullptr, nullptr };
+    QPushButton* mLevelButtons[4] = { nullptr, nullptr, nullptr, nullptr };
+    QComboBox* mLevelCombos[4] = { nullptr, nullptr, nullptr, nullptr };
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
 
-    QVBoxLayout* mParamColumn = nullptr;
     QLabel* mPreviewLabel = nullptr;
     QTimer* mPreviewTimer = nullptr;
     Editor* mEditor = nullptr;
@@ -81,7 +84,7 @@ private:
     double mPreviewScale = 1.0;  // 预览缩放比：像素参数按此同比后预览才与实跑一致
     bool mPreviewOriginal = false;
 
-    QRgb mShadowColor = qRgb(150, 130, 200);
+    AutoShadowLevel mLevels[4];  // 色阶 1..4（颜色+混合模式）
 };
 
 #endif // AUTOSHADOWDIALOG_H
