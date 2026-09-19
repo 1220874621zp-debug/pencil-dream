@@ -1234,9 +1234,13 @@ void MainWindow2::dropEvent(QDropEvent* event)
     if (importConfig.positionType == ImportImageConfig::CenterOfCamera)
         importConfig.importFrame = mEditor->currentFrame();
 
+    // 每张图自动新建一层容纳（层名=文件名）；importBitmapImage 内部会 scrubTo(+1)，
+    // 钉回拖入帧让多张图都落在同一帧上
+    const int dropFrame = mEditor->currentFrame();
     bool anyImported = false;
     for (const QString& path : imageFiles)
     {
+        mEditor->layers()->createBitmapLayer(QFileInfo(path).completeBaseName());
         Status st = mEditor->importImage(path, importConfig);
         if (!st.ok())
         {
@@ -1245,6 +1249,7 @@ void MainWindow2::dropEvent(QDropEvent* event)
             break;
         }
         anyImported = true;
+        mEditor->scrubTo(dropFrame);
     }
 
     // 图片落进画布后直接切到变形工具，方便立即拖拽摆放（导入失败时不切）
