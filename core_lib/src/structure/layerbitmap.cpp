@@ -19,6 +19,7 @@ GNU General Public License for more details.
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <algorithm>
 #include "keyframe.h"
 #include "bitmapimage.h"
 #include "util/util.h"
@@ -61,6 +62,21 @@ QRect LayerBitmap::getFrameBounds(int frame)
     BitmapImage* image = getBitmapImageAtFrame(frame);
     Q_ASSERT(image);
     return image->bounds();
+}
+
+std::vector<int> LayerBitmap::instanceGroupPositions(int keyPos) const
+{
+    KeyFrame* key = getKeyFrameAt(keyPos);
+    if (key == nullptr) { return {}; }
+
+    BitmapImage* bitmap = static_cast<BitmapImage*>(key);
+    std::vector<int> positions;
+    for (BitmapImage* member : bitmap->instanceMembers())
+    {
+        positions.push_back(member->pos());
+    }
+    std::sort(positions.begin(), positions.end());
+    return positions;
 }
 
 void LayerBitmap::loadImageAtFrame(QString path, QPoint topLeft, int frameNumber, qreal opacity)
@@ -186,6 +202,11 @@ QDomElement LayerBitmap::createDomElement(QDomDocument& doc) const
 {
     QDomElement layerElem = createBaseDomElement(doc);
 
+    // 实例组编号：同一次遍历内按共享块身份现场分配（跨会话不要求稳定，
+    // 载入侧只按属性值分组归并）
+    QHash<const void*, int> instanceGroupIds;
+    int nextInstanceId = 0;
+
     foreachKeyFrame([&](KeyFrame* pKeyFrame)
     {
         BitmapImage* pImg = static_cast<BitmapImage*>(pKeyFrame);
@@ -196,6 +217,15 @@ QDomElement LayerBitmap::createDomElement(QDomDocument& doc) const
         imageTag.setAttribute("topLeftX", pImg->topLeft().x());
         imageTag.setAttribute("topLeftY", pImg->topLeft().y());
         imageTag.setAttribute("opacity", pImg->getOpacity());
+        if (pImg->isInstanceShared())
+        {
+            const void* groupId = pImg->sharedDataId();
+            if (!instanceGroupIds.contains(groupId))
+            {
+                instanceGroupIds.insert(groupId, ++nextInstanceId);
+            }
+            imageTag.setAttribute("instance", instanceGroupIds.value(groupId));
+        }
         if (pKeyFrame->isLengthExplicit())
         {
             imageTag.setAttribute("length", pKeyFrame->length());
@@ -218,6 +248,9 @@ void LayerBitmap::loadDomElement(const QDomElement& element, QString dataDirPath
 {
     this->loadBaseDomElement(element);
 
+    // pos -> instance 组号（同组帧载入后归并回同一共享块，恢复全组同步）
+    QHash<int, int> instanceGroupByPos;
+
     QDomNode imageTag = element.firstChild();
     while (!imageTag.isNull())
     {
@@ -232,6 +265,11 @@ void LayerBitmap::loadDomElement(const QDomElement& element, QString dataDirPath
                 int y = imageElement.attribute("topLeftY").toInt();
                 qreal opacity = imageElement.attribute("opacity", "1.0").toDouble();
                 loadImageAtFrame(path, QPoint(x, y), position, opacity);
+
+                if (imageElement.hasAttribute("instance"))
+                {
+                    instanceGroupByPos.insert(position, imageElement.attribute("instance").toInt());
+                }
 
                 if (imageElement.hasAttribute("length"))
                 {
@@ -257,5 +295,28 @@ void LayerBitmap::loadDomElement(const QDomElement& element, QString dataDirPath
             progressStep();
         }
         imageTag = imageTag.nextSibling();
+    }
+
+    // 实例组归并：每组首个成员的共享块作为组块，其余成员重绑过去
+    // （各成员文件本就是同一内容的多份拷贝，取首个即正确）
+    if (!instanceGroupByPos.isEmpty())
+    {
+        QHash<int, BitmapImage*> firstOfGroup;
+        for (auto it = instanceGroupByPos.constBegin(); it != instanceGroupByPos.constEnd(); ++it)
+        {
+            BitmapImage* member = getBitmapImageAtFrame(it.key());
+            if (member == nullptr) { continue; }
+
+            const int groupId = it.value();
+            BitmapImage* first = firstOfGroup.value(groupId, nullptr);
+            if (first == nullptr)
+            {
+                firstOfGroup.insert(groupId, member);
+            }
+            else
+            {
+                member->shareDataFrom(first);
+            }
+        }
     }
 }

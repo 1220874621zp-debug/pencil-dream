@@ -147,6 +147,30 @@ private:
     BitmapImage redoBitmap;
 };
 
+/** 解除实例帧：像素不变、只断开共享块。BitmapReplaceCommand 的写穿回放
+ *  恢复不了共享关系，故用专用命令——undo 经撤销锚点成员找回原共享块重绑。 */
+class BreakInstanceCommand : public UndoRedoCommand
+{
+
+public:
+    BreakInstanceCommand(const int layerId,
+                  const int framePos,
+                  const int siblingAnchorPos,
+                  const QString& description,
+                  Editor* editor,
+                  QUndoCommand* parent = nullptr);
+
+    void undo() override;
+    void redo() override;
+
+private:
+    int mLayerId = 0;
+    int mFramePos = 0;
+    /** 解除时刻组内另一成员的位置：undo 时它持有原共享块（撤销栈 LIFO 保证
+     *  归位时它已恢复为共享成员），经它重绑即恢复整组链。 */
+    int mSiblingAnchorPos = -1;
+};
+
 class TransformCommand : public UndoRedoCommand
 
 {

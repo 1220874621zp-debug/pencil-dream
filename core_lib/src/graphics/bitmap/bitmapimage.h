@@ -46,6 +46,32 @@ public:
 
     BitmapImage* clone() const override;
 
+    /** 实例帧（Instance）：新建一个与本帧共用同一共享数据块的壳。
+     *  之后任一成员的内容/边界修改全组同步；曝光长度、透明度等帧级属性各自独立。 */
+    BitmapImage* createInstance();
+
+    /** 解除实例：深拷贝一份自己的共享块，此后与本组其它成员互不影响（像素不变）。 */
+    void breakInstance();
+
+    /** 让本帧改用 source 的共享块（载入归并恢复实例链、解除实例撤销用）。 */
+    void shareDataFrom(BitmapImage* source);
+
+    /** 是否与其它帧共用共享块（实例组成员数 >= 2）。 */
+    bool isInstanceShared() const { return d->owners.size() > 1; }
+
+    bool sharesDataWith(const BitmapImage* other) const { return d == other->d; }
+
+    /** 同组全部成员（含自身）。返回拷贝，调用方持有期间组结构不变即可信。 */
+    std::vector<BitmapImage*> instanceMembers() const { return d->owners; }
+
+    /** 共享块标识（仅用于同一次遍历内分组比较，无持久含义）。 */
+    const void* sharedDataId() const { return d.get(); }
+
+    /** 置脏广播到实例组全体成员：存盘按帧跳过未修改帧（needSaveFrame），
+     *  若只置被编辑帧，其它成员的文件保持陈旧内容，重开工程即丢编辑。 */
+    void modification() override;
+    void setModified(bool b) override;
+
     /** Loads the backing image data from disk and into memory if it exists but hasn't been loaded yet */
     void loadFile() override;
 
@@ -189,7 +215,7 @@ protected:
 private:
     /** 帧图像数据共享块。普通帧独占一块；实例帧（Instance）由 createInstance()
      *  建链后多个壳共用同一块——内容与边界写穿共享块即全组同步。
-     *  拷贝构造/赋值恒为深拷贝语义，共享只经 createInstance() 建立，
+     *  拷贝构造/赋值恒为深拷贝语义，共享只经 createInstance()/shareDataFrom() 建立，
      *  否则撤销快照（BitmapReplaceCommand 按值持有）会被别名破坏。 */
     struct SharedData
     {
@@ -198,10 +224,26 @@ private:
 
         /** @see isMinimallyBounded() */
         bool minBound = true;
+
+        /** 同组成员登记簿（含自身）。置脏广播与实例归属判断的事实源；
+         *  由壳的构造/析构/重绑维护，不参与拷贝语义。 */
+        std::vector<BitmapImage*> owners;
+
+        SharedData() = default;
+        SharedData(const SharedData& o) : image(o.image), bounds(o.bounds), minBound(o.minBound) {}
+        SharedData& operator=(const SharedData& o)
+        {
+            if (this != &o) { image = o.image; bounds = o.bounds; minBound = o.minBound; }
+            return *this;
+        }
     };
     std::shared_ptr<SharedData> d = std::make_shared<SharedData>();
 
     bool mEnableAutoCrop = false;
+
+    void registerOwner();
+    void unregisterOwner();
+    void rebindSharedData(std::shared_ptr<SharedData> newData);
 
     const int LOW_THRESHOLD = 30; // threshold for images to be given transparency
     const int COLORDIFF = 5;      // difference in color values to decide color

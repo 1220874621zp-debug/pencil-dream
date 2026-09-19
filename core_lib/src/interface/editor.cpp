@@ -905,6 +905,61 @@ KeyFrame* Editor::addKeyFrame(const int layerNumber, int frameIndex)
     return newFrame;
 }
 
+KeyFrame* Editor::createFrameInstance(Layer* layer, int sourcePos, int targetPos)
+{
+    if (layer == nullptr || layer->type() != Layer::BITMAP) { return nullptr; }
+
+    if (!layer->visible())
+    {
+        mScribbleArea->showLayerNotVisibleWarning();
+        return nullptr;
+    }
+    if (layer->locked())
+    {
+        mScribbleArea->showLayerLockedWarning();
+        return nullptr;
+    }
+
+    KeyFrame* sourceKey = layer->getKeyFrameAt(sourcePos);
+    if (sourceKey == nullptr) { return nullptr; }
+    auto source = dynamic_cast<BitmapImage*>(sourceKey);
+    if (source == nullptr) { return nullptr; }
+
+    // 首版只落在空位：目标被占由调用方提示，不做推挤
+    if (layer->keyExists(targetPos)) { return nullptr; }
+
+    beginLayerLayoutEdit(layer);
+    BitmapImage* instance = source->createInstance();
+    instance->setPos(targetPos);
+    layer->addKeyFrame(targetPos, instance);
+    endLayerLayoutEdit(tr("创建实例"));
+
+    scrubTo(targetPos);
+    emit frameModified(targetPos);
+    layers()->notifyAnimationLengthChanged();
+    return instance;
+}
+
+void Editor::breakFrameInstance(Layer* layer, int position)
+{
+    if (layer == nullptr || layer->type() != Layer::BITMAP) { return; }
+
+    auto frame = dynamic_cast<BitmapImage*>(layer->getKeyFrameAt(position));
+    if (frame == nullptr || !frame->isInstanceShared()) { return; }
+
+    // 撤销锚点：组内任一其它成员（撤销栈 LIFO 保证 undo 时它持有原共享块）
+    int anchorPos = -1;
+    for (BitmapImage* member : frame->instanceMembers())
+    {
+        if (member != frame) { anchorPos = member->pos(); break; }
+    }
+
+    frame->breakInstance();
+    undoRedo()->pushUndoCommand(
+        new BreakInstanceCommand(layer->id(), position, anchorPos, tr("解除实例"), this));
+    emit frameModified(position);
+}
+
 void Editor::removeKey()
 {
     Layer* layer = layers()->currentLayer();

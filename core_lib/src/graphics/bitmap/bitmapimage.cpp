@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include <QFileInfo>
 #include <QImageWriter>
 #include <QPainterPath>
+#include <algorithm>
 #include "util.h"
 
 #include "blitrect.h"
@@ -30,6 +31,7 @@ GNU General Public License for more details.
 
 BitmapImage::BitmapImage()
 {
+    registerOwner();
 }
 
 BitmapImage::BitmapImage(const BitmapImage& a) : KeyFrame(a)
@@ -37,6 +39,7 @@ BitmapImage::BitmapImage(const BitmapImage& a) : KeyFrame(a)
     mEnableAutoCrop = a.mEnableAutoCrop;
     mOpacity = a.mOpacity;
     d = std::make_shared<SharedData>(*a.d); // 深拷贝共享块（QImage 内部 COW 与旧行为一致）
+    registerOwner();
 }
 
 BitmapImage::BitmapImage(const QRect& rectangle, const QColor& color)
@@ -45,6 +48,7 @@ BitmapImage::BitmapImage(const QRect& rectangle, const QColor& color)
     d->image = QImage(d->bounds.size(), QImage::Format_ARGB32_Premultiplied);
     d->image.fill(color.rgba());
     d->minBound = false;
+    registerOwner();
 }
 
 BitmapImage::BitmapImage(const QPoint& topLeft, const QImage& image)
@@ -52,6 +56,7 @@ BitmapImage::BitmapImage(const QPoint& topLeft, const QImage& image)
     d->bounds = QRect(topLeft, image.size());
     d->minBound = true;
     d->image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    registerOwner();
 }
 
 BitmapImage::BitmapImage(const QPoint& topLeft, const QString& path)
@@ -62,10 +67,75 @@ BitmapImage::BitmapImage(const QPoint& topLeft, const QString& path)
     d->bounds = QRect(topLeft, QSize(-1, 0));
     d->minBound = true;
     setModified(false);
+    registerOwner();
 }
 
 BitmapImage::~BitmapImage()
 {
+    unregisterOwner();
+}
+
+void BitmapImage::registerOwner()
+{
+    d->owners.push_back(this);
+}
+
+void BitmapImage::unregisterOwner()
+{
+    auto& owners = d->owners;
+    owners.erase(std::remove(owners.begin(), owners.end(), this), owners.end());
+}
+
+void BitmapImage::rebindSharedData(std::shared_ptr<SharedData> newData)
+{
+    unregisterOwner();
+    d = std::move(newData);
+    registerOwner();
+}
+
+BitmapImage* BitmapImage::createInstance()
+{
+    BitmapImage* instance = new BitmapImage();
+    instance->mEnableAutoCrop = mEnableAutoCrop;
+    instance->mOpacity = mOpacity;
+    instance->setPos(pos());
+    instance->rebindSharedData(d);
+    return instance;
+}
+
+void BitmapImage::breakInstance()
+{
+    if (!isInstanceShared()) { return; }
+    rebindSharedData(std::make_shared<SharedData>(*d));
+    modification();
+}
+
+void BitmapImage::shareDataFrom(BitmapImage* source)
+{
+    Q_ASSERT(source != nullptr);
+    if (source == this || d == source->d) { return; }
+    rebindSharedData(source->d);
+}
+
+void BitmapImage::modification()
+{
+    setModified(true);
+}
+
+void BitmapImage::setModified(bool b)
+{
+    if (!b)
+    {
+        // 存盘成功后逐帧清脏（saveKeyFrameFile 各自调），不广播：
+        // 广播 false 会把尚未落盘的成员也标成已存，编辑丢失
+        KeyFrame::setModified(false);
+        return;
+    }
+    // 置脏广播全组（见头文件说明）；显式限定基类实现防递归
+    for (BitmapImage* owner : d->owners)
+    {
+        owner->KeyFrame::setModified(true);
+    }
 }
 
 void BitmapImage::setImage(QImage* img)

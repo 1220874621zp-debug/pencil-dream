@@ -412,3 +412,60 @@ void ConvertLayerCommand::redo()
     mNewAttached = true;
     refreshUi();
 }
+
+BreakInstanceCommand::BreakInstanceCommand(const int layerId,
+                                           const int framePos,
+                                           const int siblingAnchorPos,
+                                           const QString& description,
+                                           Editor* editor,
+                                           QUndoCommand* parent)
+    : UndoRedoCommand(editor, parent)
+    , mLayerId(layerId)
+    , mFramePos(framePos)
+    , mSiblingAnchorPos(siblingAnchorPos)
+{
+    setText(description);
+}
+
+void BreakInstanceCommand::undo()
+{
+    Layer* layer = editor()->layers()->findLayerById(mLayerId);
+    if (!layer) {
+        return setObsolete(true);
+    }
+
+    UndoRedoCommand::undo();
+
+    BitmapImage* frame = static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(mFramePos);
+    BitmapImage* anchor = (mSiblingAnchorPos >= 0)
+            ? static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(mSiblingAnchorPos)
+            : nullptr;
+    if (frame != nullptr && anchor != nullptr && anchor != frame)
+    {
+        frame->shareDataFrom(anchor);
+    }
+    // 找不到锚点（异常状态）：保持独立帧，像素本就一致，最多损失链关系
+
+    editor()->scrubTo(mFramePos);
+}
+
+void BreakInstanceCommand::redo()
+{
+    Layer* layer = editor()->layers()->findLayerById(mLayerId);
+    if (!layer) {
+        return setObsolete(true);
+    }
+
+    UndoRedoCommand::redo();
+
+    // 忽略入栈时的自动首次 redo（断链已在命令构造前由调用方完成）
+    if (isFirstRedo()) { setFirstRedo(false); return; }
+
+    BitmapImage* frame = static_cast<LayerBitmap*>(layer)->getBitmapImageAtFrame(mFramePos);
+    if (frame != nullptr)
+    {
+        frame->breakInstance();
+    }
+
+    editor()->scrubTo(mFramePos);
+}

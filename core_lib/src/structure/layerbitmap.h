@@ -41,6 +41,10 @@ public:
     void repositionFrame(QPoint point, int frame);
     QRect getFrameBounds(int frame);
 
+    /** keyPos 处关键帧所属实例组的全部成员位置（升序，含自身）。
+     *  非实例帧返回 { keyPos }；无帧返回空。 */
+    std::vector<int> instanceGroupPositions(int keyPos) const;
+
 protected:
     Status saveKeyFrameFile(KeyFrame*, QString strPath) override;
     KeyFrame* createKeyFrame(int position) override;

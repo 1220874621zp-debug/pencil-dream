@@ -437,3 +437,105 @@ TEST_CASE("BitmapImage autoCrop performance")
         REQUIRE(b->height() == 901);
     }
 }
+
+TEST_CASE("BitmapImage instance sharing")
+{
+    SECTION("createInstance shares data and edits propagate")
+    {
+        BitmapImage source(QRect(0, 0, 20, 20), Qt::transparent);
+        source.setPos(1);
+        source.setPixel(5, 5, qRgb(255, 0, 0));
+
+        BitmapImage* instance = source.createInstance();
+        instance->setPos(30);
+
+        REQUIRE(source.sharesDataWith(instance));
+        REQUIRE(source.isInstanceShared());
+        REQUIRE(instance->isInstanceShared());
+
+        // 写穿：改实例，原画同步
+        instance->setPixel(2, 2, qRgb(0, 255, 0));
+        REQUIRE(source.pixel(2, 2) == qRgb(0, 255, 0));
+
+        // 反向：改原画，实例同步
+        source.setPixel(8, 8, qRgb(0, 0, 255));
+        REQUIRE(instance->pixel(8, 8) == qRgb(0, 0, 255));
+
+        // 置脏广播：任一成员编辑后全组带脏（存盘正确性）
+        instance->setModified(false);
+        source.setModified(false);
+        instance->setPixel(1, 1, qRgb(9, 9, 9));
+        REQUIRE(source.isModified());
+        REQUIRE(instance->isModified());
+
+        delete instance;
+    }
+
+    SECTION("copy construction and clone stay deep (undo snapshot redline)")
+    {
+        BitmapImage source(QRect(0, 0, 20, 20), Qt::transparent);
+        source.setPos(1);
+        source.setPixel(5, 5, qRgb(255, 0, 0));
+
+        BitmapImage* instance = source.createInstance();
+        instance->setPos(30);
+
+        BitmapImage* cloned = source.clone();
+        cloned->setPixel(7, 7, qRgb(0, 255, 0));
+        REQUIRE(source.pixel(7, 7) != qRgb(0, 255, 0));
+        REQUIRE(instance->pixel(7, 7) != qRgb(0, 255, 0));
+        delete cloned;
+
+        BitmapImage copied(*instance); // 撤销快照走的就是这条路径
+        copied.setPixel(9, 9, qRgb(255, 255, 0));
+        REQUIRE(source.pixel(9, 9) != qRgb(255, 255, 0));
+        REQUIRE(instance->pixel(9, 9) != qRgb(255, 255, 0));
+
+        delete instance;
+    }
+
+    SECTION("breakInstance detaches without pixel change")
+    {
+        BitmapImage source(QRect(0, 0, 20, 20), Qt::transparent);
+        source.setPos(1);
+        source.setPixel(5, 5, qRgb(255, 0, 0));
+
+        BitmapImage* instance = source.createInstance();
+        instance->setPos(30);
+
+        instance->breakInstance();
+        REQUIRE(!source.sharesDataWith(instance));
+        REQUIRE(!source.isInstanceShared());
+        REQUIRE(!instance->isInstanceShared());
+
+        // 像素原样保留
+        REQUIRE(instance->pixel(5, 5) == qRgb(255, 0, 0));
+
+        // 断链后互不影响
+        instance->setPixel(3, 3, qRgb(0, 255, 0));
+        REQUIRE(source.pixel(3, 3) != qRgb(0, 255, 0));
+
+        delete instance;
+    }
+
+    SECTION("deleting a member keeps the others consistent")
+    {
+        BitmapImage source(QRect(0, 0, 20, 20), Qt::transparent);
+        source.setPos(1);
+        BitmapImage* a = source.createInstance();
+        a->setPos(10);
+        BitmapImage* b = source.createInstance();
+        b->setPos(20);
+        REQUIRE(source.instanceMembers().size() == 3);
+
+        delete a; // 析构必须从登记簿摘除
+        REQUIRE(source.instanceMembers().size() == 2);
+        REQUIRE(source.isInstanceShared());
+
+        b->setPixel(4, 4, qRgb(255, 255, 255));
+        REQUIRE(source.pixel(4, 4) == qRgb(255, 255, 255));
+
+        delete b;
+        REQUIRE(!source.isInstanceShared());
+    }
+}

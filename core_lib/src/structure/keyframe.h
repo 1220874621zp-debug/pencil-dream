@@ -51,7 +51,7 @@ public:
     bool isKeyDrawing() const { return mIsKeyDrawing; }
     void setKeyDrawing(bool b) { mIsKeyDrawing = b; }
 
-    void modification() { mIsModified = true; }
+    virtual void modification() { mIsModified = true; }
     virtual void setModified(bool b) { mIsModified = b; }
     bool isModified() const { return mIsModified; }
 
