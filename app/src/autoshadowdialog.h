@@ -55,7 +55,7 @@ public:
 
 private:
     void addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip,
-                      QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
+                      const QString& suffix, QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
     void pickLevelColor(const int levelIndex);
     void updateLevelButton(const int levelIndex);
     void grabPreviewSource();
@@ -68,7 +68,9 @@ private:
 
     QDoubleSpinBox* mLightXSpin = nullptr;
     QDoubleSpinBox* mLightYSpin = nullptr;
-    QDoubleSpinBox* mDisplaceSpin = nullptr;
+    QDoubleSpinBox* mThresholdSpin = nullptr;
+    QDoubleSpinBox* mDistanceSpin = nullptr;
+    QDoubleSpinBox* mSizeSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
     QSlider* mFeatherSlider = nullptr;
     QComboBox* mTypeCombo = nullptr;

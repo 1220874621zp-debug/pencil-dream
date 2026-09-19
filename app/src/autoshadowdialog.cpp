@@ -56,7 +56,8 @@ constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
-    q.displaceStrength = qRound(p.displaceStrength * s);
+    q.shadowDistance = std::max(1, qRound(p.shadowDistance * s));
+    q.shadowSize = qRound(p.shadowSize * s);
     return q;
 }
 
@@ -247,32 +248,46 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     mParamColumn->setSpacing(6);
 
-    // ── 场生成段参数：光源=预览框点/拖定位，滑杆是 X/Y 百分比 ──
+    // ── 场生成段参数：光源=预览框点/拖定位 + 黑透白不透掩膜 + 内阴影距离/大小 ──
     QDoubleSpinBox* lightXSpin = nullptr;
     QSlider* lightXSlider = nullptr;
     addSliderRow(tr("光源 X："), -100, 200, 15,
         tr("光源水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
-        lightXSpin, lightXSlider);
+        tr("%"), lightXSpin, lightXSlider);
     mLightXSpin = lightXSpin;
 
     QDoubleSpinBox* lightYSpin = nullptr;
     QSlider* lightYSlider = nullptr;
     addSliderRow(tr("光源 Y："), -100, 200, 5,
         tr("光源垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
-        lightYSpin, lightYSlider);
+        tr("%"), lightYSpin, lightYSlider);
     mLightYSpin = lightYSpin;
 
-    QDoubleSpinBox* displaceSpin = nullptr;
-    QSlider* displaceSlider = nullptr;
-    addSliderRow(tr("置换强度："), 0, 30, 8,
-        tr("按原图亮度置换场采样点的强度（像素）：暗线处边界推移，色阶边界贴合线稿起伏而非完美圆弧。"),
-        displaceSpin, displaceSlider);
-    mDisplaceSpin = displaceSpin;
+    QDoubleSpinBox* thresholdSpin = nullptr;
+    QSlider* thresholdSlider = nullptr;
+    addSliderRow(tr("去色阈值："), 1, 254, 128,
+        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的洞，内阴影沿这些边界生长。"),
+        QString(), thresholdSpin, thresholdSlider);
+    mThresholdSpin = thresholdSpin;
+
+    QDoubleSpinBox* distanceSpin = nullptr;
+    QSlider* distanceSlider = nullptr;
+    addSliderRow(tr("内阴影距离："), 1, 60, 16,
+        tr("阴影带深入形体的宽度（像素）：外轮廓远光侧月牙、线槽贴线阴影都由它决定，类似 PS 内阴影的距离。"),
+        tr(" px"), distanceSpin, distanceSlider);
+    mDistanceSpin = distanceSpin;
+
+    QDoubleSpinBox* sizeSpin = nullptr;
+    QSlider* sizeSlider = nullptr;
+    addSliderRow(tr("内阴影大小："), 0, 40, 8,
+        tr("阴影边界的模糊半径（像素）：0=硬边，越大越软；色阶阈值会在渐变上切出多层断层。"),
+        tr(" px"), sizeSpin, sizeSlider);
+    mSizeSpin = sizeSpin;
 
     QSlider* featherSlider = nullptr;
     addSliderRow(tr("边缘羽化："), 0, 50, 0,
         tr("色调分离模式下色阶边界的过渡带宽（场值单位）：0=硬边赛璐璐，越大越软。平滑阴影模式下无效。"),
-        mFeatherSpin, featherSlider);
+        QString(), mFeatherSpin, featherSlider);
     mFeatherSlider = featherSlider;
 
     // ── 映射段参数（CSP 色调设置）──
@@ -390,7 +405,9 @@ AutoShadowParams AutoShadowDialog::params() const
     AutoShadowParams p;
     p.lightX = mLightXSpin->value() / 100.0;
     p.lightY = mLightYSpin->value() / 100.0;
-    p.displaceStrength = qRound(mDisplaceSpin->value());
+    p.maskThreshold = qRound(mThresholdSpin->value());
+    p.shadowDistance = qRound(mDistanceSpin->value());
+    p.shadowSize = qRound(mSizeSpin->value());
     for (int i = 0; i < 3; ++i)
         p.thresholds[i] = mLevelsBar->thresholds(i);
     p.edgeFeather = qRound(mFeatherSpin->value());
@@ -449,7 +466,7 @@ void AutoShadowDialog::setLightFromPreview(const QPoint& pos)
 }
 
 void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
-                                    const int defV, const QString& tip,
+                                    const int defV, const QString& tip, const QString& suffix,
                                     QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
 {
     auto* grid = new QGridLayout;
@@ -468,7 +485,7 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
     spin->setDecimals(0);
     spin->setRange(minV, maxV);
     spin->setValue(defV);
-    spin->setSuffix(tr("%"));
+    spin->setSuffix(suffix);
     spin->setFixedWidth(96);
     spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     spin->setToolTip(tip);

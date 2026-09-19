@@ -64,6 +64,83 @@ float bilinearSample(const std::vector<float>& buf, const int w, const int h, do
     return static_cast<float>((a * (1.0 - fx) + b * fx) * (1.0 - fy) + (c * (1.0 - fx) + d * fx) * fy);
 }
 
+/** ── 高斯模糊：3 次盒式模糊近似（分离前缀和，O(N) 与半径无关）── */
+
+std::vector<int> boxesForGauss(const float sigma, const int boxCount)
+{
+    const float wIdeal = std::sqrt((12.0f * sigma * sigma / static_cast<float>(boxCount)) + 1.0f);
+    int wl = static_cast<int>(std::floor(wIdeal));
+    if (wl % 2 == 0)
+        --wl;
+    if (wl < 1)
+        wl = 1;
+    const int wu = wl + 2;
+    const float mIdeal = (12.0f * sigma * sigma
+                          - static_cast<float>(boxCount) * wl * wl
+                          - static_cast<float>(boxCount) * wl
+                          - static_cast<float>(boxCount) / 4.0f)
+                         / static_cast<float>(-4 * wl - 4);
+    const int m = static_cast<int>(std::round(mIdeal));
+    std::vector<int> sizes;
+    for (int i = 0; i < boxCount; ++i)
+        sizes.push_back(i < m ? wl : wu);
+    return sizes;
+}
+
+void boxBlurH(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const int r)
+{
+    if (r <= 0)
+        return;
+    const float inv = 1.0f / static_cast<float>(2 * r + 1);
+    for (int y = 0; y < h; ++y)
+    {
+        const float* line = &buf[static_cast<size_t>(y) * w];
+        float* out = &tmp[static_cast<size_t>(y) * w];
+        float acc = line[0] * static_cast<float>(r + 1);
+        for (int i = 1; i <= r; ++i)
+            acc += line[std::min(i, w - 1)];
+        for (int x = 0; x < w; ++x)
+        {
+            out[x] = acc * inv;
+            acc += line[std::min(x + r + 1, w - 1)] - line[std::max(x - r, 0)];
+        }
+    }
+    std::swap(buf, tmp);
+}
+
+void boxBlurV(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const int r)
+{
+    if (r <= 0)
+        return;
+    const float inv = 1.0f / static_cast<float>(2 * r + 1);
+    for (int x = 0; x < w; ++x)
+    {
+        float acc = buf[static_cast<size_t>(x)] * static_cast<float>(r + 1);
+        for (int i = 1; i <= r; ++i)
+            acc += buf[static_cast<size_t>(std::min(i, h - 1)) * w + x];
+        for (int y = 0; y < h; ++y)
+        {
+            tmp[static_cast<size_t>(y) * w + x] = acc * inv;
+            acc += buf[static_cast<size_t>(std::min(y + r + 1, h - 1)) * w + x]
+                 - buf[static_cast<size_t>(std::max(y - r, 0)) * w + x];
+        }
+    }
+    std::swap(buf, tmp);
+}
+
+void gaussBlur(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const float sigma)
+{
+    const std::vector<int> boxes = boxesForGauss(sigma, 3);
+    for (const int size : boxes)
+    {
+        const int r = (size - 1) / 2;
+        if (r <= 0)
+            continue;
+        boxBlurH(buf, tmp, w, h, r);
+        boxBlurV(buf, tmp, w, h, r);
+    }
+}
+
 /** 单通道混合（预乘域）：mode 决定公式，返回混合后的预乘分量（浮点，外层统一加权后再取整） */
 double blendChannel(const int premul, const int alpha, const int s, const AutoShadowBlendMode mode)
 {
@@ -107,7 +184,9 @@ int apply(QImage& img, const AutoShadowParams& params)
     // 光源=图像归一化坐标（可越界放远光），钳到 ±10 防极端值
     const double lightX = std::min(10.0, std::max(-10.0, params.lightX)) * w;
     const double lightY = std::min(10.0, std::max(-10.0, params.lightY)) * h;
-    const int displace = clampInt(params.displaceStrength, 0, 100);
+    const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
+    const double distance = std::max(1.0, static_cast<double>(params.shadowDistance));
+    const int blurSize = clampInt(params.shadowSize, 0, 200);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
 
     // 色带（反转=镜像）
@@ -121,9 +200,9 @@ int apply(QImage& img, const AutoShadowParams& params)
 
     const size_t count = static_cast<size_t>(w) * h;
 
-    // α 场 + 亮度场 + 包围盒
-    std::vector<uint8_t> contentMask(count, 0);
-    std::vector<float> lumaF(count, 0.5f); // 置换贴图：直通亮度，透明处中性 0.5
+    // ── 掩膜生成段：去色 → 阈值二值化（黑透白不透），裁在原图 α 内
+    std::vector<uint8_t> contentMask(count, 0); // 原图内容（α≥16）
+    std::vector<float> maskF(count, 0.0f);      // 内阴影掩膜（1=不透明白，0=透明黑/洞）
     int minX = w, minY = h, maxX = -1, maxY = -1;
     for (int y = 0; y < h; ++y)
     {
@@ -137,7 +216,9 @@ int apply(QImage& img, const AutoShadowParams& params)
                 continue;
             contentMask[row + x] = 1;
             const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
-            lumaF[row + x] = (0.299f * lift(qRed(px)) + 0.587f * lift(qGreen(px)) + 0.114f * lift(qBlue(px))) / 255.0f;
+            const int gray = (299 * lift(qRed(px)) + 587 * lift(qGreen(px)) + 114 * lift(qBlue(px))) / 1000;
+            if (gray >= maskThreshold)
+                maskF[row + x] = 1.0f;
             minX = std::min(minX, x);
             maxX = std::max(maxX, x);
             minY = std::min(minY, y);
@@ -147,68 +228,36 @@ int apply(QImage& img, const AutoShadowParams& params)
     if (maxX < 0)
         return 0;
 
-    // ── 场生成段：g = 到光源距离 − r0（内容最近点归零），置换后按内容最大值归一化到 0..100
-    double minD2 = std::numeric_limits<double>::max();
+    // ── 内阴影场段：取样掩膜 = 掩膜沿背光方向平移（逐像素径向，光源远≈平行），再高斯模糊
+    std::vector<float> shifted(count, 0.0f);
     for (int y = minY; y <= maxY; ++y)
     {
         const size_t row = static_cast<size_t>(y) * w;
-        const double dy = y - lightY;
         for (int x = minX; x <= maxX; ++x)
         {
             if (contentMask[row + x] == 0)
                 continue;
             const double dx = x - lightX;
-            const double d2 = dx * dx + dy * dy;
-            if (d2 < minD2)
-                minD2 = d2;
-        }
-    }
-    const double r0 = std::sqrt(minD2);
-
-    std::vector<float> field(count, 0.0f);
-    double fieldMax = 0.0;
-    for (int y = 0; y < h; ++y)
-    {
-        const size_t row = static_cast<size_t>(y) * w;
-        const double dy = y - lightY;
-        for (int x = 0; x < w; ++x)
-        {
-            const double dx = x - lightX;
-            field[row + x] = static_cast<float>(std::max(0.0, std::sqrt(dx * dx + dy * dy) - r0));
-        }
-    }
-    for (int y = minY; y <= maxY; ++y)
-    {
-        const size_t row = static_cast<size_t>(y) * w;
-        for (int x = minX; x <= maxX; ++x)
-        {
-            if (contentMask[row + x] != 0)
-                fieldMax = std::max(fieldMax, static_cast<double>(field[row + x]));
-        }
-    }
-    if (fieldMax <= 0.0)
-        fieldMax = 1.0;
-    const double normScale = 100.0 / fieldMax;
-
-    // 置换（贴图=原图亮度，双轴等强度）→ 归一化场值 F∈[0,100]
-    std::vector<float> fieldNorm(count, 0.0f);
-    for (int y = 0; y < h; ++y)
-    {
-        const size_t row = static_cast<size_t>(y) * w;
-        for (int x = 0; x < w; ++x)
-        {
-            double g = field[row + x];
-            if (displace > 0)
+            const double dy = y - lightY;
+            const double len = std::sqrt(dx * dx + dy * dy);
+            if (len < 1.0)
             {
-                const double off = static_cast<double>(displace) * (lumaF[row + x] - 0.5) * 2.0;
-                if (off != 0.0)
-                    g = bilinearSample(field, w, h, x + off, y + off);
+                // 光源就在像素上：该像素正对光，取样自身（掩膜=1 → 无阴影）
+                shifted[row + x] = maskF[row + x];
+                continue;
             }
-            fieldNorm[row + x] = static_cast<float>(std::min(100.0, std::max(0.0, g * normScale)));
+            shifted[row + x] = bilinearSample(maskF, w, h,
+                                              x + dx / len * distance,
+                                              y + dy / len * distance);
         }
     }
+    if (blurSize > 0)
+    {
+        std::vector<float> tmp(count);
+        gaussBlur(shifted, tmp, w, h, std::max(1.0f, blurSize / 2.0f));
+    }
 
-    // ── 映射段：权重（色调分离=smoothstep阶跃 / 平滑=分段线性）→ 各阶混合按权重加权
+    // ── 映射段：shadow = mask − blur(shift)，钳 0..1 → 场值 0..100 → 色阶权重
     const double levelS[4][3] = {
         { qRed(levels[0].color), qGreen(levels[0].color), qBlue(levels[0].color) },
         { qRed(levels[1].color), qGreen(levels[1].color), qBlue(levels[1].color) },
@@ -225,13 +274,12 @@ int apply(QImage& img, const AutoShadowParams& params)
         {
             if (contentMask[row + x] == 0)
                 continue;
-            const float F = fieldNorm[row + x];
+            const double shadowRaw = maskF[row + x] - shifted[row + x];
+            const float F = static_cast<float>(std::min(1.0, std::max(0.0, shadowRaw)) * 100.0);
             const QRgb px = line[x];
             const int alpha = qAlpha(px);
 
             // 色阶权重 w0..w3（和恒为 1）：三条越界进度 s1/s2/s3 链式组合
-            //   s1: 场值 0→t1（色阶1→2）、s2: t1→t2（2→3）、s3: t2→t3（3→4）
-            //   色调分离 = smoothstep 过渡（feather=0 即硬阶跃）；平滑 = 线性坡道（连续梯度映射）
             double s1, s2, s3;
             const auto ramp = [](const double lo, const double hi, const double v) {
                 return std::min(1.0, std::max(0.0, (v - lo) / (hi - lo)));
