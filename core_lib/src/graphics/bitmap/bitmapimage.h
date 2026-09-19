@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include "keyframe.h"
 #include <QtMath>
 #include <QHash>
+#include <memory>
 
 class TiledBuffer;
 
@@ -80,7 +81,7 @@ public:
     BitmapImage transformed(QRectF rectangle, bool smoothTransform) { return transformed(rectangle.toRect(), smoothTransform); }
     BitmapImage transformed(QPolygonF selection, QTransform transform, bool smoothTransform);
 
-    bool contains(QPoint P) { return mBounds.contains(P); }
+    bool contains(QPoint P) { return d->bounds.contains(P); }
     bool contains(QPointF P) { return contains(P.toPoint()); }
     void autoCrop();
 
@@ -102,21 +103,21 @@ public:
     void drawEllipse(QRectF rectangle, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);
     void drawPath(QPainterPath path, QPen pen, QBrush brush, QPainter::CompositionMode cm, bool antialiasing);
 
-    QPoint topLeft() { autoCrop(); return mBounds.topLeft(); }
-    QPoint topRight() { autoCrop(); return mBounds.topRight(); }
-    QPoint bottomLeft() { autoCrop(); return mBounds.bottomLeft(); }
-    QPoint bottomRight() { autoCrop(); return mBounds.bottomRight(); }
-    int left() { autoCrop(); return mBounds.left(); }
-    int right() { autoCrop(); return mBounds.right(); }
-    int top() { autoCrop(); return mBounds.top(); }
-    int bottom() { autoCrop(); return mBounds.bottom(); }
-    int width() { autoCrop(); return mBounds.width(); }
-    int height() { autoCrop(); return mBounds.height(); }
-    QSize size() { autoCrop(); return mBounds.size(); }
+    QPoint topLeft() { autoCrop(); return d->bounds.topLeft(); }
+    QPoint topRight() { autoCrop(); return d->bounds.topRight(); }
+    QPoint bottomLeft() { autoCrop(); return d->bounds.bottomLeft(); }
+    QPoint bottomRight() { autoCrop(); return d->bounds.bottomRight(); }
+    int left() { autoCrop(); return d->bounds.left(); }
+    int right() { autoCrop(); return d->bounds.right(); }
+    int top() { autoCrop(); return d->bounds.top(); }
+    int bottom() { autoCrop(); return d->bounds.bottom(); }
+    int width() { autoCrop(); return d->bounds.width(); }
+    int height() { autoCrop(); return d->bounds.height(); }
+    QSize size() { autoCrop(); return d->bounds.size(); }
 
     BitmapImage* scanToTransparent(BitmapImage* img, int threshold, bool redEnabled, bool greenEnabled, bool blueEnabled);
 
-    QRect& bounds() { autoCrop(); return mBounds; }
+    QRect& bounds() { autoCrop(); return d->bounds; }
 
     /** Determines if the BitmapImage is minimally bounded.
      *
@@ -128,7 +129,7 @@ public:
      *  @return True only if bounds() is the minimal bounding box
      *          for the contained image.
      */
-    bool isMinimallyBounded() const { return mMinBound; }
+    bool isMinimallyBounded() const { return d->minBound; }
     void enableAutoCrop(bool b) { mEnableAutoCrop = b; }
     void setOpacity(qreal opacity) { mOpacity = opacity; }
     qreal getOpacity() const { return mOpacity; }
@@ -186,11 +187,20 @@ protected:
     void setCompositionModeBounds(QRect sourceBounds, bool isSourceMinBounds, QPainter::CompositionMode cm);
 
 private:
-    QImage mImage;
-    QRect mBounds{0, 0, 0, 0};
+    /** 帧图像数据共享块。普通帧独占一块；实例帧（Instance）由 createInstance()
+     *  建链后多个壳共用同一块——内容与边界写穿共享块即全组同步。
+     *  拷贝构造/赋值恒为深拷贝语义，共享只经 createInstance() 建立，
+     *  否则撤销快照（BitmapReplaceCommand 按值持有）会被别名破坏。 */
+    struct SharedData
+    {
+        QImage image;
+        QRect bounds {0, 0, 0, 0};
 
-    /** @see isMinimallyBounded() */
-    bool mMinBound = true;
+        /** @see isMinimallyBounded() */
+        bool minBound = true;
+    };
+    std::shared_ptr<SharedData> d = std::make_shared<SharedData>();
+
     bool mEnableAutoCrop = false;
 
     const int LOW_THRESHOLD = 30; // threshold for images to be given transparency
