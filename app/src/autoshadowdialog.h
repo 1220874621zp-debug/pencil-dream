@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #define AUTOSHADOWDIALOG_H
 
 #include <QDialog>
+#include <QImage>
 #include <QRgb>
 
 #include "autoshadow.h"
@@ -31,14 +32,19 @@ class QLabel;
 class QPushButton;
 class QRadioButton;
 class QSlider;
+class QTimer;
+class QVBoxLayout;
+class Editor;
 
-/** 自动上阴影参数对话框（光源角度/距离、阴影范围、单双层、阴影色、浓度、阻塞、作用范围） */
+/** 自动上阴影参数对话框：左参数右预览（当前位图帧实时预览，点击预览切原图对比） */
 class AutoShadowDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit AutoShadowDialog(QWidget* parent = nullptr);
+    explicit AutoShadowDialog(Editor* editor, QWidget* parent = nullptr);
+
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
     AutoShadowParams params() const;
     bool applyToAllKeyFrames() const;
@@ -47,6 +53,10 @@ private:
     void pickShadowColor();
     void updateColorButton();
     QDoubleSpinBox* addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip);
+
+    void grabPreviewSource();
+    void schedulePreview();
+    void renderPreview();
 
     QPushButton* mColorButton = nullptr;
     QDoubleSpinBox* mAngleSpin = nullptr;
@@ -61,6 +71,14 @@ private:
     QDoubleSpinBox* mChokeSpin = nullptr;
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
+
+    QVBoxLayout* mParamColumn = nullptr;
+    QLabel* mPreviewLabel = nullptr;
+    QTimer* mPreviewTimer = nullptr;
+    Editor* mEditor = nullptr;
+    QImage mScaledSource;        // 当前帧缩放到预览框尺寸的副本（预览基准，COW 不动原图）
+    double mPreviewScale = 1.0;  // 预览缩放比：像素参数按此同比后预览才与实跑一致
+    bool mPreviewOriginal = false;
 
     QRgb mShadowColor = qRgb(150, 130, 200);
 };

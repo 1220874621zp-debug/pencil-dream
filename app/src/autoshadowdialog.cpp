@@ -20,25 +20,68 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 #include "autoshadowdialog.h"
 
+#include "bitmapimage.h"
+#include "editor.h"
+#include "layer.h"
+#include "layerbitmap.h"
+#include "layermanager.h"
+
 #include <QColorDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSlider>
+#include <QTimer>
 #include <QVBoxLayout>
 
-AutoShadowDialog::AutoShadowDialog(QWidget* parent)
+namespace
+{
+
+constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
+constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
+
+/** 像素参数按预览缩放同比（角度/颜色/浓度不随缩放）；
+    平行光语义保持（距离≥PARALLEL_DIST 不缩放，否则缩放后仍是点光的同比例光场） */
+AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
+{
+    AutoShadowParams q = p;
+    q.shadowRange = std::max(2, qRound(p.shadowRange * s));
+    if (p.secondLevelRange > 0)
+        q.secondLevelRange = std::max(q.shadowRange + 2, qRound(p.secondLevelRange * s));
+    q.choke = qRound(p.choke * s);
+    if (p.lightDistance < AutoShadow::PARALLEL_DIST)
+        q.lightDistance = std::max(50, qRound(p.lightDistance * s));
+    return q;
+}
+
+} // namespace
+
+AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     : QDialog(parent)
+    , mEditor(editor)
 {
     setWindowTitle(tr("自动上阴影"));
     setModal(true);
 
-    auto* rootLayout = new QVBoxLayout(this);
-    rootLayout->setSpacing(6);
+    // 参数变动防抖：拖滑杆连续触发，只在停顿后重算一次预览
+    mPreviewTimer = new QTimer(this);
+    mPreviewTimer->setSingleShot(true);
+    mPreviewTimer->setInterval(120);
+    connect(mPreviewTimer, &QTimer::timeout, this, &AutoShadowDialog::renderPreview);
+
+    auto* rootLayout = new QHBoxLayout(this);
+    mParamColumn = new QVBoxLayout;
+    auto* previewColumn = new QVBoxLayout;
+    rootLayout->addLayout(mParamColumn, 1);
+    rootLayout->addLayout(previewColumn, 0);
+
+    mParamColumn->setSpacing(6);
 
     // 滑杆+输入框参数行（数值守卫防环，输入框是唯一数据源——同 ColorToAlphaDialog 范式）
     mAngleSpin = addSliderRow(tr("光源角度："), 0, 359, 135,
@@ -66,7 +109,7 @@ AutoShadowDialog::AutoShadowDialog(QWidget* parent)
     mColorButton->setAutoDefault(false);
     connect(mColorButton, &QPushButton::clicked, this, &AutoShadowDialog::pickShadowColor);
     colorLayout->addWidget(mColorButton, 1, 0);
-    rootLayout->addLayout(colorLayout);
+    mParamColumn->addLayout(colorLayout);
     updateColorButton();
 
     // 阴影层级：单层/双层（双层=更深的凹陷压得更暗）
@@ -97,7 +140,7 @@ AutoShadowDialog::AutoShadowDialog(QWidget* parent)
     secondLayout->addWidget(mSecondSlider, 0, 0);
     secondLayout->addWidget(mSecondSpin, 0, 1);
     levelLayout->addLayout(secondLayout);
-    rootLayout->addWidget(levelBox);
+    mParamColumn->addWidget(levelBox);
 
     connect(mSecondSlider, &QSlider::valueChanged, this, [this](const int value) {
         if (qRound(mSecondSpin->value()) != value)
@@ -116,6 +159,8 @@ AutoShadowDialog::AutoShadowDialog(QWidget* parent)
     };
     connect(mSingleLevelRadio, &QRadioButton::toggled, this, syncSecondEnabled);
     connect(mTwoLevelRadio, &QRadioButton::toggled, this, syncSecondEnabled);
+    connect(mTwoLevelRadio, &QRadioButton::toggled, this, [this] { schedulePreview(); });
+    connect(mSecondSpin, &QDoubleSpinBox::valueChanged, this, [this](double) { schedulePreview(); });
     syncSecondEnabled();
 
     // 作用范围
@@ -126,12 +171,28 @@ AutoShadowDialog::AutoShadowDialog(QWidget* parent)
     mAllKeyFramesRadio = new QRadioButton(tr("当前图层全部关键帧"), scopeBox);
     scopeLayout->addWidget(mCurrentFrameRadio);
     scopeLayout->addWidget(mAllKeyFramesRadio);
-    rootLayout->addWidget(scopeBox);
+    mParamColumn->addWidget(scopeBox);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    rootLayout->addWidget(buttons);
+    mParamColumn->addWidget(buttons);
+
+    // 预览框（右栏）：当前帧实时预览，点击切原图对比
+    auto* previewBox = new QGroupBox(tr("预览"), this);
+    auto* previewLayout = new QVBoxLayout(previewBox);
+    mPreviewLabel = new QLabel(previewBox);
+    mPreviewLabel->setMinimumSize(PREVIEW_W, PREVIEW_H);
+    mPreviewLabel->setAlignment(Qt::AlignCenter);
+    mPreviewLabel->setCursor(Qt::PointingHandCursor);
+    mPreviewLabel->setToolTip(tr("参数变化即时预览效果；点击切换显示原图对比。"));
+    mPreviewLabel->installEventFilter(this);
+    previewLayout->addWidget(mPreviewLabel);
+    previewColumn->addWidget(previewBox);
+    previewColumn->addStretch(1);
+
+    grabPreviewSource();
+    renderPreview();
 }
 
 AutoShadowParams AutoShadowDialog::params() const
@@ -150,6 +211,17 @@ AutoShadowParams AutoShadowDialog::params() const
 bool AutoShadowDialog::applyToAllKeyFrames() const
 {
     return mAllKeyFramesRadio->isChecked();
+}
+
+bool AutoShadowDialog::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == mPreviewLabel && event->type() == QEvent::MouseButtonRelease)
+    {
+        mPreviewOriginal = !mPreviewOriginal;
+        renderPreview();
+        return true;
+    }
+    return QDialog::eventFilter(watched, event);
 }
 
 QDoubleSpinBox* AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
@@ -178,7 +250,7 @@ QDoubleSpinBox* AutoShadowDialog::addSliderRow(const QString& labelText, const i
     grid->addWidget(slider, 1, 0);
     grid->addWidget(spin, 0, 1, 2, 1);
     grid->setColumnStretch(0, 1);
-    static_cast<QVBoxLayout*>(layout())->addLayout(grid);
+    mParamColumn->addLayout(grid);
 
     connect(slider, &QSlider::valueChanged, this, [spin](const int value) {
         if (qRound(spin->value()) != value)
@@ -189,7 +261,66 @@ QDoubleSpinBox* AutoShadowDialog::addSliderRow(const QString& labelText, const i
         if (slider->value() != pos)
             slider->setValue(pos);
     });
+    connect(spin, &QDoubleSpinBox::valueChanged, this, [this](double) { schedulePreview(); });
     return spin;
+}
+
+void AutoShadowDialog::grabPreviewSource()
+{
+    mScaledSource = QImage();
+    mPreviewScale = 1.0;
+    if (mEditor == nullptr)
+        return;
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr || !layer->isBitmapKind())
+        return;
+
+    // 与画布落笔同源：循环层取显示帧背后的关键帧
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+    BitmapImage* bitmap = static_cast<BitmapImage*>(
+        bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+    if (bitmap == nullptr || bitmap->image() == nullptr)
+        return;
+
+    QImage source = *bitmap->image(); // COW 浅拷贝，后续只读不动原图
+    if (source.format() != QImage::Format_ARGB32_Premultiplied)
+        source = source.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+    const double scale = std::min(1.0, std::min(static_cast<double>(PREVIEW_W) / source.width(),
+                                                static_cast<double>(PREVIEW_H) / source.height()));
+    if (scale < 1.0)
+        mScaledSource = source.scaled(qMax(1, qRound(source.width() * scale)),
+                                      qMax(1, qRound(source.height() * scale)),
+                                      Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    else
+        mScaledSource = source;
+    mPreviewScale = scale;
+}
+
+void AutoShadowDialog::schedulePreview()
+{
+    mPreviewTimer->start();
+}
+
+void AutoShadowDialog::renderPreview()
+{
+    if (mScaledSource.isNull())
+    {
+        mPreviewLabel->setPixmap(QPixmap());
+        mPreviewLabel->setText(tr("当前帧没有可预览的位图内容。"));
+        return;
+    }
+
+    if (mPreviewOriginal)
+    {
+        mPreviewLabel->setPixmap(QPixmap::fromImage(mScaledSource));
+        return;
+    }
+
+    QImage preview = mScaledSource; // COW 拷贝，apply 就地改写
+    AutoShadow::apply(preview, scaledForPreview(params(), mPreviewScale));
+    mPreviewLabel->setPixmap(QPixmap::fromImage(preview));
 }
 
 void AutoShadowDialog::pickShadowColor()
@@ -199,6 +330,7 @@ void AutoShadowDialog::pickShadowColor()
     {
         mShadowColor = picked.rgb();
         updateColorButton();
+        schedulePreview();
     }
 }
 

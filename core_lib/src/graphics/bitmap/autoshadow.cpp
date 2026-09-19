@@ -32,7 +32,6 @@ namespace
 
 constexpr int ALPHA_MIN = 16;      // α≥此值视为不透明内容（抗锯齿半透明边缘不参与行进）
 constexpr int CLOSE_RADIUS = 2;    // 预阻塞闭运算半径：封 ≤2px 漏光笔缝
-constexpr int PARALLEL_DIST = 4000;// 光源距离 ≥ 此值按平行光处理
 
 int clampInt(const int v, const int lo, const int hi)
 {

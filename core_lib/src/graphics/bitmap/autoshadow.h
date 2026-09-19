@@ -55,6 +55,8 @@ struct AutoShadowParams
  */
 namespace AutoShadow
 {
+    constexpr int PARALLEL_DIST = 4000; // 光源距离 ≥ 此值按平行光处理（预览缩放须保持该语义）
+
     int apply(QImage& img, const AutoShadowParams& params);
 }
 
