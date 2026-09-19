@@ -648,15 +648,17 @@ Status Editor::importImage(const QString& filePath, const ImportImageConfig impo
     switch (importConfig.positionType)
     {
         case ImportImageConfig::CenterOfCamera: {
-            LayerCamera* layerCam = static_cast<LayerCamera*>(layers()->getCameraLayerBelow(currentLayerIndex()));
-            Q_ASSERT(layerCam);
-            transform = layerCam->getViewAtFrame(importConfig.importFrame).inverted();
+            // 建层容纳的导入路径会在调用前新建层（垫底），新层下方可能没有相机层；
+            // 拿不到相机时回退画布中心（transform 保持单位），不能空指针解引用
+            LayerCamera* layerCam = layers()->getCameraLayerBelow(currentLayerIndex());
+            if (layerCam != nullptr)
+                transform = layerCam->getViewAtFrame(importConfig.importFrame).inverted();
             break;
         }
         case ImportImageConfig::CenterOfCameraFollowed: {
-            LayerCamera* camera = static_cast<LayerCamera*>(layers()->getCameraLayerBelow(currentLayerIndex()));
-            Q_ASSERT(camera);
-            transform = camera->getViewAtFrame(currentFrame()).inverted();
+            LayerCamera* camera = layers()->getCameraLayerBelow(currentLayerIndex());
+            if (camera != nullptr)
+                transform = camera->getViewAtFrame(currentFrame()).inverted();
             break;
         }
         case ImportImageConfig::CenterOfView: {

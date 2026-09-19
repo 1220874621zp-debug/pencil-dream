@@ -1126,6 +1126,10 @@ void MainWindow2::importImage()
     }
 
     ImportImageConfig importImageConfig = positionDialog->importConfig();
+
+    // 与拖拽导入一致：自动新建一层容纳（层名=文件名），当前图层隐藏/类型不对都不阻断导入
+    mEditor->layers()->createBitmapLayer(QFileInfo(strFilePath).completeBaseName());
+
     Status st = mEditor->importImage(strFilePath, importImageConfig);
     if (!st.ok())
     {
