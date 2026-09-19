@@ -56,6 +56,7 @@ GNU General Public License for more details.
 #include "colorizeupdatemanager.h"
 #include "holefiller.h"
 #include "colortoalpha.h"
+#include "autoshadow.h"
 #include "layersplitter.h"
 #include "colordistance.h"
 #include "colorref.h"
@@ -1331,6 +1332,112 @@ Status ActionCommands::applyColorToAlpha(const ColorToAlphaParams& params, bool 
     }
 
     mEditor->undoRedo()->record(saveStateId, tr("颜色转为透明度（全部关键帧）", "Undo step text"));
+    if (canceled)
+    {
+        QMessageBox::information(mParent, tipTitle,
+                                 tr("完成 %1/%2 帧，已取消。已处理的帧可 Ctrl+Z 撤销。").arg(done).arg(bitmaps.size()));
+    }
+    return Status::OK;
+}
+
+Status ActionCommands::applyAutoShadow(const AutoShadowParams& params, bool allKeyFrames)
+{
+    const QString tipTitle = tr("自动上阴影");
+
+    Layer* layer = mEditor->layers()->currentLayer();
+    if (layer == nullptr)
+    {
+        return Status::FAIL;
+    }
+    if (!layer->isBitmapKind())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("自动上阴影只能在位图族图层（位图/填色）上使用。"));
+        return Status::CANCELED;
+    }
+    if (layer->locked())
+    {
+        QMessageBox::information(mParent, tipTitle, tr("图层“%1”已锁定，无法处理。").arg(layer->name()));
+        return Status::CANCELED;
+    }
+
+    auto bitmapLayer = static_cast<LayerBitmap*>(layer);
+
+    // 逐帧双快照（BitmapReplaceCommand）：改一帧算一帧，撤销精确到像素
+    const auto processFrame = [this, bitmapLayer, &params](BitmapImage* bitmap, QUndoCommand* parentMacro) -> bool {
+        QImage* img = bitmap->image();
+        if (img == nullptr)
+            return false;
+        const BitmapImage undoSnapshot = *bitmap;
+        const int changed = AutoShadow::apply(*img, params);
+        if (changed == 0)
+            return false;
+        bitmap->setModified(true);
+        const BitmapImage redoSnapshot = *bitmap;
+        mEditor->undoRedo()->pushUndoCommand(
+            new BitmapReplaceCommand(&undoSnapshot, &redoSnapshot, bitmapLayer->id(),
+                                     tr("自动上阴影", "Undo step text"), mEditor, parentMacro));
+        // 数据失效传实际关键帧 pos；显示缓存失效传当前显示帧
+        mEditor->setModified(mEditor->layers()->currentLayerIndex(), bitmap->pos());
+        mEditor->getScribbleArea()->onFrameModified(mEditor->currentFrame());
+        return true;
+    };
+
+    if (!allKeyFrames)
+    {
+        // 与画布落笔同源：循环层编辑的是显示帧背后的关键帧（所见即所编辑）
+        BitmapImage* bitmap = static_cast<BitmapImage*>(
+            bitmapLayer->getKeyFrameWhichCovers(bitmapLayer->displayFrameFor(mEditor->currentFrame())));
+        if (bitmap == nullptr)
+        {
+            QMessageBox::information(mParent, tipTitle, tr("当前帧没有可处理的位图内容。"));
+            return Status::CANCELED;
+        }
+        if (!processFrame(bitmap, nullptr))
+        {
+            // 无变化不进撤销栈
+            QMessageBox::information(mParent, tipTitle, tr("没有产生阴影，图像未改变。"));
+        }
+        return Status::OK;
+    }
+
+    // 批量：图层全部关键帧，宏命令单步撤销
+    QVector<BitmapImage*> bitmaps;
+    bitmapLayer->foreachKeyFrame([&](KeyFrame* key) {
+        bitmaps.append(static_cast<BitmapImage*>(key));
+    });
+
+    QProgressDialog progress(tr("正在自动上阴影…"), tr("取消"), 0, bitmaps.size(), mParent);
+    progress.setWindowTitle(tipTitle);
+    progress.setWindowModality(Qt::WindowModal);
+
+    QUndoCommand* macro = new QUndoCommand(tr("自动上阴影（全部关键帧）", "Undo step text"));
+    int changedFrames = 0;
+    int done = 0;
+    bool canceled = false;
+
+    for (BitmapImage* bitmap : bitmaps)
+    {
+        if (processFrame(bitmap, macro))
+            ++changedFrames;
+        ++done;
+        progress.setValue(done);
+        QApplication::processEvents();
+        if (progress.wasCanceled())
+        {
+            canceled = true;
+            break;
+        }
+    }
+
+    if (macro->childCount() == 0)
+    {
+        delete macro;
+        QMessageBox::information(mParent, tipTitle,
+                                 canceled ? tr("已取消，没有帧被处理。") : tr("没有产生阴影，图像未改变。"));
+        return Status::OK;
+    }
+
+    mEditor->undoRedo()->pushUndoCommand(macro);
     if (canceled)
     {
         QMessageBox::information(mParent, tipTitle,

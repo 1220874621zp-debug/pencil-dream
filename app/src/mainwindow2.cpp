@@ -87,6 +87,7 @@ GNU General Public License for more details.
 #include "addtransparencytopaperdialog.h"
 #include "colortoalphadialog.h"
 #include "layersplitdialog.h"
+#include "autoshadowdialog.h"
 #include "repositionframesdialog.h"
 
 #include "errordialog.h"
@@ -622,6 +623,14 @@ void MainWindow2::createMenus()
         if (dialog.exec() != QDialog::Accepted)
             return;
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
+    });
+    QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
+    autoShadowAction->setStatusTip(tr("按光源方向给平涂画面自动叠上赛璐璐阴影（方向深度场量化+阻塞），可单层/双层，可批量整层处理"));
+    connect(autoShadowAction, &QAction::triggered, this, [this] {
+        AutoShadowDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted)
+            return;
+        mCommands->applyAutoShadow(dialog.params(), dialog.applyToAllKeyFrames());
     });
     ui->menuBar->insertMenu(mWorkspaceMenu->menuAction(), filterMenu);
 
