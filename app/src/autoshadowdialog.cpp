@@ -47,7 +47,7 @@ constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
 /** 像素参数按预览缩放同比（角度/颜色/浓度不随缩放）；
-    平行光语义保持（距离≥PARALLEL_DIST 不缩放，否则缩放后仍是点光的同比例光场） */
+    几何场（光源距离）同比缩放后与实跑光场一致 */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
@@ -55,8 +55,7 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
     if (p.secondLevelRange > 0)
         q.secondLevelRange = std::max(q.shadowRange + 2, qRound(p.secondLevelRange * s));
     q.choke = qRound(p.choke * s);
-    if (p.lightDistance < AutoShadow::PARALLEL_DIST)
-        q.lightDistance = std::max(50, qRound(p.lightDistance * s));
+    q.lightDistance = std::max(50, qRound(p.lightDistance * s));
     return q;
 }
 
@@ -87,10 +86,10 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mAngleSpin = addSliderRow(tr("光源角度："), 0, 359, 135,
         tr("光源方向（度）：0=右 90=上 135=左上 180=左 270=下。默认左上光。"));
     mDistanceSpin = addSliderRow(tr("光源距离："), 100, 5000, 600,
-        tr("光源到画面中心的距离（像素）：越远光线越平行，拉到最大（5000）即为平行光。"));
+        tr("光源到画面中心的距离（像素）：近=圆形径向渐变，远=接近平行条带。"));
     mRangeSpin = addSliderRow(tr("阴影范围："), 4, 120, 40,
-        tr("背光多深才出现阴影（像素）：沿光线方向累计的材料厚度达到该值的像素进入阴影。"
-           "值越大阴影越收敛到深凹处。"));
+        tr("离光源多远开始出现阴影（像素）：径向渐变距离超过该值的像素进入阴影。"
+           "值越大阴影越退向远离光源一侧。"));
     mOpacitySpin = addSliderRow(tr("阴影浓度："), 10, 100, 45,
         tr("阴影色以正片叠底方式叠加的强度（百分比）。"));
     mChokeSpin = addSliderRow(tr("阻塞："), 0, 8, 2,
@@ -117,7 +116,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     auto* levelLayout = new QVBoxLayout(levelBox);
     mSingleLevelRadio = new QRadioButton(tr("单层阴影"), levelBox);
     mSingleLevelRadio->setChecked(true);
-    mTwoLevelRadio = new QRadioButton(tr("双层阴影（深凹处更暗）"), levelBox);
+    mTwoLevelRadio = new QRadioButton(tr("双层阴影（远端断层更暗）"), levelBox);
     levelLayout->addWidget(mSingleLevelRadio);
     levelLayout->addWidget(mTwoLevelRadio);
 
@@ -133,7 +132,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mSecondSpin->setValue(64);
     mSecondSpin->setFixedWidth(96);
     mSecondSpin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    mSecondSpin->setToolTip(tr("材料厚度达到该值的像素压到第二档（更暗），须大于阴影范围。"));
+    mSecondSpin->setToolTip(tr("到光源的距离超过该值的像素压到第二档（更暗），须大于阴影范围。"));
     auto* secondLayout = new QGridLayout;
     secondLayout->setHorizontalSpacing(8);
     secondLayout->setContentsMargins(0, 0, 0, 0);

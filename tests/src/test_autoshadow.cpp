@@ -70,7 +70,6 @@ void fillWhiteDisc(QImage& img, const double cx, const double cy, const double r
 AutoShadowParams blackFullParams()
 {
     AutoShadowParams p;
-    p.lightDistance = 5000;         // 平行光
     p.shadowColor = qRgb(0, 0, 0);
     p.shadowOpacity = 100;
     p.choke = 0;
@@ -92,40 +91,65 @@ TEST_CASE("AutoShadow-empty-image")
     REQUIRE(AutoShadow::apply(img, AutoShadowParams{}) == 0);
 }
 
-TEST_CASE("AutoShadow-parallel-top-light")
+TEST_CASE("AutoShadow-far-light-parallel-bands")
 {
-    // 竖长白条 x[10,19] y[10,89]，顶光（90°）：朝光面不暗、深度≥阈值起进入阴影
+    // 竖长白条 x[10,19] y[10,89]，远光正上方（90°，5000px）：近似平行条带，
+    // 渐变以内容最高点归零，阴影从近光端往远处切
     QImage img = makeImage(30, 100);
     fillWhiteRect(img, 10, 10, 19, 89);
 
     AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;              // 正上方
+    p.lightAngle = 90;
+    p.lightDistance = 5000;
     p.shadowRange = 20;
 
     const int changed = AutoShadow::apply(img, p);
-    // 阴影带 y[30,89]（深度=y-10），宽 10px
-    REQUIRE(changed == 10 * 60);
-    REQUIRE(img.pixel(15, 15) == qRgb(255, 255, 255));   // 受光面
-    REQUIRE(img.pixel(15, 29) == qRgb(255, 255, 255));   // 深度 19：阈值前一行
-    REQUIRE(img.pixel(15, 30) == qRgb(0, 0, 0));         // 深度 20：第一行阴影
-    REQUIRE(img.pixel(15, 89) == qRgb(0, 0, 0));         // 底部
+    // 阴影边界是以光源为圆心的圆弧：光轴上（x=14/15，横向偏移 0.5px）y=31 起入影，
+    // 外侧八列横向偏移更大、离光更远，y=30 即越阈 → 59 行整宽 + 第 30 行 8 像素
+    REQUIRE(changed == 10 * 59 + 8);
+    REQUIRE(img.pixel(15, 15) == qRgb(255, 255, 255));   // 近光端
+    REQUIRE(img.pixel(15, 29) == qRgb(255, 255, 255));   // 阈值前一行
+    REQUIRE(img.pixel(15, 30) == qRgb(255, 255, 255));   // 光轴列：v=20-ε 恰不达标
+    REQUIRE(img.pixel(10, 30) == qRgb(0, 0, 0));         // 外侧列：v=20+ε 已入影（圆弧）
+    REQUIRE(img.pixel(15, 31) == qRgb(0, 0, 0));         // 光轴列第一行阴影
+    REQUIRE(img.pixel(15, 89) == qRgb(0, 0, 0));         // 远端
     REQUIRE(img.pixel(5, 60) == 0);                      // 掩膜外透明像素不动
 }
 
-TEST_CASE("AutoShadow-point-light-from-right")
+TEST_CASE("AutoShadow-near-light-radial-bands")
 {
-    // 圆盘 (40,30) r=12，点光在右侧：左缘深陷阴影、右缘受光
+    // 方块 x[10,49] y[10,49]，近光右侧（0°，100px）：圆形径向渐变——
+    // 左边缘中点离光近（v≈39）、四角离光远（v≈40.5），断层带应弯成圆弧：
+    // 角部入阴影而左边缘中点仍受光（平行光下两者距离相同，不可能分出差异）
+    QImage img = makeImage(60, 60);
+    fillWhiteRect(img, 10, 10, 49, 49);
+
+    AutoShadowParams p = blackFullParams();
+    p.lightAngle = 0;
+    p.lightDistance = 100;
+    p.shadowRange = 40;
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(49, 30) == qRgb(255, 255, 255));   // 右边缘（渐变零点）
+    REQUIRE(img.pixel(10, 30) == qRgb(255, 255, 255));   // 左边缘中点：v≈39 < 40
+    REQUIRE(img.pixel(10, 11) == qRgb(0, 0, 0));         // 左上角：v≈40.4 ≥ 40
+    REQUIRE(img.pixel(10, 49) == qRgb(0, 0, 0));         // 左下角：v≈40.6 ≥ 40
+}
+
+TEST_CASE("AutoShadow-point-light-on-disc")
+{
+    // 圆盘 (40,30) r=12，点光在右侧 200px：右缘是渐变零点，左半盘入阴影
     QImage img = makeImage(60, 60);
     fillWhiteDisc(img, 40, 30, 12);
 
     AutoShadowParams p = blackFullParams();
-    p.lightAngle = 0;               // 右侧
-    p.lightDistance = 200;          // 点光
+    p.lightAngle = 0;
+    p.lightDistance = 200;
     p.shadowRange = 10;
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(52, 30) == qRgb(255, 255, 255));   // 右缘：第一步入掩膜外
-    REQUIRE(img.pixel(30, 30) == qRgb(0, 0, 0));         // 左侧：向光穿过整盘
+    REQUIRE(img.pixel(52, 30) == qRgb(255, 255, 255));   // 右缘：v=0
+    REQUIRE(img.pixel(30, 30) == qRgb(0, 0, 0));         // 左侧：v=22 ≥ 10
 }
 
 TEST_CASE("AutoShadow-two-levels")
@@ -135,14 +159,15 @@ TEST_CASE("AutoShadow-two-levels")
 
     AutoShadowParams p = blackFullParams();
     p.lightAngle = 90;
+    p.lightDistance = 5000;
     p.shadowRange = 15;
     p.secondLevelRange = 50;
     p.shadowOpacity = 40;           // 第一档 f=0.6→153；第二档 k=0.6→102
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // 深度 10 < 15
-    REQUIRE(img.pixel(15, 30) == qRgb(153, 153, 153));   // 第一档（深度 20）
-    REQUIRE(img.pixel(15, 70) == qRgb(102, 102, 102));   // 第二档（深度 60 ≥ 50）
+    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // v≈10 < 15
+    REQUIRE(img.pixel(15, 30) == qRgb(153, 153, 153));   // 第一档（v≈20）
+    REQUIRE(img.pixel(15, 70) == qRgb(102, 102, 102));   // 第二档（v≈60 ≥ 50）
 }
 
 TEST_CASE("AutoShadow-choke-expands-to-line")
@@ -152,31 +177,14 @@ TEST_CASE("AutoShadow-choke-expands-to-line")
 
     AutoShadowParams p = blackFullParams();
     p.lightAngle = 90;
+    p.lightDistance = 5000;
     p.shadowRange = 25;
-    p.choke = 3;                    // 阴影边界向受光侧膨胀 3px（无阻塞时 y≥35）
+    p.choke = 3;                    // 阴影边界向受光侧膨胀 3px（无阻塞时 y≥36）
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 34) == qRgb(0, 0, 0));         // 深度 24：靠阻塞进入阴影
-    REQUIRE(img.pixel(15, 31) == qRgb(255, 255, 255));   // 深度 21：阻塞之外
+    REQUIRE(img.pixel(15, 34) == qRgb(0, 0, 0));         // 靠阻塞进入阴影
+    REQUIRE(img.pixel(15, 31) == qRgb(255, 255, 255));   // 阻塞之外
     REQUIRE(img.pixel(9, 40) == 0);                      // 膨胀不越过掩膜（透明区不动）
-}
-
-TEST_CASE("AutoShadow-closure-seals-pen-gaps")
-{
-    // 上下两条白块夹 1px 透明缝：闭运算封缝后，光不再漏过缝隙（不封缝时深度只有 1）
-    QImage img = makeImage(30, 60);
-    fillWhiteRect(img, 10, 10, 19, 14);
-    // y=15 为缝
-    fillWhiteRect(img, 10, 16, 19, 50);
-
-    AutoShadowParams p = blackFullParams();
-    p.lightAngle = 90;
-    p.shadowRange = 6;
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 17) == qRgb(0, 0, 0));         // 穿缝深度 7 ≥ 6
-    REQUIRE(img.pixel(15, 12) == qRgb(255, 255, 255));   // 上块顶部仍受光（深度 2）
-    REQUIRE(img.pixel(15, 15) == 0);                     // 缝本身透明，不上色
 }
 
 TEST_CASE("AutoShadow-alpha-preserved")
@@ -186,6 +194,7 @@ TEST_CASE("AutoShadow-alpha-preserved")
 
     AutoShadowParams p = blackFullParams();
     p.lightAngle = 90;
+    p.lightDistance = 5000;
     p.shadowRange = 20;
     p.shadowOpacity = 50;
 

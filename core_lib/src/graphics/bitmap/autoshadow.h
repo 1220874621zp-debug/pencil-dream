@@ -28,8 +28,8 @@ class QImage;
 struct AutoShadowParams
 {
     int lightAngle = 135;                     // 0..359 光源方向角（数学角、逆时针：0=右 90=上 135=左上 270=下）
-    int lightDistance = 600;                  // 光源到内容中心的像素距离，越远越接近平行光（≥4000 按平行光处理）
-    int shadowRange = 40;                     // 第一档阈值：朝光源方向的材料深度 ≥ 此值的像素进入阴影（px）
+    int lightDistance = 600;                  // 光源到内容中心的像素距离：近=圆形径向渐变，远=接近平行条带
+    int shadowRange = 40;                     // 第一档阈值：到光源的距离（以最近点为 0）≥ 此值的像素进入阴影（px）
     int secondLevelRange = 0;                 // 第二档阈值（px），0 = 单层；>0 时须大于 shadowRange
     QRgb shadowColor = qRgb(150, 130, 200);   // 阴影色（正片叠底语义）
     int shadowOpacity = 45;                   // 0..100 第一档浓度；第二档浓度为其 1.5 倍（封顶 100）
@@ -38,16 +38,14 @@ struct AutoShadowParams
 
 /** 自动上阴影：平涂画面一键叠赛璐璐阴影（CSP「Shading Assist」的程序化近似）。
 
- * 原理（对不透明掩膜 M）：
- *  1. 方向深度场：对 M 内每像素沿光线方向（点光源=指向光源；平行光=恒定方向）
- *     步进采样，累计在 M 内走过的欧氏长度 d(p)——朝光面边缘 d≈0（受光），
- *     背光凹陷处 d 大（阴影）；线宽/形体厚度天然计入 d，即「径向渐变」光场。
- *  2. 预阻塞：对 M 做半径 2 的闭运算封住 ≤2px 的漏光细缝，光不再穿过
- *     笔缝漏到背光侧（闭运算只用于行进判定，不上色）。
- *  3. 色调分离：d ≥ shadowRange 为第一档，d ≥ secondLevelRange 为第二档
- *     （更深的凹陷压得更暗），得到硬边色阶阴影。
- *  4. 阻塞：色阶掩膜膨胀 choke px 后裁回 M，阴影边界咬进线条、不留亮缝。
- *  5. 上色：预乘域逐通道正片叠底 c' = c·((1-k)+k·s/255)，第一档 k=浓度、
+ * 原理 = 径向渐变 + 色调分离 + 简单阻塞（对不透明掩膜 M）：
+ *  1. 径向渐变充当光源：值场 v(p) = 像素到光源点 L 的欧氏距离（L 近=以 L 为圆心的
+ *     圆形径向渐变，L 远=接近平行的线性条带）。以 M 上离 L 最近的点归零起步，
+ *     近端全亮、远端渐暗。
+ *  2. 色调分离：v ≥ shadowRange 为第一档阴影，v ≥ secondLevelRange 为第二档
+ *     （更暗），连续渐变被切成硬边断层色阶（赛璐璐观感）。
+ *  3. 简单阻塞：色阶掩膜膨胀 choke px 后裁回 M，阴影边界咬进线条、不出内容边界。
+ *  4. 上色：预乘域逐通道正片叠底 c' = c·((1-k)+k·s/255)，第一档 k=浓度、
  *     第二档 k=1.5×浓度；α 不变，透明像素不动。
  *
  * img 原地修改，须为 Format_ARGB32_Premultiplied。
@@ -55,8 +53,6 @@ struct AutoShadowParams
  */
 namespace AutoShadow
 {
-    constexpr int PARALLEL_DIST = 4000; // 光源距离 ≥ 此值按平行光处理（预览缩放须保持该语义）
-
     int apply(QImage& img, const AutoShadowParams& params);
 }
 

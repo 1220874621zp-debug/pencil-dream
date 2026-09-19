@@ -25,13 +25,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 namespace
 {
 
-constexpr int ALPHA_MIN = 16;      // α≥此值视为不透明内容（抗锯齿半透明边缘不参与行进）
-constexpr int CLOSE_RADIUS = 2;    // 预阻塞闭运算半径：封 ≤2px 漏光笔缝
+constexpr int ALPHA_MIN = 16; // α≥此值视为不透明内容（抗锯齿半透明边缘不参与）
 
 int clampInt(const int v, const int lo, const int hi)
 {
@@ -97,13 +97,12 @@ int apply(QImage& img, const AutoShadowParams& params)
     int second = params.secondLevelRange;
     if (second > 0)
         second = clampInt(second, range + 2, 800);
-    const int maxDepth = second > 0 ? second : range;
+    const bool hasSecond = second > 0;
 
     const double angleRad = qDegreesToRadians(static_cast<double>(((params.lightAngle % 360) + 360) % 360));
     const double dirX = std::cos(angleRad);
     const double dirY = -std::sin(angleRad); // 屏幕 y 向下，数学角逆时针
-    const int dist = std::max(50, params.lightDistance);
-    const bool parallel = dist >= PARALLEL_DIST;
+    const double dist = std::max(50.0, static_cast<double>(params.lightDistance));
 
     const double opacity = clampInt(params.shadowOpacity, 1, 100) / 100.0;
     const double opacity2 = std::min(1.0, opacity * 1.5);
@@ -130,72 +129,50 @@ int apply(QImage& img, const AutoShadowParams& params)
     if (maxX < 0)
         return 0;
 
-    const double centerX = (minX + maxX) / 2.0;
-    const double centerY = (minY + maxY) / 2.0;
-    const double lightX = centerX + dirX * dist;
-    const double lightY = centerY + dirY * dist;
+    // 2. 光源点 = 内容中心 + 极坐标(角度, 距离)；近=圆形径向渐变，远=接近平行条带
+    const double lightX = (minX + maxX) / 2.0 + dirX * dist;
+    const double lightY = (minY + maxY) / 2.0 + dirY * dist;
 
-    // 2. 预阻塞：闭运算封细缝（只作行进判定，不上色）
-    std::vector<uint8_t> closed = mask;
-    boxMorph(closed, w, h, CLOSE_RADIUS, true);
-    boxMorph(closed, w, h, CLOSE_RADIUS, false);
-
-    // 3. 方向深度场：逐像素朝光源步进，累计在闭掩膜内走过的欧氏长度
-    std::vector<uint16_t> depth(static_cast<size_t>(w) * h, 0);
+    // 3. 径向渐变场：v(p) = p 到光源的距离；以内容上离光源最近的点为 0（近端全亮起步），
+    //    只比较平方距离，阈值 = (r0 + T)² 与 d² 直接比，免开方
+    double minD2 = std::numeric_limits<double>::max();
     for (int y = minY; y <= maxY; ++y)
     {
         const size_t row = static_cast<size_t>(y) * w;
+        const double dy = y - lightY;
         for (int x = minX; x <= maxX; ++x)
         {
             if (mask[row + x] == 0)
                 continue;
-
-            double ux = dirX;
-            double uy = dirY;
-            if (!parallel)
-            {
-                const double dx = lightX - x;
-                const double dy = lightY - y;
-                const double len = std::sqrt(dx * dx + dy * dy);
-                if (len < 1.0)
-                {
-                    // 光源就在像素上：任意方向都是受光面
-                    continue;
-                }
-                ux = dx / len;
-                uy = dy / len;
-            }
-
-            double px = x + ux;
-            double py = y + uy;
-            int d = 0;
-            while (d < maxDepth)
-            {
-                const int ix = static_cast<int>(std::lround(px));
-                const int iy = static_cast<int>(std::lround(py));
-                if (ix < 0 || ix >= w || iy < 0 || iy >= h)
-                    break;
-                if (closed[static_cast<size_t>(iy) * w + ix] == 0)
-                    break;
-                ++d;
-                px += ux;
-                py += uy;
-            }
-            depth[row + x] = static_cast<uint16_t>(d);
+            const double dx = x - lightX;
+            const double d2 = dx * dx + dy * dy;
+            if (d2 < minD2)
+                minD2 = d2;
         }
     }
+    const double r0 = std::sqrt(minD2);
+    const double t1Sq = (r0 + range) * (r0 + range);
+    const double t2Sq = (r0 + second) * (r0 + second);
 
-    // 4. 色调分离成两级
+    // 4. 色调分离：d² ≥ (r0+range)² 一档；有第二档时 d² ≥ (r0+second)² 更暗
     std::vector<uint8_t> level1(static_cast<size_t>(w) * h, 0);
     std::vector<uint8_t> level2(static_cast<size_t>(w) * h, 0);
-    for (size_t i = 0; i < level1.size(); ++i)
+    for (int y = minY; y <= maxY; ++y)
     {
-        const int d = depth[i];
-        if (d >= range)
+        const size_t row = static_cast<size_t>(y) * w;
+        const double dy = y - lightY;
+        for (int x = minX; x <= maxX; ++x)
         {
-            level1[i] = 1;
-            if (second > 0 && d >= second)
-                level2[i] = 1;
+            if (mask[row + x] == 0)
+                continue;
+            const double dx = x - lightX;
+            const double d2 = dx * dx + dy * dy;
+            if (d2 >= t1Sq)
+            {
+                level1[row + x] = 1;
+                if (hasSecond && d2 >= t2Sq)
+                    level2[row + x] = 1;
+            }
         }
     }
 
