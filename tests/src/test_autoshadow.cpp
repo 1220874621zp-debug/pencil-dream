@@ -57,13 +57,13 @@ AutoShadowParams plainParams()
     return p;
 }
 
-// 远光（90°，5000px）竖条测试通用几何：条 x[10,19] y[10,89]，
-// 场值 v(y)≈y-10，内容最大场值≈79.002（底部外侧角），F=100·v/79.002≈1.2658·(y-10)
+// 远光（画面正上方，Y=-5000%≈平行光）竖条测试通用几何：条 x[10,19] y[10,89]，
+// 光源在 (15,-5000)：列 15 场值 v=y-10 精确，内容最大场值≈79.0025，F=100·(y-10)/79.0025
 AutoShadowParams farLightParams()
 {
     AutoShadowParams p = plainParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
+    p.lightX = 0.5;
+    p.lightY = -50.0;
     return p;
 }
 
@@ -210,8 +210,8 @@ TEST_CASE("AutoShadow-displace-warps-field")
     QImage displaced = plain;
 
     AutoShadowParams p = plainParams();
-    p.lightAngle = 90;
-    p.lightDistance = 5000;
+    p.lightX = 0.5;
+    p.lightY = -50.0;
     p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
 
@@ -225,14 +225,14 @@ TEST_CASE("AutoShadow-displace-warps-field")
 
 TEST_CASE("AutoShadow-near-light-arc-boundary")
 {
-    // 方块 x[10,49] y[10,49]，近光右侧（0°，100px）：场弯成圆弧——
+    // 方块 x[10,49] y[10,49]，近光右侧 100px：光在 (129.5,29.5)=(215.8%, 49.2%)，场弯成圆弧——
     // 左边缘中点 F≈96.1、四角 F≈99.6：阈值取 [96,97,98] 后分属不同色阶（平行光下不可能）
     QImage img = makeImage(60, 60);
     fillWhiteRect(img, 10, 10, 49, 49);
 
     AutoShadowParams p = plainParams();
-    p.lightAngle = 0;
-    p.lightDistance = 100;
+    p.lightX = 129.5 / 60.0;
+    p.lightY = 29.5 / 60.0;
     p.thresholds[0] = 96;
     p.thresholds[1] = 97;
     p.thresholds[2] = 98;

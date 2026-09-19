@@ -104,10 +104,9 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int t3 = clampInt(params.thresholds[2], t2 + 1, 100);
     const double t1f = t1, t2f = t2, t3f = t3;
 
-    const double angleRad = qDegreesToRadians(static_cast<double>(((params.lightAngle % 360) + 360) % 360));
-    const double dirX = std::cos(angleRad);
-    const double dirY = -std::sin(angleRad); // 屏幕 y 向下，数学角逆时针
-    const double dist = std::max(50.0, static_cast<double>(params.lightDistance));
+    // 光源=图像归一化坐标（可越界放远光），钳到 ±10 防极端值
+    const double lightX = std::min(10.0, std::max(-10.0, params.lightX)) * w;
+    const double lightY = std::min(10.0, std::max(-10.0, params.lightY)) * h;
     const int displace = clampInt(params.displaceStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
 
@@ -149,8 +148,6 @@ int apply(QImage& img, const AutoShadowParams& params)
         return 0;
 
     // ── 场生成段：g = 到光源距离 − r0（内容最近点归零），置换后按内容最大值归一化到 0..100
-    const double lightX = (minX + maxX) / 2.0 + dirX * dist;
-    const double lightY = (minY + maxY) / 2.0 + dirY * dist;
     double minD2 = std::numeric_limits<double>::max();
     for (int y = minY; y <= maxY; ++y)
     {

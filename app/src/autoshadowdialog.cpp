@@ -36,12 +36,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSlider>
-#include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
+
+#include <functional>
 
 namespace
 {
@@ -49,16 +52,173 @@ namespace
 constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
-/** 像素参数按预览缩放同比（角度/颜色/阈值/羽化是场值单位，不随缩放） */
+/** 像素参数按预览缩放同比（光源/阈值/羽化是归一化或场值单位，不随缩放） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
     q.displaceStrength = qRound(p.displaceStrength * s);
-    q.lightDistance = std::max(50, qRound(p.lightDistance * s));
     return q;
 }
 
 } // namespace
+
+/** PS 色阶语义的阈值条：色带渐变 + 三个可拖动滑块（三角游标+数值）。
+    点色段=改该色阶颜色；拖游标=改阈值。回调式，不依赖 moc。 */
+class LevelsBar : public QWidget
+{
+public:
+    LevelsBar(QWidget* parent, std::function<void()> onChanged, std::function<void(int)> onSegmentClick)
+        : QWidget(parent)
+        , mOnChanged(std::move(onChanged))
+        , mOnSegmentClick(std::move(onSegmentClick))
+    {
+        setMouseTracking(true);
+        setMinimumHeight(52);
+        setCursor(Qt::PointingHandCursor);
+    }
+
+    void setThresholds(const int t[3])
+    {
+        for (int i = 0; i < 3; ++i)
+            mThresholds[i] = t[i];
+        update();
+    }
+
+    void setLevels(const AutoShadowLevel levels[4], const bool smooth)
+    {
+        for (int i = 0; i < 4; ++i)
+            mLevels[i] = levels[i];
+        mSmooth = smooth;
+        update();
+    }
+
+    int thresholds(int i) const { return mThresholds[i]; }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter p(this);
+        const int m = 10;                      // 左右留白
+        const int barW = width() - 2 * m;
+        const int barY = 6;
+        const int barH = 16;
+
+        // 色带：色调分离=分阶色段；平滑=连续渐变
+        if (mSmooth)
+        {
+            QLinearGradient grad(m, 0, m + barW, 0);
+            grad.setColorAt(0.0, QColor(mLevels[0].color));
+            grad.setColorAt(mThresholds[0] / 100.0, QColor(mLevels[1].color));
+            grad.setColorAt(mThresholds[1] / 100.0, QColor(mLevels[2].color));
+            grad.setColorAt(mThresholds[2] / 100.0, QColor(mLevels[3].color));
+            grad.setColorAt(1.0, QColor(mLevels[3].color));
+            p.fillRect(m, barY, barW, barH, grad);
+        }
+        else
+        {
+            const int edges[5] = { 0, mThresholds[0], mThresholds[1], mThresholds[2], 100 };
+            for (int i = 0; i < 4; ++i)
+            {
+                const int x0 = m + edges[i] * barW / 100;
+                const int x1 = m + edges[i + 1] * barW / 100;
+                p.fillRect(x0, barY, x1 - x0, barH, QColor(mLevels[i].color));
+            }
+        }
+        p.setPen(QPen(QColor(120, 120, 120), 1));
+        p.drawRect(m, barY, barW - 1, barH - 1);
+
+        // 游标：三角+数值（PS 语义）
+        QFont smallFont = font();
+        smallFont.setPointSizeF(std::max(7.0, font().pointSizeF() - 2.0));
+        p.setFont(smallFont);
+        for (int i = 0; i < 3; ++i)
+        {
+            const int x = markerX(i);
+            p.setPen(Qt::NoPen);
+            p.setBrush(i == mDragIndex ? QColor(35, 131, 212) : QColor(85, 85, 85));
+            p.drawPolygon(QPolygon() << QPoint(x - 5, barY + barH + 2)
+                                      << QPoint(x + 5, barY + barH + 2)
+                                      << QPoint(x, barY + barH - 4));
+            p.setPen(QColor(160, 160, 160));
+            p.drawText(QRect(x - 16, barY + barH + 6, 32, 14), Qt::AlignHCenter | Qt::AlignTop,
+                       QString::number(mThresholds[i]));
+        }
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (event->button() != Qt::LeftButton)
+            return;
+        const int hit = hitMarker(event->pos().x());
+        if (hit >= 0)
+        {
+            mDragIndex = hit;
+            update();
+            return;
+        }
+        // 点在色段上：改该段色阶的颜色
+        const int t = posToValue(event->pos().x());
+        int level = 3;
+        if (t < mThresholds[0]) level = 0;
+        else if (t < mThresholds[1]) level = 1;
+        else if (t < mThresholds[2]) level = 2;
+        if (mOnSegmentClick)
+            mOnSegmentClick(level);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (mDragIndex < 0)
+        {
+            setCursor(hitMarker(event->pos().x()) >= 0 ? Qt::SizeAllCursor : Qt::PointingHandCursor);
+            return;
+        }
+        const int lo = mDragIndex == 0 ? 1 : mThresholds[mDragIndex - 1] + 1;
+        const int hi = mDragIndex == 2 ? 100 : mThresholds[mDragIndex + 1] - 1;
+        const int t = std::min(hi, std::max(lo, posToValue(event->pos().x())));
+        if (t != mThresholds[mDragIndex])
+        {
+            mThresholds[mDragIndex] = t;
+            update();
+            if (mOnChanged)
+                mOnChanged();
+        }
+    }
+
+    void mouseReleaseEvent(QMouseEvent*) override
+    {
+        if (mDragIndex >= 0)
+        {
+            mDragIndex = -1;
+            update();
+        }
+    }
+
+private:
+    int barLeft() const { return 10; }
+    int barWidth() const { return width() - 2 * barLeft(); }
+    int markerX(const int i) const { return barLeft() + mThresholds[i] * barWidth() / 100; }
+    int posToValue(const int x) const
+    {
+        return std::min(100, std::max(0, (x - barLeft()) * 100 / std::max(1, barWidth())));
+    }
+    int hitMarker(const int x) const
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            if (std::abs(x - markerX(i)) <= 7)
+                return i;
+        }
+        return -1;
+    }
+
+    int mThresholds[3] = { 20, 45, 80 };
+    AutoShadowLevel mLevels[4];
+    bool mSmooth = false;
+    int mDragIndex = -1;
+    std::function<void()> mOnChanged;
+    std::function<void(int)> mOnSegmentClick;
+};
 
 AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     : QDialog(parent)
@@ -76,7 +236,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     // 参数变动防抖：拖滑杆连续触发，只在停顿后重算一次预览
     mPreviewTimer = new QTimer(this);
     mPreviewTimer->setSingleShot(true);
-    mPreviewTimer->setInterval(120);
+    mPreviewTimer->setInterval(90);
     connect(mPreviewTimer, &QTimer::timeout, this, &AutoShadowDialog::renderPreview);
 
     auto* rootLayout = new QHBoxLayout(this);
@@ -87,18 +247,20 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     mParamColumn->setSpacing(6);
 
-    // ── 场生成段参数 ──
-    QDoubleSpinBox* angleSpin = nullptr;
-    QSlider* angleSlider = nullptr;
-    addSliderRow(tr("光源角度："), 0, 359, 135,
-        tr("光源方向（度）：0=右 90=上 135=左上 180=左 270=下。默认左上光。"), angleSpin, angleSlider);
-    mAngleSpin = angleSpin;
+    // ── 场生成段参数：光源=预览框点/拖定位，滑杆是 X/Y 百分比 ──
+    QDoubleSpinBox* lightXSpin = nullptr;
+    QSlider* lightXSlider = nullptr;
+    addSliderRow(tr("光源 X："), -100, 200, 15,
+        tr("光源水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
+        lightXSpin, lightXSlider);
+    mLightXSpin = lightXSpin;
 
-    QDoubleSpinBox* distanceSpin = nullptr;
-    QSlider* distanceSlider = nullptr;
-    addSliderRow(tr("光源距离："), 100, 5000, 600,
-        tr("光源到画面中心的距离（像素）：近=色阶边界弯成圆弧，远=接近平直。"), distanceSpin, distanceSlider);
-    mDistanceSpin = distanceSpin;
+    QDoubleSpinBox* lightYSpin = nullptr;
+    QSlider* lightYSlider = nullptr;
+    addSliderRow(tr("光源 Y："), -100, 200, 5,
+        tr("光源垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
+        lightYSpin, lightYSlider);
+    mLightYSpin = lightYSpin;
 
     QDoubleSpinBox* displaceSpin = nullptr;
     QSlider* displaceSlider = nullptr;
@@ -131,37 +293,23 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     connect(mInvertCheck, &QCheckBox::toggled, this, [this] { schedulePreview(); });
     mParamColumn->addWidget(mInvertCheck);
 
-    // 色阶阈值：三游标切四阶（归一化场值 0..100）
-    auto* thresholdRow = new QGridLayout;
-    thresholdRow->setHorizontalSpacing(8);
-    thresholdRow->setContentsMargins(0, 0, 0, 0);
-    auto* thresholdLabel = new QLabel(tr("色阶阈值："), this);
-    thresholdLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    thresholdRow->addWidget(thresholdLabel, 0, 0);
-    const int thresholdDefaults[3] = { 20, 45, 80 };
-    for (int i = 0; i < 3; ++i)
-    {
-        mThresholdSpins[i] = new QSpinBox(this);
-        mThresholdSpins[i]->setRange(1, 100);
-        mThresholdSpins[i]->setValue(thresholdDefaults[i]);
-        mThresholdSpins[i]->setFixedWidth(64);
-        mThresholdSpins[i]->setToolTip(tr("光场值（0=离光源最近，100=最远）超过该阈值进入下一色阶。三个阈值须递增，乱序会就近收敛。"));
-        thresholdRow->addWidget(mThresholdSpins[i], 0, i + 1);
-        connect(mThresholdSpins[i], &QSpinBox::valueChanged, this, [this](int) { schedulePreview(); });
-    }
-    thresholdRow->setColumnStretch(4, 1);
-    mParamColumn->addLayout(thresholdRow);
+    // 色阶阈值：PS 语义渐变条拖块（点色段=改该阶颜色）
+    auto* levelBox = new QGroupBox(tr("色阶（近光→背光）"), this);
+    auto* levelLayout = new QVBoxLayout(levelBox);
+    mLevelsBar = new LevelsBar(levelBox,
+                               [this] { schedulePreview(); },
+                               [this](const int levelIndex) { pickLevelColor(levelIndex); });
+    mLevelsBar->setToolTip(tr("拖动三角游标调整色阶阈值（场值 0-100）；点击色段直接修改该色阶颜色。"));
+    levelLayout->addWidget(mLevelsBar);
 
-    // 色阶颜色：4 行，每行 独立色 + 独立混合模式
-    auto* levelBox = new QGroupBox(tr("色阶颜色（近光→背光）"), this);
-    auto* levelLayout = new QGridLayout(levelBox);
-    levelLayout->setHorizontalSpacing(8);
-    levelLayout->setVerticalSpacing(2);
+    auto* levelRows = new QGridLayout;
+    levelRows->setHorizontalSpacing(8);
+    levelRows->setVerticalSpacing(2);
     const char* modeNames[3] = { "正常", "正片叠底", "线性加深" };
     for (int i = 0; i < 4; ++i)
     {
         auto* levelLabel = new QLabel(tr("色阶 %1：").arg(i + 1), levelBox);
-        levelLayout->addWidget(levelLabel, i, 0);
+        levelRows->addWidget(levelLabel, i, 0);
 
         mLevelButtons[i] = new QPushButton(levelBox);
         mLevelButtons[i]->setAutoDefault(false);
@@ -170,7 +318,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         connect(mLevelButtons[i], &QPushButton::clicked, this, [this, levelIndex] {
             pickLevelColor(levelIndex);
         });
-        levelLayout->addWidget(mLevelButtons[i], i, 1);
+        levelRows->addWidget(mLevelButtons[i], i, 1);
         updateLevelButton(i);
 
         mLevelCombos[i] = new QComboBox(levelBox);
@@ -182,9 +330,10 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
             mLevels[levelIndex].mode = static_cast<AutoShadowBlendMode>(index);
             schedulePreview();
         });
-        levelLayout->addWidget(mLevelCombos[i], i, 2);
+        levelRows->addWidget(mLevelCombos[i], i, 2);
     }
-    levelLayout->setColumnStretch(1, 1);
+    levelRows->setColumnStretch(1, 1);
+    levelLayout->addLayout(levelRows);
     mParamColumn->addWidget(levelBox);
 
     // 羽化只在色调分离模式下有意义
@@ -214,16 +363,21 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     mParamColumn->addWidget(buttons);
 
-    // 预览框（右栏）：当前帧实时预览，点击切原图对比
+    // 预览框（右栏）：点击/拖拽定位光源，按钮切换对比原图
     auto* previewBox = new QGroupBox(tr("预览"), this);
     auto* previewLayout = new QVBoxLayout(previewBox);
     mPreviewLabel = new QLabel(previewBox);
     mPreviewLabel->setMinimumSize(PREVIEW_W, PREVIEW_H);
     mPreviewLabel->setAlignment(Qt::AlignCenter);
-    mPreviewLabel->setCursor(Qt::PointingHandCursor);
-    mPreviewLabel->setToolTip(tr("参数变化即时预览效果；点击切换显示原图对比。"));
+    mPreviewLabel->setCursor(Qt::CrossCursor);
+    mPreviewLabel->setToolTip(tr("点击或拖拽定位光源（黄色标记），阴影实时跟随；对比请用下方按钮。"));
     mPreviewLabel->installEventFilter(this);
     previewLayout->addWidget(mPreviewLabel);
+    mCompareButton = new QPushButton(tr("按住对比原图"), previewBox);
+    mCompareButton->setCheckable(true);
+    mCompareButton->setAutoDefault(false);
+    connect(mCompareButton, &QPushButton::toggled, this, [this] { renderPreview(); });
+    previewLayout->addWidget(mCompareButton, 0, Qt::AlignHCenter);
     previewColumn->addWidget(previewBox);
     previewColumn->addStretch(1);
 
@@ -234,11 +388,11 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 AutoShadowParams AutoShadowDialog::params() const
 {
     AutoShadowParams p;
-    p.lightAngle = qRound(mAngleSpin->value());
-    p.lightDistance = qRound(mDistanceSpin->value());
+    p.lightX = mLightXSpin->value() / 100.0;
+    p.lightY = mLightYSpin->value() / 100.0;
     p.displaceStrength = qRound(mDisplaceSpin->value());
     for (int i = 0; i < 3; ++i)
-        p.thresholds[i] = mThresholdSpins[i]->value();
+        p.thresholds[i] = mLevelsBar->thresholds(i);
     p.edgeFeather = qRound(mFeatherSpin->value());
     p.smooth = mTypeCombo->currentIndex() == 1;
     p.invertLevels = mInvertCheck->isChecked();
@@ -254,13 +408,44 @@ bool AutoShadowDialog::applyToAllKeyFrames() const
 
 bool AutoShadowDialog::eventFilter(QObject* watched, QEvent* event)
 {
-    if (watched == mPreviewLabel && event->type() == QEvent::MouseButtonRelease)
+    if (watched == mPreviewLabel)
     {
-        mPreviewOriginal = !mPreviewOriginal;
-        renderPreview();
-        return true;
+        const QMouseEvent* mouseEvent = dynamic_cast<const QMouseEvent*>(event);
+        if (mouseEvent != nullptr
+            && event->type() == QEvent::MouseButtonPress && mouseEvent->button() == Qt::LeftButton)
+        {
+            mDraggingLight = true;
+            setLightFromPreview(mouseEvent->position().toPoint());
+            return true;
+        }
+        if (mouseEvent != nullptr && event->type() == QEvent::MouseMove && mDraggingLight)
+        {
+            setLightFromPreview(mouseEvent->position().toPoint());
+            return true;
+        }
+        if (event->type() == QEvent::MouseButtonRelease)
+        {
+            mDraggingLight = false;
+            return true;
+        }
     }
     return QDialog::eventFilter(watched, event);
+}
+
+void AutoShadowDialog::setLightFromPreview(const QPoint& pos)
+{
+    if (mScaledSource.isNull() || mLightXSpin == nullptr)
+        return;
+    // label 内图像按 AlignCenter 居中，先换算到图像坐标再归一化
+    const int lw = mPreviewLabel->width();
+    const int lh = mPreviewLabel->height();
+    const int iw = mScaledSource.width();
+    const int ih = mScaledSource.height();
+    const double u = std::min(1.0, std::max(0.0, (pos.x() - (lw - iw) / 2.0) / iw));
+    const double v = std::min(1.0, std::max(0.0, (pos.y() - (lh - ih) / 2.0) / ih));
+    mLightXSpin->setValue(qRound(u * 100.0));
+    mLightYSpin->setValue(qRound(v * 100.0));
+    renderPreview(); // 拖拽即时回显（光源标记），阴影防抖由 valueChanged→schedulePreview 处理
 }
 
 void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
@@ -283,6 +468,7 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
     spin->setDecimals(0);
     spin->setRange(minV, maxV);
     spin->setValue(defV);
+    spin->setSuffix(tr("%"));
     spin->setFixedWidth(96);
     spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     spin->setToolTip(tip);
@@ -313,6 +499,7 @@ void AutoShadowDialog::pickLevelColor(const int levelIndex)
     {
         mLevels[levelIndex].color = picked.rgb();
         updateLevelButton(levelIndex);
+        syncLevelsBar();
         schedulePreview();
     }
 }
@@ -323,6 +510,11 @@ void AutoShadowDialog::updateLevelButton(const int levelIndex)
     mLevelButtons[levelIndex]->setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid #888888;")
                                                  .arg(c.name()));
     mLevelButtons[levelIndex]->setText(c.name().toUpper());
+}
+
+void AutoShadowDialog::syncLevelsBar()
+{
+    mLevelsBar->setLevels(mLevels, mTypeCombo->currentIndex() == 1);
 }
 
 void AutoShadowDialog::grabPreviewSource()
@@ -365,6 +557,8 @@ void AutoShadowDialog::schedulePreview()
 
 void AutoShadowDialog::renderPreview()
 {
+    syncLevelsBar();
+
     if (mScaledSource.isNull())
     {
         mPreviewLabel->setPixmap(QPixmap());
@@ -372,13 +566,31 @@ void AutoShadowDialog::renderPreview()
         return;
     }
 
-    if (mPreviewOriginal)
+    if (mCompareButton != nullptr && mCompareButton->isChecked())
     {
         mPreviewLabel->setPixmap(QPixmap::fromImage(mScaledSource));
         return;
     }
 
+    const AutoShadowParams p = scaledForPreview(params(), mPreviewScale);
     QImage preview = mScaledSource; // COW 拷贝，apply 就地改写
-    AutoShadow::apply(preview, scaledForPreview(params(), mPreviewScale));
+    AutoShadow::apply(preview, p);
+
+    // 画光源标记（黄圈+十字），只在画面范围内显示
+    const int mx = qRound(p.lightX * preview.width());
+    const int my = qRound(p.lightY * preview.height());
+    if (mx >= -8 && mx <= preview.width() + 8 && my >= -8 && my <= preview.height() + 8)
+    {
+        QPainter painter(&preview);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QColor(255, 220, 60), 2));
+        painter.setBrush(QColor(255, 220, 60, 170));
+        painter.drawEllipse(QPoint(mx, my), 7, 7);
+        painter.setPen(QPen(QColor(255, 250, 200), 1));
+        painter.drawLine(mx - 11, my, mx - 4, my);
+        painter.drawLine(mx + 4, my, mx + 11, my);
+        painter.drawLine(mx, my - 11, mx, my - 4);
+        painter.drawLine(mx, my + 4, mx, my + 11);
+    }
     mPreviewLabel->setPixmap(QPixmap::fromImage(preview));
 }

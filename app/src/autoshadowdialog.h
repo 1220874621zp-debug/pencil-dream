@@ -34,13 +34,13 @@ class QLabel;
 class QPushButton;
 class QRadioButton;
 class QSlider;
-class QSpinBox;
 class QTimer;
 class QVBoxLayout;
 class Editor;
+class LevelsBar;
 
-/** 自动上阴影参数对话框（CSP 参数模型）：左参数右预览。
-    光源/置换控制场生成段；阈值/类型/色阶控制映射段（4 阶独立色+混合模式）。 */
+/** 自动上阴影参数对话框（CSP 参数模型 + PS 交互）：左参数右预览。
+    预览框点击/拖拽直接定位光源；色阶阈值=渐变条拖块（点色段改该阶颜色）。 */
 class AutoShadowDialog : public QDialog
 {
     Q_OBJECT
@@ -61,28 +61,31 @@ private:
     void grabPreviewSource();
     void schedulePreview();
     void renderPreview();
+    void setLightFromPreview(const QPoint& pos);
+    void syncLevelsBar();
 
     QVBoxLayout* mParamColumn = nullptr;
 
-    QDoubleSpinBox* mAngleSpin = nullptr;
-    QDoubleSpinBox* mDistanceSpin = nullptr;
+    QDoubleSpinBox* mLightXSpin = nullptr;
+    QDoubleSpinBox* mLightYSpin = nullptr;
     QDoubleSpinBox* mDisplaceSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
     QSlider* mFeatherSlider = nullptr;
     QComboBox* mTypeCombo = nullptr;
     QCheckBox* mInvertCheck = nullptr;
-    QSpinBox* mThresholdSpins[3] = { nullptr, nullptr, nullptr };
+    LevelsBar* mLevelsBar = nullptr;
     QPushButton* mLevelButtons[4] = { nullptr, nullptr, nullptr, nullptr };
     QComboBox* mLevelCombos[4] = { nullptr, nullptr, nullptr, nullptr };
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
 
     QLabel* mPreviewLabel = nullptr;
+    QPushButton* mCompareButton = nullptr;
     QTimer* mPreviewTimer = nullptr;
     Editor* mEditor = nullptr;
     QImage mScaledSource;        // 当前帧缩放到预览框尺寸的副本（预览基准，COW 不动原图）
     double mPreviewScale = 1.0;  // 预览缩放比：像素参数按此同比后预览才与实跑一致
-    bool mPreviewOriginal = false;
+    bool mDraggingLight = false;
 
     AutoShadowLevel mLevels[4];  // 色阶 1..4（颜色+混合模式）
 };
