@@ -40,7 +40,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QPainter>
 #include <QPushButton>
 #include <QRadioButton>
-#include <QScrollArea>
 #include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -245,17 +244,9 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     connect(mPreviewTimer, &QTimer::timeout, this, &AutoShadowDialog::renderPreview);
 
     auto* rootLayout = new QHBoxLayout(this);
-    // 参数行多（13 行滑杆），包滚动区防小屏溢出（顶层对话框无外层滚动区，无嵌套塌陷）
-    auto* paramHost = new QWidget(this);
-    mParamColumn = new QVBoxLayout(paramHost);
-    auto* paramScroll = new QScrollArea(this);
-    paramScroll->setWidget(paramHost);
-    paramScroll->setWidgetResizable(true);
-    paramScroll->setFrameShape(QFrame::NoFrame);
-    paramScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    paramScroll->setMaximumHeight(880);
+    mParamColumn = new QVBoxLayout;
     auto* previewColumn = new QVBoxLayout;
-    rootLayout->addWidget(paramScroll, 1);
+    rootLayout->addLayout(mParamColumn, 1);
     rootLayout->addLayout(previewColumn, 0);
 
     mParamColumn->setSpacing(6);
@@ -450,15 +441,16 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     });
     syncFeatherEnabled();
 
-    // ── 作用范围 ──
-    auto* scopeBox = new QGroupBox(tr("作用范围"), this);
-    auto* scopeLayout = new QVBoxLayout(scopeBox);
-    mCurrentFrameRadio = new QRadioButton(tr("仅当前帧"), scopeBox);
+    // ── 作用范围（横排紧凑） ──
+    auto* scopeRow = new QHBoxLayout;
+    scopeRow->setContentsMargins(0, 0, 0, 0);
+    mCurrentFrameRadio = new QRadioButton(tr("仅当前帧"), this);
     mCurrentFrameRadio->setChecked(true);
-    mAllKeyFramesRadio = new QRadioButton(tr("当前图层全部关键帧"), scopeBox);
-    scopeLayout->addWidget(mCurrentFrameRadio);
-    scopeLayout->addWidget(mAllKeyFramesRadio);
-    mParamColumn->addWidget(scopeBox);
+    mAllKeyFramesRadio = new QRadioButton(tr("当前图层全部关键帧"), this);
+    scopeRow->addWidget(mCurrentFrameRadio);
+    scopeRow->addWidget(mAllKeyFramesRadio);
+    scopeRow->addStretch(1);
+    mParamColumn->addLayout(scopeRow);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -580,30 +572,34 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
 void AutoShadowDialog::addSliderRowTo(QLayout* layout, const QString& labelText, const int minV, const int maxV,
                                       const int defV, const QString& tip, const QString& suffix,
                                       QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
-{    auto* grid = new QGridLayout;
+{    // 单行紧凑排版：标签 | 滑杆(拉伸) | 数值框——13 行参数也放得下常规屏幕
+    auto* grid = new QGridLayout;
     grid->setHorizontalSpacing(8);
     grid->setVerticalSpacing(2);
     grid->setContentsMargins(0, 0, 0, 0);
 
     auto* label = new QLabel(labelText, this);
+    label->setMinimumWidth(84);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     grid->addWidget(label, 0, 0);
 
     auto* slider = new QSlider(Qt::Horizontal, this);
     slider->setRange(minV, maxV);
     slider->setValue(defV);
+    slider->setToolTip(tip);
+    grid->addWidget(slider, 0, 1);
+
     auto* spin = new QDoubleSpinBox(this);
     spin->setDecimals(0);
     spin->setRange(minV, maxV);
     spin->setValue(defV);
     spin->setSuffix(suffix);
     spin->setFixedWidth(96);
-    spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     spin->setToolTip(tip);
 
-    grid->addWidget(slider, 1, 0);
-    grid->addWidget(spin, 0, 1, 2, 1);
-    grid->setColumnStretch(0, 1);
+    grid->addWidget(spin, 0, 2);
+    grid->setColumnStretch(1, 1);
     layout->addItem(grid);
 
     connect(slider, &QSlider::valueChanged, this, [spin](const int value) {
