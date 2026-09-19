@@ -206,6 +206,45 @@ TEST_CASE("AutoShadow-despeckle-mask")
     REQUIRE(view.pixel(15, 15) == qRgb(255, 255, 255));
 }
 
+TEST_CASE("AutoShadow-blend-modes-and-opacity")
+{
+    // 灰128条 + 阈值压到 [1,2,3] → 整条落阶4，逐模式验证直通域公式与不透明度回混
+    const auto makeGrayBar = [] {
+        QImage img = makeImage(30, 100);
+        fillRect(img, 10, 10, 19, 89, qRgb(128, 128, 128));
+        return img;
+    };
+    const auto run = [](QImage img, AutoShadowParams p) {
+        p.thresholds[0] = 1;
+        p.thresholds[1] = 2;
+        p.thresholds[2] = 3;
+        REQUIRE(AutoShadow::apply(img, p) > 0);
+        return img.pixel(15, 50);
+    };
+    AutoShadowParams p = plainParams();
+
+    p.levels[3] = { qRgb(255, 255, 255), AutoShadowBlendMode::Screen, 100 };
+    REQUIRE(run(makeGrayBar(), p) == qRgb(255, 255, 255));      // 滤色+白：x+1−x=1
+
+    p.levels[3] = { qRgb(0, 64, 0), AutoShadowBlendMode::LinearDodge, 100 };
+    REQUIRE(run(makeGrayBar(), p) == qRgb(128, 192, 128));      // 线性减淡：c+s
+
+    p.levels[3] = { qRgb(128, 128, 128), AutoShadowBlendMode::ColorBurn, 100 };
+    REQUIRE(run(makeGrayBar(), p) == qRgb(2, 2, 2));            // 颜色加深 1−(127/128)
+
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Darken, 100 };
+    REQUIRE(run(makeGrayBar(), p) == qRgb(64, 64, 64));         // 变暗：min
+
+    p.levels[3] = { qRgb(255, 255, 255), AutoShadowBlendMode::SoftLight, 100 };
+    REQUIRE(run(makeGrayBar(), p) == qRgb(192, 192, 192));      // 柔光+白：x(2−x)
+
+    QImage whiteBar = farLightImage();
+    AutoShadowParams q = plainParams();
+    q.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply, 40 };
+    REQUIRE(AutoShadow::apply(whiteBar, q) > 0);
+    REQUIRE(whiteBar.pixel(15, 80) == qRgb(153, 153, 153));     // 不透明度40%：1+0.4(0−1)=0.6
+}
+
 TEST_CASE("AutoShadow-matte-preview-view")
 {
     // 遮罩视图（AE 简单阻塞的 Mask 视图）：白=不透明、黑=透明（画布空白也是黑）

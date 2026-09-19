@@ -81,6 +81,7 @@ private:
     LevelsBar* mLevelsBar = nullptr;
     QPushButton* mLevelButtons[4] = { nullptr, nullptr, nullptr, nullptr };
     QComboBox* mLevelCombos[4] = { nullptr, nullptr, nullptr, nullptr };
+    QDoubleSpinBox* mLevelOpacitySpins[4] = { nullptr, nullptr, nullptr, nullptr };
     QRadioButton* mCurrentFrameRadio = nullptr;
     QRadioButton* mAllKeyFramesRadio = nullptr;
 

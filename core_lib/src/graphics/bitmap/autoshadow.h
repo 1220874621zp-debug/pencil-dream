@@ -25,19 +25,28 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 class QImage;
 
-/** 色阶混合模式（对原图做乘性/替换式混合，CSP 自动阴影同款语义） */
+/** 色阶混合模式（PS/AE 语义，直通域公式后回混不透明度、重预乘） */
 enum class AutoShadowBlendMode
 {
-    Normal,      // 正常：直通色按该像素 α 替换
-    Multiply,    // 正片叠底：c·s/255，压暗保细节
-    LinearBurn,  // 线性加深：c+s−255，比正片叠底更沉
+    Normal,       // 正常：直通色按该像素 α 替换
+    Multiply,     // 正片叠底：c·s，压暗保细节（阴影首选）
+    LinearBurn,   // 线性加深：c+s−1，比正片叠底更沉
+    Darken,       // 变暗：min(c,s)
+    ColorBurn,    // 颜色加深：1−min(1,(1−c)/s)，对比更强的加深
+    Lighten,      // 变亮：max(c,s)
+    Screen,       // 滤色：c+s−c·s，提亮（高光/受光面可用）
+    Overlay,      // 叠加：暗部正片叠底、亮部滤色
+    SoftLight,    // 柔光：温和的叠加
+    HardLight,    // 强光：以混合色决定正片叠底/滤色
+    LinearDodge,  // 线性减淡（添加）：c+s
 };
 
-/** 一个色阶：独立颜色 + 独立混合模式 */
+/** 一个色阶：独立颜色 + 独立混合模式 + 独立不透明度 */
 struct AutoShadowLevel
 {
     QRgb color = qRgb(255, 255, 255);
     AutoShadowBlendMode mode = AutoShadowBlendMode::Multiply;
+    int opacity = 100; // 0..100：混合结果按此比例回混原色（100=全强度）
 };
 
 struct AutoShadowParams

@@ -343,7 +343,8 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     auto* levelRows = new QGridLayout;
     levelRows->setHorizontalSpacing(8);
     levelRows->setVerticalSpacing(2);
-    const char* modeNames[3] = { "正常", "正片叠底", "线性加深" };
+    const char* modeNames[11] = { "正常", "正片叠底", "线性加深", "变暗", "颜色加深",
+                                  "变亮", "滤色", "叠加", "柔光", "强光", "线性减淡" };
     for (int i = 0; i < 4; ++i)
     {
         auto* levelLabel = new QLabel(tr("色阶 %1：").arg(i + 1), levelBox);
@@ -363,12 +364,25 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         for (const char* modeName : modeNames)
             mLevelCombos[i]->addItem(tr(modeName));
         mLevelCombos[i]->setCurrentIndex(static_cast<int>(mLevels[i].mode));
-        mLevelCombos[i]->setToolTip(tr("该色阶与原图的混合模式：正片叠底/线性加深=压暗保细节（CSP 常用），正常=直接换色。"));
+        mLevelCombos[i]->setToolTip(tr("该色阶与原图的混合模式（PS/AE 语义）：正片叠底/线性加深=压暗保细节（阴影常用），滤色/线性减淡=提亮（受光面可用），正常=直接换色。"));
         connect(mLevelCombos[i], &QComboBox::currentIndexChanged, this, [this, levelIndex](const int index) {
             mLevels[levelIndex].mode = static_cast<AutoShadowBlendMode>(index);
             schedulePreview();
         });
         levelRows->addWidget(mLevelCombos[i], i, 2);
+
+        mLevelOpacitySpins[i] = new QDoubleSpinBox(levelBox);
+        mLevelOpacitySpins[i]->setDecimals(0);
+        mLevelOpacitySpins[i]->setRange(0, 100);
+        mLevelOpacitySpins[i]->setValue(mLevels[i].opacity);
+        mLevelOpacitySpins[i]->setSuffix(tr("%"));
+        mLevelOpacitySpins[i]->setFixedWidth(64);
+        mLevelOpacitySpins[i]->setToolTip(tr("该色阶的不透明度：混合结果按此比例回混原色，100=全强度。"));
+        connect(mLevelOpacitySpins[i], &QDoubleSpinBox::valueChanged, this, [this, levelIndex](const double value) {
+            mLevels[levelIndex].opacity = qRound(value);
+            schedulePreview();
+        });
+        levelRows->addWidget(mLevelOpacitySpins[i], i, 3);
     }
     levelRows->setColumnStretch(1, 1);
     levelLayout->addLayout(levelRows);

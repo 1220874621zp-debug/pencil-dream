@@ -304,24 +304,64 @@ MatteData buildMatte(const QImage& img, const int maskThreshold, const int choke
     return m;
 }
 
-/** 单通道混合（预乘域）：mode 决定公式，返回混合后的预乘分量（浮点，外层统一加权后再取整） */
-double blendChannel(const int premul, const int alpha, const int s, const AutoShadowBlendMode mode)
+/** 单通道混合（PS/AE 语义）：直通域按模式计算 → 按不透明度回混原色 → 重预乘。
+    返回预乘分量（0..α，浮点，外层统一加权后再取整）。 */
+double blendChannel(const int premul, const int alpha, const int s, const AutoShadowBlendMode mode, const double opacity)
 {
+    // 直通原色（预乘提升）
+    double x;
+    if (alpha >= 255)
+        x = premul / 255.0;
+    else if (alpha <= 0)
+        return premul;
+    else
+        x = std::min(255.0, (premul * 255.0 + alpha * 0.5) / alpha) / 255.0;
+    const double y = s / 255.0;
+
+    double b; // 该模式的直通混合结果（0..1）
     switch (mode)
     {
-    case AutoShadowBlendMode::Multiply:
-        return premul * static_cast<double>(s) / 255.0;
     case AutoShadowBlendMode::Normal:
-        return s * static_cast<double>(alpha) / 255.0;
+        b = y;
+        break;
+    case AutoShadowBlendMode::Multiply:
+        b = x * y;
+        break;
     case AutoShadowBlendMode::LinearBurn:
-    {
-        if (alpha >= 255)
-            return std::max(0, premul + s - 255);
-        const int straight = std::min(255, (premul * 255 + alpha / 2) / alpha);
-        return std::max(0, std::min(255, straight + s - 255)) * static_cast<double>(alpha) / 255.0;
+        b = std::max(0.0, x + y - 1.0);
+        break;
+    case AutoShadowBlendMode::Darken:
+        b = std::min(x, y);
+        break;
+    case AutoShadowBlendMode::ColorBurn:
+        b = y <= 0.0 ? 0.0 : 1.0 - std::min(1.0, (1.0 - x) / y);
+        break;
+    case AutoShadowBlendMode::Lighten:
+        b = std::max(x, y);
+        break;
+    case AutoShadowBlendMode::Screen:
+        b = x + y - x * y;
+        break;
+    case AutoShadowBlendMode::Overlay:
+        b = x <= 0.5 ? 2.0 * x * y : 1.0 - 2.0 * (1.0 - x) * (1.0 - y);
+        break;
+    case AutoShadowBlendMode::SoftLight:
+        b = (1.0 - 2.0 * y) * x * x + 2.0 * y * x;
+        break;
+    case AutoShadowBlendMode::HardLight:
+        b = y <= 0.5 ? 2.0 * x * y : 1.0 - 2.0 * (1.0 - x) * (1.0 - y);
+        break;
+    case AutoShadowBlendMode::LinearDodge:
+        b = std::min(1.0, x + y);
+        break;
+    default:
+        b = x;
+        break;
     }
-    }
-    return premul;
+
+    // 不透明度回混：out = 原色 + 不透明度·(混合结果−原色)，再预乘
+    const double outStraight = x + opacity * (b - x);
+    return outStraight * alpha;
 }
 
 } // namespace
@@ -358,11 +398,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     // 色带（反转=镜像）
     AutoShadowLevel levels[4];
     for (int i = 0; i < 4; ++i)
-    {
-        const AutoShadowLevel& src = params.levels[params.invertLevels ? 3 - i : i];
-        levels[i].color = src.color;
-        levels[i].mode = src.mode;
-    }
+        levels[i] = params.levels[params.invertLevels ? 3 - i : i];
 
     // ── 掩膜生成段：去色阈值（黑透白不透）+ 简单阻塞
     const MatteData m = buildMatte(img, maskThreshold, chokeMatte);
@@ -586,9 +622,10 @@ int apply(QImage& img, const AutoShadowParams& params)
             {
                 if (w[i] <= 0.0)
                     continue;
-                outR += w[i] * blendChannel(qRed(px), alpha, static_cast<int>(levelS[i][0]), levels[i].mode);
-                outG += w[i] * blendChannel(qGreen(px), alpha, static_cast<int>(levelS[i][1]), levels[i].mode);
-                outB += w[i] * blendChannel(qBlue(px), alpha, static_cast<int>(levelS[i][2]), levels[i].mode);
+                const double levelOpacity = clampInt(levels[i].opacity, 0, 100) / 100.0;
+                outR += w[i] * blendChannel(qRed(px), alpha, static_cast<int>(levelS[i][0]), levels[i].mode, levelOpacity);
+                outG += w[i] * blendChannel(qGreen(px), alpha, static_cast<int>(levelS[i][1]), levels[i].mode, levelOpacity);
+                outB += w[i] * blendChannel(qBlue(px), alpha, static_cast<int>(levelS[i][2]), levels[i].mode, levelOpacity);
             }
             const QRgb out = qRgba(qRound(outR), qRound(outG), qRound(outB), alpha);
             if (out != px)
