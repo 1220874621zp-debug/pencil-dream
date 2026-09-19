@@ -32,7 +32,6 @@ namespace
 {
 
 constexpr int ALPHA_MIN = 16; // α≥此值视为不透明内容
-constexpr double EMISSION_STEP = 2.0; // 法线发射步长（BWF 同款）
 constexpr int OCCLUSION_SAMPLES = 16; // 径向遮挡采样数
 
 int clampInt(const int v, const int lo, const int hi)
@@ -159,6 +158,60 @@ void gaussBlur(std::vector<float>& buf, std::vector<float>& tmp, const int w, co
         boxBlurH(buf, tmp, w, h, r);
         boxBlurV(buf, tmp, w, h, r);
     }
+}
+
+/** 距离变换（chamfer 3-4 两趟近似欧氏）：白区（≥0.5）像素到最近非白像素的距离。
+    SDF 伪高度场的来源：每个连通区域成丘（中心高），线稿/洞/画布空白是山谷（0）。 */
+void distanceTransform(std::vector<float>& dist, const std::vector<float>& maskF, const int w, const int h)
+{
+    constexpr float kInf = 1e9f;
+    const size_t count = maskF.size();
+    dist.assign(count, 0.0f);
+    for (size_t i = 0; i < count; ++i)
+        dist[i] = maskF[i] >= 0.5f ? kInf : 0.0f;
+
+    for (int y = 0; y < h; ++y)
+    {
+        const size_t row = static_cast<size_t>(y) * w;
+        for (int x = 0; x < w; ++x)
+        {
+            float d = dist[row + x];
+            if (x > 0)
+                d = std::min(d, dist[row + x - 1] + 3.0f);
+            if (y > 0)
+            {
+                const size_t up = row - w;
+                d = std::min(d, dist[up + x] + 3.0f);
+                if (x > 0)
+                    d = std::min(d, dist[up + x - 1] + 4.0f);
+                if (x < w - 1)
+                    d = std::min(d, dist[up + x + 1] + 4.0f);
+            }
+            dist[row + x] = d;
+        }
+    }
+    for (int y = h - 1; y >= 0; --y)
+    {
+        const size_t row = static_cast<size_t>(y) * w;
+        for (int x = w - 1; x >= 0; --x)
+        {
+            float d = dist[row + x];
+            if (x < w - 1)
+                d = std::min(d, dist[row + x + 1] + 3.0f);
+            if (y < h - 1)
+            {
+                const size_t dn = row + w;
+                d = std::min(d, dist[dn + x] + 3.0f);
+                if (x < w - 1)
+                    d = std::min(d, dist[dn + x + 1] + 4.0f);
+                if (x > 0)
+                    d = std::min(d, dist[dn + x - 1] + 4.0f);
+            }
+            dist[row + x] = d;
+        }
+    }
+    for (float& v : dist)
+        v /= 3.0f;
 }
 
 /** 简单阻塞：分离两趟 min/max 形态学（正值=阻塞/收缩、负值=扩展），r 像素 */
@@ -390,9 +443,11 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
     const int chokeMatte = clampInt(params.chokeMatte, -50, 50);
     const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
+    const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
+    const int formHeight = clampInt(params.formHeight, 1, 40);
+    const int formSmooth = clampInt(params.formSmooth, 0, 40);
+    const double lightHeightF = clampInt(params.lightHeight, 1, 300);
     const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
-    const double emissionStrength = clampInt(params.emissionStrength, 0, 100) / 100.0;
-    const int emissionLength = clampInt(params.emissionLength, 1, 400);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
 
     // 色带（反转=镜像）
@@ -448,20 +503,30 @@ int apply(QImage& img, const AutoShadowParams& params)
         }
     }
 
-    // ── 场分量②：法线发射（BWF 黑山闪 stage4）——边缘沿"指向白区"法线投衰减阴影带
-    std::vector<float> emissionMap(count, 0.0f);
-    if (emissionStrength > 0.0)
+    // ── 场分量②：SDF 伪法线 N·L（形体明暗交界线，主阴影场）──
+    // 距离变换当伪高度场（连通区域成丘、线稿成谷）→ 圆滑 → 高度场法线 → 与光源点积。
+    // 明暗交界线横切形体、贴线阴影自动成立——AE Relight 类（AI 法线打光）的解析式近似。
+    std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−N·L
+    if (normalStrength > 0.0)
     {
-        std::vector<float> blurMask = m.maskF;
+        std::vector<float> height;
+        distanceTransform(height, m.maskF, w, h);
         {
             std::vector<float> tmp(count);
-            gaussBlur(blurMask, tmp, w, h, 3.0f); // σ 加大：阶梯轮廓的法线先磨平，防喷刺
+            gaussBlur(height, tmp, w, h, static_cast<float>(formSmooth));
         }
-        const int maxSteps = std::min(300, static_cast<int>(emissionLength / EMISSION_STEP) + 1);
-        const auto blurredAt = [&blurMask, w, h](const int px, const int py) {
-            const int cx = std::min(w - 1, std::max(0, px));
-            const int cy = std::min(h - 1, std::max(0, py));
-            return blurMask[static_cast<size_t>(cy) * w + cx];
+
+        // 光源高度：以 max(对角线, 光到内容距离) 为基的仰角比例——100≈45°仰角，越大越顶光；
+        // 光放得越远仰角不塌（远光仍是斜射而非掠射）
+        const double cx = (minX + maxX) * 0.5;
+        const double cy = (minY + maxY) * 0.5;
+        const double screenDist = std::sqrt((lightX - cx) * (lightX - cx) + (lightY - cy) * (lightY - cy));
+        const double diag = std::sqrt(static_cast<double>(w) * w + static_cast<double>(h) * h);
+        const double lightZ = std::max(1.0, lightHeightF / 100.0 * std::max(diag, screenDist));
+        const auto hAt = [&height, w, h](const int px, const int py) {
+            const int cxx = std::min(w - 1, std::max(0, px));
+            const int cyy = std::min(h - 1, std::max(0, py));
+            return height[static_cast<size_t>(cyy) * w + cxx];
         };
 
         for (int y = minY; y <= maxY; ++y)
@@ -471,82 +536,41 @@ int apply(QImage& img, const AutoShadowParams& params)
             {
                 if (m.maskF[row + x] < 0.5f)
                     continue;
-                // 边缘判定：白区像素且有掩膜 8 邻域为洞
-                bool edge = false;
-                for (int ddy = -1; ddy <= 1 && !edge; ++ddy)
+                // N = normalize(−∂z/∂x, −∂z/∂y, 1)，z = formHeight·h（高度场法线，向外）
+                const double gx = (hAt(x + 1, y) - hAt(x - 1, y)) * 0.5 * formHeight;
+                const double gy = (hAt(x, y + 1) - hAt(x, y - 1)) * 0.5 * formHeight;
+                const double nLen = std::sqrt(gx * gx + gy * gy + 1.0);
+                // L = 光源 − 表面点（表面点带伪高度 z）
+                const double lx = lightX - x;
+                const double ly = lightY - y;
+                const double lz = lightZ - hAt(x, y) * formHeight;
+                const double lLen = std::sqrt(lx * lx + ly * ly + lz * lz);
+                double ndl = 1.0;
+                if (lLen > 1e-6)
                 {
-                    for (int ddx = -1; ddx <= 1 && !edge; ++ddx)
-                    {
-                        if (ddx == 0 && ddy == 0)
-                            continue;
-                        const int nx = x + ddx, ny = y + ddy;
-                        if (nx < 0 || nx >= w || ny < 0 || ny >= h)
-                            continue;
-                        if (m.maskF[static_cast<size_t>(ny) * w + nx] < 0.5f)
-                            edge = true;
-                    }
+                    ndl = ((-gx / nLen) * lx + (-gy / nLen) * ly + (1.0 / nLen) * lz) / lLen;
+                    ndl = std::min(1.0, std::max(0.0, ndl));
                 }
-                if (!edge)
-                    continue;
-
-                // 法线 = 模糊掩膜的梯度方向（指向白区内部，掩膜值递增方向）
-                const double gx = blurredAt(x + 1, y) - blurredAt(x - 1, y);
-                const double gy = blurredAt(x, y + 1) - blurredAt(x, y - 1);
-                const double gMag = std::sqrt(gx * gx + gy * gy);
-                if (gMag < 1e-4)
-                    continue;
-                const double nx = gx / gMag;
-                const double ny = gy / gMag;
-
-                for (int s = 1; s <= maxSteps; ++s)
-                {
-                    const double dist = s * EMISSION_STEP;
-                    const double falloff = 1.0 - dist / (emissionLength + 1.0);
-                    if (falloff <= 0.0)
-                        break;
-                    const double f2 = falloff * falloff;
-                    const double thickness = 1.0 + (1.0 - f2) * 2.0;
-                    const int tR = static_cast<int>(std::ceil(thickness));
-                    const double base = f2 * emissionStrength;
-
-                    const int cx = x + static_cast<int>(std::lround(nx * dist));
-                    const int cy = y + static_cast<int>(std::lround(ny * dist));
-                    for (int sy = cy - tR; sy <= cy + tR; ++sy)
-                    {
-                        if (sy < 0 || sy >= h)
-                            continue;
-                        for (int sx = cx - tR; sx <= cx + tR; ++sx)
-                        {
-                            if (sx < 0 || sx >= w)
-                                continue;
-                            const double d = std::sqrt(static_cast<double>((sx - cx) * (sx - cx) + (sy - cy) * (sy - cy)));
-                            if (d > thickness)
-                                continue;
-                            const double soft = 1.0 - d / (thickness + 0.001);
-                            const double val = base * soft * soft;
-                            const size_t sidx = static_cast<size_t>(sy) * w + sx;
-                            if (val > emissionMap[sidx])
-                                emissionMap[sidx] = static_cast<float>(val);
-                        }
-                    }
-                }
+                normalF[row + x] = static_cast<float>(1.0 - ndl);
             }
-        }
-
-        // 发射图整体再熔一遍：步进印章的起伏与尖刺 → 平滑阴影带（去毛刺）
-        {
-            std::vector<float> tmp(count);
-            gaussBlur(emissionMap, tmp, w, h, 2.0f);
         }
     }
 
-    // ── 映射段：黑透白不透门控 + 场分量合成（遮挡内联）→ 色阶
+    // ── 映射段：黑透白不透门控 + 场分量合成（遮挡内联）→ 色阶（可选排线图案）──
     const double levelS[4][3] = {
         { qRed(levels[0].color), qGreen(levels[0].color), qBlue(levels[0].color) },
         { qRed(levels[1].color), qGreen(levels[1].color), qBlue(levels[1].color) },
         { qRed(levels[2].color), qGreen(levels[2].color), qBlue(levels[2].color) },
         { qRed(levels[3].color), qGreen(levels[3].color), qBlue(levels[3].color) },
     };
+
+    // 排线图案（漫画网点）：固定角度斜线，投影坐标取模；线宽≈间距/3，线隙透出原图
+    const bool hatch = params.hatch;
+    const double hatchRad = qDegreesToRadians(static_cast<double>(clampInt(params.hatchAngle, 0, 180)));
+    const double hatchCos = std::cos(hatchRad);
+    const double hatchSin = std::sin(hatchRad);
+    const double hatchSpace = std::max(1.0, static_cast<double>(clampInt(params.hatchSpacing, 1, 24)));
+    const double hatchWidth = std::max(1.0, hatchSpace / 3.0);
 
     int changed = 0;
     for (int y = 0; y < h; ++y)
@@ -561,7 +585,7 @@ int apply(QImage& img, const AutoShadowParams& params)
             const QRgb px = line[x];
             const int alpha = qAlpha(px);
 
-            double field = gradientStrength * gradF[row + x] + emissionMap[row + x];
+            double field = gradientStrength * gradF[row + x] + normalStrength * normalF[row + x];
 
             // 场分量③：径向遮挡——沿射向光源采样掩膜，洞在光路上投遮挡阴影
             if (occlusionRange > 0)
@@ -617,15 +641,37 @@ int apply(QImage& img, const AutoShadowParams& params)
                 s3,
             };
 
+            // 排线覆盖：该像素是否落在斜线上（线外=线隙，透出原图）
+            double lineT = 1.0;
+            if (hatch)
+            {
+                const double t = x * hatchCos + y * hatchSin;
+                double m = std::fmod(t, hatchSpace);
+                if (m < 0.0)
+                    m += hatchSpace;
+                lineT = m < hatchWidth ? 1.0 : 0.0;
+            }
+
             double outR = 0.0, outG = 0.0, outB = 0.0;
+            double coverageSum = 0.0;
             for (int i = 0; i < 4; ++i)
             {
-                if (w[i] <= 0.0)
+                const double c = w[i] * lineT;
+                if (c <= 0.0)
                     continue;
+                coverageSum += c;
                 const double levelOpacity = clampInt(levels[i].opacity, 0, 100) / 100.0;
-                outR += w[i] * blendChannel(qRed(px), alpha, static_cast<int>(levelS[i][0]), levels[i].mode, levelOpacity);
-                outG += w[i] * blendChannel(qGreen(px), alpha, static_cast<int>(levelS[i][1]), levels[i].mode, levelOpacity);
-                outB += w[i] * blendChannel(qBlue(px), alpha, static_cast<int>(levelS[i][2]), levels[i].mode, levelOpacity);
+                outR += c * blendChannel(qRed(px), alpha, static_cast<int>(levelS[i][0]), levels[i].mode, levelOpacity);
+                outG += c * blendChannel(qGreen(px), alpha, static_cast<int>(levelS[i][1]), levels[i].mode, levelOpacity);
+                outB += c * blendChannel(qBlue(px), alpha, static_cast<int>(levelS[i][2]), levels[i].mode, levelOpacity);
+            }
+            if (hatch)
+            {
+                // 线隙残量：透出原图（预乘原色直加）
+                const double residual = std::max(0.0, 1.0 - coverageSum);
+                outR += residual * qRed(px);
+                outG += residual * qGreen(px);
+                outB += residual * qBlue(px);
             }
             const QRgb out = qRgba(qRound(outR), qRound(outG), qRound(outB), alpha);
             if (out != px)

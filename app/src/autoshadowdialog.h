@@ -31,6 +31,7 @@ class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
+class QLayout;
 class QPushButton;
 class QRadioButton;
 class QSlider;
@@ -56,6 +57,8 @@ public:
 private:
     void addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip,
                       const QString& suffix, QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
+    void addSliderRowTo(QLayout* layout, const QString& labelText, int minV, int maxV, int defV,
+                        const QString& tip, const QString& suffix, QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
     void pickLevelColor(const int levelIndex);
     void updateLevelButton(const int levelIndex);
     void grabPreviewSource();
@@ -63,21 +66,29 @@ private:
     void renderPreview();
     void setLightFromPreview(const QPoint& pos);
     void syncLevelsBar();
+    void syncHatchEnabled();
 
     QVBoxLayout* mParamColumn = nullptr;
 
     QDoubleSpinBox* mLightXSpin = nullptr;
     QDoubleSpinBox* mLightYSpin = nullptr;
+    QDoubleSpinBox* mLightHeightSpin = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
     QDoubleSpinBox* mChokeSpin = nullptr;
     QDoubleSpinBox* mGradientSpin = nullptr;
+    QDoubleSpinBox* mNormalSpin = nullptr;
+    QDoubleSpinBox* mFormHeightSpin = nullptr;
+    QDoubleSpinBox* mFormSmoothSpin = nullptr;
     QDoubleSpinBox* mOcclusionSpin = nullptr;
-    QDoubleSpinBox* mEmissionSpin = nullptr;
-    QDoubleSpinBox* mEmissionLengthSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
     QSlider* mFeatherSlider = nullptr;
     QComboBox* mTypeCombo = nullptr;
     QCheckBox* mInvertCheck = nullptr;
+    QCheckBox* mHatchCheck = nullptr;
+    QDoubleSpinBox* mHatchAngleSpin = nullptr;
+    QDoubleSpinBox* mHatchSpacingSpin = nullptr;
+    QSlider* mHatchAngleSlider = nullptr;
+    QSlider* mHatchSpacingSlider = nullptr;
     LevelsBar* mLevelsBar = nullptr;
     QPushButton* mLevelButtons[4] = { nullptr, nullptr, nullptr, nullptr };
     QComboBox* mLevelCombos[4] = { nullptr, nullptr, nullptr, nullptr };

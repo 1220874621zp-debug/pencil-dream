@@ -636,7 +636,7 @@ void MainWindow2::createMenus()
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
-    autoShadowAction->setStatusTip(tr("BWF式自动叠阴影：圆形渐变底场+法线发射贴线变形+径向遮挡（洞挡光路），黑透白不透门控显示（线稿不动），简单阻塞修边，色阶映射上色，预览框点/拖定位光源+遮罩视图，可批量整层处理"));
+    autoShadowAction->setStatusTip(tr("SDF伪法线卡渲自动叠阴影：去色阈值黑透白不透成掩膜，距离变换当伪高度场（色块成丘/线稿成谷），高度场法线与光源 N·L 出横切形体的明暗交界线+贴线阴影，径向遮挡补洞后暗带，色阶映射上色（可选漫画排线输出），预览框点/拖定位光源+遮罩视图，可批量整层处理"));
     connect(autoShadowAction, &QAction::triggered, this, [this] {
         AutoShadowDialog dialog(mEditor, this);
         if (dialog.exec() != QDialog::Accepted)

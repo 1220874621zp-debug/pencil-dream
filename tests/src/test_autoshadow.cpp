@@ -47,15 +47,15 @@ void fillRect(QImage& img, const int x0, const int y0, const int x1, const int y
     }
 }
 
-// 基线：顶光、只有圆形渐变底场（无遮挡/无发射），四阶全白正片叠底=无变化
+// 基线：顶光、只有圆形渐变底场（无遮挡/无法线），四阶全白正片叠底=无变化
 AutoShadowParams plainParams()
 {
     AutoShadowParams p;
     p.lightX = 0.5;
     p.lightY = -50.0;         // 画面正上方远光 ≈ 平行
     p.gradientStrength = 100;
+    p.normalStrength = 0;     // 纯渐变基线：关掉 SDF 伪法线场
     p.occlusionStrength = 0;
-    p.emissionStrength = 0;
     for (int i = 0; i < 4; ++i)
         p.levels[i] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
     return p;
@@ -126,27 +126,112 @@ TEST_CASE("AutoShadow-matte-gates-display")
     REQUIRE(img.pixel(45, 50) == qRgb(0, 0, 0));         // 洞（黑区）：完全不动，保持原黑
 }
 
-TEST_CASE("AutoShadow-normal-emission")
+TEST_CASE("AutoShadow-normal-terminator")
 {
-    // 只有法线发射（BWF stage4）：宽条 x[10,49]，发射从边缘沿法线伸入，步长 2、长度 16；
-    // 发射落点在距边缘 2/4/... 像素处，val=(1-d/17)²：t=4→F≈58、t=8→F≈28、t≥12→F<20
+    // 只有 SDF 伪法线 N·L（主阴影场）：宽条 x[10,49]，左侧远光（约 45° 仰角）——
+    // 条成一座丘（丘脊 x≈29.5），左坡迎光亮、右坡背光暗，明暗交界线横切形体。
+    // 场值实测 y=50：x=14→15、28→0、29→14（阶1 白）、30→63（阶3）、31→100（阶4）
     QImage img = makeImage(60, 100);
     fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
 
     AutoShadowParams p = plainParams();
     p.gradientStrength = 0;
-    p.emissionStrength = 100;
-    p.emissionLength = 16;
-    p.levels[1] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.normalStrength = 100;
+    p.lightHeight = 100;
+    p.lightX = -50.0;   // 左侧远光
+    p.lightY = 0.5;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[3] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(30, 50) == qRgb(255, 255, 255));   // 离各边都超过 16：无发射
-    REQUIRE(img.pixel(30, 73) == qRgb(255, 255, 255));   // 距底缘 16：F≈0.3
-    REQUIRE(img.pixel(30, 77) == qRgb(255, 255, 255));   // 距底缘 12：F≈8.7
-    REQUIRE(img.pixel(30, 81) == qRgb(128, 128, 128));   // 距底缘 8：F≈28
-    REQUIRE(img.pixel(30, 85) == qRgb(128, 128, 128));   // 距底缘 4：F≈58
+    REQUIRE(img.pixel(14, 50) == qRgb(255, 255, 255));   // 左坡：迎光=阶1
+    REQUIRE(img.pixel(28, 50) == qRgb(255, 255, 255));   // 丘脊左侧：仍受光
+    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255));   // 丘脊像素：F≈14=阶1
+    REQUIRE(img.pixel(30, 50) == qRgb(128, 128, 128));   // 脊右一像素：F≈63=阶3（交界带）
+    REQUIRE(img.pixel(31, 50) == qRgb(64, 64, 64));      // 再右一像素：F=100=阶4（背光）
+    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));      // 右坡深处：阶4
+    REQUIRE(img.pixel(5, 50) == 0);                      // 掩膜外透明像素不动
+    REQUIRE(qAlpha(img.pixel(45, 50)) == 255);           // 乘性混合不动 α
+}
+
+TEST_CASE("AutoShadow-normal-flat-plateau")
+{
+    // 大方形 x[5,54]，左中光——左缘坡迎光亮、上缘坡背光暗、丘顶居中：
+    // 场值实测 (8,30)→14（左缘，阶1）、(30,30)→58（丘顶，阶3）、(30,8)→87（上缘，阶4）
+    QImage img = makeImage(60, 60);
+    fillRect(img, 5, 5, 54, 54, qRgb(255, 255, 255));
+
+    AutoShadowParams p = plainParams();
+    p.gradientStrength = 0;
+    p.normalStrength = 100;
+    p.lightHeight = 100;
+    p.lightX = -50.0;
+    p.lightY = 0.5;     // 光在左中：中部像素 ly≈0
+    p.thresholds[0] = 20;
+    p.thresholds[1] = 50;
+    p.thresholds[2] = 70;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(8, 30) == qRgb(255, 255, 255));    // 左缘坡：迎光=阶1（F≈14）
+    REQUIRE(img.pixel(30, 30) == qRgb(128, 128, 128));   // 丘顶：F≈58=阶3
+    REQUIRE(img.pixel(30, 8) == qRgb(64, 64, 64));       // 上缘坡：背光=阶4（F≈87）
+}
+
+TEST_CASE("AutoShadow-normal-groove")
+{
+    // 贴线阴影：两白条夹一条透明山谷（x=40 线稿槽），左侧远光——
+    // 左条整条成丘，右坡背光；山谷左壁暗带渐弱入谷；山谷右壁迎光亮缘；山谷本身不动。
+    // 场值实测 y=20：x=13→4、27→67、36→86、38→62、42→10、65→100
+    QImage img = makeImage(80, 40);
+    fillRect(img, 10, 10, 39, 29, qRgb(255, 255, 255));
+    fillRect(img, 41, 10, 69, 29, qRgb(255, 255, 255));  // x=40 留空=山谷
+
+    AutoShadowParams p = plainParams();
+    p.gradientStrength = 0;
+    p.normalStrength = 100;
+    p.lightHeight = 100;
+    p.lightX = -50.0;
+    p.lightY = 0.5;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));   // 左条外缘坡：迎光=阶1
+    REQUIRE(img.pixel(27, 20) == qRgb(128, 128, 128));   // 左条右坡：F≈67=阶3
+    REQUIRE(img.pixel(36, 20) == qRgb(64, 64, 64));      // 山谷左壁：F≈86=阶4（贴线暗带）
+    REQUIRE(img.pixel(38, 20) == qRgb(128, 128, 128));   // 近谷底：F≈62=阶3（渐弱入谷）
+    REQUIRE(img.pixel(40, 20) == 0);                     // 山谷线稿：门控不动
+    REQUIRE(img.pixel(42, 20) == qRgb(255, 255, 255));   // 山谷右壁：F≈10=阶1（迎光亮缘）
+    REQUIRE(img.pixel(65, 20) == qRgb(64, 64, 64));      // 右条外缘坡：F=100=阶4
+}
+
+TEST_CASE("AutoShadow-hatch-pattern")
+{
+    // 排线输出（漫画网点）：纯渐变场 F≈1.266·(y-10)，135° 斜线、间距 4（线宽≈1.33）——
+    // 阶3/4 区（F>45）线上=黑、线隙=透出原白；t=0.7071·(y−x) 对 4 取模 <1.33 为线上
+    QImage img = farLightImage();
+    AutoShadowParams p = plainParams();
+    p.hatch = true;
+    p.hatchAngle = 135;
+    p.hatchSpacing = 4;
+    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    // y=60（F≈63=阶3）：x=13 → t=1.234 在线上=黑；x=15 → t=3.820 线隙=原白
+    REQUIRE(img.pixel(13, 60) == qRgb(0, 0, 0));
+    REQUIRE(img.pixel(15, 60) == qRgb(255, 255, 255));
+    // y=80（F≈89=阶4）：x=12 → t=0.083 在线上=黑；x=10 → t=1.497 线隙=原白
+    REQUIRE(img.pixel(12, 80) == qRgb(0, 0, 0));
+    REQUIRE(img.pixel(10, 80) == qRgb(255, 255, 255));
+    // 受光区 y=20（F≈13=阶1 白正片叠底）：排线不可见，保持原色
+    REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));
 }
 
 TEST_CASE("AutoShadow-radial-occlusion")

@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QPainter>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollArea>
 #include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -53,12 +54,13 @@ constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
 /** 像素参数按预览缩放同比（光源/阈值/强度/羽化是归一化或场值单位，不随缩放；
-    遮挡半径随几何距离走，须同比） */
+    体积高度是斜率放大（缩放后 SDF 与 σ 同比缩、斜率不变）也不随缩放；
+    遮挡半径/排线间距随几何距离走，须同比） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
     q.occlusionStrength = std::max(0, qRound(p.occlusionStrength * s));
-    q.emissionLength = std::max(1, qRound(p.emissionLength * s));
+    q.hatchSpacing = std::max(1, qRound(p.hatchSpacing * s));
     q.chokeMatte = qRound(p.chokeMatte * s);
     return q;
 }
@@ -243,14 +245,22 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     connect(mPreviewTimer, &QTimer::timeout, this, &AutoShadowDialog::renderPreview);
 
     auto* rootLayout = new QHBoxLayout(this);
-    mParamColumn = new QVBoxLayout;
+    // 参数行多（13 行滑杆），包滚动区防小屏溢出（顶层对话框无外层滚动区，无嵌套塌陷）
+    auto* paramHost = new QWidget(this);
+    mParamColumn = new QVBoxLayout(paramHost);
+    auto* paramScroll = new QScrollArea(this);
+    paramScroll->setWidget(paramHost);
+    paramScroll->setWidgetResizable(true);
+    paramScroll->setFrameShape(QFrame::NoFrame);
+    paramScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    paramScroll->setMaximumHeight(880);
     auto* previewColumn = new QVBoxLayout;
-    rootLayout->addLayout(mParamColumn, 1);
+    rootLayout->addWidget(paramScroll, 1);
     rootLayout->addLayout(previewColumn, 0);
 
     mParamColumn->setSpacing(6);
 
-    // ── 场生成段参数：光源=预览框点/拖定位 + 黑透白不透掩膜 + 内阴影距离/大小 ──
+    // ── 场生成段参数：光源（预览框点/拖定位）+ 黑透白不透掩膜 + 体积法线/渐变/遮挡 ──
     QDoubleSpinBox* lightXSpin = nullptr;
     QSlider* lightXSlider = nullptr;
     addSliderRow(tr("光源 X："), -100, 200, 15,
@@ -265,10 +275,17 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         tr("%"), lightYSpin, lightYSlider);
     mLightYSpin = lightYSpin;
 
+    QDoubleSpinBox* lightHeightSpin = nullptr;
+    QSlider* lightHeightSlider = nullptr;
+    addSliderRow(tr("光源高度："), 0, 300, 150,
+        tr("光源离画面的仰角高度（%）：100≈45° 斜射，越大越顶光（明暗交界线下移、受光面变大），越小越平射（阴影越多）。光源拉远时仰角不塌。"),
+        tr("%"), lightHeightSpin, lightHeightSlider);
+    mLightHeightSpin = lightHeightSpin;
+
     QDoubleSpinBox* thresholdSpin = nullptr;
     QSlider* thresholdSlider = nullptr;
     addSliderRow(tr("去色阈值："), 1, 254, 128,
-        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的洞，内阴影沿这些边界生长。"),
+        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的山谷，形体阴影沿山谷两侧生长。"),
         QString(), thresholdSpin, thresholdSlider);
     mThresholdSpin = thresholdSpin;
 
@@ -279,33 +296,40 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         tr(" px"), chokeSpin, chokeSlider);
     mChokeSpin = chokeSpin;
 
+    QDoubleSpinBox* normalSpin = nullptr;
+    QSlider* normalSlider = nullptr;
+    addSliderRow(tr("体积强度："), 0, 100, 100,
+        tr("SDF 伪法线 N·L 形体阴影（0..100，主阴影场）：掩膜距离变换当伪高度场——每个色块是一座圆润小丘、线稿是山谷，表面朝向决定明暗——脸颊出弧形交界线、发缕各自分块、贴线阴影自动成立。"),
+        QString(), normalSpin, normalSlider);
+    mNormalSpin = normalSpin;
+
+    QDoubleSpinBox* formHeightSpin = nullptr;
+    QSlider* formHeightSlider = nullptr;
+    addSliderRow(tr("体积高度："), 1, 40, 6,
+        tr("伪高度场的鼓起程度：越大形体越鼓（法线越陡，明暗交界线贴近边缘、阴影带窄），越小越扁平（交界线圆润、过渡带宽）。"),
+        QString(), formHeightSpin, formHeightSlider);
+    mFormHeightSpin = formHeightSpin;
+
+    QDoubleSpinBox* formSmoothSpin = nullptr;
+    QSlider* formSmoothSlider = nullptr;
+    addSliderRow(tr("形体圆滑度："), 0, 40, 6,
+        tr("伪高度场的高斯模糊半径（px）：越大丘顶越圆、交界线越弧；过小会出棱角感。"),
+        tr(" px"), formSmoothSpin, formSmoothSlider);
+    mFormSmoothSpin = formSmoothSpin;
+
     QDoubleSpinBox* gradientSpin = nullptr;
     QSlider* gradientSlider = nullptr;
-    addSliderRow(tr("渐变强度："), 0, 100, 100,
-        tr("圆形渐变底场（0..100）：离光源越远越暗——本身就有阴影的感觉，是与遮挡/发射叠加的底。"),
+    addSliderRow(tr("渐变强度："), 0, 100, 30,
+        tr("圆形渐变底场（0..100）：离光源越远整体越暗——叠加在形体阴影上的全局衰减，CSP 同款底感。"),
         QString(), gradientSpin, gradientSlider);
     mGradientSpin = gradientSpin;
 
     QDoubleSpinBox* occlusionSpin = nullptr;
     QSlider* occlusionSlider = nullptr;
     addSliderRow(tr("遮挡强度："), 0, 100, 0,
-        tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞挡在光路上时其背光侧投出遮挡阴影——圆形渐变的变形手段之一。"),
+        tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞/前层挡在光路上时其背光侧投出遮挡阴影——洞在体积场里是山谷，这里再补「投影」式的洞后暗带。"),
         tr(" px"), occlusionSpin, occlusionSlider);
     mOcclusionSpin = occlusionSpin;
-
-    QDoubleSpinBox* emissionSpin = nullptr;
-    QSlider* emissionSlider = nullptr;
-    addSliderRow(tr("边缘强度："), 0, 100, 40,
-        tr("法线发射（BWF 黑山闪同源，0..100）：掩膜边缘沿指向白区的法线投衰减阴影带，贴合线稿/褶皱的形体变形。"),
-        QString(), emissionSpin, emissionSlider);
-    mEmissionSpin = emissionSpin;
-
-    QDoubleSpinBox* emissionLengthSpin = nullptr;
-    QSlider* emissionLengthSlider = nullptr;
-    addSliderRow(tr("光线长度："), 1, 200, 64,
-        tr("法线发射的深入距离（像素，BWF 同名参数）：边缘阴影带伸入形体的宽度。"),
-        tr(" px"), emissionLengthSpin, emissionLengthSlider);
-    mEmissionLengthSpin = emissionLengthSpin;
 
     QSlider* featherSlider = nullptr;
     addSliderRow(tr("边缘羽化："), 0, 50, 0,
@@ -330,6 +354,32 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mInvertCheck->setToolTip(tr("色带 1↔4 镜像：光源换到另一侧时无需重调四组颜色。"));
     connect(mInvertCheck, &QCheckBox::toggled, this, [this] { schedulePreview(); });
     mParamColumn->addWidget(mInvertCheck);
+
+    // 排线输出（漫画网点）：色阶改为固定角度斜线图案，线隙透出原图
+    auto* hatchBox = new QGroupBox(tr("排线输出（漫画网点）"), this);
+    auto* hatchLayout = new QVBoxLayout(hatchBox);
+    mHatchCheck = new QCheckBox(tr("启用排线（黑白漫画质感）"), hatchBox);
+    mHatchCheck->setToolTip(tr("色阶覆盖度改为固定角度斜线图案：线上按该阶颜色混合，线隙透出原图——画面呈排线网点阴影。关闭=常规色块阴影。"));
+    connect(mHatchCheck, &QCheckBox::toggled, this, [this] { syncHatchEnabled(); schedulePreview(); });
+    hatchLayout->addWidget(mHatchCheck);
+
+    QDoubleSpinBox* hatchAngleSpin = nullptr;
+    QSlider* hatchAngleSlider = nullptr;
+    addSliderRowTo(hatchLayout, tr("排线角度："), 0, 180, 135,
+        tr("斜线方向（度）：135=左下到右上（漫画常用），0=水平，90=垂直。"),
+        tr("°"), hatchAngleSpin, hatchAngleSlider);
+    mHatchAngleSpin = hatchAngleSpin;
+    mHatchAngleSlider = hatchAngleSlider;
+
+    QDoubleSpinBox* hatchSpacingSpin = nullptr;
+    QSlider* hatchSpacingSlider = nullptr;
+    addSliderRowTo(hatchLayout, tr("排线间距："), 1, 24, 6,
+        tr("相邻斜线的间距（px）：越小排线越密（阴影越重），线宽自动取间距的约三分之一。"),
+        tr(" px"), hatchSpacingSpin, hatchSpacingSlider);
+    mHatchSpacingSpin = hatchSpacingSpin;
+    mHatchSpacingSlider = hatchSpacingSlider;
+    mParamColumn->addWidget(hatchBox);
+    syncHatchEnabled(); // 未启用时排线参数灰显常驻（防排版跳动）
 
     // 色阶阈值：PS 语义渐变条拖块（点色段=改该阶颜色）
     auto* levelBox = new QGroupBox(tr("色阶（近光→背光）"), this);
@@ -452,17 +502,22 @@ AutoShadowParams AutoShadowDialog::params() const
     AutoShadowParams p;
     p.lightX = mLightXSpin->value() / 100.0;
     p.lightY = mLightYSpin->value() / 100.0;
+    p.lightHeight = qRound(mLightHeightSpin->value());
     p.maskThreshold = qRound(mThresholdSpin->value());
     p.chokeMatte = qRound(mChokeSpin->value());
     p.gradientStrength = qRound(mGradientSpin->value());
+    p.normalStrength = qRound(mNormalSpin->value());
+    p.formHeight = qRound(mFormHeightSpin->value());
+    p.formSmooth = qRound(mFormSmoothSpin->value());
     p.occlusionStrength = qRound(mOcclusionSpin->value());
-    p.emissionStrength = qRound(mEmissionSpin->value());
-    p.emissionLength = qRound(mEmissionLengthSpin->value());
     for (int i = 0; i < 3; ++i)
         p.thresholds[i] = mLevelsBar->thresholds(i);
     p.edgeFeather = qRound(mFeatherSpin->value());
     p.smooth = mTypeCombo->currentIndex() == 1;
     p.invertLevels = mInvertCheck->isChecked();
+    p.hatch = mHatchCheck->isChecked();
+    p.hatchAngle = qRound(mHatchAngleSpin->value());
+    p.hatchSpacing = qRound(mHatchSpacingSpin->value());
     for (int i = 0; i < 4; ++i)
         p.levels[i] = mLevels[i];
     return p;
@@ -519,7 +574,13 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
                                     const int defV, const QString& tip, const QString& suffix,
                                     QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
 {
-    auto* grid = new QGridLayout;
+    addSliderRowTo(mParamColumn, labelText, minV, maxV, defV, tip, suffix, spinOut, sliderOut);
+}
+
+void AutoShadowDialog::addSliderRowTo(QLayout* layout, const QString& labelText, const int minV, const int maxV,
+                                      const int defV, const QString& tip, const QString& suffix,
+                                      QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
+{    auto* grid = new QGridLayout;
     grid->setHorizontalSpacing(8);
     grid->setVerticalSpacing(2);
     grid->setContentsMargins(0, 0, 0, 0);
@@ -543,7 +604,7 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
     grid->addWidget(slider, 1, 0);
     grid->addWidget(spin, 0, 1, 2, 1);
     grid->setColumnStretch(0, 1);
-    mParamColumn->addLayout(grid);
+    layout->addItem(grid);
 
     connect(slider, &QSlider::valueChanged, this, [spin](const int value) {
         if (qRound(spin->value()) != value)
@@ -557,6 +618,22 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
     connect(spin, &QDoubleSpinBox::valueChanged, this, [this](double) { schedulePreview(); });
     spinOut = spin;
     sliderOut = slider;
+}
+
+void AutoShadowDialog::syncHatchEnabled()
+{
+    const bool on = mHatchCheck != nullptr && mHatchCheck->isChecked();
+    // 输入框与其配对滑杆一起启停（滑杆在构造时接入了同步信号）
+    if (mHatchAngleSpin != nullptr)
+    {
+        mHatchAngleSpin->setEnabled(on);
+        mHatchAngleSlider->setEnabled(on);
+    }
+    if (mHatchSpacingSpin != nullptr)
+    {
+        mHatchSpacingSpin->setEnabled(on);
+        mHatchSpacingSlider->setEnabled(on);
+    }
 }
 
 void AutoShadowDialog::pickLevelColor(const int levelIndex)
