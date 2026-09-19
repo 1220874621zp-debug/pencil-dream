@@ -69,6 +69,7 @@ private:
     QDoubleSpinBox* mLightXSpin = nullptr;
     QDoubleSpinBox* mLightYSpin = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
+    QDoubleSpinBox* mChokeSpin = nullptr;
     QDoubleSpinBox* mDistanceSpin = nullptr;
     QDoubleSpinBox* mSizeSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
@@ -82,6 +83,7 @@ private:
     QRadioButton* mAllKeyFramesRadio = nullptr;
 
     QLabel* mPreviewLabel = nullptr;
+    QComboBox* mViewCombo = nullptr;
     QPushButton* mCompareButton = nullptr;
     QTimer* mPreviewTimer = nullptr;
     Editor* mEditor = nullptr;

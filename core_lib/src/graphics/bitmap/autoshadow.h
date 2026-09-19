@@ -45,6 +45,7 @@ struct AutoShadowParams
     double lightX = 0.15;                     // 光源 X：图像宽度归一化坐标（0=左缘 1=右缘，可越界放远光）
     double lightY = 0.05;                     // 光源 Y：图像高度归一化坐标（0=上缘 1=下缘；Y 小=上方光源）
     int maskThreshold = 128;                  // 去色阈值（灰度 1..254）：≥此值=不透明白（受光面），低于=透明黑
+    int chokeMatte = 0;                       // 阻塞遮罩（AE 简单阻塞语义）：正值收缩(阻塞)掩膜、负值扩展（px），小增量修边
     int shadowDistance = 16;                  // 内阴影距离：掩膜沿背光方向的取样平移量，即阴影带深入形体的宽度（px）
     int shadowSize = 8;                       // 内阴影大小：取样掩膜的高斯模糊半径，控制阴影边界的软硬（px，0=硬边）
     int thresholds[3] = { 20, 45, 80 };       // 色阶阈值：归一化场值 0..100，递增，切出 4 个色阶
@@ -66,6 +67,9 @@ struct AutoShadowParams
  *  1. 原图去色（直通亮度）→ 阈值二值化：灰度 ≥ maskThreshold 为不透明白（受光填色面），
  *     低于阈值为透明黑——线稿与深色区成为掩膜上的洞（凹槽），复杂度骤减；
  *     掩膜整体裁在原图 α 内（不出轮廓）。
+ *  2. 简单阻塞（AE Simple Choker 语义）：chokeMatte 以小增量收缩/扩展掩膜边缘——
+ *     正值阻塞（收缩白区，吃掉抗锯齿白边与细白丝）、负值扩展（并掉小黑洞），
+ *     得到更整洁的掩膜后再进内阴影。
  *
  * ── 内阴影场段（椭圆→加耳朵→任意复杂剪影都成立）──
  *  2. shadow(p) = mask(p) − blur( mask(p + 背光方向·distance) )，钳 0..1：
@@ -83,6 +87,10 @@ struct AutoShadowParams
 namespace AutoShadow
 {
     int apply(QImage& img, const AutoShadowParams& params);
+
+    /** 遮罩视图（AE 简单阻塞的 Mask 视图同款）：黑白图——白=不透明、黑=透明（含画布空白），
+        返回 Format_ARGB32_Premultiplied，尺寸与 img 相同，不改 img。 */
+    QImage renderMattePreview(const QImage& img, const AutoShadowParams& params);
 }
 
 #endif // AUTOSHADOW_H

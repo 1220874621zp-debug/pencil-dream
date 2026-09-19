@@ -197,3 +197,54 @@ TEST_CASE("AutoShadow-invert-level-order")
     REQUIRE(img.pixel(15, 50) == qRgb(255, 255, 255));   // 受光区吃原阶4白→不变
     REQUIRE(img.pixel(15, 80) == qRgb(0, 0, 0));         // 月牙吃镜像后的阶4=原阶1黑
 }
+
+TEST_CASE("AutoShadow-choke-matte-shrinks")
+{
+    // 正值阻塞（收缩白区 3px）：掩膜底边 89→86，月牙起点从 70 提前到 67，
+    // 底部 3 行被吃成洞（F=0 → 色阶1=白，不变）
+    QImage img = farLightImage();
+    AutoShadowParams p = plainParams();
+    p.chokeMatte = 3;
+    p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 66) == qRgb(255, 255, 255));   // 取样 86 仍在收缩后掩膜内：受光
+    REQUIRE(img.pixel(15, 67) == qRgb(0, 0, 0));         // 取样 87 出掩膜：阴影提前开始
+    REQUIRE(img.pixel(15, 85) == qRgb(0, 0, 0));         // 阴影带内
+    REQUIRE(img.pixel(15, 87) == qRgb(255, 255, 255));   // 底部 3 行成洞：无阴影
+}
+
+TEST_CASE("AutoShadow-choke-matte-expands")
+{
+    // 负值扩展（白区外长 3px）：掩膜底边 89→92，月牙起点从 70 推迟到 73；扩展不出原图内容
+    QImage img = farLightImage();
+    AutoShadowParams p = plainParams();
+    p.chokeMatte = -3;
+    p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 72) == qRgb(255, 255, 255));   // 取样 92 仍在扩展后掩膜内
+    REQUIRE(img.pixel(15, 73) == qRgb(0, 0, 0));         // 取样 93 出掩膜：阴影推迟开始
+    REQUIRE(img.pixel(15, 89) == qRgb(0, 0, 0));         // 底行阴影
+    REQUIRE(img.pixel(5, 50) == 0);                      // 画布透明区不被扩展上色
+}
+
+TEST_CASE("AutoShadow-matte-preview-view")
+{
+    // 遮罩视图（AE 简单阻塞的 Mask 视图）：白=不透明、黑=透明（画布空白也是黑）
+    QImage img = farLightImage();
+    AutoShadowParams p = plainParams();
+
+    QImage view = AutoShadow::renderMattePreview(img, p);
+    REQUIRE(view.format() == QImage::Format_ARGB32_Premultiplied);
+    REQUIRE(view.size() == img.size());
+    REQUIRE(view.pixel(15, 50) == qRgb(255, 255, 255));
+    REQUIRE(view.pixel(15, 89) == qRgb(255, 255, 255));
+    REQUIRE(view.pixel(5, 50) == qRgb(0, 0, 0));
+
+    p.chokeMatte = 3;
+    QImage choked = AutoShadow::renderMattePreview(img, p);
+    REQUIRE(choked.pixel(15, 50) == qRgb(255, 255, 255));
+    REQUIRE(choked.pixel(15, 66) == qRgb(255, 255, 255));
+    REQUIRE(choked.pixel(15, 88) == qRgb(0, 0, 0));      // 底部 3 行被阻塞成黑
+}

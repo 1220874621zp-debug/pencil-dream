@@ -161,6 +161,92 @@ double blendChannel(const int premul, const int alpha, const int s, const AutoSh
     return premul;
 }
 
+/** 简单阻塞：分离两趟 min/max 形态学（正值=阻塞/收缩、负值=扩展），r 像素 */
+void morphChoke(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const int r, const bool choke)
+{
+    if (r <= 0)
+        return;
+    const auto fold = [choke](const float a, const float b) { return choke ? std::min(a, b) : std::max(a, b); };
+    // 水平趟：buf → tmp
+    for (int y = 0; y < h; ++y)
+    {
+        const float* src = &buf[static_cast<size_t>(y) * w];
+        float* dst = &tmp[static_cast<size_t>(y) * w];
+        for (int x = 0; x < w; ++x)
+        {
+            float acc = src[std::max(0, x - r)];
+            for (int i = std::max(0, x - r) + 1; i <= std::min(w - 1, x + r); ++i)
+                acc = fold(acc, src[i]);
+            dst[x] = acc;
+        }
+    }
+    // 垂直趟：tmp → buf
+    for (int y = 0; y < h; ++y)
+    {
+        float* dst = &buf[static_cast<size_t>(y) * w];
+        for (int x = 0; x < w; ++x)
+        {
+            float acc = tmp[static_cast<size_t>(std::max(0, y - r)) * w + x];
+            for (int i = std::max(0, y - r) + 1; i <= std::min(h - 1, y + r); ++i)
+                acc = fold(acc, tmp[static_cast<size_t>(i) * w + x]);
+            dst[x] = acc;
+        }
+    }
+}
+
+/** 掩膜生成（黑透白不透 + 简单阻塞）：apply 与遮罩视图共用 */
+struct MatteData
+{
+    int w = 0;
+    int h = 0;
+    int minX = 0, minY = 0, maxX = -1, maxY = -1; // maxY<0 = 无内容
+    std::vector<uint8_t> contentMask; // 原图内容（α≥16）
+    std::vector<float> maskF;         // 阻塞后的掩膜（1=不透明白，0=透明黑/洞）
+
+    bool valid() const { return maxX >= 0; }
+};
+
+MatteData buildMatte(const QImage& img, const int maskThreshold, const int chokeMatte)
+{
+    MatteData m;
+    m.w = img.width();
+    m.h = img.height();
+    if (m.w <= 0 || m.h <= 0)
+        return m;
+    m.contentMask.assign(static_cast<size_t>(m.w) * m.h, 0);
+    m.maskF.assign(static_cast<size_t>(m.w) * m.h, 0.0f);
+    m.minX = m.w; m.minY = m.h; m.maxX = -1; m.maxY = -1;
+
+    for (int y = 0; y < m.h; ++y)
+    {
+        const auto* line = reinterpret_cast<const QRgb*>(img.scanLine(y));
+        const size_t row = static_cast<size_t>(y) * m.w;
+        for (int x = 0; x < m.w; ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a < ALPHA_MIN)
+                continue;
+            m.contentMask[row + x] = 1;
+            const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
+            const int gray = (299 * lift(qRed(px)) + 587 * lift(qGreen(px)) + 114 * lift(qBlue(px))) / 1000;
+            if (gray >= maskThreshold)
+                m.maskF[row + x] = 1.0f;
+            m.minX = std::min(m.minX, x);
+            m.maxX = std::max(m.maxX, x);
+            m.minY = std::min(m.minY, y);
+            m.maxY = std::max(m.maxY, y);
+        }
+    }
+
+    if (chokeMatte != 0 && m.valid())
+    {
+        std::vector<float> tmp(m.maskF.size());
+        morphChoke(m.maskF, tmp, m.w, m.h, std::abs(chokeMatte), chokeMatte > 0);
+    }
+    return m;
+}
+
 } // namespace
 
 namespace AutoShadow
@@ -185,6 +271,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     const double lightX = std::min(10.0, std::max(-10.0, params.lightX)) * w;
     const double lightY = std::min(10.0, std::max(-10.0, params.lightY)) * h;
     const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
+    const int chokeMatte = clampInt(params.chokeMatte, -50, 50);
     const double distance = std::max(1.0, static_cast<double>(params.shadowDistance));
     const int blurSize = clampInt(params.shadowSize, 0, 200);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
@@ -198,37 +285,16 @@ int apply(QImage& img, const AutoShadowParams& params)
         levels[i].mode = src.mode;
     }
 
-    const size_t count = static_cast<size_t>(w) * h;
-
-    // ── 掩膜生成段：去色 → 阈值二值化（黑透白不透），裁在原图 α 内
-    std::vector<uint8_t> contentMask(count, 0); // 原图内容（α≥16）
-    std::vector<float> maskF(count, 0.0f);      // 内阴影掩膜（1=不透明白，0=透明黑/洞）
-    int minX = w, minY = h, maxX = -1, maxY = -1;
-    for (int y = 0; y < h; ++y)
-    {
-        const auto* line = reinterpret_cast<const QRgb*>(img.scanLine(y));
-        const size_t row = static_cast<size_t>(y) * w;
-        for (int x = 0; x < w; ++x)
-        {
-            const QRgb px = line[x];
-            const int a = qAlpha(px);
-            if (a < ALPHA_MIN)
-                continue;
-            contentMask[row + x] = 1;
-            const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
-            const int gray = (299 * lift(qRed(px)) + 587 * lift(qGreen(px)) + 114 * lift(qBlue(px))) / 1000;
-            if (gray >= maskThreshold)
-                maskF[row + x] = 1.0f;
-            minX = std::min(minX, x);
-            maxX = std::max(maxX, x);
-            minY = std::min(minY, y);
-            maxY = std::max(maxY, y);
-        }
-    }
-    if (maxX < 0)
+    // ── 掩膜生成段：去色阈值（黑透白不透）+ 简单阻塞
+    const MatteData m = buildMatte(img, maskThreshold, chokeMatte);
+    if (!m.valid())
         return 0;
+    const std::vector<uint8_t>& contentMask = m.contentMask;
+    const std::vector<float>& maskF = m.maskF;
+    const int minX = m.minX, minY = m.minY, maxX = m.maxX, maxY = m.maxY;
 
     // ── 内阴影场段：取样掩膜 = 掩膜沿背光方向平移（逐像素径向，光源远≈平行），再高斯模糊
+    const size_t count = maskF.size();
     std::vector<float> shifted(count, 0.0f);
     for (int y = minY; y <= maxY; ++y)
     {
@@ -323,6 +389,32 @@ int apply(QImage& img, const AutoShadowParams& params)
         }
     }
     return changed;
+}
+
+QImage renderMattePreview(const QImage& img, const AutoShadowParams& params)
+{
+    QImage out;
+    if (img.isNull() || img.format() != QImage::Format_ARGB32_Premultiplied)
+        return out;
+    const MatteData m = buildMatte(img,
+                                   clampInt(params.maskThreshold, 1, 254),
+                                   clampInt(params.chokeMatte, -50, 50));
+    if (!m.valid())
+        return out;
+
+    out = QImage(m.w, m.h, QImage::Format_ARGB32_Premultiplied);
+    out.fill(qRgb(0, 0, 0)); // 黑=透明
+    for (int y = 0; y < m.h; ++y)
+    {
+        auto* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+        const size_t row = static_cast<size_t>(y) * m.w;
+        for (int x = 0; x < m.w; ++x)
+        {
+            if (m.maskF[row + x] > 0.5f)
+                line[x] = qRgb(255, 255, 255); // 白=不透明
+        }
+    }
+    return out;
 }
 
 } // namespace AutoShadow

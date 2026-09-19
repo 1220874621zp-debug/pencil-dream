@@ -58,6 +58,7 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
     AutoShadowParams q = p;
     q.shadowDistance = std::max(1, qRound(p.shadowDistance * s));
     q.shadowSize = qRound(p.shadowSize * s);
+    q.chokeMatte = qRound(p.chokeMatte * s);
     return q;
 }
 
@@ -270,6 +271,13 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         QString(), thresholdSpin, thresholdSlider);
     mThresholdSpin = thresholdSpin;
 
+    QDoubleSpinBox* chokeSpin = nullptr;
+    QSlider* chokeSlider = nullptr;
+    addSliderRow(tr("阻塞遮罩："), -20, 20, 0,
+        tr("简单阻塞（AE 语义）：以小增量收缩或扩展掩膜边缘，得到更整洁的掩膜。正值阻塞（收缩白区，吃掉白边与细丝），负值扩展（并掉小黑洞）。配合遮罩视图调最直观。"),
+        tr(" px"), chokeSpin, chokeSlider);
+    mChokeSpin = chokeSpin;
+
     QDoubleSpinBox* distanceSpin = nullptr;
     QSlider* distanceSlider = nullptr;
     addSliderRow(tr("内阴影距离："), 1, 60, 16,
@@ -388,11 +396,21 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mPreviewLabel->setToolTip(tr("点击或拖拽定位光源（黄色标记），阴影实时跟随；对比请用下方按钮。"));
     mPreviewLabel->installEventFilter(this);
     previewLayout->addWidget(mPreviewLabel);
+    auto* viewRow = new QHBoxLayout;
+    auto* viewLabel = new QLabel(tr("视图："), previewBox);
+    viewRow->addWidget(viewLabel);
+    mViewCombo = new QComboBox(previewBox);
+    mViewCombo->addItem(tr("最终输出"));
+    mViewCombo->addItem(tr("遮罩视图"));
+    mViewCombo->setToolTip(tr("遮罩视图=黑白图：白=不透明（受光面），黑=透明（线稿槽/洞）。调去色阈值与阻塞时切过来看最直观。"));
+    connect(mViewCombo, &QComboBox::currentIndexChanged, this, [this](int) { renderPreview(); });
+    viewRow->addWidget(mViewCombo, 1);
     mCompareButton = new QPushButton(tr("按住对比原图"), previewBox);
     mCompareButton->setCheckable(true);
     mCompareButton->setAutoDefault(false);
     connect(mCompareButton, &QPushButton::toggled, this, [this] { renderPreview(); });
-    previewLayout->addWidget(mCompareButton, 0, Qt::AlignHCenter);
+    viewRow->addWidget(mCompareButton);
+    previewLayout->addLayout(viewRow);
     previewColumn->addWidget(previewBox);
     previewColumn->addStretch(1);
 
@@ -406,6 +424,7 @@ AutoShadowParams AutoShadowDialog::params() const
     p.lightX = mLightXSpin->value() / 100.0;
     p.lightY = mLightYSpin->value() / 100.0;
     p.maskThreshold = qRound(mThresholdSpin->value());
+    p.chokeMatte = qRound(mChokeSpin->value());
     p.shadowDistance = qRound(mDistanceSpin->value());
     p.shadowSize = qRound(mSizeSpin->value());
     for (int i = 0; i < 3; ++i)
@@ -590,6 +609,14 @@ void AutoShadowDialog::renderPreview()
     }
 
     const AutoShadowParams p = scaledForPreview(params(), mPreviewScale);
+
+    // 遮罩视图：黑透白不透 + 简单阻塞后的黑白掩膜
+    if (mViewCombo != nullptr && mViewCombo->currentIndex() == 1)
+    {
+        mPreviewLabel->setPixmap(QPixmap::fromImage(AutoShadow::renderMattePreview(mScaledSource, p)));
+        return;
+    }
+
     QImage preview = mScaledSource; // COW 拷贝，apply 就地改写
     AutoShadow::apply(preview, p);
 

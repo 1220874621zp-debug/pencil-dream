@@ -636,7 +636,7 @@ void MainWindow2::createMenus()
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
-    autoShadowAction->setStatusTip(tr("内阴影模型自动叠阴影：去色阈值黑透白不透成掩膜（线稿成槽），PS式内阴影沿背光方向出月牙/贴线阴影，色阶映射上色，预览框点/拖定位光源，可批量整层处理"));
+    autoShadowAction->setStatusTip(tr("内阴影模型自动叠阴影：去色阈值黑透白不透成掩膜（线稿成槽）+简单阻塞修边（正收缩/负扩展），PS式内阴影沿背光方向出月牙/贴线阴影，色阶映射上色，预览框点/拖定位光源+遮罩视图，可批量整层处理"));
     connect(autoShadowAction, &QAction::triggered, this, [this] {
         AutoShadowDialog dialog(mEditor, this);
         if (dialog.exec() != QDialog::Accepted)
