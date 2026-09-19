@@ -52,12 +52,13 @@ namespace
 constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
-/** 像素参数按预览缩放同比（光源/阈值/羽化是归一化或场值单位，不随缩放） */
+/** 像素参数按预览缩放同比（光源/阈值/强度/羽化是归一化或场值单位，不随缩放；
+    遮挡半径随几何距离走，须同比） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
-    q.shadowDistance = std::max(1, qRound(p.shadowDistance * s));
-    q.shadowSize = qRound(p.shadowSize * s);
+    q.occlusionStrength = std::max(0, qRound(p.occlusionStrength * s));
+    q.emissionLength = std::max(1, qRound(p.emissionLength * s));
     q.chokeMatte = qRound(p.chokeMatte * s);
     return q;
 }
@@ -278,19 +279,33 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         tr(" px"), chokeSpin, chokeSlider);
     mChokeSpin = chokeSpin;
 
-    QDoubleSpinBox* distanceSpin = nullptr;
-    QSlider* distanceSlider = nullptr;
-    addSliderRow(tr("内阴影距离："), 1, 60, 16,
-        tr("阴影带深入形体的宽度（像素）：外轮廓远光侧月牙、线槽贴线阴影都由它决定，类似 PS 内阴影的距离。"),
-        tr(" px"), distanceSpin, distanceSlider);
-    mDistanceSpin = distanceSpin;
+    QDoubleSpinBox* gradientSpin = nullptr;
+    QSlider* gradientSlider = nullptr;
+    addSliderRow(tr("渐变强度："), 0, 100, 100,
+        tr("圆形渐变底场（0..100）：离光源越远越暗——本身就有阴影的感觉，是与遮挡/发射叠加的底。"),
+        QString(), gradientSpin, gradientSlider);
+    mGradientSpin = gradientSpin;
 
-    QDoubleSpinBox* sizeSpin = nullptr;
-    QSlider* sizeSlider = nullptr;
-    addSliderRow(tr("内阴影大小："), 0, 40, 8,
-        tr("阴影边界的模糊半径（像素）：0=硬边，越大越软；色阶阈值会在渐变上切出多层断层。"),
-        tr(" px"), sizeSpin, sizeSlider);
-    mSizeSpin = sizeSpin;
+    QDoubleSpinBox* occlusionSpin = nullptr;
+    QSlider* occlusionSlider = nullptr;
+    addSliderRow(tr("遮挡强度："), 0, 100, 0,
+        tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞挡在光路上时其背光侧投出遮挡阴影——圆形渐变的变形手段之一。"),
+        tr(" px"), occlusionSpin, occlusionSlider);
+    mOcclusionSpin = occlusionSpin;
+
+    QDoubleSpinBox* emissionSpin = nullptr;
+    QSlider* emissionSlider = nullptr;
+    addSliderRow(tr("边缘强度："), 0, 100, 40,
+        tr("法线发射（BWF 黑山闪同源，0..100）：掩膜边缘沿指向白区的法线投衰减阴影带，贴合线稿/褶皱的形体变形。"),
+        QString(), emissionSpin, emissionSlider);
+    mEmissionSpin = emissionSpin;
+
+    QDoubleSpinBox* emissionLengthSpin = nullptr;
+    QSlider* emissionLengthSlider = nullptr;
+    addSliderRow(tr("光线长度："), 1, 200, 64,
+        tr("法线发射的深入距离（像素，BWF 同名参数）：边缘阴影带伸入形体的宽度。"),
+        tr(" px"), emissionLengthSpin, emissionLengthSlider);
+    mEmissionLengthSpin = emissionLengthSpin;
 
     QSlider* featherSlider = nullptr;
     addSliderRow(tr("边缘羽化："), 0, 50, 0,
@@ -425,8 +440,10 @@ AutoShadowParams AutoShadowDialog::params() const
     p.lightY = mLightYSpin->value() / 100.0;
     p.maskThreshold = qRound(mThresholdSpin->value());
     p.chokeMatte = qRound(mChokeSpin->value());
-    p.shadowDistance = qRound(mDistanceSpin->value());
-    p.shadowSize = qRound(mSizeSpin->value());
+    p.gradientStrength = qRound(mGradientSpin->value());
+    p.occlusionStrength = qRound(mOcclusionSpin->value());
+    p.emissionStrength = qRound(mEmissionSpin->value());
+    p.emissionLength = qRound(mEmissionLengthSpin->value());
     for (int i = 0; i < 3; ++i)
         p.thresholds[i] = mLevelsBar->thresholds(i);
     p.edgeFeather = qRound(mFeatherSpin->value());

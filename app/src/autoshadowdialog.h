@@ -70,8 +70,10 @@ private:
     QDoubleSpinBox* mLightYSpin = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
     QDoubleSpinBox* mChokeSpin = nullptr;
-    QDoubleSpinBox* mDistanceSpin = nullptr;
-    QDoubleSpinBox* mSizeSpin = nullptr;
+    QDoubleSpinBox* mGradientSpin = nullptr;
+    QDoubleSpinBox* mOcclusionSpin = nullptr;
+    QDoubleSpinBox* mEmissionSpin = nullptr;
+    QDoubleSpinBox* mEmissionLengthSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
     QSlider* mFeatherSlider = nullptr;
     QComboBox* mTypeCombo = nullptr;
