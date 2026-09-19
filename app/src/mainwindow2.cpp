@@ -636,7 +636,7 @@ void MainWindow2::createMenus()
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
     });
     QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
-    autoShadowAction->setStatusTip(tr("按光源给平涂画面自动叠上赛璐璐阴影（径向渐变+色调分离+阻塞），可单层/双层，可批量整层处理"));
+    autoShadowAction->setStatusTip(tr("按 AE 流程给平涂画面自动叠阴影：复制层填充阴影色+高斯模糊+圆形遮罩+置换贴图+轨道遮罩翻转，可单层/双层，可批量整层处理"));
     connect(autoShadowAction, &QAction::triggered, this, [this] {
         AutoShadowDialog dialog(mEditor, this);
         if (dialog.exec() != QDialog::Accepted)
@@ -1234,6 +1234,7 @@ void MainWindow2::dropEvent(QDropEvent* event)
     if (importConfig.positionType == ImportImageConfig::CenterOfCamera)
         importConfig.importFrame = mEditor->currentFrame();
 
+    bool anyImported = false;
     for (const QString& path : imageFiles)
     {
         Status st = mEditor->importImage(path, importConfig);
@@ -1243,7 +1244,12 @@ void MainWindow2::dropEvent(QDropEvent* event)
             errorDialog.exec();
             break;
         }
+        anyImported = true;
     }
+
+    // 图片落进画布后直接切到变形工具，方便立即拖拽摆放（导入失败时不切）
+    if (anyImported)
+        mEditor->tools()->setCurrentTool(ToolType::DEFORM);
 
     ui->scribbleArea->updateFrame();
     mTimeLine->updateContent();
