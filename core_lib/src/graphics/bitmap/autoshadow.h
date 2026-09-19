@@ -54,9 +54,9 @@ struct AutoShadowParams
     int edgeFeather = 0;                      // 色调分离模式下阈值过渡带宽（场值单位），0=硬边
     bool smooth = false;                      // false=色调分离阴影（分阶），true=平滑阴影（连续梯度映射）
     bool invertLevels = false;                // 反转应用色阶的顺序（色带 1↔4 镜像）
-    // 默认色带：受光暖黄→橙→洋红→背光蓝紫（CSP 截图同款暖到冷序列）
+    // 默认色带：受光纯白（不动原图）→橙→洋红→背光蓝紫；色阶1要暖色受光可自行调色
     AutoShadowLevel levels[4] = {
-        { qRgb(255, 244, 186), AutoShadowBlendMode::Multiply },
+        { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply },
         { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply },
         { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn },
         { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply },

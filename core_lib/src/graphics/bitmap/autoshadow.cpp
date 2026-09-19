@@ -192,7 +192,62 @@ void morphChoke(std::vector<float>& buf, std::vector<float>& tmp, const int w, c
     }
 }
 
-/** 掩膜生成（黑透白不透 + 简单阻塞）：apply 与遮罩视图共用 */
+/** 去椒盐：翻转 ≤maxArea px 的孤立连通域（白岛→洞、洞→白岛）。
+    肤色等中间调骑在阈值上会撒椒盐，法线发射从每个噪点喷刺——先清干净；
+    连通域判定保长度（1px 细线是长连通域，不会被翻）。 */
+void despeckleMask(std::vector<float>& mask, const int w, const int h, const int maxArea)
+{
+    if (maxArea <= 0)
+        return;
+    const size_t count = static_cast<size_t>(w) * h;
+    std::vector<uint8_t> visited(count, 0);
+    std::vector<int> stack;
+    std::vector<size_t> component;
+
+    for (size_t seed = 0; seed < count; ++seed)
+    {
+        if (visited[seed] != 0)
+            continue;
+        const float value = mask[seed];
+        stack.clear();
+        component.clear();
+        stack.push_back(static_cast<int>(seed));
+        visited[seed] = 1;
+        while (!stack.empty())
+        {
+            const int here = stack.back();
+            stack.pop_back();
+            component.push_back(static_cast<size_t>(here));
+            const int hy = here / w;
+            const int hx = here % w;
+            for (int ddy = -1; ddy <= 1; ++ddy)
+            {
+                for (int ddx = -1; ddx <= 1; ++ddx)
+                {
+                    if (ddx == 0 && ddy == 0)
+                        continue;
+                    const int nx = hx + ddx;
+                    const int ny = hy + ddy;
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h)
+                        continue;
+                    const size_t nb = static_cast<size_t>(ny) * w + nx;
+                    if (visited[nb] != 0 || mask[nb] != value)
+                        continue;
+                    visited[nb] = 1;
+                    stack.push_back(static_cast<int>(nb));
+                }
+            }
+        }
+        if (static_cast<int>(component.size()) <= maxArea)
+        {
+            const float flipped = value > 0.5f ? 0.0f : 1.0f;
+            for (const size_t idx : component)
+                mask[idx] = flipped;
+        }
+    }
+}
+
+/** 掩膜生成（黑透白不透 + 简单阻塞 + 去椒盐）：apply 与遮罩视图共用 */
 struct MatteData
 {
     int w = 0;
@@ -241,6 +296,10 @@ MatteData buildMatte(const QImage& img, const int maskThreshold, const int choke
     {
         std::vector<float> tmp(m.maskF.size());
         morphChoke(m.maskF, tmp, m.w, m.h, std::abs(chokeMatte), chokeMatte > 0);
+    }
+    if (m.valid())
+    {
+        despeckleMask(m.maskF, m.w, m.h, 3);
     }
     return m;
 }
@@ -360,7 +419,7 @@ int apply(QImage& img, const AutoShadowParams& params)
         std::vector<float> blurMask = m.maskF;
         {
             std::vector<float> tmp(count);
-            gaussBlur(blurMask, tmp, w, h, 1.5f);
+            gaussBlur(blurMask, tmp, w, h, 3.0f); // σ 加大：阶梯轮廓的法线先磨平，防喷刺
         }
         const int maxSteps = std::min(300, static_cast<int>(emissionLength / EMISSION_STEP) + 1);
         const auto blurredAt = [&blurMask, w, h](const int px, const int py) {
@@ -436,6 +495,12 @@ int apply(QImage& img, const AutoShadowParams& params)
                     }
                 }
             }
+        }
+
+        // 发射图整体再熔一遍：步进印章的起伏与尖刺 → 平滑阴影带（去毛刺）
+        {
+            std::vector<float> tmp(count);
+            gaussBlur(emissionMap, tmp, w, h, 2.0f);
         }
     }
 

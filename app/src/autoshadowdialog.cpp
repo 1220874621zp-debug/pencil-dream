@@ -230,8 +230,8 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     setWindowTitle(tr("自动上阴影"));
     setModal(true);
 
-    // 默认色带：受光暖黄→橙→洋红→背光蓝紫（CSP 截图同款暖到冷序列）
-    mLevels[0] = { qRgb(255, 244, 186), AutoShadowBlendMode::Multiply };
+    // 默认色带：受光纯白（不动原图）→橙→洋红→背光蓝紫
+    mLevels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
     mLevels[1] = { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply };
     mLevels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
     mLevels[3] = { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply };

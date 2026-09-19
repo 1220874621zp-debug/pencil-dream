@@ -187,6 +187,25 @@ TEST_CASE("AutoShadow-invert-level-order")
     REQUIRE(img.pixel(15, 80) == qRgb(0, 0, 0));         // 远端吃镜像后的阶4=原阶1黑
 }
 
+TEST_CASE("AutoShadow-despeckle-mask")
+{
+    // 椒盐清理：肤色骑阈值会撒椒盐、法线发射从噪点喷刺——≤3px 孤立连通域翻转；
+    // 长细线（大连通域）保留
+    QImage img = makeImage(30, 30);
+    fillRect(img, 5, 5, 24, 24, qRgb(255, 255, 255));
+    img.setPixel(10, 10, qRgb(0, 0, 0));   // 白区孤立黑点
+    img.setPixel(2, 2, qRgb(255, 255, 255)); // 黑底孤立白点
+    for (int y = 6; y <= 20; ++y)          // 1px 竖细线（15px 长连通域）
+        img.setPixel(18, y, qRgb(0, 0, 0));
+
+    AutoShadowParams p = plainParams();
+    QImage view = AutoShadow::renderMattePreview(img, p);
+    REQUIRE(view.pixel(10, 10) == qRgb(255, 255, 255)); // 黑点清成白
+    REQUIRE(view.pixel(2, 2) == qRgb(0, 0, 0));         // 白点清成黑
+    REQUIRE(view.pixel(18, 10) == qRgb(0, 0, 0));       // 细线保留
+    REQUIRE(view.pixel(15, 15) == qRgb(255, 255, 255));
+}
+
 TEST_CASE("AutoShadow-matte-preview-view")
 {
     // 遮罩视图（AE 简单阻塞的 Mask 视图）：白=不透明、黑=透明（画布空白也是黑）
