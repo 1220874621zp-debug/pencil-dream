@@ -100,3 +100,8 @@ cmake-build-*/
 /.lupdate/
 /cmake_install.cmake
 /pencil2d_autogen/
+
+# 翻译产物/测试输出（构建目录外的都是误生成）
+*.qm
+/pencil2d_tests_autogen/
+/run-std*.txt
