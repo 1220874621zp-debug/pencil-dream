@@ -222,8 +222,18 @@ void BrushPresetStore::load()
             BrushSettings settings;
             QImage thumbnail;
             if (readPresetFile(entry.absoluteFilePath(), settings, thumbnail)) {
+                const QString presetName = settings.name.isEmpty() ? entry.completeBaseName() : settings.name;
+                // 内置同名去重：墨戏精灵等已 qrc 编译内置，历史用户副本（旧机器
+                // 手动拷贝/旧版首启导入）不再加载，面板只保留内置一份
+                bool clashesBuiltin = false;
+                for (const BrushPreset& builtIn : builtIns)
+                {
+                    if (builtIn.name == presetName) { clashesBuiltin = true; break; }
+                }
+                if (clashesBuiltin) { continue; }
+
                 BrushPreset preset;
-                preset.name = settings.name.isEmpty() ? entry.completeBaseName() : settings.name;
+                preset.name = presetName;
                 preset.settings = settings;
                 preset.settings.name = preset.name;
                 preset.thumbnail = thumbnail;
