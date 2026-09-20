@@ -730,24 +730,27 @@ void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, co
 void AutoShadowDialog::addSliderRowTo(QLayout* layout, const QString& labelText, const int minV, const int maxV,
                                       const int defV, const QString& tip, const QString& suffix,
                                       QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
-{    // 单行紧凑排版：标签 | 滑杆(拉伸) | 数值框——13 行参数也放得下常规屏幕
+{    // 单行紧凑排版：标签 | 滑杆(拉伸) | 数值框——13 行参数也放得下常规屏幕。
+    // 控件必须挂布局的宿主控件：挂 this 而宿主是分组框时 addItem 不重父，
+    // 控件脱管漂到对话框左上角级联叠压（排线行曾因此盖住光源行）。
+    QWidget* host = (layout->parentWidget() != nullptr) ? layout->parentWidget() : this;
     auto* grid = new QGridLayout;
     grid->setHorizontalSpacing(8);
     grid->setVerticalSpacing(2);
     grid->setContentsMargins(0, 0, 0, 0);
 
-    auto* label = new QLabel(labelText, this);
+    auto* label = new QLabel(labelText, host);
     label->setMinimumWidth(84);
     label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     grid->addWidget(label, 0, 0);
 
-    auto* slider = new QSlider(Qt::Horizontal, this);
+    auto* slider = new QSlider(Qt::Horizontal, host);
     slider->setRange(minV, maxV);
     slider->setValue(defV);
     slider->setToolTip(tip);
     grid->addWidget(slider, 0, 1);
 
-    auto* spin = new QDoubleSpinBox(this);
+    auto* spin = new QDoubleSpinBox(host);
     spin->setDecimals(0);
     spin->setRange(minV, maxV);
     spin->setValue(defV);

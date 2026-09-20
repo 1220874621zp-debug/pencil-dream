@@ -31,10 +31,15 @@ GNU General Public License for more details.
 
 #include "commandlineexporter.h"
 #include "commandlineparser.h"
+#include "autoshadowdialog.h"
 #include "mainwindow2.h"
 #include "pencildef.h"
 #include "platformhandler.h"
 #include "theme.h"
+
+#include <QDoubleSpinBox>
+#include <QGroupBox>
+#include <QSlider>
 
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
@@ -75,6 +80,47 @@ Status Pencil2D::handleCommandLineOptions()
 {
     CommandLineParser parser;
     parser.process(arguments());
+
+    // TODO(remove): 临时对话框布局探针——ASHADOW_DIALOG_PROBE=1 时离线量几何
+    if (qEnvironmentVariableIsSet("ASHADOW_DIALOG_PROBE"))
+    {
+        AutoShadowDialog dialog(nullptr);
+        auto dumpGeometry = [&dialog](const char* tag) {
+            const auto spins = dialog.findChildren<QDoubleSpinBox*>();
+            const auto sliders = dialog.findChildren<QSlider*>();
+            qDebug() << "[probe]" << tag << "size" << dialog.size() << "hint" << dialog.sizeHint() << "minHint" << dialog.minimumSizeHint();
+            struct Item { QString name; QRect r; };
+            QList<Item> items;
+            for (auto* sp : spins)
+                items.append({ QStringLiteral("spin"), QRect(sp->mapTo(&dialog, QPoint(0, 0)), sp->size()) });
+            for (auto* sl : sliders)
+                items.append({ QStringLiteral("slider"), QRect(sl->mapTo(&dialog, QPoint(0, 0)), sl->size()) });
+            int overlaps = 0;
+            for (int i = 0; i < items.size(); ++i)
+                for (int j = i + 1; j < items.size(); ++j)
+                    if (items[i].r.intersects(items[j].r))
+                    {
+                        ++overlaps;
+                        qDebug() << "[probe] OVERLAP" << items[i].name << items[i].r << "vs" << items[j].name << items[j].r;
+                    }
+            qDebug() << "[probe]" << tag << "overlaps=" << overlaps << "spins=" << spins.size() << "sliders=" << sliders.size();
+        };
+        dialog.show();
+        for (int i = 0; i < 8; ++i)
+            QCoreApplication::processEvents();
+        dumpGeometry("natural");
+        for (auto* b : dialog.findChildren<QGroupBox*>())
+            qDebug() << "[probe] groupbox" << b->title() << QRect(b->mapTo(&dialog, QPoint(0, 0)), b->size());
+        for (auto* sp : dialog.findChildren<QDoubleSpinBox*>())
+            qDebug() << "[probe] spin parent=" << sp->parentWidget()->metaObject()->className()
+                     << QRect(sp->mapTo(&dialog, QPoint(0, 0)), sp->size())
+                     << "suffix=" << sp->suffix();
+        dialog.resize(960, 660);
+        for (int i = 0; i < 8; ++i)
+            QCoreApplication::processEvents();
+        dumpGeometry("squeezed660");
+        return Status::SAFE;
+    }
 
 #ifndef QT_DEBUG
     if (isInstanceOpen()) {
