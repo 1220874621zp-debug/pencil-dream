@@ -53,25 +53,25 @@ struct AutoShadowLevel
 /** 一个光源（CSP 光源设置语义）：位置 + 仰角高度 + 强度 */
 struct AutoShadowLight
 {
-    double x = 0.15;       // 光源 X：图像宽度归一化坐标（0=左缘 1=右缘，可越界放远光）
-    double y = 0.05;       // 光源 Y：图像高度归一化坐标（0=上缘 1=下缘；Y 小=上方光源）
-    int height = 150;      // 光源高度 0..300（%）：以 max(对角线, 光到内容距离) 为基——100≈45°仰角，越大越顶光
+    double x = 0.32;       // 光源 X：图像宽度归一化坐标（0=左缘 1=右缘，可越界放远光）
+    double y = 0.38;       // 光源 Y：图像高度归一化坐标（0=上缘 1=下缘；Y 小=上方光源）
+    int height = 218;      // 光源高度 0..300（%）：以 max(对角线, 光到内容距离) 为基——100≈45°仰角，越大越顶光
     int intensity = 100;   // 强度 0..100：多光源叠加照明（照度=Σ 强度·max(0,N·L)），0=该光源关闭
 };
 
 struct AutoShadowParams
 {
     QVector<AutoShadowLight> lights = { AutoShadowLight{} }; // 光源列表（≥1，CSP 添加光源同款）
-    int maskThreshold = 128;                  // 去色阈值（灰度 1..254）：≥此值=不透明白（受光面），低于=透明黑
-    int chokeMatte = 0;                       // 阻塞遮罩（AE 简单阻塞语义）：正值收缩(阻塞)掩膜、负值扩展（px）
-    int gradientStrength = 30;                // 圆形渐变强度 0..100：离光源越远越暗的底场（与体积场叠加）
-    int normalStrength = 100;                 // 体积法线强度 0..100：SDF 伪法线 N·L 形体明暗交界线（主阴影场）
-    int formHeight = 2;                       // 体积高度 1..40：伪高度场的 z 放大（斜率倍率）——
+    int maskThreshold = 238;                  // 去色阈值（灰度 1..254）：≥此值=不透明白（受光面），低于=透明黑
+    int chokeMatte = 5;                        // 阻塞遮罩（AE 简单阻塞语义）：正值收缩(阻塞)掩膜、负值扩展（px）
+    int gradientStrength = 47;                // 圆形渐变强度 0..100：离光源越远越暗的底场（与体积场叠加）
+    int normalStrength = 11;                  // 体积法线强度 0..100：SDF 伪法线 N·L 形体明暗交界线（主阴影场）
+    int formHeight = 1;                       // 体积高度 1..40：伪高度场的 z 放大（斜率倍率）——
                                                // 自适应球冠坡度已自带 ≥1，调大主要加深贴线谷壁暗带
-    int formRadius = 300;                     // 部件最大半径 8..2000（px）：每连通域按自身 dmax 鼓球冠
+    int formRadius = 2000;                    // 部件最大半径 8..2000（px）：每连通域按自身 dmax 鼓球冠
                                                // （尺度不变，交界线横切任意大小部件），巨域（背景光晕）按此封顶
-    int formSmooth = 6;                       // 形体圆滑度（px）：伪高度场的高斯模糊 σ，越大丘顶越圆、交界线越弧
-    int occlusionStrength = 0;                // 遮挡强度 0..100：沿射向光源采样掩膜，洞在光路上投出遮挡阴影（px 半径）
+    int formSmooth = 40;                      // 形体圆滑度（px）：伪高度场的高斯模糊 σ，越大丘顶越圆、交界线越弧
+    int occlusionStrength = 84;               // 遮挡强度 0..100：沿射向光源采样掩膜，洞在光路上投出遮挡阴影（px 半径）
     int thresholds[3] = { 20, 45, 80 };       // 色阶阈值：归一化场值 0..100，递增，切出 4 个色阶
     int edgeFeather = 0;                      // 色调分离模式下阈值过渡带宽（场值单位），0=硬边
     bool smooth = false;                      // false=色调分离阴影（分阶），true=平滑阴影（连续梯度映射）

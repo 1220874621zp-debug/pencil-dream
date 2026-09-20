@@ -47,12 +47,19 @@ void fillRect(QImage& img, const int x0, const int y0, const int x1, const int y
     }
 }
 
-// 基线：顶光、只有圆形渐变底场（无遮挡/无法线），四阶全白正片叠底=无变化
+// 基线：顶光、只有圆形渐变底场（无遮挡/无法线），四阶全白正片叠底=无变化。
+// 用户调参默认（v12）与机制测试无关——这里钉住旧基线默认，场值断言不随默认漂移。
 AutoShadowParams plainParams()
 {
     AutoShadowParams p;
     p.lights[0].x = 0.5;
     p.lights[0].y = -50.0;    // 画面正上方远光 ≈ 平行
+    p.lights[0].height = 150;
+    p.maskThreshold = 128;
+    p.chokeMatte = 0;
+    p.formHeight = 2;
+    p.formRadius = 300;
+    p.formSmooth = 6;
     p.gradientStrength = 100;
     p.normalStrength = 0;     // 纯渐变基线：关掉 SDF 伪法线场
     p.occlusionStrength = 0;

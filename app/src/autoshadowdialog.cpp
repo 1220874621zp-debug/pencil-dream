@@ -368,7 +368,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     // ── 场生成段参数：选中光源（预览框点/拖定位）+ 黑透白不透掩膜 + 体积法线/渐变/遮挡 ──
     QDoubleSpinBox* lightXSpin = nullptr;
     QSlider* lightXSlider = nullptr;
-    addSliderRow(tr("光源 X："), -100, 200, 15,
+    addSliderRow(tr("光源 X："), -100, 200, 32,
         tr("当前光源的水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
         tr("%"), lightXSpin, lightXSlider);
     mLightXSpin = lightXSpin;
@@ -380,7 +380,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* lightYSpin = nullptr;
     QSlider* lightYSlider = nullptr;
-    addSliderRow(tr("光源 Y："), -100, 200, 5,
+    addSliderRow(tr("光源 Y："), -100, 200, 38,
         tr("当前光源的垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
         tr("%"), lightYSpin, lightYSlider);
     mLightYSpin = lightYSpin;
@@ -392,7 +392,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* lightHeightSpin = nullptr;
     QSlider* lightHeightSlider = nullptr;
-    addSliderRow(tr("光源高度："), 0, 300, 150,
+    addSliderRow(tr("光源高度："), 0, 300, 218,
         tr("当前光源离画面的仰角高度（%）：100≈45° 斜射，越大越顶光（明暗交界线下移、受光面变大），越小越平射（阴影越多）。光源拉远时仰角不塌。"),
         tr("%"), lightHeightSpin, lightHeightSlider);
     mLightHeightSpin = lightHeightSpin;
@@ -416,56 +416,56 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* thresholdSpin = nullptr;
     QSlider* thresholdSlider = nullptr;
-    addSliderRow(tr("去色阈值："), 1, 254, 128,
+    addSliderRow(tr("去色阈值："), 1, 254, 238,
         tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的山谷，形体阴影沿山谷两侧生长。"),
         QString(), thresholdSpin, thresholdSlider);
     mThresholdSpin = thresholdSpin;
 
     QDoubleSpinBox* chokeSpin = nullptr;
     QSlider* chokeSlider = nullptr;
-    addSliderRow(tr("阻塞遮罩："), -20, 20, 0,
+    addSliderRow(tr("阻塞遮罩："), -20, 20, 5,
         tr("简单阻塞（AE 语义）：以小增量收缩或扩展掩膜边缘，得到更整洁的掩膜。正值阻塞（收缩白区，吃掉白边与细丝），负值扩展（并掉小黑洞）。配合遮罩视图调最直观。"),
         tr(" px"), chokeSpin, chokeSlider);
     mChokeSpin = chokeSpin;
 
     QDoubleSpinBox* normalSpin = nullptr;
     QSlider* normalSlider = nullptr;
-    addSliderRow(tr("体积强度："), 0, 100, 100,
+    addSliderRow(tr("体积强度："), 0, 100, 11,
         tr("SDF 伪法线 N·L 形体阴影（0..100，主阴影场）：掩膜距离变换当伪高度场——每个色块是一座圆润小丘、线稿是山谷，表面朝向决定明暗——脸颊出弧形交界线、发缕各自分块、贴线阴影自动成立。"),
         QString(), normalSpin, normalSlider);
     mNormalSpin = normalSpin;
 
     QDoubleSpinBox* formHeightSpin = nullptr;
     QSlider* formHeightSlider = nullptr;
-    addSliderRow(tr("体积高度："), 1, 40, 2,
+    addSliderRow(tr("体积高度："), 1, 40, 1,
         tr("伪高度场的斜率放大（倍）：球冠坡度已自带 ≥1，调大主要加深贴线谷壁的暗带，调小交界过渡更宽更柔。"),
         QString(), formHeightSpin, formHeightSlider);
     mFormHeightSpin = formHeightSpin;
 
     QDoubleSpinBox* formRadiusSpin = nullptr;
     QSlider* formRadiusSlider = nullptr;
-    addSliderRow(tr("部件最大半径："), 8, 2000, 300,
+    addSliderRow(tr("部件最大半径："), 8, 2000, 2000,
         tr("每个色块按自身大小自动鼓成球冠（交界线横切任意大小的部件，无需手调）；此值只封顶过大的连通域（如背景大光晕），防止巨域被横切出一条明暗线。"),
         tr(" px"), formRadiusSpin, formRadiusSlider);
     mFormRadiusSpin = formRadiusSpin;
 
     QDoubleSpinBox* formSmoothSpin = nullptr;
     QSlider* formSmoothSlider = nullptr;
-    addSliderRow(tr("形体圆滑度："), 0, 40, 6,
+    addSliderRow(tr("形体圆滑度："), 0, 40, 40,
         tr("伪高度场的高斯模糊半径（px）：越大丘顶越圆、交界线越弧；过小会出棱角感。"),
         tr(" px"), formSmoothSpin, formSmoothSlider);
     mFormSmoothSpin = formSmoothSpin;
 
     QDoubleSpinBox* gradientSpin = nullptr;
     QSlider* gradientSlider = nullptr;
-    addSliderRow(tr("渐变强度："), 0, 100, 30,
+    addSliderRow(tr("渐变强度："), 0, 100, 47,
         tr("圆形渐变底场（0..100）：离光源越远整体越暗——叠加在形体阴影上的全局衰减，CSP 同款底感。"),
         QString(), gradientSpin, gradientSlider);
     mGradientSpin = gradientSpin;
 
     QDoubleSpinBox* occlusionSpin = nullptr;
     QSlider* occlusionSlider = nullptr;
-    addSliderRow(tr("遮挡强度："), 0, 100, 0,
+    addSliderRow(tr("遮挡强度："), 0, 100, 84,
         tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞/前层挡在光路上时其背光侧投出遮挡阴影——洞在体积场里是山谷，这里再补「投影」式的洞后暗带。"),
         tr(" px"), occlusionSpin, occlusionSlider);
     mOcclusionSpin = occlusionSpin;
