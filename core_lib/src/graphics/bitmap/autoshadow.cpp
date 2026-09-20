@@ -437,16 +437,19 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int t3 = clampInt(params.thresholds[2], t2 + 1, 100);
     const double t1f = t1, t2f = t2, t3f = t3;
 
-    // 光源=图像归一化坐标（可越界放远光），钳到 ±10 防极端值
-    const double lightX = std::min(10.0, std::max(-10.0, params.lightX)) * w;
-    const double lightY = std::min(10.0, std::max(-10.0, params.lightY)) * h;
+    // 光源列表清洗：空列表回退默认单光；位置钳 ±10 防极端值，高度/强度钳有效域
+    std::vector<AutoShadowLight> lightList;
+    if (params.lights.isEmpty())
+        lightList.push_back(AutoShadowLight{});
+    else
+        for (const auto& l : params.lights)
+            lightList.push_back(l);
     const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
     const int chokeMatte = clampInt(params.chokeMatte, -50, 50);
     const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
     const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
     const int formHeight = clampInt(params.formHeight, 1, 40);
     const int formSmooth = clampInt(params.formSmooth, 0, 40);
-    const double lightHeightF = clampInt(params.lightHeight, 1, 300);
     const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
 
@@ -462,51 +465,103 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int minX = m.minX, minY = m.minY, maxX = m.maxX, maxY = m.maxY;
     const size_t count = m.maskF.size();
 
-    // ── 场分量①：圆形渐变底场（白区内 到光源距离按 r0/vmax 归一化 0..1）
+    // 各光源像素坐标 + 伪空间 z（以 max(对角线, 光到内容距离) 为基的仰角比例——
+    // 100≈45°仰角，越大越顶光；光放得越远仰角不塌）+ 归一化强度
+    struct LightSetup
+    {
+        double px = 0.0, py = 0.0, z = 1.0, w = 1.0;
+    };
+    std::vector<LightSetup> lights;
+    {
+        const double cx = (minX + maxX) * 0.5;
+        const double cy = (minY + maxY) * 0.5;
+        const double diag = std::sqrt(static_cast<double>(w) * w + static_cast<double>(h) * h);
+        for (const AutoShadowLight& l : lightList)
+        {
+            LightSetup s;
+            s.px = std::min(10.0, std::max(-10.0, l.x)) * w;
+            s.py = std::min(10.0, std::max(-10.0, l.y)) * h;
+            const double screenDist = std::sqrt((s.px - cx) * (s.px - cx) + (s.py - cy) * (s.py - cy));
+            s.z = std::max(1.0, clampInt(l.height, 1, 300) / 100.0 * std::max(diag, screenDist));
+            s.w = clampInt(l.intensity, 0, 100) / 100.0;
+            if (s.w > 0.0)
+                lights.push_back(s); // 强度 0 = 该光源关闭，直接不参与
+        }
+        if (lights.empty())
+        {
+            // 全部光源强度为 0：保留一个位置但零照度（伪法线场全暗、渐变场取最小）
+            LightSetup s;
+            s.px = std::min(10.0, std::max(-10.0, lightList.front().x)) * w;
+            s.py = std::min(10.0, std::max(-10.0, lightList.front().y)) * h;
+            const double screenDist = std::sqrt((s.px - cx) * (s.px - cx) + (s.py - cy) * (s.py - cy));
+            s.z = std::max(1.0, clampInt(lightList.front().height, 1, 300) / 100.0 * std::max(diag, screenDist));
+            lights.push_back(s);
+            lights.back().w = 0.0;
+        }
+    }
+
+    // ── 场分量①：圆形渐变底场（白区内 到各光源距离按 r0/vmax 归一化 0..1，取各光源最近者）──
     std::vector<float> gradF(count, 0.0f);
     if (gradientStrength > 0.0)
     {
-        double minD2 = std::numeric_limits<double>::max();
-        double maxD2 = 0.0;
-        for (int y = minY; y <= maxY; ++y)
+        std::vector<float> perLight(count, 0.0f);
+        bool any = false;
+        for (const LightSetup& ls : lights)
         {
-            const size_t row = static_cast<size_t>(y) * w;
-            const double dy = y - lightY;
-            for (int x = minX; x <= maxX; ++x)
+            if (ls.w <= 0.0)
+                continue;
+            double minD2 = std::numeric_limits<double>::max();
+            double maxD2 = 0.0;
+            for (int y = minY; y <= maxY; ++y)
             {
-                if (m.maskF[row + x] < 0.5f)
-                    continue;
-                const double dx = x - lightX;
-                const double d2 = dx * dx + dy * dy;
-                if (d2 < minD2)
-                    minD2 = d2;
-                if (d2 > maxD2)
-                    maxD2 = d2;
+                const size_t row = static_cast<size_t>(y) * w;
+                const double dy = y - ls.py;
+                for (int x = minX; x <= maxX; ++x)
+                {
+                    if (m.maskF[row + x] < 0.5f)
+                        continue;
+                    const double dx = x - ls.px;
+                    const double d2 = dx * dx + dy * dy;
+                    if (d2 < minD2)
+                        minD2 = d2;
+                    if (d2 > maxD2)
+                        maxD2 = d2;
+                }
             }
-        }
-        if (maxD2 > minD2)
-        {
+            if (maxD2 <= minD2)
+                continue;
             const double r0 = std::sqrt(minD2);
             const double norm = 1.0 / (std::sqrt(maxD2) - r0);
             for (int y = minY; y <= maxY; ++y)
             {
                 const size_t row = static_cast<size_t>(y) * w;
-                const double dy = y - lightY;
+                const double dy = y - ls.py;
                 for (int x = minX; x <= maxX; ++x)
                 {
                     if (m.maskF[row + x] < 0.5f)
                         continue;
-                    const double dx = x - lightX;
-                    gradF[row + x] = static_cast<float>(std::max(0.0, (std::sqrt(dx * dx + dy * dy) - r0) * norm));
+                    const double dx = x - ls.px;
+                    perLight[row + x] = static_cast<float>(std::max(0.0, (std::sqrt(dx * dx + dy * dy) - r0) * norm));
                 }
+            }
+            if (!any)
+            {
+                gradF = perLight; // 第一个有效光源直接铺底
+                any = true;
+            }
+            else
+            {
+                for (size_t i = 0; i < count; ++i)
+                    gradF[i] = std::min(gradF[i], perLight[i]); // 多光源：任一光照到即不受另一光的衰减
             }
         }
     }
 
     // ── 场分量②：SDF 伪法线 N·L（形体明暗交界线，主阴影场）──
-    // 距离变换当伪高度场（连通区域成丘、线稿成谷）→ 圆滑 → 高度场法线 → 与光源点积。
+    // 距离变换当伪高度场（连通区域成丘、线稿成谷）→ 圆滑 → 高度场法线 → 多光源照度。
+    // 照度 = Σ 强度i·max(0, N·L_i)——各光源互补照明，所有光都照不到的坡面才全暗。
     // 明暗交界线横切形体、贴线阴影自动成立——AE Relight 类（AI 法线打光）的解析式近似。
-    std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−N·L
+    std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−照度
     if (normalStrength > 0.0)
     {
         std::vector<float> height;
@@ -515,14 +570,6 @@ int apply(QImage& img, const AutoShadowParams& params)
             std::vector<float> tmp(count);
             gaussBlur(height, tmp, w, h, static_cast<float>(formSmooth));
         }
-
-        // 光源高度：以 max(对角线, 光到内容距离) 为基的仰角比例——100≈45°仰角，越大越顶光；
-        // 光放得越远仰角不塌（远光仍是斜射而非掠射）
-        const double cx = (minX + maxX) * 0.5;
-        const double cy = (minY + maxY) * 0.5;
-        const double screenDist = std::sqrt((lightX - cx) * (lightX - cx) + (lightY - cy) * (lightY - cy));
-        const double diag = std::sqrt(static_cast<double>(w) * w + static_cast<double>(h) * h);
-        const double lightZ = std::max(1.0, lightHeightF / 100.0 * std::max(diag, screenDist));
         const auto hAt = [&height, w, h](const int px, const int py) {
             const int cxx = std::min(w - 1, std::max(0, px));
             const int cyy = std::min(h - 1, std::max(0, py));
@@ -540,18 +587,27 @@ int apply(QImage& img, const AutoShadowParams& params)
                 const double gx = (hAt(x + 1, y) - hAt(x - 1, y)) * 0.5 * formHeight;
                 const double gy = (hAt(x, y + 1) - hAt(x, y - 1)) * 0.5 * formHeight;
                 const double nLen = std::sqrt(gx * gx + gy * gy + 1.0);
-                // L = 光源 − 表面点（表面点带伪高度 z）
-                const double lx = lightX - x;
-                const double ly = lightY - y;
-                const double lz = lightZ - hAt(x, y) * formHeight;
-                const double lLen = std::sqrt(lx * lx + ly * ly + lz * lz);
-                double ndl = 1.0;
-                if (lLen > 1e-6)
+                const double hz = hAt(x, y) * formHeight;
+                // 多光源：照度 = Σ 强度i·max(0, N·L_i)（表面点带伪高度 z）
+                double illuminance = 0.0;
+                for (const LightSetup& ls : lights)
                 {
-                    ndl = ((-gx / nLen) * lx + (-gy / nLen) * ly + (1.0 / nLen) * lz) / lLen;
-                    ndl = std::min(1.0, std::max(0.0, ndl));
+                    if (ls.w <= 0.0)
+                        continue;
+                    const double lx = ls.px - x;
+                    const double ly = ls.py - y;
+                    const double lz = ls.z - hz;
+                    const double lLen = std::sqrt(lx * lx + ly * ly + lz * lz);
+                    if (lLen <= 1e-6)
+                    {
+                        illuminance += ls.w;
+                        continue;
+                    }
+                    const double ndl = ((-gx / nLen) * lx + (-gy / nLen) * ly + (1.0 / nLen) * lz) / lLen;
+                    if (ndl > 0.0)
+                        illuminance += ls.w * ndl;
                 }
-                normalF[row + x] = static_cast<float>(1.0 - ndl);
+                normalF[row + x] = static_cast<float>(1.0 - std::min(1.0, illuminance));
             }
         }
     }
@@ -577,7 +633,6 @@ int apply(QImage& img, const AutoShadowParams& params)
     {
         auto* line = reinterpret_cast<QRgb*>(img.scanLine(y));
         const size_t row = static_cast<size_t>(y) * w;
-        const double dy = y - lightY;
         for (int x = 0; x < w; ++x)
         {
             if (m.maskF[row + x] < 0.5f)
@@ -587,13 +642,23 @@ int apply(QImage& img, const AutoShadowParams& params)
 
             double field = gradientStrength * gradF[row + x] + normalStrength * normalF[row + x];
 
-            // 场分量③：径向遮挡——沿射向光源采样掩膜，洞在光路上投遮挡阴影
+            // 场分量③：径向遮挡——沿射向各光源采样掩膜，任一光路通畅即无遮挡
+            // （取受阻最轻者）：洞在所有光源的背光侧才投出遮挡阴影
             if (occlusionRange > 0)
             {
-                const double dx = x - lightX;
-                const double len = std::sqrt(dx * dx + dy * dy);
-                if (len >= 1.0)
+                double minBlocked = 1.0;
+                for (const LightSetup& ls : lights)
                 {
+                    if (ls.w <= 0.0)
+                        continue;
+                    const double dx = x - ls.px;
+                    const double dy = y - ls.py;
+                    const double len = std::sqrt(dx * dx + dy * dy);
+                    if (len < 1.0)
+                    {
+                        minBlocked = 0.0; // 光源贴脸：无遮挡
+                        break;
+                    }
                     const double ux = -dx / len; // 指向光源
                     const double uy = -dy / len;
                     double acc = 0.0;
@@ -609,9 +674,13 @@ int apply(QImage& img, const AutoShadowParams& params)
                         acc += wgt * cm * bilinearSample(m.maskF, w, h, x + ux * off, y + uy * off);
                         weightSum += wgt * cm;
                     }
-                    if (weightSum > 1e-3)
-                        field += 1.0 - acc / weightSum;
+                    const double blocked = weightSum > 1e-3 ? 1.0 - acc / weightSum : 0.0;
+                    if (blocked < minBlocked)
+                        minBlocked = blocked;
+                    if (minBlocked <= 0.0)
+                        break; // 已有通畅光路，再无遮挡
                 }
+                field += minBlocked;
             }
 
             const float F = static_cast<float>(std::min(1.0, std::max(0.0, field)) * 100.0);

@@ -41,7 +41,9 @@ class Editor;
 class LevelsBar;
 
 /** 自动上阴影参数对话框（CSP 参数模型 + PS 交互）：左参数右预览。
-    预览框点击/拖拽直接定位光源；色阶阈值=渐变条拖块（点色段改该阶颜色）。 */
+    预设一键整套光源+色带（CSP 预设语义）；光源列表可增删（CSP 添加光源同款），
+    滑杆编辑选中光源；预览框点击/拖拽定位选中光源（点其他标记切换选中）；
+    色阶阈值=渐变条拖块（点色段改该阶颜色）。 */
 class AutoShadowDialog : public QDialog
 {
     Q_OBJECT
@@ -67,12 +69,29 @@ private:
     void setLightFromPreview(const QPoint& pos);
     void syncLevelsBar();
     void syncHatchEnabled();
+    void refreshLightCombo();
+    void syncLightControls();
+    void syncLevelRow(const int levelIndex);
+    void applyPreset(const int presetIndex);
 
     QVBoxLayout* mParamColumn = nullptr;
+
+    QComboBox* mPresetCombo = nullptr;
+    QComboBox* mLightCombo = nullptr;
+    QPushButton* mAddLightButton = nullptr;
+    QPushButton* mRemoveLightButton = nullptr;
+    QVector<AutoShadowLight> mLights;
+    int mCurrentLight = 0;
+    bool mApplyingPreset = false;
 
     QDoubleSpinBox* mLightXSpin = nullptr;
     QDoubleSpinBox* mLightYSpin = nullptr;
     QDoubleSpinBox* mLightHeightSpin = nullptr;
+    QDoubleSpinBox* mLightIntensitySpin = nullptr;
+    QSlider* mLightXSlider = nullptr;
+    QSlider* mLightYSlider = nullptr;
+    QSlider* mLightHeightSlider = nullptr;
+    QSlider* mLightIntensitySlider = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
     QDoubleSpinBox* mChokeSpin = nullptr;
     QDoubleSpinBox* mGradientSpin = nullptr;

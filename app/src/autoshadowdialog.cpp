@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <QPainter>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSignalBlocker>
 #include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -62,6 +63,46 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
     q.hatchSpacing = std::max(1, qRound(p.hatchSpacing * s));
     q.chokeMatte = qRound(p.chokeMatte * s);
     return q;
+}
+
+/** 预设（CSP 预设语义）：一键整套光源列表 + 渐变强度 + 色带 + 阈值。
+    id: 1=顺光 2=逆光轮廓光（双光源） 3=夜晚 4=黄昏 */
+AutoShadowParams presetParams(const int id)
+{
+    AutoShadowParams p;
+    if (id == 2)
+    {
+        AutoShadowLight a; a.x = 0.15; a.y = 0.30; a.height = 120;
+        AutoShadowLight b; b.x = 0.85; b.y = 0.30; b.height = 120;
+        p.lights = { a, b };
+        p.gradientStrength = 20;
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(255, 216, 172), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(186, 142, 168), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(92, 70, 108), AutoShadowBlendMode::Multiply };
+    }
+    else if (id == 3)
+    {
+        AutoShadowLight a; a.x = -0.10; a.y = -0.20; a.height = 200; a.intensity = 80;
+        p.lights = { a };
+        p.gradientStrength = 45;
+        p.thresholds[0] = 18; p.thresholds[1] = 42; p.thresholds[2] = 72;
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(168, 190, 255), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(120, 140, 215), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(58, 68, 130), AutoShadowBlendMode::Multiply };
+    }
+    else if (id == 4)
+    {
+        AutoShadowLight a; a.x = 1.10; a.y = 0.55; a.height = 70;
+        p.lights = { a };
+        p.gradientStrength = 50;
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(255, 208, 150), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(236, 148, 96), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(150, 72, 62), AutoShadowBlendMode::Multiply };
+    }
+    return p;
 }
 
 } // namespace
@@ -237,6 +278,10 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mLevels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
     mLevels[3] = { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply };
 
+    // 光源列表：默认一盏主光（左上 45°）
+    mLights = { AutoShadowLight{} };
+    mCurrentLight = 0;
+
     // 参数变动防抖：拖滑杆连续触发，只在停顿后重算一次预览
     mPreviewTimer = new QTimer(this);
     mPreviewTimer->setSingleShot(true);
@@ -251,27 +296,110 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     mParamColumn->setSpacing(6);
 
-    // ── 场生成段参数：光源（预览框点/拖定位）+ 黑透白不透掩膜 + 体积法线/渐变/遮挡 ──
+    // ── 预设（CSP 预设语义）：一键整套光源列表 + 渐变强度 + 色带 ──
+    auto* presetRow = new QGridLayout;
+    presetRow->setHorizontalSpacing(8);
+    presetRow->setContentsMargins(0, 0, 0, 0);
+    auto* presetLabel = new QLabel(tr("预设："), this);
+    presetRow->addWidget(presetLabel, 0, 0);
+    mPresetCombo = new QComboBox(this);
+    mPresetCombo->addItem(tr("无"));
+    mPresetCombo->addItem(tr("顺光"));
+    mPresetCombo->addItem(tr("逆光轮廓光（双光源）"));
+    mPresetCombo->addItem(tr("夜晚"));
+    mPresetCombo->addItem(tr("黄昏"));
+    mPresetCombo->setToolTip(tr("一键应用整套光源与色带配置（CSP 预设语义）。应用后手动改任何参数，预设自动回到「无」。"));
+    connect(mPresetCombo, &QComboBox::activated, this, [this](const int index) { applyPreset(index); });
+    presetRow->addWidget(mPresetCombo, 0, 1);
+    mParamColumn->addLayout(presetRow);
+
+    // ── 光源列表（CSP 光源设置语义）：下拉选中编辑对象，可增删 ──
+    auto* lightRow = new QHBoxLayout;
+    lightRow->setContentsMargins(0, 0, 0, 0);
+    mLightCombo = new QComboBox(this);
+    mLightCombo->setToolTip(tr("当前编辑的光源。滑杆与预览框拖拽都作用于它；点击预览框里其他光源的编号标记可切换。"));
+    connect(mLightCombo, &QComboBox::activated, this, [this](const int index) {
+        mCurrentLight = index;
+        syncLightControls();
+        renderPreview(); // 立即刷新标记高亮
+    });
+    lightRow->addWidget(mLightCombo, 1);
+    mAddLightButton = new QPushButton(tr("＋添加光源"), this);
+    mAddLightButton->setAutoDefault(false);
+    mAddLightButton->setToolTip(tr("再加一盏光源：多光源互补照明（照度=Σ 强度·max(0,N·L)），所有光都照不到的坡面才全暗——双光可做双侧轮廓光。"));
+    connect(mAddLightButton, &QPushButton::clicked, this, [this] {
+        AutoShadowLight l;
+        l.x = 0.85;
+        l.y = 0.10;
+        mLights.append(l);
+        mCurrentLight = mLights.size() - 1;
+        refreshLightCombo();
+        syncLightControls();
+        schedulePreview();
+    });
+    lightRow->addWidget(mAddLightButton);
+    mRemoveLightButton = new QPushButton(tr("－删除光源"), this);
+    mRemoveLightButton->setAutoDefault(false);
+    connect(mRemoveLightButton, &QPushButton::clicked, this, [this] {
+        if (mLights.size() <= 1)
+            return;
+        mLights.removeAt(mCurrentLight);
+        mCurrentLight = std::min(mCurrentLight, static_cast<int>(mLights.size()) - 1);
+        refreshLightCombo();
+        syncLightControls();
+        schedulePreview();
+    });
+    lightRow->addWidget(mRemoveLightButton);
+    mParamColumn->addLayout(lightRow);
+
+    // ── 场生成段参数：选中光源（预览框点/拖定位）+ 黑透白不透掩膜 + 体积法线/渐变/遮挡 ──
     QDoubleSpinBox* lightXSpin = nullptr;
     QSlider* lightXSlider = nullptr;
     addSliderRow(tr("光源 X："), -100, 200, 15,
-        tr("光源水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
+        tr("当前光源的水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
         tr("%"), lightXSpin, lightXSlider);
     mLightXSpin = lightXSpin;
+    mLightXSlider = lightXSlider;
+    connect(mLightXSpin, &QDoubleSpinBox::valueChanged, this, [this](const double value) {
+        if (mCurrentLight < mLights.size())
+            mLights[mCurrentLight].x = value / 100.0;
+    });
 
     QDoubleSpinBox* lightYSpin = nullptr;
     QSlider* lightYSlider = nullptr;
     addSliderRow(tr("光源 Y："), -100, 200, 5,
-        tr("光源垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
+        tr("当前光源的垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
         tr("%"), lightYSpin, lightYSlider);
     mLightYSpin = lightYSpin;
+    mLightYSlider = lightYSlider;
+    connect(mLightYSpin, &QDoubleSpinBox::valueChanged, this, [this](const double value) {
+        if (mCurrentLight < mLights.size())
+            mLights[mCurrentLight].y = value / 100.0;
+    });
 
     QDoubleSpinBox* lightHeightSpin = nullptr;
     QSlider* lightHeightSlider = nullptr;
     addSliderRow(tr("光源高度："), 0, 300, 150,
-        tr("光源离画面的仰角高度（%）：100≈45° 斜射，越大越顶光（明暗交界线下移、受光面变大），越小越平射（阴影越多）。光源拉远时仰角不塌。"),
+        tr("当前光源离画面的仰角高度（%）：100≈45° 斜射，越大越顶光（明暗交界线下移、受光面变大），越小越平射（阴影越多）。光源拉远时仰角不塌。"),
         tr("%"), lightHeightSpin, lightHeightSlider);
     mLightHeightSpin = lightHeightSpin;
+    mLightHeightSlider = lightHeightSlider;
+    connect(mLightHeightSpin, &QDoubleSpinBox::valueChanged, this, [this](const double value) {
+        if (mCurrentLight < mLights.size())
+            mLights[mCurrentLight].height = qRound(value);
+    });
+
+    QDoubleSpinBox* lightIntensitySpin = nullptr;
+    QSlider* lightIntensitySlider = nullptr;
+    addSliderRow(tr("光源强度："), 0, 100, 100,
+        tr("当前光源的强度（%）：多光源按强度加权叠加照明；0=关闭该光源（只剩其余光源照明）。"),
+        tr("%"), lightIntensitySpin, lightIntensitySlider);
+    mLightIntensitySpin = lightIntensitySpin;
+    mLightIntensitySlider = lightIntensitySlider;
+    connect(mLightIntensitySpin, &QDoubleSpinBox::valueChanged, this, [this](const double value) {
+        if (mCurrentLight < mLights.size())
+            mLights[mCurrentLight].intensity = qRound(value);
+    });
 
     QDoubleSpinBox* thresholdSpin = nullptr;
     QSlider* thresholdSlider = nullptr;
@@ -486,15 +614,15 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     previewColumn->addStretch(1);
 
     grabPreviewSource();
+    refreshLightCombo();
+    syncLightControls();
     renderPreview();
 }
 
 AutoShadowParams AutoShadowDialog::params() const
 {
     AutoShadowParams p;
-    p.lightX = mLightXSpin->value() / 100.0;
-    p.lightY = mLightYSpin->value() / 100.0;
-    p.lightHeight = qRound(mLightHeightSpin->value());
+    p.lights = mLights;
     p.maskThreshold = qRound(mThresholdSpin->value());
     p.chokeMatte = qRound(mChokeSpin->value());
     p.gradientStrength = qRound(mGradientSpin->value());
@@ -555,6 +683,24 @@ void AutoShadowDialog::setLightFromPreview(const QPoint& pos)
     const int lh = mPreviewLabel->height();
     const int iw = mScaledSource.width();
     const int ih = mScaledSource.height();
+    // 点中其他光源的编号标记（±12px）→ 切换为当前编辑光源
+    for (int i = 0; i < mLights.size(); ++i)
+    {
+        const double mx = mLights[i].x * iw + (lw - iw) / 2.0;
+        const double my = mLights[i].y * ih + (lh - ih) / 2.0;
+        const double ddx = pos.x() - mx;
+        const double ddy = pos.y() - my;
+        if (ddx * ddx + ddy * ddy <= 12.0 * 12.0)
+        {
+            if (i != mCurrentLight)
+            {
+                mCurrentLight = i;
+                syncLightControls();
+                renderPreview();
+            }
+            return;
+        }
+    }
     const double u = std::min(1.0, std::max(0.0, (pos.x() - (lw - iw) / 2.0) / iw));
     const double v = std::min(1.0, std::max(0.0, (pos.y() - (lh - ih) / 2.0) / ih));
     mLightXSpin->setValue(qRound(u * 100.0));
@@ -692,6 +838,12 @@ void AutoShadowDialog::grabPreviewSource()
 
 void AutoShadowDialog::schedulePreview()
 {
+    // 手动改参后预设不再是当前状态：回到「无」（应用预设期间除外）
+    if (!mApplyingPreset && mPresetCombo != nullptr && mPresetCombo->currentIndex() != 0)
+    {
+        QSignalBlocker blocker(mPresetCombo);
+        mPresetCombo->setCurrentIndex(0);
+    }
     mPreviewTimer->start();
 }
 
@@ -724,21 +876,102 @@ void AutoShadowDialog::renderPreview()
     QImage preview = mScaledSource; // COW 拷贝，apply 就地改写
     AutoShadow::apply(preview, p);
 
-    // 画光源标记（黄圈+十字），只在画面范围内显示
-    const int mx = qRound(p.lightX * preview.width());
-    const int my = qRound(p.lightY * preview.height());
-    if (mx >= -8 && mx <= preview.width() + 8 && my >= -8 && my <= preview.height() + 8)
+    // 画所有光源标记（编号圈，各自配色；选中的更大+白描边），只在画面范围内显示
+    static const QColor kMarkerColors[5] = {
+        QColor(255, 220, 60), QColor(60, 200, 255), QColor(255, 90, 220),
+        QColor(90, 230, 130), QColor(255, 150, 60),
+    };
+    for (int i = 0; i < p.lights.size(); ++i)
     {
+        const int mx = qRound(p.lights[i].x * preview.width());
+        const int my = qRound(p.lights[i].y * preview.height());
+        if (mx < -8 || mx > preview.width() + 8 || my < -8 || my > preview.height() + 8)
+            continue;
+        const bool selected = (i == mCurrentLight);
+        const int r = selected ? 9 : 7;
         QPainter painter(&preview);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QPen(QColor(255, 220, 60), 2));
-        painter.setBrush(QColor(255, 220, 60, 170));
-        painter.drawEllipse(QPoint(mx, my), 7, 7);
-        painter.setPen(QPen(QColor(255, 250, 200), 1));
-        painter.drawLine(mx - 11, my, mx - 4, my);
-        painter.drawLine(mx + 4, my, mx + 11, my);
-        painter.drawLine(mx, my - 11, mx, my - 4);
-        painter.drawLine(mx, my + 4, mx, my + 11);
+        painter.setPen(QPen(selected ? QColor(255, 255, 255) : QColor(30, 30, 30), selected ? 2 : 1));
+        painter.setBrush(kMarkerColors[i % 5]);
+        painter.drawEllipse(QPoint(mx, my), r, r);
+        painter.setPen(QPen(QColor(30, 30, 30)));
+        QFont markerFont = font();
+        markerFont.setPointSizeF(std::max(7.0, font().pointSizeF() - 3.0));
+        markerFont.setBold(true);
+        painter.setFont(markerFont);
+        painter.drawText(QRect(mx - r, my - r, 2 * r, 2 * r), Qt::AlignCenter, QString::number(i + 1));
     }
     mPreviewLabel->setPixmap(QPixmap::fromImage(preview));
+}
+
+void AutoShadowDialog::refreshLightCombo()
+{
+    QSignalBlocker blocker(mLightCombo);
+    mLightCombo->clear();
+    for (int i = 0; i < mLights.size(); ++i)
+        mLightCombo->addItem(tr("光源 %1").arg(i + 1));
+    mCurrentLight = std::min(mCurrentLight, std::max(0, static_cast<int>(mLights.size()) - 1));
+    mLightCombo->setCurrentIndex(mCurrentLight);
+    if (mRemoveLightButton != nullptr)
+        mRemoveLightButton->setEnabled(mLights.size() > 1);
+}
+
+void AutoShadowDialog::syncLightControls()
+{
+    mCurrentLight = std::min(mCurrentLight, std::max(0, static_cast<int>(mLights.size()) - 1));
+    const AutoShadowLight& l = mLights[std::max(0, mCurrentLight)];
+    // 屏蔽信号写滑杆/数值框：避免触发挂钩把值写回错误的光源
+    QSignalBlocker bx(mLightXSpin);
+    QSignalBlocker by(mLightYSpin);
+    QSignalBlocker bh(mLightHeightSpin);
+    QSignalBlocker bi(mLightIntensitySpin);
+    QSignalBlocker sx(mLightXSlider);
+    QSignalBlocker sy(mLightYSlider);
+    QSignalBlocker sh(mLightHeightSlider);
+    QSignalBlocker si(mLightIntensitySlider);
+    mLightXSpin->setValue(l.x * 100.0);
+    mLightYSpin->setValue(l.y * 100.0);
+    mLightHeightSpin->setValue(l.height);
+    mLightIntensitySpin->setValue(l.intensity);
+    mLightXSlider->setValue(qRound(l.x * 100.0));
+    mLightYSlider->setValue(qRound(l.y * 100.0));
+    mLightHeightSlider->setValue(l.height);
+    mLightIntensitySlider->setValue(l.intensity);
+    QSignalBlocker bc(mLightCombo);
+    mLightCombo->setCurrentIndex(mCurrentLight);
+}
+
+void AutoShadowDialog::syncLevelRow(const int levelIndex)
+{
+    updateLevelButton(levelIndex);
+    QSignalBlocker bc(mLevelCombos[levelIndex]);
+    mLevelCombos[levelIndex]->setCurrentIndex(static_cast<int>(mLevels[levelIndex].mode));
+    QSignalBlocker bo(mLevelOpacitySpins[levelIndex]);
+    mLevelOpacitySpins[levelIndex]->setValue(mLevels[levelIndex].opacity);
+}
+
+void AutoShadowDialog::applyPreset(const int presetIndex)
+{
+    if (presetIndex <= 0)
+        return; // 无：不动作
+    mApplyingPreset = true;
+    const AutoShadowParams p = presetParams(presetIndex);
+    mLights = p.lights;
+    mCurrentLight = 0;
+    mGradientSpin->setValue(p.gradientStrength);
+    for (int i = 0; i < 4; ++i)
+    {
+        mLevels[i] = p.levels[i];
+        syncLevelRow(i);
+    }
+    mLevelsBar->setThresholds(p.thresholds);
+    mTypeCombo->setCurrentIndex(0);      // 色调分离（赛璐璐）
+    mInvertCheck->setChecked(false);
+    mHatchCheck->setChecked(false);       // 预设不碰排线：留给漫画流程单独开
+    syncHatchEnabled();
+    refreshLightCombo();
+    syncLightControls();
+    syncLevelsBar();
+    mApplyingPreset = false;
+    schedulePreview();
 }

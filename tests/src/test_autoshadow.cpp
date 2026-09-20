@@ -51,8 +51,8 @@ void fillRect(QImage& img, const int x0, const int y0, const int x1, const int y
 AutoShadowParams plainParams()
 {
     AutoShadowParams p;
-    p.lightX = 0.5;
-    p.lightY = -50.0;         // 画面正上方远光 ≈ 平行
+    p.lights[0].x = 0.5;
+    p.lights[0].y = -50.0;    // 画面正上方远光 ≈ 平行
     p.gradientStrength = 100;
     p.normalStrength = 0;     // 纯渐变基线：关掉 SDF 伪法线场
     p.occlusionStrength = 0;
@@ -116,8 +116,8 @@ TEST_CASE("AutoShadow-matte-gates-display")
     fillRect(img, 40, 10, 49, 89, qRgb(0, 0, 0));        // 深色区成洞
 
     AutoShadowParams p = plainParams();
-    p.lightX = -50.0;                                    // 左侧远光
-    p.lightY = 0.5;
+    p.lights[0].x = -50.0;                               // 左侧远光
+    p.lights[0].y = 0.5;
     p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
@@ -137,9 +137,9 @@ TEST_CASE("AutoShadow-normal-terminator")
     AutoShadowParams p = plainParams();
     p.gradientStrength = 0;
     p.normalStrength = 100;
-    p.lightHeight = 100;
-    p.lightX = -50.0;   // 左侧远光
-    p.lightY = 0.5;
+    p.lights[0].height = 100;
+    p.lights[0].x = -50.0;   // 左侧远光
+    p.lights[0].y = 0.5;
     p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
     p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
@@ -165,9 +165,9 @@ TEST_CASE("AutoShadow-normal-flat-plateau")
     AutoShadowParams p = plainParams();
     p.gradientStrength = 0;
     p.normalStrength = 100;
-    p.lightHeight = 100;
-    p.lightX = -50.0;
-    p.lightY = 0.5;     // 光在左中：中部像素 ly≈0
+    p.lights[0].height = 100;
+    p.lights[0].x = -50.0;
+    p.lights[0].y = 0.5;     // 光在左中：中部像素 ly≈0
     p.thresholds[0] = 20;
     p.thresholds[1] = 50;
     p.thresholds[2] = 70;
@@ -193,9 +193,9 @@ TEST_CASE("AutoShadow-normal-groove")
     AutoShadowParams p = plainParams();
     p.gradientStrength = 0;
     p.normalStrength = 100;
-    p.lightHeight = 100;
-    p.lightX = -50.0;
-    p.lightY = 0.5;
+    p.lights[0].height = 100;
+    p.lights[0].x = -50.0;
+    p.lights[0].y = 0.5;
     p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
     p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
@@ -208,6 +208,70 @@ TEST_CASE("AutoShadow-normal-groove")
     REQUIRE(img.pixel(40, 20) == 0);                     // 山谷线稿：门控不动
     REQUIRE(img.pixel(42, 20) == qRgb(255, 255, 255));   // 山谷右壁：F≈10=阶1（迎光亮缘）
     REQUIRE(img.pixel(65, 20) == qRgb(64, 64, 64));      // 右条外缘坡：F=100=阶4
+}
+
+TEST_CASE("AutoShadow-multi-light-opposite")
+{
+    // 多光源互补照明：宽条 x[10,49]，左右各一盏对称远光（45° 仰角）——
+    // 单左光时右坡 F=100 全暗；加右光后照度=Σ max(0,N·L) 只增不减，
+    // 右坡被右光照亮（灰阶变浅）、丘顶照度饱和仍全亮。灰阶单色带保证场值→灰度单调。
+    const auto grayRamp = [](AutoShadowParams& p) {
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+    };
+    QImage img = makeImage(60, 100);
+    fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
+
+    AutoShadowParams single = plainParams();
+    single.gradientStrength = 0;
+    single.normalStrength = 100;
+    single.lights[0].height = 100;
+    single.lights[0].x = -50.0;
+    single.lights[0].y = 0.5;
+    grayRamp(single);
+    REQUIRE(AutoShadow::apply(img, single) > 0);
+    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));    // 基线：右坡深处=阶4
+    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255)); // 丘顶=阶1
+
+    QImage img2 = makeImage(60, 100);
+    fillRect(img2, 10, 10, 49, 89, qRgb(255, 255, 255));
+    AutoShadowParams dual = single;
+    AutoShadowLight second;
+    second.x = 50.0;
+    second.y = 0.5;
+    second.height = 100;
+    dual.lights.append(second);
+    REQUIRE(AutoShadow::apply(img2, dual) > 0);
+    REQUIRE(img2.pixel(29, 50) == qRgb(255, 255, 255)); // 丘顶照度饱和：仍全亮
+    REQUIRE(qGray(img2.pixel(45, 50)) > 64);            // 右坡被右光照亮：严格亮于单光
+    REQUIRE(qGray(img2.pixel(14, 50)) > 64);            // 左坡同理被左光照住
+    REQUIRE(qGray(img2.pixel(45, 50)) >= qGray(img.pixel(45, 50))); // 单调保证：加光不减照度
+}
+
+TEST_CASE("AutoShadow-light-intensity-off")
+{
+    // 强度 0=该光源关闭：照度恒 0 → 场值恒 100 → 整条落最深阶（灰阶带=64）
+    QImage img = makeImage(60, 100);
+    fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
+
+    AutoShadowParams p = plainParams();
+    p.gradientStrength = 0;
+    p.normalStrength = 100;
+    p.lights[0].height = 100;
+    p.lights[0].x = -50.0;
+    p.lights[0].y = 0.5;
+    p.lights[0].intensity = 0;
+    p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+    p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
+    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+    REQUIRE(img.pixel(15, 50) == qRgb(64, 64, 64)); // 近光侧也无光：全条最深阶
+    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));
+    REQUIRE(img.pixel(5, 50) == 0);                 // 掩膜外不动
 }
 
 TEST_CASE("AutoShadow-hatch-pattern")
@@ -248,8 +312,8 @@ TEST_CASE("AutoShadow-radial-occlusion")
     p.levels[1] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
     p.levels[3] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.lightX = -50.0;
-    p.lightY = 0.5;
+    p.lights[0].x = -50.0;
+    p.lights[0].y = 0.5;
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
     REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // 迎光侧：射向光源全是白区
