@@ -129,8 +129,8 @@ TEST_CASE("AutoShadow-matte-gates-display")
 TEST_CASE("AutoShadow-normal-terminator")
 {
     // 只有 SDF 伪法线 N·L（主阴影场）：宽条 x[10,49]，左侧远光（约 45° 仰角）——
-    // 条成一座丘（丘脊 x≈29.5），左坡迎光亮、右坡背光暗，明暗交界线横切形体。
-    // 场值实测 y=50：x=14→15、28→0、29→14（阶1 白）、30→63（阶3）、31→100（阶4）
+    // 条鼓成球冠丘（丘脊 x≈29.5），左坡迎光亮、右坡背光暗，明暗交界线横切形体。
+    // 场值实测 y=50：x=14→17、28→1、29→19（阶1 白）、30→64（阶3）、31→≥98（阶4）
     QImage img = makeImage(60, 100);
     fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
 
@@ -147,8 +147,8 @@ TEST_CASE("AutoShadow-normal-terminator")
     REQUIRE(AutoShadow::apply(img, p) > 0);
     REQUIRE(img.pixel(14, 50) == qRgb(255, 255, 255));   // 左坡：迎光=阶1
     REQUIRE(img.pixel(28, 50) == qRgb(255, 255, 255));   // 丘脊左侧：仍受光
-    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255));   // 丘脊像素：F≈14=阶1
-    REQUIRE(img.pixel(30, 50) == qRgb(128, 128, 128));   // 脊右一像素：F≈63=阶3（交界带）
+    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255));   // 丘脊像素：F≈19=阶1（交界线贴脊）
+    REQUIRE(img.pixel(30, 50) == qRgb(128, 128, 128));   // 脊右一像素：F≈64=阶3（交界带）
     REQUIRE(img.pixel(31, 50) == qRgb(64, 64, 64));      // 再右一像素：F=100=阶4（背光）
     REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));      // 右坡深处：阶4
     REQUIRE(img.pixel(5, 50) == 0);                      // 掩膜外透明像素不动
@@ -157,8 +157,8 @@ TEST_CASE("AutoShadow-normal-terminator")
 
 TEST_CASE("AutoShadow-normal-flat-plateau")
 {
-    // 大方形 x[5,54]，左中光——左缘坡迎光亮、上缘坡背光暗、丘顶居中：
-    // 场值实测 (8,30)→14（左缘，阶1）、(30,30)→58（丘顶，阶3）、(30,8)→87（上缘，阶4）
+    // 大方形 x[5,54]，左中光——左缘坡迎光亮、上/下缘坡背光暗、丘顶居中：
+    // 场值实测 (8,30)→19（左缘，阶1）、(30,30)→55（丘顶，阶3）、(30,8)→96（上缘，阶4）
     QImage img = makeImage(60, 60);
     fillRect(img, 5, 5, 54, 54, qRgb(255, 255, 255));
 
@@ -176,16 +176,16 @@ TEST_CASE("AutoShadow-normal-flat-plateau")
     p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(8, 30) == qRgb(255, 255, 255));    // 左缘坡：迎光=阶1（F≈14）
-    REQUIRE(img.pixel(30, 30) == qRgb(128, 128, 128));   // 丘顶：F≈58=阶3
-    REQUIRE(img.pixel(30, 8) == qRgb(64, 64, 64));       // 上缘坡：背光=阶4（F≈87）
+    REQUIRE(img.pixel(8, 30) == qRgb(255, 255, 255));    // 左缘坡：迎光=阶1（F≈19）
+    REQUIRE(img.pixel(30, 30) == qRgb(128, 128, 128));   // 丘顶：F≈55=阶3
+    REQUIRE(img.pixel(30, 8) == qRgb(64, 64, 64));       // 上缘坡：背光=阶4（F≈96）
 }
 
 TEST_CASE("AutoShadow-normal-groove")
 {
     // 贴线阴影：两白条夹一条透明山谷（x=40 线稿槽），左侧远光——
     // 左条整条成丘，右坡背光；山谷左壁暗带渐弱入谷；山谷右壁迎光亮缘；山谷本身不动。
-    // 场值实测 y=20：x=13→4、27→67、36→86、38→62、42→10、65→100
+    // 场值实测 y=20：x=13→17、27→97、36→100、38→89、42→9、65→100
     QImage img = makeImage(80, 40);
     fillRect(img, 10, 10, 39, 29, qRgb(255, 255, 255));
     fillRect(img, 41, 10, 69, 29, qRgb(255, 255, 255));  // x=40 留空=山谷
@@ -202,11 +202,11 @@ TEST_CASE("AutoShadow-normal-groove")
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
     REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));   // 左条外缘坡：迎光=阶1
-    REQUIRE(img.pixel(27, 20) == qRgb(128, 128, 128));   // 左条右坡：F≈67=阶3
-    REQUIRE(img.pixel(36, 20) == qRgb(64, 64, 64));      // 山谷左壁：F≈86=阶4（贴线暗带）
-    REQUIRE(img.pixel(38, 20) == qRgb(128, 128, 128));   // 近谷底：F≈62=阶3（渐弱入谷）
+    REQUIRE(img.pixel(27, 20) == qRgb(64, 64, 64));      // 左条右坡：F≈97=阶4
+    REQUIRE(img.pixel(36, 20) == qRgb(64, 64, 64));      // 山谷左壁：F≈100=阶4（贴线暗带）
+    REQUIRE(img.pixel(38, 20) == qRgb(64, 64, 64));      // 近谷底：F≈89=阶4（渐弱入谷）
     REQUIRE(img.pixel(40, 20) == 0);                     // 山谷线稿：门控不动
-    REQUIRE(img.pixel(42, 20) == qRgb(255, 255, 255));   // 山谷右壁：F≈10=阶1（迎光亮缘）
+    REQUIRE(img.pixel(42, 20) == qRgb(255, 255, 255));   // 山谷右壁：F≈9=阶1（迎光亮缘）
     REQUIRE(img.pixel(65, 20) == qRgb(64, 64, 64));      // 右条外缘坡：F=100=阶4
 }
 
@@ -232,8 +232,8 @@ TEST_CASE("AutoShadow-multi-light-opposite")
     single.lights[0].y = 0.5;
     grayRamp(single);
     REQUIRE(AutoShadow::apply(img, single) > 0);
-    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));    // 基线：右坡深处=阶4
-    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255)); // 丘顶=阶1
+    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));    // 基线：右坡深处 F≥98=阶4
+    REQUIRE(img.pixel(29, 50) == qRgb(255, 255, 255)); // 丘脊 F≈19=阶1（交界线贴脊）
 
     QImage img2 = makeImage(60, 100);
     fillRect(img2, 10, 10, 49, 89, qRgb(255, 255, 255));
@@ -244,8 +244,8 @@ TEST_CASE("AutoShadow-multi-light-opposite")
     second.height = 100;
     dual.lights.append(second);
     REQUIRE(AutoShadow::apply(img2, dual) > 0);
-    REQUIRE(img2.pixel(29, 50) == qRgb(255, 255, 255)); // 丘顶照度饱和：仍全亮
-    REQUIRE(qGray(img2.pixel(45, 50)) > 64);            // 右坡被右光照亮：严格亮于单光
+    REQUIRE(img2.pixel(29, 50) == qRgb(255, 255, 255)); // 丘顶照度饱和 F=0：仍全亮
+    REQUIRE(qGray(img2.pixel(45, 50)) > 64);            // 右坡被右光照亮 F≈19：严格亮于单光
     REQUIRE(qGray(img2.pixel(14, 50)) > 64);            // 左坡同理被左光照住
     REQUIRE(qGray(img2.pixel(45, 50)) >= qGray(img.pixel(45, 50))); // 单调保证：加光不减照度
 }

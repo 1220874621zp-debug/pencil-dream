@@ -449,6 +449,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
     const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
     const int formHeight = clampInt(params.formHeight, 1, 40);
+    const float formRadiusF = static_cast<float>(clampInt(params.formRadius, 1, 200));
     const int formSmooth = clampInt(params.formSmooth, 0, 40);
     const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
@@ -558,14 +559,23 @@ int apply(QImage& img, const AutoShadowParams& params)
     }
 
     // ── 场分量②：SDF 伪法线 N·L（形体明暗交界线，主阴影场）──
-    // 距离变换当伪高度场（连通区域成丘、线稿成谷）→ 圆滑 → 高度场法线 → 多光源照度。
+    // 距离变换经半椭球剖面（dNorm=min(1,d/R)，z=√(2u−u²)）当伪高度场——连通区域
+    // 鼓成球冠而非平顶台地、线稿成谷 → 圆滑 → 球面法线 → 多光源照度。
     // 照度 = Σ 强度i·max(0, N·L_i)——各光源互补照明，所有光都照不到的坡面才全暗。
-    // 明暗交界线横切形体、贴线阴影自动成立——AE Relight 类（AI 法线打光）的解析式近似。
+    // 球冠内法线连续放射（球面 lambert），交界线横切形体中部——AI 法线打光的解析式近似。
     std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−照度
     if (normalStrength > 0.0)
     {
         std::vector<float> height;
         distanceTransform(height, m.maskF, w, h);
+        // 半椭球剖面（丘高=部件半径，与距离同量纲）：z=√(2Rd−d²)（d≤R）、d≥R 封顶。
+        // 丘从平顶台地改球冠——部件内部法线连续放射，N·L 从迎光缘到背光缘单调变化，
+        // 阈值切出的交界线横切形体（脸颊弧线/脖子宽面）；边缘坡度≈√(R/2) 与旧距离场同强度
+        for (float& d : height)
+        {
+            d = d >= formRadiusF ? formRadiusF
+                                 : std::sqrt(std::max(0.0f, 2.0f * formRadiusF * d - d * d));
+        }
         {
             std::vector<float> tmp(count);
             gaussBlur(height, tmp, w, h, static_cast<float>(formSmooth));

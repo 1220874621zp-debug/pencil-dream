@@ -54,11 +54,14 @@ constexpr int PREVIEW_W = 360; // 预览框最大宽（像素）
 constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
 /** 像素参数按预览缩放同比（光源/阈值/强度/羽化是归一化或场值单位，不随缩放；
-    体积高度是斜率放大（缩放后 SDF 与 σ 同比缩、斜率不变）也不随缩放；
-    遮挡半径/排线间距随几何距离走，须同比） */
+    体积高度是斜率放大（剖面同比缩、斜率不变）也不随缩放；
+    部件半径/圆滑度/遮挡半径/排线间距随几何距离走，须同比——
+    半椭球剖面形状由部件半径定义，R 与 σ 不同步缩放会让预览的丘形失真） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
+    q.formRadius = std::max(1, qRound(p.formRadius * s));
+    q.formSmooth = std::max(0, qRound(p.formSmooth * s));
     q.occlusionStrength = std::max(0, qRound(p.occlusionStrength * s));
     q.hatchSpacing = std::max(1, qRound(p.hatchSpacing * s));
     q.chokeMatte = qRound(p.chokeMatte * s);
@@ -66,7 +69,7 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 }
 
 /** 预设（CSP 预设语义）：一键整套光源列表 + 渐变强度 + 色带 + 阈值。
-    id: 1=顺光 2=逆光轮廓光（双光源） 3=夜晚 4=黄昏 */
+    id: 1=顺光（标准阴影默认） 2=逆光轮廓光（双光源） 3=夜晚 4=黄昏 5=风格化彩色 */
 AutoShadowParams presetParams(const int id)
 {
     AutoShadowParams p;
@@ -101,6 +104,15 @@ AutoShadowParams presetParams(const int id)
         p.levels[1] = { qRgb(255, 208, 150), AutoShadowBlendMode::Multiply };
         p.levels[2] = { qRgb(236, 148, 96), AutoShadowBlendMode::Multiply };
         p.levels[3] = { qRgb(150, 72, 62), AutoShadowBlendMode::Multiply };
+    }
+    else if (id == 5)
+    {
+        // 风格化彩色（旧默认色带，v4 照抄 CSP 截图的暖橙→洋红→蓝紫）
+        p.gradientStrength = 30;
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
+        p.levels[3] = { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply };
     }
     return p;
 }
@@ -272,11 +284,11 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     setWindowTitle(tr("自动上阴影"));
     setModal(true);
 
-    // 默认色带：受光纯白（不动原图）→橙→洋红→背光蓝紫
-    mLevels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
-    mLevels[1] = { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply };
-    mLevels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
-    mLevels[3] = { qRgb(96, 76, 176), AutoShadowBlendMode::Multiply };
+    // 默认色带：标准阴影——受光不动原图、暗部同色系深蓝灰逐级加深（CSP/AI 卡渲同款观感）
+    mLevels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply, 100 };
+    mLevels[1] = { qRgb(128, 136, 172), AutoShadowBlendMode::Multiply, 60 };
+    mLevels[2] = { qRgb(100, 108, 146), AutoShadowBlendMode::Multiply, 80 };
+    mLevels[3] = { qRgb(74, 82, 120), AutoShadowBlendMode::Multiply, 100 };
 
     // 光源列表：默认一盏主光（左上 45°）
     mLights = { AutoShadowLight{} };
@@ -308,6 +320,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mPresetCombo->addItem(tr("逆光轮廓光（双光源）"));
     mPresetCombo->addItem(tr("夜晚"));
     mPresetCombo->addItem(tr("黄昏"));
+    mPresetCombo->addItem(tr("风格化彩色"));
     mPresetCombo->setToolTip(tr("一键应用整套光源与色带配置（CSP 预设语义）。应用后手动改任何参数，预设自动回到「无」。"));
     connect(mPresetCombo, &QComboBox::activated, this, [this](const int index) { applyPreset(index); });
     presetRow->addWidget(mPresetCombo, 0, 1);
@@ -428,6 +441,13 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         tr("伪高度场的鼓起程度：越大形体越鼓（法线越陡，明暗交界线贴近边缘、阴影带窄），越小越扁平（交界线圆润、过渡带宽）。"),
         QString(), formHeightSpin, formHeightSlider);
     mFormHeightSpin = formHeightSpin;
+
+    QDoubleSpinBox* formRadiusSpin = nullptr;
+    QSlider* formRadiusSlider = nullptr;
+    addSliderRow(tr("部件半径："), 1, 200, 30,
+        tr("半椭球丘的鼓起半径（px）：每个色块鼓成球冠，法线在部件内部连续放射——明暗交界线横切形体中部（脸颊弧线、脖子横切宽面）。越大交界线越往部件中心移，越小越贴线稿边缘。"),
+        tr(" px"), formRadiusSpin, formRadiusSlider);
+    mFormRadiusSpin = formRadiusSpin;
 
     QDoubleSpinBox* formSmoothSpin = nullptr;
     QSlider* formSmoothSlider = nullptr;
@@ -628,6 +648,7 @@ AutoShadowParams AutoShadowDialog::params() const
     p.gradientStrength = qRound(mGradientSpin->value());
     p.normalStrength = qRound(mNormalSpin->value());
     p.formHeight = qRound(mFormHeightSpin->value());
+    p.formRadius = qRound(mFormRadiusSpin->value());
     p.formSmooth = qRound(mFormSmoothSpin->value());
     p.occlusionStrength = qRound(mOcclusionSpin->value());
     for (int i = 0; i < 3; ++i)

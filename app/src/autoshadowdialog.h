@@ -97,6 +97,7 @@ private:
     QDoubleSpinBox* mGradientSpin = nullptr;
     QDoubleSpinBox* mNormalSpin = nullptr;
     QDoubleSpinBox* mFormHeightSpin = nullptr;
+    QDoubleSpinBox* mFormRadiusSpin = nullptr;
     QDoubleSpinBox* mFormSmoothSpin = nullptr;
     QDoubleSpinBox* mOcclusionSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
