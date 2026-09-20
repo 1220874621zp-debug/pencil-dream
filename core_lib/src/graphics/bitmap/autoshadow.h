@@ -63,7 +63,6 @@ struct AutoShadowParams
 {
     QVector<AutoShadowLight> lights = { AutoShadowLight{} }; // 光源列表（≥1，CSP 添加光源同款）
     int maskThreshold = 238;                  // 去色阈值（灰度 1..254）：≥此值=不透明白（受光面），低于=透明黑
-    int chokeMatte = 5;                        // 阻塞遮罩（AE 简单阻塞语义）：正值收缩(阻塞)掩膜、负值扩展（px）
     int gradientStrength = 47;                // 圆形渐变强度 0..100：离光源越远越暗的底场（与体积场叠加）
     int normalStrength = 11;                  // 体积法线强度 0..100：SDF 伪法线 N·L 形体明暗交界线（主阴影场）
     int formHeight = 1;                       // 体积高度 1..40：伪高度场的 z 放大（斜率倍率）——
@@ -92,7 +91,7 @@ struct AutoShadowParams
 /** 自动上阴影：SDF 伪法线卡渲（Relight 无 AI 近似）+ 黑透白不透门控。
 
  * ── 掩膜生成段（黑透白不透）──
- *  1. 去色阈值二值化（线稿与深色区成洞/山谷）+ 简单阻塞修边（AE 语义）+ 去椒盐。
+ *  1. 去色阈值二值化（线稿与深色区成洞/山谷）+ 去椒盐。
  *
  * ── 场生成段：多光源叠加照明，clamp 后 0..100 进映射 ──
  *  2. 圆形渐变（底场）：白区内 到各光源距离−r0 按 vmax 归一化，取各光源最近者
@@ -122,7 +121,7 @@ namespace AutoShadow
 {
     int apply(QImage& img, const AutoShadowParams& params);
 
-    /** 遮罩视图（AE 简单阻塞的 Mask 视图同款）：黑白图——白=不透明、黑=透明（含画布空白），
+    /** 遮罩视图：黑白图——白=不透明、黑=透明（含画布空白），
         返回 Format_ARGB32_Premultiplied，尺寸与 img 相同，不改 img。 */
     QImage renderMattePreview(const QImage& img, const AutoShadowParams& params);
 }

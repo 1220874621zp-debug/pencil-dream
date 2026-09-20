@@ -64,7 +64,6 @@ AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
     q.formSmooth = std::max(0, qRound(p.formSmooth * s));
     q.occlusionStrength = std::max(0, qRound(p.occlusionStrength * s));
     q.hatchSpacing = std::max(1, qRound(p.hatchSpacing * s));
-    q.chokeMatte = qRound(p.chokeMatte * s);
     return q;
 }
 
@@ -421,13 +420,6 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         QString(), thresholdSpin, thresholdSlider);
     mThresholdSpin = thresholdSpin;
 
-    QDoubleSpinBox* chokeSpin = nullptr;
-    QSlider* chokeSlider = nullptr;
-    addSliderRow(tr("阻塞遮罩："), -20, 20, 5,
-        tr("简单阻塞（AE 语义）：以小增量收缩或扩展掩膜边缘，得到更整洁的掩膜。正值阻塞（收缩白区，吃掉白边与细丝），负值扩展（并掉小黑洞）。配合遮罩视图调最直观。"),
-        tr(" px"), chokeSpin, chokeSlider);
-    mChokeSpin = chokeSpin;
-
     QDoubleSpinBox* normalSpin = nullptr;
     QSlider* normalSlider = nullptr;
     addSliderRow(tr("体积强度："), 0, 100, 11,
@@ -621,7 +613,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     mViewCombo = new QComboBox(previewBox);
     mViewCombo->addItem(tr("最终输出"));
     mViewCombo->addItem(tr("遮罩视图"));
-    mViewCombo->setToolTip(tr("遮罩视图=黑白图：白=不透明（受光面），黑=透明（线稿槽/洞）。调去色阈值与阻塞时切过来看最直观。"));
+    mViewCombo->setToolTip(tr("遮罩视图=黑白图：白=不透明（受光面），黑=透明（线稿槽/洞）。调去色阈值时切过来看最直观。"));
     connect(mViewCombo, &QComboBox::currentIndexChanged, this, [this](int) { renderPreview(); });
     viewRow->addWidget(mViewCombo, 1);
     mCompareButton = new QPushButton(tr("按住对比原图"), previewBox);
@@ -644,7 +636,6 @@ AutoShadowParams AutoShadowDialog::params() const
     AutoShadowParams p;
     p.lights = mLights;
     p.maskThreshold = qRound(mThresholdSpin->value());
-    p.chokeMatte = qRound(mChokeSpin->value());
     p.gradientStrength = qRound(mGradientSpin->value());
     p.normalStrength = qRound(mNormalSpin->value());
     p.formHeight = qRound(mFormHeightSpin->value());
@@ -887,7 +878,7 @@ void AutoShadowDialog::renderPreview()
 
     const AutoShadowParams p = scaledForPreview(params(), mPreviewScale);
 
-    // 遮罩视图：黑透白不透 + 简单阻塞后的黑白掩膜
+    // 遮罩视图：黑透白不透的黑白掩膜
     if (mViewCombo != nullptr && mViewCombo->currentIndex() == 1)
     {
         mPreviewLabel->setPixmap(QPixmap::fromImage(AutoShadow::renderMattePreview(mScaledSource, p)));

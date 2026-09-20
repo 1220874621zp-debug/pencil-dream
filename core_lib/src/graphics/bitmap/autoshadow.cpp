@@ -214,37 +214,6 @@ void distanceTransform(std::vector<float>& dist, const std::vector<float>& maskF
         v /= 3.0f;
 }
 
-/** 简单阻塞：分离两趟 min/max 形态学（正值=阻塞/收缩、负值=扩展），r 像素 */
-void morphChoke(std::vector<float>& buf, std::vector<float>& tmp, const int w, const int h, const int r, const bool choke)
-{
-    if (r <= 0)
-        return;
-    const auto fold = [choke](const float a, const float b) { return choke ? std::min(a, b) : std::max(a, b); };
-    for (int y = 0; y < h; ++y)
-    {
-        const float* src = &buf[static_cast<size_t>(y) * w];
-        float* dst = &tmp[static_cast<size_t>(y) * w];
-        for (int x = 0; x < w; ++x)
-        {
-            float acc = src[std::max(0, x - r)];
-            for (int i = std::max(0, x - r) + 1; i <= std::min(w - 1, x + r); ++i)
-                acc = fold(acc, src[i]);
-            dst[x] = acc;
-        }
-    }
-    for (int y = 0; y < h; ++y)
-    {
-        float* dst = &buf[static_cast<size_t>(y) * w];
-        for (int x = 0; x < w; ++x)
-        {
-            float acc = tmp[static_cast<size_t>(std::max(0, y - r)) * w + x];
-            for (int i = std::max(0, y - r) + 1; i <= std::min(h - 1, y + r); ++i)
-                acc = fold(acc, tmp[static_cast<size_t>(i) * w + x]);
-            dst[x] = acc;
-        }
-    }
-}
-
 /** 去椒盐：翻转 ≤maxArea px 的孤立连通域（白岛→洞、洞→白岛）。
     肤色等中间调骑在阈值上会撒椒盐，法线发射从每个噪点喷刺——先清干净；
     连通域判定保长度（1px 细线是长连通域，不会被翻）。 */
@@ -353,19 +322,19 @@ void labelMaskRegions(const std::vector<float>& maskF, const std::vector<float>&
     }
 }
 
-/** 掩膜生成（黑透白不透 + 简单阻塞 + 去椒盐）：apply 与遮罩视图共用 */
+/** 掩膜生成（黑透白不透 + 去椒盐）：apply 与遮罩视图共用 */
 struct MatteData
 {
     int w = 0;
     int h = 0;
     int minX = 0, minY = 0, maxX = -1, maxY = -1; // maxY<0 = 无内容
     std::vector<uint8_t> contentMask; // 原图内容（α≥16）
-    std::vector<float> maskF;         // 阻塞后的掩膜（1=不透明白，0=透明黑/洞）
+    std::vector<float> maskF;         // 掩膜（1=不透明白，0=透明黑/洞）
 
     bool valid() const { return maxX >= 0; }
 };
 
-MatteData buildMatte(const QImage& img, const int maskThreshold, const int chokeMatte)
+MatteData buildMatte(const QImage& img, const int maskThreshold)
 {
     MatteData m;
     m.w = img.width();
@@ -398,11 +367,6 @@ MatteData buildMatte(const QImage& img, const int maskThreshold, const int choke
         }
     }
 
-    if (chokeMatte != 0 && m.valid())
-    {
-        std::vector<float> tmp(m.maskF.size());
-        morphChoke(m.maskF, tmp, m.w, m.h, std::abs(chokeMatte), chokeMatte > 0);
-    }
     if (m.valid())
     {
         despeckleMask(m.maskF, m.w, m.h, 3);
@@ -498,7 +462,6 @@ int apply(QImage& img, const AutoShadowParams& params)
         for (const auto& l : params.lights)
             lightList.push_back(l);
     const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
-    const int chokeMatte = clampInt(params.chokeMatte, -50, 50);
     const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
     const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
     const int formHeight = clampInt(params.formHeight, 1, 40);
@@ -512,8 +475,8 @@ int apply(QImage& img, const AutoShadowParams& params)
     for (int i = 0; i < 4; ++i)
         levels[i] = params.levels[params.invertLevels ? 3 - i : i];
 
-    // ── 掩膜生成段：去色阈值（黑透白不透）+ 简单阻塞
-    const MatteData m = buildMatte(img, maskThreshold, chokeMatte);
+    // ── 掩膜生成段：去色阈值（黑透白不透）
+    const MatteData m = buildMatte(img, maskThreshold);
     if (!m.valid())
         return 0;
     const int minX = m.minX, minY = m.minY, maxX = m.maxX, maxY = m.maxY;
@@ -836,9 +799,7 @@ QImage renderMattePreview(const QImage& img, const AutoShadowParams& params)
     QImage out;
     if (img.isNull() || img.format() != QImage::Format_ARGB32_Premultiplied)
         return out;
-    const MatteData m = buildMatte(img,
-                                   clampInt(params.maskThreshold, 1, 254),
-                                   clampInt(params.chokeMatte, -50, 50));
+    const MatteData m = buildMatte(img, clampInt(params.maskThreshold, 1, 254));
     if (!m.valid())
         return out;
 

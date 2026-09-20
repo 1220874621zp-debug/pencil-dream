@@ -56,7 +56,6 @@ AutoShadowParams plainParams()
     p.lights[0].y = -50.0;    // 画面正上方远光 ≈ 平行
     p.lights[0].height = 150;
     p.maskThreshold = 128;
-    p.chokeMatte = 0;
     p.formHeight = 2;
     p.formRadius = 300;
     p.formSmooth = 6;
@@ -406,7 +405,7 @@ TEST_CASE("AutoShadow-blend-modes-and-opacity")
 
 TEST_CASE("AutoShadow-matte-preview-view")
 {
-    // 遮罩视图（AE 简单阻塞的 Mask 视图）：白=不透明、黑=透明（画布空白也是黑）
+    // 遮罩视图：白=不透明、黑=透明（画布空白也是黑）
     QImage img = farLightImage();
     AutoShadowParams p = plainParams();
 
@@ -416,10 +415,4 @@ TEST_CASE("AutoShadow-matte-preview-view")
     REQUIRE(view.pixel(15, 50) == qRgb(255, 255, 255));
     REQUIRE(view.pixel(15, 89) == qRgb(255, 255, 255));
     REQUIRE(view.pixel(5, 50) == qRgb(0, 0, 0));
-
-    p.chokeMatte = 3;
-    QImage choked = AutoShadow::renderMattePreview(img, p);
-    REQUIRE(choked.pixel(15, 50) == qRgb(255, 255, 255));
-    REQUIRE(choked.pixel(15, 66) == qRgb(255, 255, 255));
-    REQUIRE(choked.pixel(15, 88) == qRgb(0, 0, 0));      // 底部 3 行被阻塞成黑
 }

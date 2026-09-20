@@ -93,7 +93,6 @@ private:
     QSlider* mLightHeightSlider = nullptr;
     QSlider* mLightIntensitySlider = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
-    QDoubleSpinBox* mChokeSpin = nullptr;
     QDoubleSpinBox* mGradientSpin = nullptr;
     QDoubleSpinBox* mNormalSpin = nullptr;
     QDoubleSpinBox* mFormHeightSpin = nullptr;
