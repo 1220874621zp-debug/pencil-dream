@@ -90,3 +90,13 @@ CMakeCache.txt
 compile_commands.json
 cmake-build-*/
 
+
+# 源码根误跑 cmake 的产物（真实构建在 pencil-build-qt6）
+/CMakeFiles/
+/build.ninja
+/.ninja_*
+/CTestTestfile.cmake
+/.qt/
+/.lupdate/
+/cmake_install.cmake
+/pencil2d_autogen/
