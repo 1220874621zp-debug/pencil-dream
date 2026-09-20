@@ -275,6 +275,11 @@ add_executable(pencil2d
     ${PLATFORM_SOURCES}
 )
 
+# 本地构建即部署：把仓库笔刷库拷到 exe 旁（首次启动自动导入）
+add_custom_command(TARGET pencil2d POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/brushes $<TARGET_FILE_DIR:pencil2d>/brushes)
+
 # Platform-specific target properties
 if(APPLE)
     set_target_properties(pencil2d PROPERTIES
@@ -336,6 +341,8 @@ target_precompile_headers(pencil2d PRIVATE
 if(UNIX AND NOT APPLE)
     # Linux installation
     install(TARGETS pencil2d DESTINATION bin)
+    # 随程序分发的笔刷库：与 exe 同目录（bin/brushes），首次启动自动导入用户目录
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/brushes/ DESTINATION bin/brushes FILES_MATCHING PATTERN "*.pbp")
     
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/app/data/pencil2d
             DESTINATION share/bash-completion/completions)

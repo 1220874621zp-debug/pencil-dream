@@ -16,6 +16,7 @@ GNU General Public License for more details.
 */
 #include "brushpresetstore.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -160,6 +161,55 @@ void BrushPresetStore::load()
         s.pressureSize = true;
         s.eraser = true;
         addBuiltin(QStringLiteral("软橡皮"), s);
+    }
+
+    // ---- 墨戏精灵内置（qrc 内嵌 .pbp：编译进程序，任何机器拉代码即有） ----
+    const struct { const char* file; } kEmbeddedBrushes[] = {
+        { "brushes/fojinT.pbp" },
+        { "brushes/moqinT.pbp" },
+        { "brushes/ruyiT.pbp" },
+        { "brushes/nishangranTD.pbp" },
+    };
+    for (const auto& embedded : kEmbeddedBrushes)
+    {
+        BrushSettings settings;
+        QImage thumbnail;
+        if (readPresetFile(QStringLiteral(":/") + embedded.file, settings, thumbnail))
+        {
+            const QString fallbackName = QFileInfo(QString(embedded.file)).completeBaseName();
+            BrushPreset preset;
+            preset.name = settings.name.isEmpty() ? fallbackName : settings.name;
+            preset.settings = settings;
+            preset.settings.name = preset.name;
+            preset.thumbnail = thumbnail;
+            preset.builtIn = true;
+            builtIns.append(preset);
+        }
+    }
+
+    // ---- 首次启动导入随程序分发的笔刷库（程序旁 brushes/，CI/安装包携带） ----
+    {
+        QDir userDir(userPresetDir());
+        const bool userDirEmpty = !userDir.exists()
+            || userDir.entryList({ "*" + kFileExtension }, QDir::Files).isEmpty();
+        if (userDirEmpty)
+        {
+            const QDir bundledDir(QCoreApplication::applicationDirPath() + "/brushes");
+            if (bundledDir.exists())
+            {
+                userDir.mkpath(".");
+                const QFileInfoList bundled = bundledDir.entryInfoList(
+                    { "*" + kFileExtension }, QDir::Files, QDir::Name);
+                for (const QFileInfo& entry : bundled)
+                {
+                    const QString dest = userDir.absoluteFilePath(entry.fileName());
+                    if (!QFile::exists(dest))
+                    {
+                        QFile::copy(entry.absoluteFilePath(), dest);
+                    }
+                }
+            }
+        }
     }
 
     // ---- 用户预设目录 ----
