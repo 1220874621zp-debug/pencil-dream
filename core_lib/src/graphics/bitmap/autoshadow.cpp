@@ -300,6 +300,59 @@ void despeckleMask(std::vector<float>& mask, const int w, const int h, const int
     }
 }
 
+/** 白区连通域标记（4-连通，线稿为界——对角不漏）：label 0=洞，1..N=白域；
+    dmax[i]=第 i 域内距离变换最大值（该部件的内切半径，当球冠半径用）。 */
+void labelMaskRegions(const std::vector<float>& maskF, const std::vector<float>& dist,
+                      const int w, const int h, std::vector<int>& label, std::vector<float>& dmax)
+{
+    const size_t count = static_cast<size_t>(w) * h;
+    label.assign(count, 0);
+    dmax.clear();
+    dmax.push_back(0.0f); // 占位：label 0（洞）不用
+    std::vector<int> stack;
+
+    for (size_t seed = 0; seed < count; ++seed)
+    {
+        if (label[seed] != 0 || maskF[seed] < 0.5f)
+            continue;
+        const int id = static_cast<int>(dmax.size());
+        dmax.push_back(0.0f);
+        stack.clear();
+        stack.push_back(static_cast<int>(seed));
+        label[seed] = id;
+        while (!stack.empty())
+        {
+            const int here = stack.back();
+            stack.pop_back();
+            const float d = dist[static_cast<size_t>(here)];
+            if (d > dmax[static_cast<size_t>(id)])
+                dmax[static_cast<size_t>(id)] = d;
+            const int hy = here / w;
+            const int hx = here % w;
+            if (hx > 0 && label[here - 1] == 0 && maskF[here - 1] >= 0.5f)
+            {
+                label[here - 1] = id;
+                stack.push_back(here - 1);
+            }
+            if (hx + 1 < w && label[here + 1] == 0 && maskF[here + 1] >= 0.5f)
+            {
+                label[here + 1] = id;
+                stack.push_back(here + 1);
+            }
+            if (hy > 0 && label[here - w] == 0 && maskF[here - w] >= 0.5f)
+            {
+                label[here - w] = id;
+                stack.push_back(here - w);
+            }
+            if (hy + 1 < h && label[here + w] == 0 && maskF[here + w] >= 0.5f)
+            {
+                label[here + w] = id;
+                stack.push_back(here + w);
+            }
+        }
+    }
+}
+
 /** 掩膜生成（黑透白不透 + 简单阻塞 + 去椒盐）：apply 与遮罩视图共用 */
 struct MatteData
 {
@@ -449,7 +502,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
     const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
     const int formHeight = clampInt(params.formHeight, 1, 40);
-    const float formRadiusF = static_cast<float>(clampInt(params.formRadius, 1, 200));
+    const float formRadiusF = static_cast<float>(clampInt(params.formRadius, 8, 2000));
     const int formSmooth = clampInt(params.formSmooth, 0, 40);
     const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
@@ -559,22 +612,37 @@ int apply(QImage& img, const AutoShadowParams& params)
     }
 
     // ── 场分量②：SDF 伪法线 N·L（形体明暗交界线，主阴影场）──
-    // 距离变换经半椭球剖面（dNorm=min(1,d/R)，z=√(2u−u²)）当伪高度场——连通区域
-    // 鼓成球冠而非平顶台地、线稿成谷 → 圆滑 → 球面法线 → 多光源照度。
+    // 距离变换经**连通域自适应球冠**（每域 D=域内 dmax 封顶 formRadius，z=√(2u−u²)·D）
+    // 当伪高度场——每个部件鼓成自己的球冠而非共用固定半径，线稿成谷 → 圆滑 →
+    // 球面法线 → 多光源照度。坡度只依赖 u=d/D（尺度不变），交界线横切任意大小部件。
     // 照度 = Σ 强度i·max(0, N·L_i)——各光源互补照明，所有光都照不到的坡面才全暗。
-    // 球冠内法线连续放射（球面 lambert），交界线横切形体中部——AI 法线打光的解析式近似。
     std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−照度
     if (normalStrength > 0.0)
     {
         std::vector<float> height;
         distanceTransform(height, m.maskF, w, h);
-        // 半椭球剖面（丘高=部件半径，与距离同量纲）：z=√(2Rd−d²)（d≤R）、d≥R 封顶。
-        // 丘从平顶台地改球冠——部件内部法线连续放射，N·L 从迎光缘到背光缘单调变化，
-        // 阈值切出的交界线横切形体（脸颊弧线/脖子宽面）；边缘坡度≈√(R/2) 与旧距离场同强度
-        for (float& d : height)
+        // 连通域自适应球冠（v11）：每域半径 D=min(域内 dmax, formRadius 上限)，
+        // z=√(2Dd−d²)（d≤D 封顶）。坡度 (1−u)/√(2u−u²)（u=d/D）与域大小无关——
+        // 尺度不变，部件再大交界线也横切整个部件（v10 固定半径在大部件上退化为
+        // 平顶均匀灰膜+贴线陡壁脏带）。formRadius 语义=部件最大半径上限：
+        // 背景大光晕等巨域按此封顶（丘顶平但与球冠相切连续，不出横切环）。
         {
-            d = d >= formRadiusF ? formRadiusF
-                                 : std::sqrt(std::max(0.0f, 2.0f * formRadiusF * d - d * d));
+            std::vector<int> label;
+            std::vector<float> dmax;
+            labelMaskRegions(m.maskF, height, w, h, label, dmax);
+            for (size_t i = 0; i < count; ++i)
+            {
+                const int id = label[i];
+                if (id == 0)
+                {
+                    height[i] = 0.0f;
+                    continue;
+                }
+                const float D = std::min(dmax[static_cast<size_t>(id)], formRadiusF);
+                const float d = std::min(height[i], D);
+                height[i] = D <= 1.0f ? 0.0f
+                                      : std::sqrt(std::max(0.0f, 2.0f * D * d - d * d));
+            }
         }
         {
             std::vector<float> tmp(count);

@@ -55,8 +55,8 @@ constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
 /** 像素参数按预览缩放同比（光源/阈值/强度/羽化是归一化或场值单位，不随缩放；
     体积高度是斜率放大（剖面同比缩、斜率不变）也不随缩放；
-    部件半径/圆滑度/遮挡半径/排线间距随几何距离走，须同比——
-    半椭球剖面形状由部件半径定义，R 与 σ 不同步缩放会让预览的丘形失真） */
+    部件最大半径（封顶值）/圆滑度/遮挡半径/排线间距随几何距离走，须同比——
+    σ 与域尺寸不同步缩放会让预览的丘形失真） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
@@ -437,15 +437,15 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* formHeightSpin = nullptr;
     QSlider* formHeightSlider = nullptr;
-    addSliderRow(tr("体积高度："), 1, 40, 6,
-        tr("伪高度场的鼓起程度：越大形体越鼓（法线越陡，明暗交界线贴近边缘、阴影带窄），越小越扁平（交界线圆润、过渡带宽）。"),
+    addSliderRow(tr("体积高度："), 1, 40, 2,
+        tr("伪高度场的斜率放大（倍）：球冠坡度已自带 ≥1，调大主要加深贴线谷壁的暗带，调小交界过渡更宽更柔。"),
         QString(), formHeightSpin, formHeightSlider);
     mFormHeightSpin = formHeightSpin;
 
     QDoubleSpinBox* formRadiusSpin = nullptr;
     QSlider* formRadiusSlider = nullptr;
-    addSliderRow(tr("部件半径："), 1, 200, 30,
-        tr("半椭球丘的鼓起半径（px）：每个色块鼓成球冠，法线在部件内部连续放射——明暗交界线横切形体中部（脸颊弧线、脖子横切宽面）。越大交界线越往部件中心移，越小越贴线稿边缘。"),
+    addSliderRow(tr("部件最大半径："), 8, 2000, 300,
+        tr("每个色块按自身大小自动鼓成球冠（交界线横切任意大小的部件，无需手调）；此值只封顶过大的连通域（如背景大光晕），防止巨域被横切出一条明暗线。"),
         tr(" px"), formRadiusSpin, formRadiusSlider);
     mFormRadiusSpin = formRadiusSpin;
 
