@@ -688,8 +688,8 @@ void ReferenceCardCanvas::paintEvent(QPaintEvent* event)
 
 void ReferenceCardCanvas::updateCursor(const QPointF& pos)
 {
-    if (mMarkerMode) { setCursor(Qt::CrossCursor); return; }
     if (mPanning) { setCursor(Qt::ClosedHandCursor); return; }
+    if (mMarkerMode) { setCursor(Qt::CrossCursor); return; }
     if (mDragging) { setCursor(Qt::ClosedHandCursor); return; }
     if (hitSwatch(pos) >= 0) { setCursor(Qt::SizeAllCursor); return; }
     setCursor(Qt::ArrowCursor);
@@ -699,6 +699,16 @@ void ReferenceCardCanvas::mousePressEvent(QMouseEvent* event)
 {
     setFocus();
     const QPointF pos = event->position();
+
+    // 中键平移两种工具下都生效（标记线绘制中也可拖画布）：草稿点存图像坐标，平移不扰动
+    if (event->button() == Qt::MiddleButton)
+    {
+        mPanning = true;
+        mPanPressPos = pos;
+        mPanPressPan = mPan;
+        updateCursor(pos);
+        return;
+    }
 
     if (mMarkerMode)
     {
@@ -711,15 +721,6 @@ void ReferenceCardCanvas::mousePressEvent(QMouseEvent* event)
         {
             confirmDraft();
         }
-        return;
-    }
-
-    if (event->button() == Qt::MiddleButton)
-    {
-        mPanning = true;
-        mPanPressPos = pos;
-        mPanPressPan = mPan;
-        updateCursor(pos);
         return;
     }
 
