@@ -74,7 +74,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist\PencilDream | Out-Null
           Copy-Item build\pencil2d.exe dist\PencilDream\
           windeployqt --release --compiler-runtime dist\PencilDream\pencil2d.exe
-          Copy-Item brushes dist\PencilDreamrushes -Recurse
+          Copy-Item brushes dist\PencilDream\brushes -Recurse
           # ffmpeg：视频导出/音频导入依赖，Pencil2D 固定在 plugins/ 下寻找
           curl.exe -fsSL -o ffmpeg-win64.zip https://github.com/pencil2d/pencil2d-deps/releases/download/ffmpge-v4.1.1/ffmpeg-win64.zip
           tar -xf ffmpeg-win64.zip
