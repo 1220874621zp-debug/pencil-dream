@@ -543,7 +543,7 @@ void TimeLineCells::paintInstancePreview(QPainter& painter) const
         {
             painter.setPen(QPen(QColor(0xE0, 0x9E, 0x2E), 1.0));
             QFont f = painter.font();
-            f.setPixelSize(qMax(9, (mLayerHeight - 12) / 2));
+            f.setPixelSize(qBound(9, mLayerHeight / 5, 13));
             painter.setFont(f);
             painter.drawText(QRectF(ghostLeft, getLayerY(srcIndex) + 2.0, mFrameSize, mLayerHeight - 6.0),
                              Qt::AlignCenter, tr("替换已有帧"));
