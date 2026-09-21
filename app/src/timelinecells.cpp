@@ -446,7 +446,7 @@ void TimeLineCells::showInstanceMenu(QPoint pos)
 
     if (chosen == createAction)
     {
-        // 进入放置态：左键点同层空位落成，右键或无效点击取消
+        // 进入放置态：左键点同层空位=新增实例，点同层已有帧=替换为实例，右键或无效点击取消
         mInstancePlacing = true;
         mInstanceSourceLayerId = curLayer->id();
         mInstanceSourcePos = frameNumber;
@@ -501,16 +501,53 @@ void TimeLineCells::paintInstancePreview(QPainter& painter) const
         painter.drawRoundedRect(QRectF(srcLeft, getLayerY(srcIndex) + 1.0, srcW, mLayerHeight - 4.0), 5.0, 5.0);
     }
 
-    // 落位格幽灵框：光标所在列（同层空位=可落，画满格高亮；否则灰框提示不可落）
+    // 落位格幽灵框：光标所在列（同层空位=新增，画满格高亮；同层已有帧=替换，
+    // 橙色框+文字提示；源自身或其它层=灰框提示不可落）
     if (mInstanceGhostPos >= 1)
     {
         const qreal ghostLeft = getFrameX(mInstanceGhostPos) - mFrameSize;
         const bool sameLayer = (mLayerPosMoveY == srcIndex);
-        const bool droppable = sameLayer && !srcLayer->keyExists(mInstanceGhostPos);
-        QColor fill = droppable ? QColor(0xE8, 0x38, 0x5A, 36) : QColor(120, 120, 130, 30);
-        painter.setPen(QPen(droppable ? Theme::Accent : QColor(120, 120, 130), 1.6, Qt::DashLine));
+        const bool occupied = srcLayer->keyExists(mInstanceGhostPos);
+        const bool selfSource = (mInstanceGhostPos == mInstanceSourcePos);
+        bool replaceable = false;
+        if (sameLayer && occupied && !selfSource && srcKey != nullptr)
+        {
+            // 已是同组实例的目标替换无意义，按不可落处理
+            auto occ = dynamic_cast<const BitmapImage*>(srcLayer->getKeyFrameAt(mInstanceGhostPos));
+            auto srcBmp = dynamic_cast<const BitmapImage*>(srcKey);
+            replaceable = (occ != nullptr && srcBmp != nullptr && !occ->sharesDataWith(srcBmp));
+        }
+        const bool droppable = sameLayer && !occupied;
+        QColor fill;
+        QPen pen;
+        if (droppable)
+        {
+            fill = QColor(0xE8, 0x38, 0x5A, 36);
+            pen = QPen(Theme::Accent, 1.6, Qt::DashLine);
+        }
+        else if (replaceable)
+        {
+            const QColor replaceHint(0xE0, 0x9E, 0x2E);
+            fill = QColor(replaceHint.red(), replaceHint.green(), replaceHint.blue(), 36);
+            pen = QPen(replaceHint, 1.6, Qt::DashLine);
+        }
+        else
+        {
+            fill = QColor(120, 120, 130, 30);
+            pen = QPen(QColor(120, 120, 130), 1.6, Qt::DashLine);
+        }
+        painter.setPen(pen);
         painter.setBrush(fill);
         painter.drawRoundedRect(QRectF(ghostLeft, getLayerY(srcIndex) + 2.0, mFrameSize, mLayerHeight - 6.0), 4.0, 4.0);
+        if (replaceable && mFrameSize >= 70)
+        {
+            painter.setPen(QPen(QColor(0xE0, 0x9E, 0x2E), 1.0));
+            QFont f = painter.font();
+            f.setPixelSize(qMax(9, (mLayerHeight - 12) / 2));
+            painter.setFont(f);
+            painter.drawText(QRectF(ghostLeft, getLayerY(srcIndex) + 2.0, mFrameSize, mLayerHeight - 6.0),
+                             Qt::AlignCenter, tr("替换已有帧"));
+        }
     }
 
     painter.restore();
@@ -2765,8 +2802,9 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             Layer* srcLayer = mEditor->layers()->findLayerById(mInstanceSourceLayerId);
             const bool sameLayer = (layerNumber >= 0 && layerNumber < mEditor->object()->getLayerCount()
                                     && mEditor->object()->getLayer(layerNumber) == srcLayer);
-            if (srcLayer != nullptr && sameLayer && !srcLayer->keyExists(targetPos))
+            if (srcLayer != nullptr && sameLayer && targetPos != mInstanceSourcePos)
             {
+                // 空位=新增实例帧；已有帧=替换为实例（无效目标在 Editor 内静默拒绝）
                 mEditor->createFrameInstance(srcLayer, mInstanceSourcePos, targetPos);
             }
         }

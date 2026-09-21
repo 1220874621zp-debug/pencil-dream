@@ -289,7 +289,8 @@ private:
     bool mPlusCreating = false;
     int mPlusPreviewCount = 0;
 
-    // 实例帧放置态：右键「创建实例…」启动，左键点同层空位落成，右键/无效点击取消
+    // 实例帧放置态：右键「创建实例…」启动，左键点同层空位=新增实例、
+    // 点同层已有帧=替换为实例（保留曝光长度，可撤销），右键/无效点击取消
     bool mInstancePlacing = false;
     int mInstanceSourceLayerId = -1;
     int mInstanceSourcePos = -1;

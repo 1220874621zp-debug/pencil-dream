@@ -944,14 +944,29 @@ KeyFrame* Editor::createFrameInstance(Layer* layer, int sourcePos, int targetPos
     auto source = dynamic_cast<BitmapImage*>(sourceKey);
     if (source == nullptr) { return nullptr; }
 
-    // 首版只落在空位：目标被占由调用方提示，不做推挤
-    if (layer->keyExists(targetPos)) { return nullptr; }
+    // 落在源自身无意义；目标已是同组实例则无事可做
+    if (targetPos == sourcePos) { return nullptr; }
+    KeyFrame* occupiedKey = layer->getKeyFrameAt(targetPos);
+    if (occupiedKey != nullptr)
+    {
+        auto occupied = dynamic_cast<BitmapImage*>(occupiedKey);
+        if (occupied == nullptr || occupied->sharesDataWith(source)) { return nullptr; }
+    }
 
     beginLayerLayoutEdit(layer);
     BitmapImage* instance = source->createInstance();
     instance->setPos(targetPos);
+    const bool replacing = (occupiedKey != nullptr);
+    if (replacing)
+    {
+        // 替换路径：沿用被替换帧的曝光长度/显式标记（块外观不变），
+        // 旧帧进布局命令托管，撤销一步找回原像素
+        instance->setLength(occupiedKey->length());
+        instance->setLengthExplicit(occupiedKey->isLengthExplicit());
+        takeLayerKeyFrame(layer, targetPos);
+    }
     layer->addKeyFrame(targetPos, instance);
-    endLayerLayoutEdit(tr("创建实例"));
+    endLayerLayoutEdit(replacing ? tr("应用实例到已有帧") : tr("创建实例"));
 
     scrubTo(targetPos);
     emit frameModified(targetPos);

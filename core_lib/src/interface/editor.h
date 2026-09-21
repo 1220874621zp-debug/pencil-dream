@@ -199,9 +199,12 @@ public: //slots
     KeyFrame* addKeyFrame(int layerNumber, int frameIndex);
     void removeKey();
 
-    /** 实例帧（Instance）：在 targetPos（须为空位）创建与 sourcePos 处关键帧
-     *  共用图像数据的实例，布局事务单步撤销。任一成员的像素修改全组同步。
-     *  @return 新建的实例关键帧；层不可用/源不存在/目标被占时返回 nullptr */
+    /** 实例帧（Instance）：在 targetPos 创建与 sourcePos 处关键帧共用图像数据
+     *  的实例，布局事务单步撤销。任一成员的像素修改全组同步。
+     *  targetPos 为空位=新增实例帧；已有位图帧=替换为实例（保留其曝光长度，
+     *  旧帧由布局命令托管，撤销找回原像素）。
+     *  @return 新建的实例关键帧；层不可用/源不存在/目标无效
+     *  （落在源自身、已是同组实例）时返回 nullptr */
     KeyFrame* createFrameInstance(Layer* layer, int sourcePos, int targetPos);
 
     /** 解除 pos 处实例帧的共享关系：像素不变，之后编辑互不影响（可撤销）。 */
