@@ -1204,8 +1204,9 @@ Status ActionCommands::stampVisibleLayers()
     const int frame = mEditor->currentFrame();
 
     // 盖印画幅 = 相机取景框（世界坐标）；无相机时退回 800x600
+    // getLayerBelow 从传入索引本身起扫，必须传有效索引（传 count 会 getLayer 越界得 nullptr）
     QRect worldRect(-400, -300, 800, 600);
-    LayerCamera* camera = layerMgr->getCameraLayerBelow(object->getLayerCount());
+    LayerCamera* camera = layerMgr->getCameraLayerBelow(object->getLayerCount() - 1);
     if (camera != nullptr)
     {
         worldRect = camera->getViewRect();
