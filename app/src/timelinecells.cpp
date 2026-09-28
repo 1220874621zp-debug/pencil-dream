@@ -1691,8 +1691,8 @@ void TimeLineCells::drawCollapseTriangle(QPainter& painter, const Layer* layer, 
 bool TimeLineCells::rowHasInlineControls(int rowWidth) const
 {
     // controls sit on their own line under the name: slider(64) + %(38) +
-    // lock(16) + clip(16) anchored at x=52, ending around x=194
-    return rowWidth >= 205;
+    // lock(16) + clip(16) + solo(16) anchored at x=52, ending around x=214
+    return rowWidth >= 225;
 }
 
 QRect TimeLineCells::opacitySliderRect(int rowWidth) const
@@ -1714,6 +1714,13 @@ QRect TimeLineCells::clipIconRect(int rowWidth) const
     Q_UNUSED(rowWidth)
     // right after the padlock: 158 + 16 lock + 4 gap
     return QRect(178, 0, 16, 0);
+}
+
+QRect TimeLineCells::soloIconRect(int rowWidth) const
+{
+    Q_UNUSED(rowWidth)
+    // right after the clip toggle: 178 + 16 clip + 4 gap
+    return QRect(198, 0, 16, 0);
 }
 
 QPixmap TimeLineCells::cachedRowIcon(const QString& key, const std::function<QPixmap()>& make) const
@@ -1914,6 +1921,17 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
       {
           painter.drawPixmap(QPointF(clipR.x(), sliderY - 8.0), clipTinted);
       }
+
+      // solo 独显开关（文字 s）：任一层激活时其余层不渲染（Object::isLayerRenderable）
+      const QRect soloR = soloIconRect(width);
+      painter.save();
+      QFont soloFont = painter.font();
+      soloFont.setBold(true);
+      painter.setFont(soloFont);
+      painter.setPen(layer->solo() ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
+      painter.drawText(soloR.adjusted(0, sliderY - 11, 0, sliderY + 11),
+                       Qt::AlignCenter, QStringLiteral("s"));
+      painter.restore();
     }
 
     // loop-mode badge: only drawn when the layer is set to Cycle/PingPong
@@ -1923,7 +1941,7 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     if (layer->isBitmapKind() && layer->loopMode() != Layer::LoopMode::None)
     {
         const QColor loopColor = Theme::Accent;
-        const QRect loopR(clipR.right() + 4, 0, 16, 0);
+        const QRect loopR(soloIconRect(width).right() + 4, 0, 16, 0);
         if (layer->loopMode() == Layer::LoopMode::Cycle)
         {
             // QIcon 按请求尺寸+设备DPR直接矢量栅格化：QPixmap(svg路径)对
@@ -2938,6 +2956,16 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         mEditor->getScribbleArea()->onLayerChanged();
                         updateContent();
                     }
+                    break;
+                }
+                const QRect soloHit = soloIconRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
+                if (soloHit.contains(event->pos().x(), event->pos().y()))
+                {
+                    hitLayer->setSolo(!hitLayer->solo());
+                    qDebug() << "[ui] layer" << layerNumber << "solo ->" << hitLayer->solo();
+                    // 独显改变全局可见性合成：整画布缓存失效
+                    mEditor->getScribbleArea()->onLayerChanged();
+                    updateContent();
                     break;
                 }
                 const QRect slider = opacitySliderRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);

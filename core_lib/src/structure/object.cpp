@@ -613,7 +613,23 @@ bool Object::isLayerGroupLocked(int groupId) const
 bool Object::isLayerRenderable(const Layer* layer) const
 {
     if (layer == nullptr) { return false; }
-    return layer->visible() && isLayerGroupVisible(layer->groupId());
+    if (!layer->visible() || !isLayerGroupVisible(layer->groupId())) { return false; }
+    // solo 独显：任一层激活时只渲染 solo 层（画布/导出同源判定）
+    if (anyLayerSolo()) { return layer->solo(); }
+    return true;
+}
+
+bool Object::anyLayerSolo() const
+{
+    for (const Layer* layer : mLayers)
+    {
+        // 眼睛/组眼关掉的 solo 层不产生独显效果（否则全场景不可见）
+        if (layer->solo() && layer->visible() && isLayerGroupVisible(layer->groupId()))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Object::isLayerEditable(const Layer* layer) const

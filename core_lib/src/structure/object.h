@@ -180,6 +180,8 @@ public:
     bool isLayerGroupLocked(int groupId) const;
     /** 渲染/编辑门禁合成：层自身可见 && 所在组可见 */
     bool isLayerRenderable(const Layer* layer) const;
+    /** 任一层 solo 激活（自身可见且组可见）即全局独显模式开启 */
+    bool anyLayerSolo() const;
     bool isLayerEditable(const Layer* layer) const;
     /** 组成员在扁平栈中的连续索引区间（按栈顶首个成员展开），无效返回空 */
     QList<int> layerGroupMemberIndices(int groupId) const;

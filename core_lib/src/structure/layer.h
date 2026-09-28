@@ -108,6 +108,11 @@ public:
     bool visible() const { return mVisible; }
     void setVisible(bool b) { mVisible = b; }
 
+    /** Solo 独显（PS/AE 式）：任一层 solo 激活时，渲染只显示 solo 层。
+     *  与眼睛取与：眼睛关掉的层即使 solo 也不显示。 */
+    bool solo() const { return mSolo; }
+    void setSolo(bool b) { mSolo = b; }
+
     /** Layer opacity in the 0..1 range (TVP layer-panel slider; multiplies
      *  the per-frame image opacity when the layer is composited). */
     qreal opacity() const { return mOpacity; }
@@ -285,6 +290,7 @@ private:
     LAYER_TYPE meType = UNDEFINED;
     int        mId = 0;
     bool       mVisible = true;
+    bool       mSolo = false;
     qreal      mOpacity = 1.0;
     bool       mLocked = false;
     bool       mClipMask = false;

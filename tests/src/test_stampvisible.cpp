@@ -147,3 +147,60 @@ TEST_CASE("StampVisible composite + top layer + undo roundtrip")
     REQUIRE(object->getLayer(object->getLayerCount() - 1) == stampLayer);
     REQUIRE(stampLayer->getKeyFrameAt(1) == stampImage);
 }
+
+/** Solo 独显（图层行 s 按钮）渲染语义：任一可见层 solo 激活时只合成 solo 层；
+ *  多 solo 并存、眼关的 solo 不激活、全关恢复。判定点=Object::isLayerRenderable
+ *  （画布/盖印/导出同源），XML 持久化属性 solo。 */
+TEST_CASE("Solo visibility composite semantics")
+{
+    LayerBitmap* bottom = nullptr;
+    LayerBitmap* top = nullptr;
+    Editor* editor = makeStampEditor(&bottom, &top);
+    Object* object = editor->object();
+
+    QPen redPen(QColor(255, 0, 0, 255));
+    redPen.setWidth(20);
+    QPen bluePen(QColor(0, 0, 255, 255));
+    bluePen.setWidth(20);
+    auto* bottomFrame = static_cast<BitmapImage*>(bottom->getKeyFrameAt(1));
+    bottomFrame->drawLine(QPointF(-100, -100), QPointF(-40, -100), redPen,
+                          QPainter::CompositionMode_SourceOver, false);
+    auto* topFrame = static_cast<BitmapImage*>(top->getKeyFrameAt(1));
+    topFrame->drawLine(QPointF(50, 50), QPointF(110, 50), bluePen,
+                       QPainter::CompositionMode_SourceOver, false);
+
+    LayerCamera* camera = editor->layers()->getCameraLayerBelow(object->getLayerCount() - 1);
+    REQUIRE(camera != nullptr);
+    const QRect worldRect = camera->getViewRect();
+    const QPoint redAt = QPoint(-70, -100) - worldRect.topLeft();
+    const QPoint blueAt = QPoint(80, 50) - worldRect.topLeft();
+
+    // solo 底层：合成只含底层
+    bottom->setSolo(true);
+    REQUIRE(object->anyLayerSolo());
+    QImage soloOne = compositeVisible(object, worldRect, 1);
+    REQUIRE(soloOne.pixel(redAt) == qRgb(255, 0, 0));
+    REQUIRE(qAlpha(soloOne.pixel(blueAt)) == 0);
+
+    // 第二层也 solo：多 solo 并存全显示
+    top->setSolo(true);
+    QImage soloBoth = compositeVisible(object, worldRect, 1);
+    REQUIRE(soloBoth.pixel(redAt) == qRgb(255, 0, 0));
+    REQUIRE(soloBoth.pixel(blueAt) == qRgb(0, 0, 255));
+
+    // 全部关 solo：恢复全显
+    bottom->setSolo(false);
+    top->setSolo(false);
+    REQUIRE_FALSE(object->anyLayerSolo());
+    QImage soloOff = compositeVisible(object, worldRect, 1);
+    REQUIRE(soloOff.pixel(redAt) == qRgb(255, 0, 0));
+    REQUIRE(soloOff.pixel(blueAt) == qRgb(0, 0, 255));
+
+    // 眼睛关闭的 solo 层不激活独显（否则全场景不可见）；眼关仍胜过 solo
+    bottom->setSolo(true);
+    bottom->setVisible(false);
+    REQUIRE_FALSE(object->anyLayerSolo());
+    QImage eyeOff = compositeVisible(object, worldRect, 1);
+    REQUIRE(qAlpha(eyeOff.pixel(redAt)) == 0);
+    REQUIRE(eyeOff.pixel(blueAt) == qRgb(0, 0, 255));
+}

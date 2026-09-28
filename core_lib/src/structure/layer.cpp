@@ -966,6 +966,10 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     {
         layerTag.setAttribute("locked", 1);
     }
+    if (mSolo)
+    {
+        layerTag.setAttribute("solo", 1);
+    }
     if (mClipMask)
     {
         layerTag.setAttribute("clipMask", 1);
@@ -996,6 +1000,7 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     setVisible(elem.attribute("visibility", "1").toInt());
     setOpacity(elem.attribute("opacity", "1").toDouble());
     setLocked(elem.attribute("locked", "0").toInt() == 1);
+    setSolo(elem.attribute("solo", "0").toInt() == 1);
     setClipMask(elem.attribute("clipMask", "0").toInt() == 1);
     mColorIndex = elem.attribute("colorIndex", "-1").toInt();
     mGroupId = elem.attribute("group", "-1").toInt();
