@@ -998,6 +998,14 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     {
         layerTag.setAttribute("sbNotes", mStoryboardNotes);
     }
+    if (!mStoryboardShotType.isEmpty())
+    {
+        layerTag.setAttribute("sbShotType", mStoryboardShotType);
+    }
+    if (!mStoryboardPrompt.isEmpty())
+    {
+        layerTag.setAttribute("sbPrompt", mStoryboardPrompt);
+    }
     return layerTag;
 }
 
@@ -1020,4 +1028,6 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     mStoryboardAction = elem.attribute("sbAction", "");
     mStoryboardDialog = elem.attribute("sbDialog", "");
     mStoryboardNotes = elem.attribute("sbNotes", "");
+    mStoryboardShotType = elem.attribute("sbShotType", "");
+    mStoryboardPrompt = elem.attribute("sbPrompt", "");
 }

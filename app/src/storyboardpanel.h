@@ -39,6 +39,8 @@ struct StoryboardShot
     bool hasAction = false;
     bool hasDialog = false;
     bool hasNotes = false;
+    int shotType = -1;        // 景别索引 0-6（-1 = 未设置；代号存锚点层 sbShotType）
+    bool hasPrompt = false;   // AI 提示词非空（锚点层 sbPrompt）
     bool cameraMoves = false; // 镜头帧范围内相机关键帧 > 1
 };
 
@@ -74,6 +76,8 @@ public:
     int fps() const { return mFps; }
     void clearThumbCache() { mThumbCache.clear(); mThumbQueue.clear(); mThumbQueued.clear(); }
 
+    void showDynamicsChart(); // 影像力学：景别-时间节奏曲线（面板工具栏入口）
+
     int shotCount() const { return mShots.size(); }
     int totalFrames() const;
 
@@ -106,6 +110,7 @@ private:
     void showRenameDialog(int shotIndex);
     void playFromShot(int shotIndex);
     void applyShotColor(int shotIndex, int colorIndex);
+    void applyShotType(int shotIndex, int typeIndex);
     void commitDrag();
 
     // 缩略图
@@ -167,6 +172,7 @@ private:
     StoryboardView* mView = nullptr;
     QPushButton* mLockButton = nullptr;
     QPushButton* mCameraButton = nullptr;
+    QPushButton* mDynamicsButton = nullptr;
     QPushButton* mTimeModeButton = nullptr;
     QSlider* mSizeSlider = nullptr;
     QLabel* mStatusLabel = nullptr;

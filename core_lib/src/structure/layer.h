@@ -90,6 +90,13 @@ public:
     QString storyboardNotes() const { return mStoryboardNotes; }
     void setStoryboardNotes(const QString& text) { mStoryboardNotes = text; }
 
+    /** 分镜景别：空串 = 未设置；存代号（ELS/LS/FS/MS/CU/ECU/MECU），面板侧映射标签与颜色 */
+    QString storyboardShotType() const { return mStoryboardShotType; }
+    void setStoryboardShotType(const QString& code) { mStoryboardShotType = code; }
+    /** 分镜 AI 提示词（生图工作流）：空串 = 无 */
+    QString storyboardPrompt() const { return mStoryboardPrompt; }
+    void setStoryboardPrompt(const QString& text) { mStoryboardPrompt = text; }
+
     /** 所属图层组（-1 = 不在组；声音/相机层恒不进组，由操作入口保证） */
     int groupId() const { return mGroupId; }
     void setGroupId(int groupId) { mGroupId = groupId; }
@@ -310,6 +317,8 @@ private:
     QString    mStoryboardAction;
     QString    mStoryboardDialog;
     QString    mStoryboardNotes;
+    QString    mStoryboardShotType;
+    QString    mStoryboardPrompt;
 
     std::map<int, KeyFrame*, std::greater<int>> mKeyFrames;
 

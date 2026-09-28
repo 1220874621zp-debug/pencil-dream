@@ -10,10 +10,13 @@
 */
 #include "storyboardpanel.h"
 
+#include <QClipboard>
+#include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -26,7 +29,9 @@
 #include <QScrollBar>
 #include <QSettings>
 #include <QSlider>
+#include <QToolTip>
 #include <QVBoxLayout>
+#include <QtMath>
 
 #include <limits>
 
@@ -65,7 +70,203 @@ qint64 sbThumbKey(int layerId, int framePos)
 {
     return (static_cast<qint64>(layerId) << 32) | static_cast<quint32>(framePos);
 }
+
+/** 景别表（代号持久化进 XML；标签/颜色仅显示用）。索引 0-6，数值 1-7 = 曲线纵轴值 */
+struct SbShotTypeInfo
+{
+    const char* code;
+    const char* label;
+    QColor color;
+};
+const SbShotTypeInfo SB_SHOT_TYPES[7] =
+{
+    { "ELS",  "大远景", QColor(0x8B, 0x5C, 0xF6) },
+    { "LS",   "远景",   QColor(0x06, 0xB6, 0xD4) },
+    { "FS",   "全景",   QColor(0x10, 0xB9, 0x81) },
+    { "MS",   "中景",   QColor(0x3B, 0x82, 0xF6) },
+    { "CU",   "近景",   QColor(0xF5, 0x9E, 0x0B) },
+    { "ECU",  "特写",   QColor(0xEF, 0x44, 0x44) },
+    { "MECU", "大特写", QColor(0xEC, 0x48, 0x99) },
+};
+
+int sbShotTypeIndex(const QString& code)
+{
+    for (int i = 0; i < 7; ++i)
+    {
+        if (QLatin1String(SB_SHOT_TYPES[i].code) == code) { return i; }
+    }
+    return -1;
+}
 } // namespace
+
+// ---------------------------------------------------------------------------
+// 影像力学：景别-时间曲线（Obsidian 故事板插件概念移植）
+// 纵轴 = 景别数值 1-7（大远景→大特写），横轴 = 镜头时长累积（秒）；
+// 未设置景别按中景高度入曲线保证时间轴连续（灰点示意）
+// ---------------------------------------------------------------------------
+class SbDynamicsChart : public QWidget
+{
+public:
+    struct Point
+    {
+        QString shotName;
+        int shotType = -1;   // -1 = 未设置
+        qreal fromSec = 0.0; // 全片累积时间轴上的镜头起止/中点（秒）
+        qreal toSec = 0.0;
+        qreal midSec = 0.0;
+    };
+
+    explicit SbDynamicsChart(const QVector<Point>& points, qreal totalSec, QWidget* parent = nullptr)
+        : QWidget(parent), mPoints(points), mTotalSec(qMax<qreal>(totalSec, 1.0))
+    {
+        setMouseTracking(true);
+        setMinimumSize(600, 320);
+    }
+
+protected:
+    void paintEvent(QPaintEvent* event) override
+    {
+        Q_UNUSED(event)
+        QPainter painter(this);
+        painter.fillRect(rect(), QColor(0x17, 0x17, 0x1B));
+
+        const int plotL = 64, plotR = width() - 18, plotT = 18, plotB = height() - 36;
+        const qreal plotW = qMax(1, plotR - plotL);
+        const qreal plotH = qMax(1, plotB - plotT);
+
+        QFont smallFont = font();
+        smallFont.setPointSizeF(qMax<qreal>(7.5, font().pointSizeF() - 2.0));
+        painter.setFont(smallFont);
+
+        // 纵轴：景别 1-7 横网格 + 左侧景别名（同色，兼作图例）
+        for (int v = 1; v <= 7; ++v)
+        {
+            const qreal y = plotT + plotH - (v - 1) / 6.0 * plotH;
+            painter.setPen(QPen(QColor(0x2C, 0x2C, 0x33), 1));
+            painter.drawLine(plotL, qRound(y), plotR, qRound(y));
+            painter.setPen(SB_SHOT_TYPES[v - 1].color);
+            painter.drawText(QRect(0, qRound(y) - 8, plotL - 8, 16),
+                             Qt::AlignVCenter | Qt::AlignRight, tr(SB_SHOT_TYPES[v - 1].label));
+        }
+
+        // 横轴刻度（秒）
+        const int tickStep = qMax<qreal>(1.0, qCeil(mTotalSec / 10.0));
+        for (int t = 0; t <= mTotalSec; t += tickStep)
+        {
+            const qreal x = plotL + t / mTotalSec * plotW;
+            painter.setPen(QPen(QColor(0x2C, 0x2C, 0x33), 1));
+            painter.drawLine(qRound(x), plotT, qRound(x), plotB + 4);
+            painter.setPen(QColor(0x8A, 0x8A, 0x94));
+            painter.drawText(QRect(qRound(x) - 30, plotB + 6, 60, 16),
+                             Qt::AlignHCenter | Qt::AlignVCenter, tr("%1秒").arg(t));
+        }
+
+        if (mPoints.isEmpty())
+        {
+            painter.setPen(QColor(0x8A, 0x8A, 0x94));
+            painter.drawText(rect(), Qt::AlignCenter, tr("暂无带时长的镜头\n（镜头内容层需要至少一个关键帧）"));
+            return;
+        }
+
+        // 镜头分界竖线（弱虚线）
+        painter.setPen(QPen(QColor(0x2C, 0x2C, 0x33), 1, Qt::DotLine));
+        for (const Point& p : mPoints)
+        {
+            if (p.fromSec > 0.0)
+            {
+                const qreal x = plotL + p.fromSec / mTotalSec * plotW;
+                painter.drawLine(qRound(x), plotT, qRound(x), plotB);
+            }
+        }
+
+        // 折线（未设置按 4）
+        QPolygonF line;
+        for (const Point& p : mPoints)
+        {
+            const int value = p.shotType >= 0 ? p.shotType + 1 : 4;
+            line.append(QPointF(plotL + p.midSec / mTotalSec * plotW,
+                                plotT + plotH - (value - 1) / 6.0 * plotH));
+        }
+
+        // 面积填充 + 折线
+        QPainterPath area;
+        area.addPolygon(line);
+        area.lineTo(plotL + mPoints.last().toSec / mTotalSec * plotW, plotB);
+        area.lineTo(line.first().x(), plotB);
+        area.closeSubpath();
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x4A, 0x9E, 0xE8, 38));
+        painter.drawPath(area);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(0x4A, 0x9E, 0xE8), 2));
+        painter.drawPolyline(line);
+
+        // 数据点（景别色；未设置 = 灰；悬浮放大）
+        for (int i = 0; i < mPoints.size(); ++i)
+        {
+            const Point& p = mPoints[i];
+            const QColor color = p.shotType >= 0 ? SB_SHOT_TYPES[p.shotType].color : QColor(0x8A, 0x8A, 0x94);
+            painter.setPen(QPen(Qt::white, 2));
+            painter.setBrush(color);
+            painter.drawEllipse(line[i], i == mHover ? 7 : 5, i == mHover ? 7 : 5);
+        }
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        const int plotL = 64, plotR = width() - 18, plotT = 18, plotB = height() - 36;
+        const qreal plotW = qMax(1, plotR - plotL);
+        const qreal plotH = qMax(1, plotB - plotT);
+
+        int hover = -1;
+        qreal bestDist = 18.0 * 18.0; // 悬浮命中半径
+        for (int i = 0; i < mPoints.size(); ++i)
+        {
+            const Point& p = mPoints[i];
+            const int value = p.shotType >= 0 ? p.shotType + 1 : 4;
+            const QPointF c(plotL + p.midSec / mTotalSec * plotW,
+                            plotT + plotH - (value - 1) / 6.0 * plotH);
+            const QPointF d = c - QPointF(event->pos());
+            const qreal dist = d.x() * d.x() + d.y() * d.y();
+            if (dist < bestDist) { bestDist = dist; hover = i; }
+        }
+        if (hover != mHover)
+        {
+            mHover = hover;
+            update();
+        }
+        if (hover >= 0)
+        {
+            const Point& p = mPoints[hover];
+            const QString label = p.shotType >= 0 ? tr(SB_SHOT_TYPES[p.shotType].label) : tr("未设置");
+            QToolTip::showText(event->globalPosition().toPoint(),
+                               tr("%1\n%2 · %3 秒处（时长 %4 秒）")
+                                   .arg(p.shotName, label)
+                                   .arg(QString::number(p.midSec, 'f', 1))
+                                   .arg(QString::number(p.toSec - p.fromSec, 'f', 1)));
+        }
+        else
+        {
+            QToolTip::hideText();
+        }
+    }
+
+    void leaveEvent(QEvent* event) override
+    {
+        QWidget::leaveEvent(event);
+        if (mHover >= 0)
+        {
+            mHover = -1;
+            update();
+        }
+        QToolTip::hideText();
+    }
+
+private:
+    QVector<Point> mPoints;
+    qreal mTotalSec = 1.0;
+    int mHover = -1;
+};
 
 // ---------------------------------------------------------------------------
 // StoryboardView
@@ -241,6 +442,8 @@ void StoryboardView::rebuildShots()
             shot.hasAction = !anchor->storyboardAction().isEmpty();
             shot.hasDialog = !anchor->storyboardDialog().isEmpty();
             shot.hasNotes = !anchor->storyboardNotes().isEmpty();
+            shot.shotType = sbShotTypeIndex(anchor->storyboardShotType());
+            shot.hasPrompt = !anchor->storyboardPrompt().isEmpty();
         }
 
         // 运镜角标：镜头帧范围内相机关键帧 > 1
@@ -631,16 +834,28 @@ void StoryboardView::drawCard(QPainter& painter, int shotIndex, const QRect& rec
     painter.drawText(nameRect, Qt::AlignVCenter | Qt::AlignLeft,
                      QFontMetrics(nameFont).elidedText(shot.name, Qt::ElideRight, nameRect.width()));
 
-    // 信息区第二行：注释标记（动/对/备，仅非空字段）
+    // 信息区第二行：景别签（景别色）+ 注释标记（动/对/备/AI，仅非空字段）
     painter.setFont(smallFont);
+    int chipX = rect.left() + 10;
+    const int chipY = nameRect.bottom() + 3;
+    if (shot.shotType >= 0 && shot.shotType < 7)
+    {
+        const QString typeLabel = tr(SB_SHOT_TYPES[shot.shotType].label);
+        const int w = QFontMetrics(smallFont).horizontalAdvance(typeLabel) + 8;
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(SB_SHOT_TYPES[shot.shotType].color);
+        painter.drawRoundedRect(QRect(chipX, chipY, w, 14), 3, 3);
+        painter.setPen(Qt::white);
+        painter.drawText(QRect(chipX, chipY, w, 14), Qt::AlignCenter, typeLabel);
+        chipX += w + 4;
+    }
     const struct { bool on; QString label; QColor color; } chips[] =
     {
         { shot.hasAction, tr("动"), QColor(0x46, 0xA7, 0x58) },
         { shot.hasDialog, tr("对"), QColor(0x00, 0x90, 0xFF) },
         { shot.hasNotes,  tr("备"), QColor(0xF7, 0x6B, 0x15) },
+        { shot.hasPrompt, tr("AI"), QColor(0xA7, 0x8B, 0xFA) },
     };
-    int chipX = rect.left() + 10;
-    const int chipY = nameRect.bottom() + 3;
     for (const auto& chip : chips)
     {
         if (!chip.on) { continue; }
@@ -903,6 +1118,52 @@ void StoryboardView::applyShotColor(int shotIndex, int colorIndex)
     emit mEditor->updateTimeLine();
 }
 
+void StoryboardView::applyShotType(int shotIndex, int typeIndex)
+{
+    if (mEditor == nullptr || mEditor->object() == nullptr) { return; }
+    if (shotIndex < 0 || shotIndex >= mShots.size()) { return; }
+    Layer* anchor = mEditor->object()->findLayerById(mShots[shotIndex].anchorLayerId);
+    if (anchor == nullptr) { return; }
+    anchor->setStoryboardShotType(typeIndex >= 0 && typeIndex < 7
+                                      ? QString::fromLatin1(SB_SHOT_TYPES[typeIndex].code)
+                                      : QString());
+    mEditor->object()->modification();
+    emit mEditor->updateTimeLine();
+}
+
+void StoryboardView::showDynamicsChart()
+{
+    // 数据：镜头按显示序累积时长（秒）；无关键帧镜头无时长不入曲线
+    QVector<SbDynamicsChart::Point> points;
+    qreal totalSec = 0.0;
+    for (const StoryboardShot& shot : mShots)
+    {
+        if (shot.lastFrame < shot.firstFrame) { continue; }
+        const qreal from = totalSec;
+        const qreal dur = (shot.lastFrame - shot.firstFrame + 1) / static_cast<qreal>(qMax(1, mFps));
+        totalSec += dur;
+        SbDynamicsChart::Point p;
+        p.shotName = shot.name;
+        p.shotType = shot.shotType;
+        p.fromSec = from;
+        p.toSec = totalSec;
+        p.midSec = from + dur / 2.0;
+        points.append(p);
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("影像力学 — 景别节奏曲线"));
+    QVBoxLayout* lay = new QVBoxLayout(&dialog);
+    lay->setContentsMargins(8, 8, 8, 8);
+    SbDynamicsChart* chart = new SbDynamicsChart(points, totalSec, &dialog);
+    lay->addWidget(chart);
+    QLabel* hint = new QLabel(tr("纵轴 = 景别（大远景→大特写），横轴 = 时间；灰点 = 未设置景别（按中景高度示意）。"), &dialog);
+    hint->setWordWrap(true);
+    hint->setStyleSheet(QStringLiteral("color:#8A8A94;"));
+    lay->addWidget(hint);
+    dialog.exec();
+}
+
 void StoryboardView::showRenameDialog(int shotIndex)
 {
     if (mEditor == nullptr || mEditor->object() == nullptr) { return; }
@@ -941,6 +1202,16 @@ void StoryboardView::showEditDialog(int shotIndex)
 
     QFormLayout* form = new QFormLayout(&dialog);
     QLineEdit* nameEdit = new QLineEdit(shot.name, &dialog);
+    QComboBox* typeCombo = new QComboBox(&dialog);
+    typeCombo->addItem(tr("未设置"));
+    for (int t = 0; t < 7; ++t)
+    {
+        typeCombo->addItem(tr(SB_SHOT_TYPES[t].label));
+        QPixmap swatch(12, 12);
+        swatch.fill(SB_SHOT_TYPES[t].color);
+        typeCombo->setItemIcon(t + 1, QIcon(swatch));
+    }
+    typeCombo->setCurrentIndex(qMax(0, shot.shotType + 1)); // -1 = 未设置 → 0
     QLineEdit* actionEdit = new QLineEdit(anchor->storyboardAction(), &dialog);
     actionEdit->setPlaceholderText(tr("画面动作描述"));
     QLineEdit* dialogEdit = new QLineEdit(anchor->storyboardDialog(), &dialog);
@@ -948,10 +1219,15 @@ void StoryboardView::showEditDialog(int shotIndex)
     QPlainTextEdit* notesEdit = new QPlainTextEdit(anchor->storyboardNotes(), &dialog);
     notesEdit->setPlaceholderText(tr("备注（镜头衔接/音效/提示等）"));
     notesEdit->setFixedHeight(72);
+    QPlainTextEdit* promptEdit = new QPlainTextEdit(anchor->storyboardPrompt(), &dialog);
+    promptEdit->setPlaceholderText(tr("AI 生图提示词（卡片右键可复制）"));
+    promptEdit->setFixedHeight(72);
     form->addRow(tr("镜头名称："), nameEdit);
+    form->addRow(tr("景别："), typeCombo);
     form->addRow(tr("动作："), actionEdit);
     form->addRow(tr("对白："), dialogEdit);
     form->addRow(tr("备注："), notesEdit);
+    form->addRow(tr("提示词："), promptEdit);
 
     QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -975,6 +1251,10 @@ void StoryboardView::showEditDialog(int shotIndex)
     anchor->setStoryboardAction(actionEdit->text().trimmed());
     anchor->setStoryboardDialog(dialogEdit->text().trimmed());
     anchor->setStoryboardNotes(notesEdit->toPlainText().trimmed());
+    const int typeIndex = typeCombo->currentIndex() - 1;
+    anchor->setStoryboardShotType(typeIndex >= 0 ? QString::fromLatin1(SB_SHOT_TYPES[typeIndex].code)
+                                                 : QString());
+    anchor->setStoryboardPrompt(promptEdit->toPlainText().trimmed());
     mEditor->object()->modification();
     emit mEditor->updateTimeLine();
 }
@@ -991,8 +1271,27 @@ void StoryboardView::contextMenuEvent(QContextMenuEvent* event)
     menu.addSeparator();
     QAction* editAction = menu.addAction(tr("编辑注释…"));
     QAction* renameAction = menu.addAction(tr("重命名…"));
+    QAction* copyPromptAction = nullptr;
+    if (shot.hasPrompt)
+    {
+        copyPromptAction = menu.addAction(tr("复制提示词"));
+    }
     menu.addSeparator();
     QAction* visibleAction = menu.addAction(shot.visible ? tr("隐藏镜头") : tr("显示镜头"));
+    QMenu* typeMenu = menu.addMenu(tr("景别"));
+    QAction* noType = typeMenu->addAction(tr("未设置"));
+    noType->setCheckable(true);
+    noType->setChecked(shot.shotType < 0);
+    QAction* typeActions[7] = {};
+    for (int t = 0; t < 7; ++t)
+    {
+        typeActions[t] = typeMenu->addAction(tr(SB_SHOT_TYPES[t].label));
+        typeActions[t]->setCheckable(true);
+        typeActions[t]->setChecked(shot.shotType == t);
+        QPixmap swatch(14, 14);
+        swatch.fill(SB_SHOT_TYPES[t].color);
+        typeActions[t]->setIcon(QIcon(swatch));
+    }
     QMenu* colorMenu = menu.addMenu(tr("场次颜色"));
     QAction* noColor = colorMenu->addAction(tr("无颜色"));
     noColor->setCheckable(true);
@@ -1019,11 +1318,24 @@ void StoryboardView::contextMenuEvent(QContextMenuEvent* event)
     if (chosen == playAction) { playFromShot(index); }
     else if (chosen == editAction) { showEditDialog(index); }
     else if (chosen == renameAction) { showRenameDialog(index); }
+    else if (chosen == copyPromptAction)
+    {
+        Layer* anchor = mEditor->object()->findLayerById(shot.anchorLayerId);
+        if (anchor != nullptr)
+        {
+            QGuiApplication::clipboard()->setText(anchor->storyboardPrompt());
+        }
+    }
     else if (chosen == visibleAction) { toggleShotVisible(index); }
+    else if (chosen == noType) { applyShotType(index, -1); }
     else if (chosen == noColor) { applyShotColor(index, -1); }
     else if (chosen == dissolveAction) { mEditor->layers()->dissolveGroup(shot.groupId); }
     else
     {
+        for (int t = 0; t < 7; ++t)
+        {
+            if (chosen == typeActions[t]) { applyShotType(index, t); return; }
+        }
         for (int c = 0; c < 8; ++c)
         {
             if (chosen == colorActions[c]) { applyShotColor(index, c); return; }
@@ -1077,6 +1389,11 @@ void StoryboardPanel::initUI()
     mCameraButton->setFixedHeight(24);
     mCameraButton->setToolTip(tr("在缩略图上叠加相机取景框（需相机图层）"));
     toolbar->addWidget(mCameraButton);
+
+    mDynamicsButton = new QPushButton(tr("影像力学"), root);
+    mDynamicsButton->setFixedHeight(24);
+    mDynamicsButton->setToolTip(tr("景别随时间变化的节奏曲线"));
+    toolbar->addWidget(mDynamicsButton);
 
     mTimeModeButton = new QPushButton(QString(), root);
     mTimeModeButton->setFixedHeight(24);
@@ -1133,6 +1450,10 @@ void StoryboardPanel::initUI()
         mView->setShowCamera(on);
         QSettings s(PENCIL2D, PENCIL2D);
         s.setValue(QStringLiteral("Storyboard/ShowCamera"), on);
+    });
+    connect(mDynamicsButton, &QPushButton::clicked, this, [this]
+    {
+        if (mView != nullptr) { mView->showDynamicsChart(); }
     });
     connect(mTimeModeButton, &QPushButton::clicked, this, [this, syncButtons]
     {
