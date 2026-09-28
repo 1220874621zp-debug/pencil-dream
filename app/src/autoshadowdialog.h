@@ -41,10 +41,11 @@ class Editor;
 class LevelsBar;
 
 /** 自动上阴影参数对话框（CSP 参数模型 + PS 交互）：左参数右预览。
-    参数按「光源 / 形体阴影 / 掩膜与底场 / 输出 / 排线 / 色阶」分组；
-    形体法线来源可选 SDF 球冠（描线稿）或分区四色渐变（纯色块）。
-    预设一键整套光源+色带（CSP 预设语义）；光源列表可增删（CSP 添加光源同款），
-    滑杆编辑选中光源；预览框点击/拖拽定位选中光源（点其他标记切换选中）；
+    算法=分区四色渐变法线卡渲：按颜色分区，每区沿主光刷四段渐变当高度场。
+    参数按「光源 / 形体阴影 / 掩膜 / 输出 / 排线 / 色阶」分组；
+    预设一键整套光源+色带（CSP 预设语义）；光源列表可增删（CSP 添加光源同款，
+    光源 1=主光定向渐变，其余=辅光补照明）；滑杆编辑选中光源；
+    预览框点击/拖拽定位选中光源（点其他标记切换选中）；
     色阶阈值=渐变条拖块（点色段改该阶颜色）。 */
 class AutoShadowDialog : public QDialog
 {
@@ -59,8 +60,6 @@ public:
     bool applyToAllKeyFrames() const;
 
 private:
-    void addSliderRow(const QString& labelText, int minV, int maxV, int defV, const QString& tip,
-                      const QString& suffix, QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
     void addSliderRowTo(QLayout* layout, const QString& labelText, int minV, int maxV, int defV,
                         const QString& tip, const QString& suffix, QDoubleSpinBox*& spinOut, QSlider*& sliderOut);
     void pickLevelColor(const int levelIndex);
@@ -71,7 +70,6 @@ private:
     void setLightFromPreview(const QPoint& pos);
     void syncLevelsBar();
     void syncHatchEnabled();
-    void syncFormModeEnabled();
     void refreshLightCombo();
     void syncLightControls();
     void syncLevelRow(const int levelIndex);
@@ -80,7 +78,6 @@ private:
     QVBoxLayout* mParamColumn = nullptr;
 
     QComboBox* mPresetCombo = nullptr;
-    QComboBox* mFormSourceCombo = nullptr;
     QComboBox* mLightCombo = nullptr;
     QPushButton* mAddLightButton = nullptr;
     QPushButton* mRemoveLightButton = nullptr;
@@ -97,7 +94,6 @@ private:
     QSlider* mLightHeightSlider = nullptr;
     QSlider* mLightIntensitySlider = nullptr;
     QDoubleSpinBox* mThresholdSpin = nullptr;
-    QDoubleSpinBox* mGradientSpin = nullptr;
     QDoubleSpinBox* mNormalSpin = nullptr;
     QDoubleSpinBox* mFormHeightSpin = nullptr;
     QDoubleSpinBox* mFormRadiusSpin = nullptr;
@@ -106,7 +102,6 @@ private:
     QDoubleSpinBox* mRegionDomeSpin = nullptr;
     QSlider* mRegionToleranceSlider = nullptr;
     QSlider* mRegionDomeSlider = nullptr;
-    QDoubleSpinBox* mOcclusionSpin = nullptr;
     QDoubleSpinBox* mFeatherSpin = nullptr;
     QSlider* mFeatherSlider = nullptr;
     QComboBox* mTypeCombo = nullptr;

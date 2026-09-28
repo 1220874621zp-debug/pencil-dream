@@ -55,19 +55,18 @@ constexpr int PREVIEW_H = 300; // 预览框最大高（像素）
 
 /** 像素参数按预览缩放同比（光源/阈值/强度/羽化是归一化或场值单位，不随缩放；
     体积高度是斜率放大（剖面同比缩、斜率不变）也不随缩放；
-    部件最大半径（封顶值）/圆滑度/遮挡半径/排线间距随几何距离走，须同比——
+    部件最大半径（封顶值）/圆滑度/排线间距随几何距离走，须同比——
     σ 与域尺寸不同步缩放会让预览的丘形失真） */
 AutoShadowParams scaledForPreview(const AutoShadowParams& p, const double s)
 {
     AutoShadowParams q = p;
     q.formRadius = std::max(1, qRound(p.formRadius * s));
     q.formSmooth = std::max(0, qRound(p.formSmooth * s));
-    q.occlusionStrength = std::max(0, qRound(p.occlusionStrength * s));
     q.hatchSpacing = std::max(1, qRound(p.hatchSpacing * s));
     return q;
 }
 
-/** 预设（CSP 预设语义）：一键整套光源列表 + 渐变强度 + 色带 + 阈值。
+/** 预设（CSP 预设语义）：一键整套光源列表 + 色带 + 阈值。
     id: 1=顺光（标准阴影默认） 2=逆光轮廓光（双光源） 3=夜晚 4=黄昏 5=风格化彩色 */
 AutoShadowParams presetParams(const int id)
 {
@@ -77,7 +76,6 @@ AutoShadowParams presetParams(const int id)
         AutoShadowLight a; a.x = 0.15; a.y = 0.30; a.height = 120;
         AutoShadowLight b; b.x = 0.85; b.y = 0.30; b.height = 120;
         p.lights = { a, b };
-        p.gradientStrength = 20;
         p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
         p.levels[1] = { qRgb(255, 216, 172), AutoShadowBlendMode::Multiply };
         p.levels[2] = { qRgb(186, 142, 168), AutoShadowBlendMode::Multiply };
@@ -87,7 +85,6 @@ AutoShadowParams presetParams(const int id)
     {
         AutoShadowLight a; a.x = -0.10; a.y = -0.20; a.height = 200; a.intensity = 80;
         p.lights = { a };
-        p.gradientStrength = 45;
         p.thresholds[0] = 18; p.thresholds[1] = 42; p.thresholds[2] = 72;
         p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
         p.levels[1] = { qRgb(168, 190, 255), AutoShadowBlendMode::Multiply };
@@ -98,7 +95,6 @@ AutoShadowParams presetParams(const int id)
     {
         AutoShadowLight a; a.x = 1.10; a.y = 0.55; a.height = 70;
         p.lights = { a };
-        p.gradientStrength = 50;
         p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
         p.levels[1] = { qRgb(255, 208, 150), AutoShadowBlendMode::Multiply };
         p.levels[2] = { qRgb(236, 148, 96), AutoShadowBlendMode::Multiply };
@@ -107,7 +103,6 @@ AutoShadowParams presetParams(const int id)
     else if (id == 5)
     {
         // 风格化彩色（旧默认色带，v4 照抄 CSP 截图的暖橙→洋红→蓝紫）
-        p.gradientStrength = 30;
         p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
         p.levels[1] = { qRgb(255, 191, 128), AutoShadowBlendMode::Multiply };
         p.levels[2] = { qRgb(255, 92, 158), AutoShadowBlendMode::LinearBurn };
@@ -307,7 +302,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     mParamColumn->setSpacing(6);
 
-    // ── 预设（CSP 预设语义）：一键整套光源列表 + 渐变强度 + 色带 ──
+    // ── 预设（CSP 预设语义）：一键整套光源列表 + 色带 ──
     auto* presetRow = new QGridLayout;
     presetRow->setHorizontalSpacing(8);
     presetRow->setContentsMargins(0, 0, 0, 0);
@@ -341,7 +336,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     lightRow->addWidget(mLightCombo, 1);
     mAddLightButton = new QPushButton(tr("＋添加光源"), lightBox);
     mAddLightButton->setAutoDefault(false);
-    mAddLightButton->setToolTip(tr("再加一盏光源：多光源互补照明（照度=Σ 强度·max(0,N·L)），所有光都照不到的坡面才全暗——双光可做双侧轮廓光。"));
+    mAddLightButton->setToolTip(tr("再加一盏辅光：只补 N·L 照明（照度=Σ 强度·max(0,N·L)），不改变渐变方向——渐变恒沿光源 1（主光）定向；双光可做双侧轮廓光。"));
     connect(mAddLightButton, &QPushButton::clicked, this, [this] {
         AutoShadowLight l;
         l.x = 0.85;
@@ -417,41 +412,22 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     });
     mParamColumn->addWidget(lightBox);
 
-    // ── 形体阴影组（法线场）：法线来源 + 体积强度 + 各来源参数 + 圆滑度 ──
-    auto* formBox = new QGroupBox(tr("形体阴影（法线场）"), this);
+    // ── 形体阴影组（分区四色渐变高度场）：强度 + 分区/圆顶 + 斜率/半径/圆滑 ──
+    auto* formBox = new QGroupBox(tr("形体阴影（分区四色渐变）"), this);
     auto* formLayout = new QVBoxLayout(formBox);
     formLayout->setSpacing(2);
 
-    auto* sourceRow = new QGridLayout;
-    sourceRow->setHorizontalSpacing(8);
-    sourceRow->setContentsMargins(0, 0, 0, 0);
-    auto* sourceLabel = new QLabel(tr("法线来源："), formBox);
-    sourceRow->addWidget(sourceLabel, 0, 0);
-    mFormSourceCombo = new QComboBox(formBox);
-    mFormSourceCombo->addItem(tr("SDF 球冠（沿轮廓鼓包）"));
-    mFormSourceCombo->addItem(tr("分区四色渐变（纯色块）"));
-    mFormSourceCombo->setToolTip(tr("形体伪高度场的来源。\n"
-        "SDF 球冠：掩膜连通域各鼓一个球冠（描线稿适用——线稿是丘间山谷）。\n"
-        "分区四色渐变：先按颜色把白区分成色块，每块沿光向刷四段渐变当高度场（纯色块/扁平图适用——"
-        "纯色图掩膜全连通，球冠方向盲、整片鼓一个包；分区渐变才能横跨每个色块切出体积交界线）。"));
-    connect(mFormSourceCombo, &QComboBox::currentIndexChanged, this, [this](const int) {
-        syncFormModeEnabled();
-        schedulePreview();
-    });
-    sourceRow->addWidget(mFormSourceCombo, 0, 1);
-    formLayout->addLayout(sourceRow);
-
     QDoubleSpinBox* normalSpin = nullptr;
     QSlider* normalSlider = nullptr;
-    addSliderRowTo(formLayout, tr("体积强度："), 0, 100, 11,
-        tr("形体法线 N·L 阴影（0..100，主阴影场）：伪高度场表面朝向决定明暗——交界线横切部件、贴线阴影自动成立。"),
+    addSliderRowTo(formLayout, tr("阴影强度："), 0, 100, 100,
+        tr("阴影总强度（0..100）：场值=强度·(1−照度)，0=无变化。分区四色渐变高度场的表面朝向决定明暗——交界线横跨每个色块、贴线阴影自动成立。"),
         QString(), normalSpin, normalSlider);
     mNormalSpin = normalSpin;
 
     QDoubleSpinBox* regionToleranceSpin = nullptr;
     QSlider* regionToleranceSlider = nullptr;
     addSliderRowTo(formLayout, tr("分区容差："), 0, 100, 26,
-        tr("分区颜色容差（Lab ΔE）：白区内色差≤容差的像素并入同一色块（种子锚定，防渐变漂移）。纯色稿默认即可；带压缩噪点/轻渐变的图适当调大。仅在「分区四色渐变」来源下有效。"),
+        tr("分区颜色容差（Lab ΔE）：白区内色差≤容差的像素并入同一色块（种子锚定，防渐变漂移）。纯色稿默认即可；带压缩噪点/轻渐变的图适当调大。"),
         QString(), regionToleranceSpin, regionToleranceSlider);
     mRegionToleranceSpin = regionToleranceSpin;
     mRegionToleranceSlider = regionToleranceSlider;
@@ -459,7 +435,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     QDoubleSpinBox* regionDomeSpin = nullptr;
     QSlider* regionDomeSlider = nullptr;
     addSliderRowTo(formLayout, tr("圆顶混合："), 0, 100, 35,
-        tr("分区高度场里方向渐变与球冠的配比：0=纯方向渐变（斜面感、单向明暗），100=纯球冠（枕头感、轮廓圆角），中间值渐变切交界线+球冠补圆角，通常最自然。仅在「分区四色渐变」来源下有效。"),
+        tr("分区高度场里方向渐变与球冠的配比：0=纯方向渐变（斜面感、单向明暗），100=纯球冠（枕头感、轮廓圆角），中间值渐变切交界线+球冠补圆角，通常最自然。"),
         tr("%"), regionDomeSpin, regionDomeSlider);
     mRegionDomeSpin = regionDomeSpin;
     mRegionDomeSlider = regionDomeSlider;
@@ -467,51 +443,36 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     QDoubleSpinBox* formHeightSpin = nullptr;
     QSlider* formHeightSlider = nullptr;
     addSliderRowTo(formLayout, tr("体积高度："), 1, 40, 1,
-        tr("伪高度场的斜率放大（倍）：坡度已自带 ≥1，调大主要加深贴线谷壁的暗带，调小交界过渡更宽更柔。"),
+        tr("高度场的斜率放大（倍）：调大交界过渡变陡、贴线暗带加深，调小更宽更柔。"),
         QString(), formHeightSpin, formHeightSlider);
     mFormHeightSpin = formHeightSpin;
 
     QDoubleSpinBox* formRadiusSpin = nullptr;
     QSlider* formRadiusSlider = nullptr;
     addSliderRowTo(formLayout, tr("部件最大半径："), 8, 2000, 2000,
-        tr("每个色块按自身大小自动鼓成球冠（交界线横切任意大小的部件，无需手调）；此值只封顶过大的连通域（如背景大光晕），防止巨域被横切出一条明暗线。"),
+        tr("每个色块按自身大小自动鼓球冠（圆顶分量的半径）；此值只封顶过大的连通域（如背景大光晕），防止巨域被横切出一条明暗线。"),
         tr(" px"), formRadiusSpin, formRadiusSlider);
     mFormRadiusSpin = formRadiusSpin;
 
     QDoubleSpinBox* formSmoothSpin = nullptr;
     QSlider* formSmoothSlider = nullptr;
     addSliderRowTo(formLayout, tr("形体圆滑度："), 0, 40, 40,
-        tr("伪高度场的高斯模糊半径（px）：越大丘顶越圆、交界线越弧、渐变折点越柔；过小会出棱角感。"),
+        tr("高度场的高斯模糊半径（px）：越大渐变折点越柔、交界线越弧；过小会出棱角感。"),
         tr(" px"), formSmoothSpin, formSmoothSlider);
     mFormSmoothSpin = formSmoothSpin;
     mParamColumn->addWidget(formBox);
-    syncFormModeEnabled(); // SDF 模式下分区参数灰显常驻（防排版跳动）
 
-    // ── 掩膜与底场组：黑透白不透门控 + 渐变底场 + 遮挡 ──
-    auto* baseBox = new QGroupBox(tr("掩膜与底场"), this);
+    // ── 掩膜组：黑透白不透门控 ──
+    auto* baseBox = new QGroupBox(tr("掩膜"), this);
     auto* baseLayout = new QVBoxLayout(baseBox);
     baseLayout->setSpacing(2);
 
     QDoubleSpinBox* thresholdSpin = nullptr;
     QSlider* thresholdSlider = nullptr;
     addSliderRowTo(baseLayout, tr("去色阈值："), 1, 254, 238,
-        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的山谷，形体阴影沿山谷两侧生长。"),
+        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区不显示阴影。"),
         QString(), thresholdSpin, thresholdSlider);
     mThresholdSpin = thresholdSpin;
-
-    QDoubleSpinBox* gradientSpin = nullptr;
-    QSlider* gradientSlider = nullptr;
-    addSliderRowTo(baseLayout, tr("渐变强度："), 0, 100, 47,
-        tr("圆形渐变底场（0..100）：离光源越远整体越暗——叠加在形体阴影上的全局衰减，CSP 同款底感。"),
-        QString(), gradientSpin, gradientSlider);
-    mGradientSpin = gradientSpin;
-
-    QDoubleSpinBox* occlusionSpin = nullptr;
-    QSlider* occlusionSlider = nullptr;
-    addSliderRowTo(baseLayout, tr("遮挡强度："), 0, 100, 84,
-        tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞/前层挡在光路上时其背光侧投出遮挡阴影——洞在体积场里是山谷，这里再补「投影」式的洞后暗带。"),
-        tr(" px"), occlusionSpin, occlusionSlider);
-    mOcclusionSpin = occlusionSpin;
     mParamColumn->addWidget(baseBox);
 
     // ── 输出组（CSP 色调设置）：类型 + 羽化 + 反转 ──
@@ -693,15 +654,12 @@ AutoShadowParams AutoShadowDialog::params() const
     AutoShadowParams p;
     p.lights = mLights;
     p.maskThreshold = qRound(mThresholdSpin->value());
-    p.gradientStrength = qRound(mGradientSpin->value());
     p.normalStrength = qRound(mNormalSpin->value());
     p.formHeight = qRound(mFormHeightSpin->value());
     p.formRadius = qRound(mFormRadiusSpin->value());
     p.formSmooth = qRound(mFormSmoothSpin->value());
-    p.regionGradient = mFormSourceCombo != nullptr && mFormSourceCombo->currentIndex() == 1;
     p.regionTolerance = qRound(mRegionToleranceSpin->value());
     p.regionDomeWeight = qRound(mRegionDomeSpin->value());
-    p.occlusionStrength = qRound(mOcclusionSpin->value());
     for (int i = 0; i < 3; ++i)
         p.thresholds[i] = mLevelsBar->thresholds(i);
     p.edgeFeather = qRound(mFeatherSpin->value());
@@ -780,13 +738,6 @@ void AutoShadowDialog::setLightFromPreview(const QPoint& pos)
     renderPreview(); // 拖拽即时回显（光源标记），阴影防抖由 valueChanged→schedulePreview 处理
 }
 
-void AutoShadowDialog::addSliderRow(const QString& labelText, const int minV, const int maxV,
-                                    const int defV, const QString& tip, const QString& suffix,
-                                    QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
-{
-    addSliderRowTo(mParamColumn, labelText, minV, maxV, defV, tip, suffix, spinOut, sliderOut);
-}
-
 void AutoShadowDialog::addSliderRowTo(QLayout* layout, const QString& labelText, const int minV, const int maxV,
                                       const int defV, const QString& tip, const QString& suffix,
                                       QDoubleSpinBox*& spinOut, QSlider*& sliderOut)
@@ -853,21 +804,6 @@ void AutoShadowDialog::syncHatchEnabled()
     }
 }
 
-void AutoShadowDialog::syncFormModeEnabled()
-{
-    // 分区四色渐变来源才需要分区参数；SDF 模式灰显常驻（防排版跳动）
-    const bool region = mFormSourceCombo != nullptr && mFormSourceCombo->currentIndex() == 1;
-    if (mRegionToleranceSpin != nullptr)
-    {
-        mRegionToleranceSpin->setEnabled(region);
-        mRegionToleranceSlider->setEnabled(region);
-    }
-    if (mRegionDomeSpin != nullptr)
-    {
-        mRegionDomeSpin->setEnabled(region);
-        mRegionDomeSlider->setEnabled(region);
-    }
-}
 
 void AutoShadowDialog::pickLevelColor(const int levelIndex)
 {
@@ -1049,7 +985,6 @@ void AutoShadowDialog::applyPreset(const int presetIndex)
     const AutoShadowParams p = presetParams(presetIndex);
     mLights = p.lights;
     mCurrentLight = 0;
-    mGradientSpin->setValue(p.gradientStrength);
     for (int i = 0; i < 4; ++i)
     {
         mLevels[i] = p.levels[i];

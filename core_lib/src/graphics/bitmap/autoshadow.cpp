@@ -34,7 +34,6 @@ namespace
 {
 
 constexpr int ALPHA_MIN = 16; // α≥此值视为不透明内容
-constexpr int OCCLUSION_SAMPLES = 16; // 径向遮挡采样数
 
 int clampInt(const int v, const int lo, const int hi)
 {
@@ -47,42 +46,6 @@ float smoothStep(const float e0, const float e1, const float x)
         return x < e0 ? 0.0f : 1.0f;
     const float t = std::min(1.0f, std::max(0.0f, (x - e0) / (e1 - e0)));
     return t * t * (3.0f - 2.0f * t);
-}
-
-/** 双线性采样（边界钳位） */
-float bilinearSample(const std::vector<float>& buf, const int w, const int h, double x, double y)
-{
-    x = std::min(static_cast<double>(w - 1), std::max(0.0, x));
-    y = std::min(static_cast<double>(h - 1), std::max(0.0, y));
-    const int x0 = static_cast<int>(std::floor(x));
-    const int y0 = static_cast<int>(std::floor(y));
-    const int x1 = std::min(x0 + 1, w - 1);
-    const int y1 = std::min(y0 + 1, h - 1);
-    const double fx = x - x0;
-    const double fy = y - y0;
-    const float a = buf[static_cast<size_t>(y0) * w + x0];
-    const float b = buf[static_cast<size_t>(y0) * w + x1];
-    const float c = buf[static_cast<size_t>(y1) * w + x0];
-    const float d = buf[static_cast<size_t>(y1) * w + x1];
-    return static_cast<float>((a * (1.0 - fx) + b * fx) * (1.0 - fy) + (c * (1.0 - fx) + d * fx) * fy);
-}
-
-/** uint8 缓冲的双线性采样（内容掩膜用） */
-float bilinearSampleU8(const std::vector<uint8_t>& buf, const int w, const int h, double x, double y)
-{
-    x = std::min(static_cast<double>(w - 1), std::max(0.0, x));
-    y = std::min(static_cast<double>(h - 1), std::max(0.0, y));
-    const int x0 = static_cast<int>(std::floor(x));
-    const int y0 = static_cast<int>(std::floor(y));
-    const int x1 = std::min(x0 + 1, w - 1);
-    const int y1 = std::min(y0 + 1, h - 1);
-    const double fx = x - x0;
-    const double fy = y - y0;
-    const double a = buf[static_cast<size_t>(y0) * w + x0];
-    const double b = buf[static_cast<size_t>(y0) * w + x1];
-    const double c = buf[static_cast<size_t>(y1) * w + x0];
-    const double d = buf[static_cast<size_t>(y1) * w + x1];
-    return static_cast<float>((a * (1.0 - fx) + b * fx) * (1.0 - fy) + (c * (1.0 - fx) + d * fx) * fy);
 }
 
 /** ── 高斯模糊：3 次盒式模糊近似（分离前缀和，O(N) 与半径无关）── */
@@ -278,66 +241,12 @@ struct LightSetup
     double px = 0.0, py = 0.0, z = 1.0, w = 1.0;
 };
 
-/** 白区连通域标记（4-连通，线稿为界——对角不漏）：label 0=洞，1..N=白域；
-    dmax[i]=第 i 域内距离变换最大值（该部件的内切半径，当球冠半径用）。 */
-void labelMaskRegions(const std::vector<float>& maskF, const std::vector<float>& dist,
-                      const int w, const int h, std::vector<int>& label, std::vector<float>& dmax)
-{
-    const size_t count = static_cast<size_t>(w) * h;
-    label.assign(count, 0);
-    dmax.clear();
-    dmax.push_back(0.0f); // 占位：label 0（洞）不用
-    std::vector<int> stack;
-
-    for (size_t seed = 0; seed < count; ++seed)
-    {
-        if (label[seed] != 0 || maskF[seed] < 0.5f)
-            continue;
-        const int id = static_cast<int>(dmax.size());
-        dmax.push_back(0.0f);
-        stack.clear();
-        stack.push_back(static_cast<int>(seed));
-        label[seed] = id;
-        while (!stack.empty())
-        {
-            const int here = stack.back();
-            stack.pop_back();
-            const float d = dist[static_cast<size_t>(here)];
-            if (d > dmax[static_cast<size_t>(id)])
-                dmax[static_cast<size_t>(id)] = d;
-            const int hy = here / w;
-            const int hx = here % w;
-            if (hx > 0 && label[here - 1] == 0 && maskF[here - 1] >= 0.5f)
-            {
-                label[here - 1] = id;
-                stack.push_back(here - 1);
-            }
-            if (hx + 1 < w && label[here + 1] == 0 && maskF[here + 1] >= 0.5f)
-            {
-                label[here + 1] = id;
-                stack.push_back(here + 1);
-            }
-            if (hy > 0 && label[here - w] == 0 && maskF[here - w] >= 0.5f)
-            {
-                label[here - w] = id;
-                stack.push_back(here - w);
-            }
-            if (hy + 1 < h && label[here + w] == 0 && maskF[here + w] >= 0.5f)
-            {
-                label[here + w] = id;
-                stack.push_back(here + w);
-            }
-        }
-    }
-}
-
 /** 掩膜生成（黑透白不透 + 去椒盐）：apply 与遮罩视图共用 */
 struct MatteData
 {
     int w = 0;
     int h = 0;
     int minX = 0, minY = 0, maxX = -1, maxY = -1; // maxY<0 = 无内容
-    std::vector<uint8_t> contentMask; // 原图内容（α≥16）
     std::vector<float> maskF;         // 掩膜（1=不透明白，0=透明黑/洞）
 
     bool valid() const { return maxX >= 0; }
@@ -350,7 +259,6 @@ MatteData buildMatte(const QImage& img, const int maskThreshold)
     m.h = img.height();
     if (m.w <= 0 || m.h <= 0)
         return m;
-    m.contentMask.assign(static_cast<size_t>(m.w) * m.h, 0);
     m.maskF.assign(static_cast<size_t>(m.w) * m.h, 0.0f);
     m.minX = m.w; m.minY = m.h; m.maxX = -1; m.maxY = -1;
 
@@ -364,7 +272,6 @@ MatteData buildMatte(const QImage& img, const int maskThreshold)
             const int a = qAlpha(px);
             if (a < ALPHA_MIN)
                 continue;
-            m.contentMask[row + x] = 1;
             const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
             const int gray = (299 * lift(qRed(px)) + 587 * lift(qGreen(px)) + 114 * lift(qBlue(px))) / 1000;
             if (gray >= maskThreshold)
@@ -404,7 +311,7 @@ double ramp4(const double t)
 
 /** 颜色分区（分区四色渐变用）：白区内按 Lab ΔE 4-连通泛洪（种子锚定——邻居与
     种子色比，防渐变图逐像素漂移串联），线稿/洞仍是墙。
-    每区统计：dmax=域内距离变换最大值（球冠半径）、dlMin/dlMax=到最近光源距离的
+    每区统计：dmax=域内距离变换最大值（球冠半径）、dlMin/dlMax=到主光距离的
     范围（方向渐变的归一化区间与沿光尺度 E）。label 0=洞/线稿，1..N=色块。 */
 struct ColorRegionStats
 {
@@ -414,7 +321,7 @@ struct ColorRegionStats
 };
 
 void labelColorRegions(const QImage& img, const MatteData& m, const std::vector<float>& dist,
-                       const std::vector<LightSetup>& lights, const double tolerance,
+                       const double lightX, const double lightY, const double tolerance,
                        const int w, const int h,
                        std::vector<int>& label, std::vector<ColorRegionStats>& stats)
 {
@@ -442,15 +349,10 @@ void labelColorRegions(const QImage& img, const MatteData& m, const std::vector<
     stats.push_back(ColorRegionStats{}); // 占位：label 0（洞/线稿）不用
     std::vector<int> stack;
 
-    const auto dlAt = [&lights](const double x, const double y) {
-        double dl = std::numeric_limits<double>::max();
-        for (const LightSetup& ls : lights)
-        {
-            const double ddx = x - ls.px;
-            const double ddy = y - ls.py;
-            dl = std::min(dl, std::sqrt(ddx * ddx + ddy * ddy));
-        }
-        return dl;
+    const auto dlAt = [lightX, lightY](const double x, const double y) {
+        const double ddx = x - lightX;
+        const double ddy = y - lightY;
+        return std::sqrt(ddx * ddx + ddy * ddy);
     };
 
     for (size_t seed = 0; seed < count; ++seed)
@@ -584,14 +486,11 @@ int apply(QImage& img, const AutoShadowParams& params)
         for (const auto& l : params.lights)
             lightList.push_back(l);
     const int maskThreshold = clampInt(params.maskThreshold, 1, 254);
-    const double gradientStrength = clampInt(params.gradientStrength, 0, 100) / 100.0;
     const double normalStrength = clampInt(params.normalStrength, 0, 100) / 100.0;
     const int formHeight = clampInt(params.formHeight, 1, 40);
     const float formRadiusF = static_cast<float>(clampInt(params.formRadius, 8, 2000));
     const int formSmooth = clampInt(params.formSmooth, 0, 40);
-    const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
-    const bool regionGradient = params.regionGradient;                    // 分区四色渐变（纯色块）
     const double regionTolD = clampInt(params.regionTolerance, 0, 100);  // 分区颜色容差（ΔE）
     const double domeWeight = clampInt(params.regionDomeWeight, 0, 100) / 100.0;
 
@@ -637,83 +536,25 @@ int apply(QImage& img, const AutoShadowParams& params)
         }
     }
 
-    // ── 场分量①：圆形渐变底场（白区内 到各光源距离按 r0/vmax 归一化 0..1，取各光源最近者）──
-    std::vector<float> gradF(count, 0.0f);
-    if (gradientStrength > 0.0)
-    {
-        std::vector<float> perLight(count, 0.0f);
-        bool any = false;
-        for (const LightSetup& ls : lights)
-        {
-            if (ls.w <= 0.0)
-                continue;
-            double minD2 = std::numeric_limits<double>::max();
-            double maxD2 = 0.0;
-            for (int y = minY; y <= maxY; ++y)
-            {
-                const size_t row = static_cast<size_t>(y) * w;
-                const double dy = y - ls.py;
-                for (int x = minX; x <= maxX; ++x)
-                {
-                    if (m.maskF[row + x] < 0.5f)
-                        continue;
-                    const double dx = x - ls.px;
-                    const double d2 = dx * dx + dy * dy;
-                    if (d2 < minD2)
-                        minD2 = d2;
-                    if (d2 > maxD2)
-                        maxD2 = d2;
-                }
-            }
-            if (maxD2 <= minD2)
-                continue;
-            const double r0 = std::sqrt(minD2);
-            const double norm = 1.0 / (std::sqrt(maxD2) - r0);
-            for (int y = minY; y <= maxY; ++y)
-            {
-                const size_t row = static_cast<size_t>(y) * w;
-                const double dy = y - ls.py;
-                for (int x = minX; x <= maxX; ++x)
-                {
-                    if (m.maskF[row + x] < 0.5f)
-                        continue;
-                    const double dx = x - ls.px;
-                    perLight[row + x] = static_cast<float>(std::max(0.0, (std::sqrt(dx * dx + dy * dy) - r0) * norm));
-                }
-            }
-            if (!any)
-            {
-                gradF = perLight; // 第一个有效光源直接铺底
-                any = true;
-            }
-            else
-            {
-                for (size_t i = 0; i < count; ++i)
-                    gradF[i] = std::min(gradF[i], perLight[i]); // 多光源：任一光照到即不受另一光的衰减
-            }
-        }
-    }
+    // 主光（光源 1）：分区渐变沿它定向；其余光源只补 N·L 照明（lights 恒非空，
+    // 全零强度时回退保留位置的光源——场值退化为全暗，不崩）
+    const LightSetup& primary = lights.front();
 
-    // ── 场分量②：SDF 伪法线 N·L（形体明暗交界线，主阴影场）──
-    // 距离变换经**连通域自适应球冠**（每域 D=域内 dmax 封顶 formRadius，z=√(2u−u²)·D）
-    // 当伪高度场——每个部件鼓成自己的球冠而非共用固定半径，线稿成谷 → 圆滑 →
-    // 球面法线 → 多光源照度。坡度只依赖 u=d/D（尺度不变），交界线横切任意大小部件。
-    // 照度 = Σ 强度i·max(0, N·L_i)——各光源互补照明，所有光都照不到的坡面才全暗。
+    // ── 高度场段：分区四色渐变（唯一路径）──
     std::vector<float> normalF(count, 0.0f); // 阴影深度 = 1−照度
     if (normalStrength > 0.0)
     {
         std::vector<float> height;
         distanceTransform(height, m.maskF, w, h);
-        if (regionGradient)
+        // 白区内按颜色 ΔE 泛洪分区，每区沿「到主光距离」在自身范围内归一化 t，
+        // 刷凹形四段折线渐变 ramp4(t)·E（E=区域沿光向尺度——斜率与色块大小无关，
+        // 尺度不变），与区内自适应球冠（z=√(2Dd−d²)，D=min(dmax,formRadius) 封顶
+        // 巨域）按圆顶混合配比：渐变斜面给沿光向的单向明暗（每块各自重起渐变，
+        // 交界线横跨每个色块而非整片鼓一个包），球冠补轮廓圆角与贴线暗带。
         {
-            // ── 分区四色渐变高度场（纯色块）：白区内按颜色 ΔE 泛洪分区，每区沿
-            // 「到最近光源距离」在自身范围内归一化 t，刷凹形四段折线渐变 ramp4(t)·E
-            // （E=区域沿光向尺度——斜率与区域大小无关，尺度不变），与连通域自适应
-            // 球冠按圆顶混合配比：渐变斜面给沿光向的单向明暗（分区各自重起渐变，
-            // 交界线横跨每个色块而非整片鼓一个包），球冠补轮廓圆角与贴线暗带。──
             std::vector<int> label;
             std::vector<ColorRegionStats> stats;
-            labelColorRegions(img, m, height, lights, regionTolD, w, h, label, stats);
+            labelColorRegions(img, m, height, primary.px, primary.py, regionTolD, w, h, label, stats);
             for (int y = minY; y <= maxY; ++y)
             {
                 const size_t row = static_cast<size_t>(y) * w;
@@ -731,13 +572,9 @@ int apply(QImage& img, const AutoShadowParams& params)
                     const float d = std::min(height[i], D);
                     const float dome = D <= 1.0f ? 0.0f
                                                 : std::sqrt(std::max(0.0f, 2.0f * D * d - d * d));
-                    double dl = std::numeric_limits<double>::max();
-                    for (const LightSetup& ls : lights)
-                    {
-                        const double ddx = x - ls.px;
-                        const double ddy = y - ls.py;
-                        dl = std::min(dl, std::sqrt(ddx * ddx + ddy * ddy));
-                    }
+                    const double ddx = x - primary.px;
+                    const double ddy = y - primary.py;
+                    const double dl = std::sqrt(ddx * ddx + ddy * ddy);
                     const double E = st.dlMax - st.dlMin; // 区域沿光向尺度（px）
                     const double t = E > 1e-3
                         ? std::min(1.0, std::max(0.0, (dl - st.dlMin) / E)) : 0.0;
@@ -745,32 +582,6 @@ int apply(QImage& img, const AutoShadowParams& params)
                                                    + domeWeight * dome);
                 }
             }
-        }
-        else
-        {
-        // 连通域自适应球冠（v11）：每域半径 D=min(域内 dmax, formRadius 上限)，
-        // z=√(2Dd−d²)（d≤D 封顶）。坡度 (1−u)/√(2u−u²)（u=d/D）与域大小无关——
-        // 尺度不变，部件再大交界线也横切整个部件（v10 固定半径在大部件上退化为
-        // 平顶均匀灰膜+贴线陡壁脏带）。formRadius 语义=部件最大半径上限：
-        // 背景大光晕等巨域按此封顶（丘顶平但与球冠相切连续，不出横切环）。
-        {
-            std::vector<int> label;
-            std::vector<float> dmax;
-            labelMaskRegions(m.maskF, height, w, h, label, dmax);
-            for (size_t i = 0; i < count; ++i)
-            {
-                const int id = label[i];
-                if (id == 0)
-                {
-                    height[i] = 0.0f;
-                    continue;
-                }
-                const float D = std::min(dmax[static_cast<size_t>(id)], formRadiusF);
-                const float d = std::min(height[i], D);
-                height[i] = D <= 1.0f ? 0.0f
-                                      : std::sqrt(std::max(0.0f, 2.0f * D * d - d * d));
-            }
-        }
         }
         {
             std::vector<float> tmp(count);
@@ -846,50 +657,7 @@ int apply(QImage& img, const AutoShadowParams& params)
             const QRgb px = line[x];
             const int alpha = qAlpha(px);
 
-            double field = gradientStrength * gradF[row + x] + normalStrength * normalF[row + x];
-
-            // 场分量③：径向遮挡——沿射向各光源采样掩膜，任一光路通畅即无遮挡
-            // （取受阻最轻者）：洞在所有光源的背光侧才投出遮挡阴影
-            if (occlusionRange > 0)
-            {
-                double minBlocked = 1.0;
-                for (const LightSetup& ls : lights)
-                {
-                    if (ls.w <= 0.0)
-                        continue;
-                    const double dx = x - ls.px;
-                    const double dy = y - ls.py;
-                    const double len = std::sqrt(dx * dx + dy * dy);
-                    if (len < 1.0)
-                    {
-                        minBlocked = 0.0; // 光源贴脸：无遮挡
-                        break;
-                    }
-                    const double ux = -dx / len; // 指向光源
-                    const double uy = -dy / len;
-                    double acc = 0.0;
-                    double weightSum = 0.0;
-                    for (int i = 0; i < OCCLUSION_SAMPLES; ++i)
-                    {
-                        const double t = static_cast<double>(i) / static_cast<double>(OCCLUSION_SAMPLES - 1);
-                        const double wgt = 1.0 - t; // tent：离本像素越远权重越低
-                        const double off = t * occlusionRange;
-                        const float cm = bilinearSampleU8(m.contentMask, w, h, x + ux * off, y + uy * off);
-                        if (cm <= 0.0f)
-                            continue; // 内容外不计入（空画布不挡光）
-                        acc += wgt * cm * bilinearSample(m.maskF, w, h, x + ux * off, y + uy * off);
-                        weightSum += wgt * cm;
-                    }
-                    const double blocked = weightSum > 1e-3 ? 1.0 - acc / weightSum : 0.0;
-                    if (blocked < minBlocked)
-                        minBlocked = blocked;
-                    if (minBlocked <= 0.0)
-                        break; // 已有通畅光路，再无遮挡
-                }
-                field += minBlocked;
-            }
-
-            const float F = static_cast<float>(std::min(1.0, std::max(0.0, field)) * 100.0);
+            const float F = static_cast<float>(std::min(1.0, std::max(0.0, normalStrength * normalF[row + x])) * 100.0);
 
             // 色阶权重 w0..w3（和恒为 1）：三条越界进度 s1/s2/s3 链式组合
             double s1, s2, s3;

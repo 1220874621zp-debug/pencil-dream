@@ -1,5 +1,4 @@
 /*
-
 Pencil2D - Traditional Animation Software
 Copyright (C) 2005-2007 Patrick Corrieri & Pascal Naidon
 Copyright (C) 2012-2020 Matthew Chiawen Chang
@@ -47,8 +46,8 @@ void fillRect(QImage& img, const int x0, const int y0, const int x1, const int y
     }
 }
 
-// 基线：顶光、只有圆形渐变底场（无遮挡/无法线），四阶全白正片叠底=无变化。
-// 用户调参默认（v12）与机制测试无关——这里钉住旧基线默认，场值断言不随默认漂移。
+// 基线：分区四色渐变高度场（圆顶混合 0=纯方向渐变）、顶光、全强度，
+// 四阶全白正片叠底=无变化。
 AutoShadowParams plainParams()
 {
     AutoShadowParams p;
@@ -59,15 +58,15 @@ AutoShadowParams plainParams()
     p.formHeight = 2;
     p.formRadius = 300;
     p.formSmooth = 6;
-    p.gradientStrength = 100;
-    p.normalStrength = 0;     // 纯渐变基线：关掉 SDF 伪法线场
-    p.occlusionStrength = 0;
+    p.normalStrength = 100;
+    p.regionTolerance = 26;
+    p.regionDomeWeight = 0;
     for (int i = 0; i < 4; ++i)
         p.levels[i] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
     return p;
 }
 
-// 竖白条 x[10,19] y[10,89]：顶光下渐变场 F≈100·(y-10)/79.0025（v4 同几何）
+// 竖白条 x[10,19] y[10,89]：单色区沿到顶光距离归一化，段1 陡坡迎光、段3 趋平
 QImage farLightImage()
 {
     QImage img = makeImage(30, 100);
@@ -96,134 +95,116 @@ TEST_CASE("AutoShadow-white-levels-noop")
     REQUIRE(AutoShadow::apply(img, plainParams()) == 0); // 四阶全白正片叠底=无变化
 }
 
-TEST_CASE("AutoShadow-gradient-bands")
+TEST_CASE("AutoShadow-region-gradient")
 {
-    // 只有圆形渐变：白条（掩膜=整条）顶光，F≈1.266·(y-10)，阈值[20,45,80]切带 y=26/46/74
-    QImage img = farLightImage();
+    // 分区四色渐变（核心机制）：两色块无缝相邻——无描边线、掩膜全连通。
+    // 按颜色切开（ΔE≈81 > 容差 20），每块沿光向各自重起四段折线渐变
+    // （近光段陡坡迎光、远段趋平），交界线横跨每个色块。
+    // 低仰角光（height=25≈14°）让三段斜率（×体积高度2：2.7/1.98/1.32）的 N·L
+    // 拉开场值差；光源伪高度须远在渐变场表面之上（掠射光会让表面顶过光源、
+    // 远侧 L 向量朝下而全黑）。圆顶混合 0（纯方向渐变）+ 细分阈值切带。
+    const auto grayRamp = [](AutoShadowParams& p) {
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+    };
+    const auto makeTwoBlocks = [] {
+        QImage img = makeImage(80, 40);
+        fillRect(img, 10, 10, 39, 29, qRgb(255, 150, 150)); // 左块：浅粉
+        fillRect(img, 40, 10, 69, 29, qRgb(150, 255, 150)); // 右块：浅绿（无缝相邻）
+        return img;
+    };
+
     AutoShadowParams p = plainParams();
-    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
+    p.formSmooth = 2;         // 折点轻圆化，采样点避开边界
+    p.lights[0].x = -50.0;    // 左侧远光（=主光，渐变沿它定向）
+    p.lights[0].y = 0.5;
+    p.lights[0].height = 25;  // 低仰角≈14°：平坦区照度低、三段坡照度阶梯拉开
+    p.thresholds[0] = 2;
+    p.thresholds[1] = 4;
+    p.thresholds[2] = 7;
+    p.regionTolerance = 20;
+    grayRamp(p);
+
+    QImage img = makeTwoBlocks();
+    REQUIRE(AutoShadow::apply(img, p) > 0);
+
+    // 采样点离色块交界与渐变折点均 ≥5px（formSmooth 模糊会跨边界/折点混高，
+    // 贴边采样的斜率被邻块渐变尾部污染）：段1 斜率 2.7 迎光=阶1 原色，段3
+    // 斜率 1.32 趋平=阶4——每块近光亮、远光暗。
+    REQUIRE(qGray(img.pixel(16, 20)) > qGray(img.pixel(34, 20)));   // 左块内渐变
+    REQUIRE(qGray(img.pixel(46, 20)) > qGray(img.pixel(64, 20)));   // 右块内渐变
+    REQUIRE(qGray(img.pixel(46, 20)) > qGray(img.pixel(34, 20)));   // 分区重起：右块近界亮于左块远端
+    REQUIRE(img.pixel(5, 20) == 0);                                 // 掩膜外透明像素不动
+    REQUIRE(qAlpha(img.pixel(34, 20)) == 255);                      // 乘性混合不动 α
+}
+
+TEST_CASE("AutoShadow-region-tolerance-merges")
+{
+    // 分区容差：容差 0=精确色匹配，近色（ΔE≈2）被切开成两块各自渐变；
+    // 容差拉到 30 后并回一块。以两块中缝（左块远端 vs 右块近端）亮度判别：
+    // 分开=右块近端重起迎光（亮），合并=左块远端连续变暗（暗）。
+    AutoShadowParams p = plainParams();
+    p.formSmooth = 2;
+    p.lights[0].x = -50.0;
+    p.lights[0].y = 0.5;
+    p.lights[0].height = 25;
+    p.thresholds[0] = 2;
+    p.thresholds[1] = 4;
+    p.thresholds[2] = 7;
+    p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
     p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
     p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
 
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // F≈12.7 阶1：受光
-    REQUIRE(img.pixel(15, 30) == qRgb(0, 0, 0));         // F≈25.3 阶2
-    REQUIRE(img.pixel(15, 60) == qRgb(128, 128, 128));   // F≈63.3 阶3
-    REQUIRE(img.pixel(15, 80) == qRgb(64, 64, 64));      // F≈88.6 阶4
-    REQUIRE(img.pixel(5, 60) == 0);                      // 掩膜外透明像素不动
-    REQUIRE(qAlpha(img.pixel(15, 80)) == 255);           // 乘性混合不动 α
+    const auto makeNearBlocks = [] {
+        QImage img = makeImage(80, 40);
+        fillRect(img, 10, 10, 39, 29, qRgb(255, 150, 150)); // 浅粉
+        fillRect(img, 40, 10, 69, 29, qRgb(250, 158, 156)); // 近似粉（ΔE 小）
+        return img;
+    };
+
+    p.regionTolerance = 0;   // 精确匹配：切开
+    QImage split = makeNearBlocks();
+    REQUIRE(AutoShadow::apply(split, p) > 0);
+    REQUIRE(qGray(split.pixel(46, 20)) > qGray(split.pixel(34, 20))); // 右块重起迎光
+
+    p.regionTolerance = 30;  // 近色并入：一块连续渐变
+    QImage merged = makeNearBlocks();
+    REQUIRE(AutoShadow::apply(merged, p) > 0);
+    REQUIRE(qGray(merged.pixel(46, 20)) < qGray(merged.pixel(20, 20))); // 整条单调：中缝已深处
 }
 
 TEST_CASE("AutoShadow-matte-gates-display")
 {
-    // 黑透白不透显示阴影：黑区（洞）完全不动，白区照常上阴影
+    // 黑透白不透显示阴影：黑区（洞）完全不动，白区照常上阴影（分区渐变场）
     QImage img = makeImage(60, 100);
     fillRect(img, 10, 10, 39, 89, qRgb(255, 255, 255));
     fillRect(img, 40, 10, 49, 89, qRgb(0, 0, 0));        // 深色区成洞
 
     AutoShadowParams p = plainParams();
+    p.formSmooth = 2;
     p.lights[0].x = -50.0;                               // 左侧远光
     p.lights[0].y = 0.5;
+    p.lights[0].height = 25;
+    p.thresholds[0] = 2;
+    p.thresholds[1] = 4;
+    p.thresholds[2] = 7;
     p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(12, 50) == qRgb(255, 255, 255));   // 白区近光：受光
-    REQUIRE(img.pixel(35, 50) == qRgb(0, 0, 0));         // 白区远光：阶4黑
+    REQUIRE(img.pixel(12, 50) == qRgb(255, 255, 255));   // 近光段1：迎光=阶1
+    REQUIRE(img.pixel(33, 50) == qRgb(0, 0, 0));         // 远光段3：趋平=阶4
     REQUIRE(img.pixel(45, 50) == qRgb(0, 0, 0));         // 洞（黑区）：完全不动，保持原黑
-}
-
-TEST_CASE("AutoShadow-normal-terminator")
-{
-    // 只有 SDF 伪法线 N·L（主阴影场）：宽条 x[10,49]，左侧远光（约 45° 仰角）——
-    // 条按自身 dmax=20 鼓成球冠（连通域自适应 v11），左坡迎光亮、右坡背光暗。
-    // 场值实测 y=50：x=14→4、20~23→0（迎光坡）、28→19、29→27、31→45、35→87、37+→100
-    // ——交界带横切全条（单调渐变），不再只贴脊部三像素。
-    QImage img = makeImage(60, 100);
-    fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
-
-    AutoShadowParams p = plainParams();
-    p.gradientStrength = 0;
-    p.normalStrength = 100;
-    p.lights[0].height = 100;
-    p.lights[0].x = -50.0;   // 左侧远光
-    p.lights[0].y = 0.5;
-    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
-    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(14, 50) == qRgb(255, 255, 255));   // 左坡：迎光=阶1
-    REQUIRE(img.pixel(28, 50) == qRgb(255, 255, 255));   // 交界线前：F≈19=阶1
-    REQUIRE(img.pixel(29, 50) == qRgb(0, 0, 0));         // 交界线：F≈27=阶2
-    REQUIRE(img.pixel(30, 50) == qRgb(0, 0, 0));         // F≈35=阶2
-    REQUIRE(img.pixel(31, 50) == qRgb(128, 128, 128));   // F≈45=阶3
-    REQUIRE(img.pixel(35, 50) == qRgb(64, 64, 64));      // F≈87=阶4（背光深处）
-    REQUIRE(img.pixel(45, 50) == qRgb(64, 64, 64));      // 右坡深处：F=100=阶4
-    REQUIRE(img.pixel(5, 50) == 0);                      // 掩膜外透明像素不动
-    REQUIRE(qAlpha(img.pixel(45, 50)) == 255);           // 乘性混合不动 α
-}
-
-TEST_CASE("AutoShadow-normal-square-dome")
-{
-    // 大方形 x[5,54]（50px 域，dmax=25），左中光——连通域自适应：大域同样全程鼓丘
-    // （v11 前固定小半径会在大部件内部退化成平顶台地+贴线脏带）。
-    // 场值实测 (8,30)→6（左缘，阶1）、(30,30)→34（丘顶，阶2）、(30,8)→74（上缘，阶4）
-    QImage img = makeImage(60, 60);
-    fillRect(img, 5, 5, 54, 54, qRgb(255, 255, 255));
-
-    AutoShadowParams p = plainParams();
-    p.gradientStrength = 0;
-    p.normalStrength = 100;
-    p.lights[0].height = 100;
-    p.lights[0].x = -50.0;
-    p.lights[0].y = 0.5;     // 光在左中：中部像素 ly≈0
-    p.thresholds[0] = 20;
-    p.thresholds[1] = 50;
-    p.thresholds[2] = 70;
-    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
-    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(8, 30) == qRgb(255, 255, 255));    // 左缘坡：迎光=阶1（F≈6）
-    REQUIRE(img.pixel(30, 30) == qRgb(0, 0, 0));         // 丘顶：F≈34=阶2
-    REQUIRE(img.pixel(30, 8) == qRgb(64, 64, 64));       // 上缘坡：背光=阶4（F≈74）
-}
-
-TEST_CASE("AutoShadow-normal-groove")
-{
-    // 贴线阴影：两白条夹一条透明山谷（x=40 线稿槽），左侧远光——
-    // 左条整条成丘，右坡背光；山谷左壁暗带渐弱入谷；山谷右壁受光较亮但未到阶1。
-    // 场值实测 y=20：x=13→0、27→38、36→43、38→37、42→23、65→90
-    QImage img = makeImage(80, 40);
-    fillRect(img, 10, 10, 39, 29, qRgb(255, 255, 255));
-    fillRect(img, 41, 10, 69, 29, qRgb(255, 255, 255));  // x=40 留空=山谷
-
-    AutoShadowParams p = plainParams();
-    p.gradientStrength = 0;
-    p.normalStrength = 100;
-    p.lights[0].height = 100;
-    p.lights[0].x = -50.0;
-    p.lights[0].y = 0.5;
-    p.levels[1] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
-    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));   // 左条外缘坡：迎光=阶1
-    REQUIRE(img.pixel(27, 20) == qRgb(0, 0, 0));         // 左条右坡：F≈38=阶2
-    REQUIRE(img.pixel(36, 20) == qRgb(0, 0, 0));         // 山谷左壁：F≈43=阶2（贴线暗带）
-    REQUIRE(img.pixel(38, 20) == qRgb(0, 0, 0));         // 近谷底：F≈37=阶2（渐弱入谷）
-    REQUIRE(img.pixel(40, 20) == 0);                     // 山谷线稿：门控不动
-    REQUIRE(img.pixel(42, 20) == qRgb(0, 0, 0));         // 山谷右壁：F≈23=阶2（全谷最亮壁）
-    REQUIRE(img.pixel(65, 20) == qRgb(64, 64, 64));      // 右条外缘坡：F≈90=阶4
 }
 
 TEST_CASE("AutoShadow-multi-light-opposite")
 {
-    // 多光源互补照明：宽条 x[10,49]，左右各一盏对称远光（45° 仰角）——
-    // 单左光时右坡 F=100 全暗；加右光后照度=Σ max(0,N·L) 只增不减，
-    // 右坡被右光照亮（灰阶变浅）、丘顶照度饱和仍全亮。灰阶单色带保证场值→灰度单调。
+    // 多光源互补照明（圆顶分量）：宽条 x[10,49]，左右各一盏对称远光（45° 仰角）。
+    // 方向渐变恒沿主光（光源 1）定向，纯斜面（圆顶 0）背光侧辅光照不到；
+    // 圆顶混合 100 时坡面法线放射、辅光可照——单左光时右坡 F=100 全暗，
+    // 加右光后照度=Σ max(0,N·L) 只增不减，右坡被照亮、丘顶照度饱和仍全亮。
+    // 灰阶单色带保证场值→灰度单调。
     const auto grayRamp = [](AutoShadowParams& p) {
         p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
         p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
@@ -234,8 +215,7 @@ TEST_CASE("AutoShadow-multi-light-opposite")
     fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
 
     AutoShadowParams single = plainParams();
-    single.gradientStrength = 0;
-    single.normalStrength = 100;
+    single.regionDomeWeight = 100;   // 纯球冠：坡面放射法线对辅光最敏感
     single.lights[0].height = 100;
     single.lights[0].x = -50.0;
     single.lights[0].y = 0.5;
@@ -266,8 +246,6 @@ TEST_CASE("AutoShadow-light-intensity-off")
     fillRect(img, 10, 10, 49, 89, qRgb(255, 255, 255));
 
     AutoShadowParams p = plainParams();
-    p.gradientStrength = 0;
-    p.normalStrength = 100;
     p.lights[0].height = 100;
     p.lights[0].x = -50.0;
     p.lights[0].y = 0.5;
@@ -285,10 +263,15 @@ TEST_CASE("AutoShadow-light-intensity-off")
 
 TEST_CASE("AutoShadow-hatch-pattern")
 {
-    // 排线输出（漫画网点）：纯渐变场 F≈1.266·(y-10)，135° 斜线、间距 4（线宽≈1.33）——
-    // 阶3/4 区（F>45）线上=黑、线隙=透出原白；t=0.7071·(y−x) 对 4 取模 <1.33 为线上
+    // 排线输出（漫画网点）：竖白条顶光分区渐变场（段3 F≈9=阶4，段1 F≈0.7=阶1），
+    // 135° 斜线、间距 4（线宽≈1.33）——t=0.7071·(y−x) 对 4 取模 <1.33 为线上
     QImage img = farLightImage();
     AutoShadowParams p = plainParams();
+    p.formSmooth = 0;   // 10px 窄条禁模糊：σ2 磨圆窄脊使法线外翻、稀释竖直照度
+    p.lights[0].height = 25;   // 低仰角拉开场值
+    p.thresholds[0] = 2;
+    p.thresholds[1] = 4;
+    p.thresholds[2] = 7;
     p.hatch = true;
     p.hatchAngle = 135;
     p.hatchSpacing = 4;
@@ -297,111 +280,33 @@ TEST_CASE("AutoShadow-hatch-pattern")
     p.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    // y=60（F≈63=阶3）：x=13 → t=1.234 在线上=黑；x=15 → t=3.820 线隙=原白
-    REQUIRE(img.pixel(13, 60) == qRgb(0, 0, 0));
-    REQUIRE(img.pixel(15, 60) == qRgb(255, 255, 255));
-    // y=80（F≈89=阶4）：x=12 → t=0.083 在线上=黑；x=10 → t=1.497 线隙=原白
+    // y=80（F≈9=阶4）：x=12 → t=0.7071·68=48.08 对 4 取模 0.08 在线上=黑；
+    // x=15 → 45.96 取模 1.96 线隙=透出原白
     REQUIRE(img.pixel(12, 80) == qRgb(0, 0, 0));
-    REQUIRE(img.pixel(10, 80) == qRgb(255, 255, 255));
-    // 受光区 y=20（F≈13=阶1 白正片叠底）：排线不可见，保持原色
+    REQUIRE(img.pixel(15, 80) == qRgb(255, 255, 255));
+    // 受光区 y=20（F≈0.7<2=阶1 白正片叠底）：排线不可见，保持原色
     REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));
-}
-
-TEST_CASE("AutoShadow-region-gradient")
-{
-    // 分区四色渐变（纯色块）：两色块无缝相邻——无描边线、掩膜全连通。
-    // SDF 球冠模式方向盲：整片鼓一个丘，丘顶平坦处低仰角下照度低。
-    // 分区模式按颜色切开（ΔE≈81 > 容差 20），每块沿光向各自重起四段折线渐变
-    // （近光段陡坡迎光、远段趋平），交界线横跨每个色块。
-    // 低仰角光（height=25≈14°）让三段斜率（×体积高度2：2.7/1.98/1.32）的 N·L
-    // 拉开场值差；光源伪高度须远在渐变场表面之上（掠射光会让表面顶过光源、
-    // 远侧 L 向量朝下而全黑）。圆顶混合 0（纯方向渐变）+ 细分阈值切带。
-    const auto grayRamp = [](AutoShadowParams& p) {
-        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
-        p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
-        p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-        p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
-    };
-    const auto makeTwoBlocks = [] {
-        QImage img = makeImage(80, 40);
-        fillRect(img, 10, 10, 39, 29, qRgb(255, 150, 150)); // 左块：浅粉
-        fillRect(img, 40, 10, 69, 29, qRgb(150, 255, 150)); // 右块：浅绿（无缝相邻）
-        return img;
-    };
-
-    AutoShadowParams base = plainParams();
-    base.gradientStrength = 0;
-    base.normalStrength = 100;
-    base.formSmooth = 2;         // 折点轻圆化，采样点避开边界
-    base.lights[0].x = -50.0;    // 左侧远光
-    base.lights[0].y = 0.5;
-    base.lights[0].height = 25;  // 低仰角≈14°：平坦区照度低、三段坡照度阶梯拉开
-    base.thresholds[0] = 2;
-    base.thresholds[1] = 4;
-    base.thresholds[2] = 7;
-    grayRamp(base);
-
-    QImage sdf = makeTwoBlocks();
-    REQUIRE(AutoShadow::apply(sdf, base) > 0);
-
-    AutoShadowParams region = base;
-    region.regionGradient = true;
-    region.regionTolerance = 20;
-    region.regionDomeWeight = 0; // 纯方向渐变，断言最干净
-    QImage reg = makeTwoBlocks();
-    REQUIRE(AutoShadow::apply(reg, region) > 0);
-
-    // 采样点离色块交界与渐变折点均 ≥5px（formSmooth 模糊会跨边界/折点混高，
-    // 贴边采样的斜率被邻块渐变尾部污染）：段1 斜率 2.7 迎光=阶1 原色，段3
-    // 斜率 1.32 趋平=阶4——每块近光亮、远光暗。
-    REQUIRE(qGray(reg.pixel(16, 20)) > qGray(reg.pixel(34, 20)));
-    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(reg.pixel(64, 20)));
-    // 分区重置：右块近界处比左块远端亮——SDF 单调鼓丘没有这个每块重起
-    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(reg.pixel(34, 20)));
-    // 同一像素对比 SDF：丘顶平坦处照度低（阶4），分区模式此处重起迎光坡显著亮
-    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(sdf.pixel(46, 20)));
-    // 掩膜外透明像素不动
-    REQUIRE(reg.pixel(5, 20) == 0);
-    REQUIRE(qAlpha(reg.pixel(34, 20)) == 255); // 乘性混合不动 α
-}
-
-TEST_CASE("AutoShadow-radial-occlusion")
-{
-    // 只有径向遮挡：白区 x[10,69]，洞 x[25,29]，左侧光——
-    // 洞背光侧（x=30/33）光路被洞挡 → 遮挡阴影；洞迎光侧（x=15）与远处（x=45）不受影响
-    QImage img = makeImage(80, 40);
-    fillRect(img, 10, 10, 69, 29, qRgb(255, 255, 255));
-    fillRect(img, 25, 10, 29, 29, qRgb(0, 0, 0));        // 洞（深色区）
-
-    AutoShadowParams p = plainParams();
-    p.gradientStrength = 0;
-    p.occlusionStrength = 10;                            // 采样半径 10px
-    p.levels[1] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.levels[3] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
-    p.lights[0].x = -50.0;
-    p.lights[0].y = 0.5;
-
-    REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 20) == qRgb(255, 255, 255));   // 迎光侧：射向光源全是白区
-    REQUIRE(img.pixel(45, 20) == qRgb(255, 255, 255));   // 远处：采样不经过洞
-    REQUIRE(img.pixel(33, 20) == qRgb(128, 128, 128));   // 洞背光侧：光路被挡 F≈33
-    REQUIRE(img.pixel(30, 20) == qRgb(128, 128, 128));   // 更贴近洞 F≈49
-    REQUIRE(img.pixel(27, 20) == qRgb(0, 0, 0));         // 洞内：门控，完全不动
 }
 
 TEST_CASE("AutoShadow-invert-level-order")
 {
     // 只把阶1 设为黑、反转 → 黑色带被镜像到最深阴影区；受光区吃原阶4白=不变
+    // （低仰角+细分阈值：受光段2 F≈3=反转后阶2白、远端段3 F≈9=反转后阶4黑）
     QImage img = farLightImage();
     AutoShadowParams p = plainParams();
+    p.formSmooth = 0;   // 10px 窄条禁模糊：σ2 磨圆窄脊使法线外翻、稀释竖直照度
+    p.lights[0].height = 25;
+    p.thresholds[0] = 2;
+    p.thresholds[1] = 4;
+    p.thresholds[2] = 7;
     p.levels[0] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply };
     p.invertLevels = true;
 
     REQUIRE(AutoShadow::apply(img, p) > 0);
-    REQUIRE(img.pixel(15, 50) == qRgb(255, 255, 255));   // 受光区吃原阶4白→不变
+    REQUIRE(img.pixel(15, 50) == qRgb(255, 255, 255));   // 受光区吃白阶→不变
     REQUIRE(img.pixel(15, 80) == qRgb(0, 0, 0));         // 远端吃镜像后的阶4=原阶1黑
 }
+
 
 TEST_CASE("AutoShadow-despeckle-mask")
 {
@@ -456,6 +361,11 @@ TEST_CASE("AutoShadow-blend-modes-and-opacity")
 
     QImage whiteBar = farLightImage();
     AutoShadowParams q = plainParams();
+    q.formSmooth = 2;
+    q.lights[0].height = 25;   // 低仰角：远端段3 场值≈8 落阶4
+    q.thresholds[0] = 2;
+    q.thresholds[1] = 4;
+    q.thresholds[2] = 7;
     q.levels[3] = { qRgb(0, 0, 0), AutoShadowBlendMode::Multiply, 40 };
     REQUIRE(AutoShadow::apply(whiteBar, q) > 0);
     REQUIRE(whiteBar.pixel(15, 80) == qRgb(153, 153, 153));     // 不透明度40%：1+0.4(0−1)=0.6
