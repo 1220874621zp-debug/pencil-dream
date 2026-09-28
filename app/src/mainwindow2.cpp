@@ -97,7 +97,6 @@ GNU General Public License for more details.
 #include "addtransparencytopaperdialog.h"
 #include "colortoalphadialog.h"
 #include "layersplitdialog.h"
-#include "autoshadowdialog.h"
 #include "repositionframesdialog.h"
 
 #include "errordialog.h"
@@ -643,14 +642,6 @@ void MainWindow2::createMenus()
         if (dialog.exec() != QDialog::Accepted)
             return;
         mCommands->splitLayerByColor(dialog.params(), dialog.applyToAllKeyFrames());
-    });
-    QAction* autoShadowAction = filterMenu->addAction(tr("自动上阴影..."));
-    autoShadowAction->setStatusTip(tr("SDF伪法线卡渲自动叠阴影：去色阈值黑透白不透成掩膜，距离变换当伪高度场（色块成丘/线稿成谷），高度场法线与光源 N·L 出横切形体的明暗交界线+贴线阴影，径向遮挡补洞后暗带，色阶映射上色（可选漫画排线输出），预览框点/拖定位光源+遮罩视图，可批量整层处理"));
-    connect(autoShadowAction, &QAction::triggered, this, [this] {
-        AutoShadowDialog dialog(mEditor, this);
-        if (dialog.exec() != QDialog::Accepted)
-            return;
-        mCommands->applyAutoShadow(dialog.params(), dialog.applyToAllKeyFrames());
     });
     ui->menuBar->insertMenu(mWorkspaceMenu->menuAction(), filterMenu);
 
