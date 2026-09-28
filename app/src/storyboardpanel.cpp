@@ -10,13 +10,11 @@
 */
 #include "storyboardpanel.h"
 
-#include <QClipboard>
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
-#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -443,7 +441,6 @@ void StoryboardView::rebuildShots()
             shot.hasDialog = !anchor->storyboardDialog().isEmpty();
             shot.hasNotes = !anchor->storyboardNotes().isEmpty();
             shot.shotType = sbShotTypeIndex(anchor->storyboardShotType());
-            shot.hasPrompt = !anchor->storyboardPrompt().isEmpty();
         }
 
         // 运镜角标：镜头帧范围内相机关键帧 > 1
@@ -834,7 +831,7 @@ void StoryboardView::drawCard(QPainter& painter, int shotIndex, const QRect& rec
     painter.drawText(nameRect, Qt::AlignVCenter | Qt::AlignLeft,
                      QFontMetrics(nameFont).elidedText(shot.name, Qt::ElideRight, nameRect.width()));
 
-    // 信息区第二行：景别签（景别色）+ 注释标记（动/对/备/AI，仅非空字段）
+    // 信息区第二行：景别签（景别色）+ 注释标记（动/对/备，仅非空字段）
     painter.setFont(smallFont);
     int chipX = rect.left() + 10;
     const int chipY = nameRect.bottom() + 3;
@@ -854,7 +851,6 @@ void StoryboardView::drawCard(QPainter& painter, int shotIndex, const QRect& rec
         { shot.hasAction, tr("动"), QColor(0x46, 0xA7, 0x58) },
         { shot.hasDialog, tr("对"), QColor(0x00, 0x90, 0xFF) },
         { shot.hasNotes,  tr("备"), QColor(0xF7, 0x6B, 0x15) },
-        { shot.hasPrompt, tr("AI"), QColor(0xA7, 0x8B, 0xFA) },
     };
     for (const auto& chip : chips)
     {
@@ -1219,15 +1215,11 @@ void StoryboardView::showEditDialog(int shotIndex)
     QPlainTextEdit* notesEdit = new QPlainTextEdit(anchor->storyboardNotes(), &dialog);
     notesEdit->setPlaceholderText(tr("备注（镜头衔接/音效/提示等）"));
     notesEdit->setFixedHeight(72);
-    QPlainTextEdit* promptEdit = new QPlainTextEdit(anchor->storyboardPrompt(), &dialog);
-    promptEdit->setPlaceholderText(tr("AI 生图提示词（卡片右键可复制）"));
-    promptEdit->setFixedHeight(72);
     form->addRow(tr("镜头名称："), nameEdit);
     form->addRow(tr("景别："), typeCombo);
     form->addRow(tr("动作："), actionEdit);
     form->addRow(tr("对白："), dialogEdit);
     form->addRow(tr("备注："), notesEdit);
-    form->addRow(tr("提示词："), promptEdit);
 
     QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1254,7 +1246,6 @@ void StoryboardView::showEditDialog(int shotIndex)
     const int typeIndex = typeCombo->currentIndex() - 1;
     anchor->setStoryboardShotType(typeIndex >= 0 ? QString::fromLatin1(SB_SHOT_TYPES[typeIndex].code)
                                                  : QString());
-    anchor->setStoryboardPrompt(promptEdit->toPlainText().trimmed());
     mEditor->object()->modification();
     emit mEditor->updateTimeLine();
 }
@@ -1271,11 +1262,6 @@ void StoryboardView::contextMenuEvent(QContextMenuEvent* event)
     menu.addSeparator();
     QAction* editAction = menu.addAction(tr("编辑注释…"));
     QAction* renameAction = menu.addAction(tr("重命名…"));
-    QAction* copyPromptAction = nullptr;
-    if (shot.hasPrompt)
-    {
-        copyPromptAction = menu.addAction(tr("复制提示词"));
-    }
     menu.addSeparator();
     QAction* visibleAction = menu.addAction(shot.visible ? tr("隐藏镜头") : tr("显示镜头"));
     QMenu* typeMenu = menu.addMenu(tr("景别"));
@@ -1318,14 +1304,6 @@ void StoryboardView::contextMenuEvent(QContextMenuEvent* event)
     if (chosen == playAction) { playFromShot(index); }
     else if (chosen == editAction) { showEditDialog(index); }
     else if (chosen == renameAction) { showRenameDialog(index); }
-    else if (chosen == copyPromptAction)
-    {
-        Layer* anchor = mEditor->object()->findLayerById(shot.anchorLayerId);
-        if (anchor != nullptr)
-        {
-            QGuiApplication::clipboard()->setText(anchor->storyboardPrompt());
-        }
-    }
     else if (chosen == visibleAction) { toggleShotVisible(index); }
     else if (chosen == noType) { applyShotType(index, -1); }
     else if (chosen == noColor) { applyShotColor(index, -1); }

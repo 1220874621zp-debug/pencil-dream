@@ -40,7 +40,6 @@ struct StoryboardShot
     bool hasDialog = false;
     bool hasNotes = false;
     int shotType = -1;        // 景别索引 0-6（-1 = 未设置；代号存锚点层 sbShotType）
-    bool hasPrompt = false;   // AI 提示词非空（锚点层 sbPrompt）
     bool cameraMoves = false; // 镜头帧范围内相机关键帧 > 1
 };
 
