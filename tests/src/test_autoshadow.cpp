@@ -307,6 +307,64 @@ TEST_CASE("AutoShadow-hatch-pattern")
     REQUIRE(img.pixel(13, 20) == qRgb(255, 255, 255));
 }
 
+TEST_CASE("AutoShadow-region-gradient")
+{
+    // 分区四色渐变（纯色块）：两色块无缝相邻——无描边线、掩膜全连通。
+    // SDF 球冠模式方向盲：整片鼓一个丘，丘顶平坦处低仰角下照度低。
+    // 分区模式按颜色切开（ΔE≈81 > 容差 20），每块沿光向各自重起四段折线渐变
+    // （近光段陡坡迎光、远段趋平），交界线横跨每个色块。
+    // 低仰角光（height=25≈14°）让三段斜率（×体积高度2：2.7/1.98/1.32）的 N·L
+    // 拉开场值差；光源伪高度须远在渐变场表面之上（掠射光会让表面顶过光源、
+    // 远侧 L 向量朝下而全黑）。圆顶混合 0（纯方向渐变）+ 细分阈值切带。
+    const auto grayRamp = [](AutoShadowParams& p) {
+        p.levels[0] = { qRgb(255, 255, 255), AutoShadowBlendMode::Multiply };
+        p.levels[1] = { qRgb(200, 200, 200), AutoShadowBlendMode::Multiply };
+        p.levels[2] = { qRgb(128, 128, 128), AutoShadowBlendMode::Multiply };
+        p.levels[3] = { qRgb(64, 64, 64), AutoShadowBlendMode::Multiply };
+    };
+    const auto makeTwoBlocks = [] {
+        QImage img = makeImage(80, 40);
+        fillRect(img, 10, 10, 39, 29, qRgb(255, 150, 150)); // 左块：浅粉
+        fillRect(img, 40, 10, 69, 29, qRgb(150, 255, 150)); // 右块：浅绿（无缝相邻）
+        return img;
+    };
+
+    AutoShadowParams base = plainParams();
+    base.gradientStrength = 0;
+    base.normalStrength = 100;
+    base.formSmooth = 2;         // 折点轻圆化，采样点避开边界
+    base.lights[0].x = -50.0;    // 左侧远光
+    base.lights[0].y = 0.5;
+    base.lights[0].height = 25;  // 低仰角≈14°：平坦区照度低、三段坡照度阶梯拉开
+    base.thresholds[0] = 2;
+    base.thresholds[1] = 4;
+    base.thresholds[2] = 7;
+    grayRamp(base);
+
+    QImage sdf = makeTwoBlocks();
+    REQUIRE(AutoShadow::apply(sdf, base) > 0);
+
+    AutoShadowParams region = base;
+    region.regionGradient = true;
+    region.regionTolerance = 20;
+    region.regionDomeWeight = 0; // 纯方向渐变，断言最干净
+    QImage reg = makeTwoBlocks();
+    REQUIRE(AutoShadow::apply(reg, region) > 0);
+
+    // 采样点离色块交界与渐变折点均 ≥5px（formSmooth 模糊会跨边界/折点混高，
+    // 贴边采样的斜率被邻块渐变尾部污染）：段1 斜率 2.7 迎光=阶1 原色，段3
+    // 斜率 1.32 趋平=阶4——每块近光亮、远光暗。
+    REQUIRE(qGray(reg.pixel(16, 20)) > qGray(reg.pixel(34, 20)));
+    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(reg.pixel(64, 20)));
+    // 分区重置：右块近界处比左块远端亮——SDF 单调鼓丘没有这个每块重起
+    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(reg.pixel(34, 20)));
+    // 同一像素对比 SDF：丘顶平坦处照度低（阶4），分区模式此处重起迎光坡显著亮
+    REQUIRE(qGray(reg.pixel(46, 20)) > qGray(sdf.pixel(46, 20)));
+    // 掩膜外透明像素不动
+    REQUIRE(reg.pixel(5, 20) == 0);
+    REQUIRE(qAlpha(reg.pixel(34, 20)) == 255); // 乘性混合不动 α
+}
+
 TEST_CASE("AutoShadow-radial-occlusion")
 {
     // 只有径向遮挡：白区 x[10,69]，洞 x[25,29]，左侧光——

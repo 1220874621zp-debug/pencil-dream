@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 #include "autoshadow.h"
 
+#include "colordistance.h"
+
 #include <QImage>
 #include <QtMath>
 
@@ -269,6 +271,13 @@ void despeckleMask(std::vector<float>& mask, const int w, const int h, const int
     }
 }
 
+/** 光源像素坐标 + 伪空间 z（以 max(对角线, 光到内容距离) 为基的仰角比例——
+    100≈45°仰角，越大越顶光；光放得越远仰角不塌）+ 归一化强度 */
+struct LightSetup
+{
+    double px = 0.0, py = 0.0, z = 1.0, w = 1.0;
+};
+
 /** 白区连通域标记（4-连通，线稿为界——对角不漏）：label 0=洞，1..N=白域；
     dmax[i]=第 i 域内距离变换最大值（该部件的内切半径，当球冠半径用）。 */
 void labelMaskRegions(const std::vector<float>& maskF, const std::vector<float>& dist,
@@ -374,6 +383,119 @@ MatteData buildMatte(const QImage& img, const int maskThreshold)
     return m;
 }
 
+/** 分区四色渐变的四段折线标定（凹形）：t=沿光向归一化位置（0=最近光），高度 0→1。
+    段斜率 1.35/0.99/0.66——近光侧陡（迎光面亮）、远侧趋平（远端暗由球冠/底场补）；
+    折线斜率分段恒定 → N·L 出分带卡渲阶，formSmooth 模糊会圆化折点。 */
+double ramp4(const double t)
+{
+    constexpr double ts[4] = { 0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0 };
+    constexpr double vs[4] = { 0.0, 0.45, 0.78, 1.0 };
+    const double tt = std::min(1.0, std::max(0.0, t));
+    for (int i = 0; i < 3; ++i)
+    {
+        if (tt <= ts[i + 1] || i == 2)
+        {
+            const double u = (tt - ts[i]) / (ts[i + 1] - ts[i]);
+            return vs[i] + std::min(1.0, std::max(0.0, u)) * (vs[i + 1] - vs[i]);
+        }
+    }
+    return 1.0;
+}
+
+/** 颜色分区（分区四色渐变用）：白区内按 Lab ΔE 4-连通泛洪（种子锚定——邻居与
+    种子色比，防渐变图逐像素漂移串联），线稿/洞仍是墙。
+    每区统计：dmax=域内距离变换最大值（球冠半径）、dlMin/dlMax=到最近光源距离的
+    范围（方向渐变的归一化区间与沿光尺度 E）。label 0=洞/线稿，1..N=色块。 */
+struct ColorRegionStats
+{
+    float dmax = 0.0f;
+    double dlMin = std::numeric_limits<double>::max();
+    double dlMax = 0.0;
+};
+
+void labelColorRegions(const QImage& img, const MatteData& m, const std::vector<float>& dist,
+                       const std::vector<LightSetup>& lights, const double tolerance,
+                       const int w, const int h,
+                       std::vector<int>& label, std::vector<ColorRegionStats>& stats)
+{
+    const size_t count = static_cast<size_t>(w) * h;
+
+    // 预计算内容像素的 Lab（直通色，与 buildMatte 同解预乘）
+    std::vector<ColorDistance::LabF> lab(count);
+    for (int y = 0; y < h; ++y)
+    {
+        const auto* line = reinterpret_cast<const QRgb*>(img.scanLine(y));
+        const size_t row = static_cast<size_t>(y) * w;
+        for (int x = 0; x < w; ++x)
+        {
+            const QRgb px = line[x];
+            const int a = qAlpha(px);
+            if (a < ALPHA_MIN)
+                continue;
+            const auto lift = [a](const int premul) { return std::min(255, (premul * 255 + a / 2) / a); };
+            lab[row + x] = ColorDistance::rgbToLab(lift(qRed(px)), lift(qGreen(px)), lift(qBlue(px)));
+        }
+    }
+
+    label.assign(count, 0);
+    stats.clear();
+    stats.push_back(ColorRegionStats{}); // 占位：label 0（洞/线稿）不用
+    std::vector<int> stack;
+
+    const auto dlAt = [&lights](const double x, const double y) {
+        double dl = std::numeric_limits<double>::max();
+        for (const LightSetup& ls : lights)
+        {
+            const double ddx = x - ls.px;
+            const double ddy = y - ls.py;
+            dl = std::min(dl, std::sqrt(ddx * ddx + ddy * ddy));
+        }
+        return dl;
+    };
+
+    for (size_t seed = 0; seed < count; ++seed)
+    {
+        if (label[seed] != 0 || m.maskF[seed] < 0.5f)
+            continue;
+        const int id = static_cast<int>(stats.size());
+        stats.push_back(ColorRegionStats{});
+        const ColorDistance::LabF seedLab = lab[seed];
+        stack.clear();
+        stack.push_back(static_cast<int>(seed));
+        label[seed] = id;
+        while (!stack.empty())
+        {
+            const int here = stack.back();
+            stack.pop_back();
+            const int hy = here / w;
+            const int hx = here % w;
+            ColorRegionStats& st = stats[static_cast<size_t>(id)];
+            const float d = dist[static_cast<size_t>(here)];
+            if (d > st.dmax)
+                st.dmax = d;
+            const double dl = dlAt(hx, hy);
+            if (dl < st.dlMin)
+                st.dlMin = dl;
+            if (dl > st.dlMax)
+                st.dlMax = dl;
+            const int nbx[4] = { hx - 1, hx + 1, hx, hx };
+            const int nby[4] = { hy, hy, hy - 1, hy + 1 };
+            for (int k = 0; k < 4; ++k)
+            {
+                if (nbx[k] < 0 || nbx[k] >= w || nby[k] < 0 || nby[k] >= h)
+                    continue;
+                const size_t nb = static_cast<size_t>(nby[k]) * w + nbx[k];
+                if (label[nb] != 0 || m.maskF[nb] < 0.5f)
+                    continue;
+                if (ColorDistance::deltaE(lab[nb], seedLab) > tolerance)
+                    continue;
+                label[nb] = id;
+                stack.push_back(static_cast<int>(nb));
+            }
+        }
+    }
+}
+
 /** 单通道混合（PS/AE 语义）：直通域按模式计算 → 按不透明度回混原色 → 重预乘。
     返回预乘分量（0..α，浮点，外层统一加权后再取整）。 */
 double blendChannel(const int premul, const int alpha, const int s, const AutoShadowBlendMode mode, const double opacity)
@@ -469,6 +591,9 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int formSmooth = clampInt(params.formSmooth, 0, 40);
     const int occlusionRange = clampInt(params.occlusionStrength, 0, 100);
     const float feather = std::max(0.0f, static_cast<float>(params.edgeFeather));
+    const bool regionGradient = params.regionGradient;                    // 分区四色渐变（纯色块）
+    const double regionTolD = clampInt(params.regionTolerance, 0, 100);  // 分区颜色容差（ΔE）
+    const double domeWeight = clampInt(params.regionDomeWeight, 0, 100) / 100.0;
 
     // 色带（反转=镜像）
     AutoShadowLevel levels[4];
@@ -482,12 +607,7 @@ int apply(QImage& img, const AutoShadowParams& params)
     const int minX = m.minX, minY = m.minY, maxX = m.maxX, maxY = m.maxY;
     const size_t count = m.maskF.size();
 
-    // 各光源像素坐标 + 伪空间 z（以 max(对角线, 光到内容距离) 为基的仰角比例——
-    // 100≈45°仰角，越大越顶光；光放得越远仰角不塌）+ 归一化强度
-    struct LightSetup
-    {
-        double px = 0.0, py = 0.0, z = 1.0, w = 1.0;
-    };
+    // 各光源像素坐标 + 归一化强度（LightSetup 见上）
     std::vector<LightSetup> lights;
     {
         const double cx = (minX + maxX) * 0.5;
@@ -584,6 +704,50 @@ int apply(QImage& img, const AutoShadowParams& params)
     {
         std::vector<float> height;
         distanceTransform(height, m.maskF, w, h);
+        if (regionGradient)
+        {
+            // ── 分区四色渐变高度场（纯色块）：白区内按颜色 ΔE 泛洪分区，每区沿
+            // 「到最近光源距离」在自身范围内归一化 t，刷凹形四段折线渐变 ramp4(t)·E
+            // （E=区域沿光向尺度——斜率与区域大小无关，尺度不变），与连通域自适应
+            // 球冠按圆顶混合配比：渐变斜面给沿光向的单向明暗（分区各自重起渐变，
+            // 交界线横跨每个色块而非整片鼓一个包），球冠补轮廓圆角与贴线暗带。──
+            std::vector<int> label;
+            std::vector<ColorRegionStats> stats;
+            labelColorRegions(img, m, height, lights, regionTolD, w, h, label, stats);
+            for (int y = minY; y <= maxY; ++y)
+            {
+                const size_t row = static_cast<size_t>(y) * w;
+                for (int x = minX; x <= maxX; ++x)
+                {
+                    const size_t i = row + x;
+                    const int id = label[i];
+                    if (id == 0 || m.maskF[i] < 0.5f)
+                    {
+                        height[i] = 0.0f;
+                        continue;
+                    }
+                    const ColorRegionStats& st = stats[static_cast<size_t>(id)];
+                    const float D = std::min(st.dmax, formRadiusF);
+                    const float d = std::min(height[i], D);
+                    const float dome = D <= 1.0f ? 0.0f
+                                                : std::sqrt(std::max(0.0f, 2.0f * D * d - d * d));
+                    double dl = std::numeric_limits<double>::max();
+                    for (const LightSetup& ls : lights)
+                    {
+                        const double ddx = x - ls.px;
+                        const double ddy = y - ls.py;
+                        dl = std::min(dl, std::sqrt(ddx * ddx + ddy * ddy));
+                    }
+                    const double E = st.dlMax - st.dlMin; // 区域沿光向尺度（px）
+                    const double t = E > 1e-3
+                        ? std::min(1.0, std::max(0.0, (dl - st.dlMin) / E)) : 0.0;
+                    height[i] = static_cast<float>((1.0 - domeWeight) * ramp4(t) * E
+                                                   + domeWeight * dome);
+                }
+            }
+        }
+        else
+        {
         // 连通域自适应球冠（v11）：每域半径 D=min(域内 dmax, formRadius 上限)，
         // z=√(2Dd−d²)（d≤D 封顶）。坡度 (1−u)/√(2u−u²)（u=d/D）与域大小无关——
         // 尺度不变，部件再大交界线也横切整个部件（v10 固定半径在大部件上退化为
@@ -606,6 +770,7 @@ int apply(QImage& img, const AutoShadowParams& params)
                 height[i] = D <= 1.0f ? 0.0f
                                       : std::sqrt(std::max(0.0f, 2.0f * D * d - d * d));
             }
+        }
         }
         {
             std::vector<float> tmp(count);

@@ -325,10 +325,13 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
     presetRow->addWidget(mPresetCombo, 0, 1);
     mParamColumn->addLayout(presetRow);
 
-    // ── 光源列表（CSP 光源设置语义）：下拉选中编辑对象，可增删 ──
+    // ── 光源组（CSP 光源设置语义）：下拉选中编辑对象，可增删 ──
+    auto* lightBox = new QGroupBox(tr("光源"), this);
+    auto* lightLayout = new QVBoxLayout(lightBox);
+    lightLayout->setSpacing(2);
     auto* lightRow = new QHBoxLayout;
     lightRow->setContentsMargins(0, 0, 0, 0);
-    mLightCombo = new QComboBox(this);
+    mLightCombo = new QComboBox(lightBox);
     mLightCombo->setToolTip(tr("当前编辑的光源。滑杆与预览框拖拽都作用于它；点击预览框里其他光源的编号标记可切换。"));
     connect(mLightCombo, &QComboBox::activated, this, [this](const int index) {
         mCurrentLight = index;
@@ -336,7 +339,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         renderPreview(); // 立即刷新标记高亮
     });
     lightRow->addWidget(mLightCombo, 1);
-    mAddLightButton = new QPushButton(tr("＋添加光源"), this);
+    mAddLightButton = new QPushButton(tr("＋添加光源"), lightBox);
     mAddLightButton->setAutoDefault(false);
     mAddLightButton->setToolTip(tr("再加一盏光源：多光源互补照明（照度=Σ 强度·max(0,N·L)），所有光都照不到的坡面才全暗——双光可做双侧轮廓光。"));
     connect(mAddLightButton, &QPushButton::clicked, this, [this] {
@@ -350,7 +353,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         schedulePreview();
     });
     lightRow->addWidget(mAddLightButton);
-    mRemoveLightButton = new QPushButton(tr("－删除光源"), this);
+    mRemoveLightButton = new QPushButton(tr("－删除光源"), lightBox);
     mRemoveLightButton->setAutoDefault(false);
     connect(mRemoveLightButton, &QPushButton::clicked, this, [this] {
         if (mLights.size() <= 1)
@@ -362,12 +365,12 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         schedulePreview();
     });
     lightRow->addWidget(mRemoveLightButton);
-    mParamColumn->addLayout(lightRow);
+    lightLayout->addLayout(lightRow);
 
-    // ── 场生成段参数：选中光源（预览框点/拖定位）+ 黑透白不透掩膜 + 体积法线/渐变/遮挡 ──
+    // ── 光源参数：选中光源（预览框点/拖定位）──
     QDoubleSpinBox* lightXSpin = nullptr;
     QSlider* lightXSlider = nullptr;
-    addSliderRow(tr("光源 X："), -100, 200, 32,
+    addSliderRowTo(lightLayout, tr("光源 X："), -100, 200, 32,
         tr("当前光源的水平位置（画面宽度的百分比，0=左缘 100=右缘，可拉出画面放远光）。也可直接在预览框里点击/拖拽定位。"),
         tr("%"), lightXSpin, lightXSlider);
     mLightXSpin = lightXSpin;
@@ -379,7 +382,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* lightYSpin = nullptr;
     QSlider* lightYSlider = nullptr;
-    addSliderRow(tr("光源 Y："), -100, 200, 38,
+    addSliderRowTo(lightLayout, tr("光源 Y："), -100, 200, 38,
         tr("当前光源的垂直位置（画面高度的百分比，0=上缘 100=下缘；负值=画面上方光源）。"),
         tr("%"), lightYSpin, lightYSlider);
     mLightYSpin = lightYSpin;
@@ -391,7 +394,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* lightHeightSpin = nullptr;
     QSlider* lightHeightSlider = nullptr;
-    addSliderRow(tr("光源高度："), 0, 300, 218,
+    addSliderRowTo(lightLayout, tr("光源高度："), 0, 300, 218,
         tr("当前光源离画面的仰角高度（%）：100≈45° 斜射，越大越顶光（明暗交界线下移、受光面变大），越小越平射（阴影越多）。光源拉远时仰角不塌。"),
         tr("%"), lightHeightSpin, lightHeightSlider);
     mLightHeightSpin = lightHeightSpin;
@@ -403,7 +406,7 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
 
     QDoubleSpinBox* lightIntensitySpin = nullptr;
     QSlider* lightIntensitySlider = nullptr;
-    addSliderRow(tr("光源强度："), 0, 100, 100,
+    addSliderRowTo(lightLayout, tr("光源强度："), 0, 100, 100,
         tr("当前光源的强度（%）：多光源按强度加权叠加照明；0=关闭该光源（只剩其余光源照明）。"),
         tr("%"), lightIntensitySpin, lightIntensitySlider);
     mLightIntensitySpin = lightIntensitySpin;
@@ -412,79 +415,133 @@ AutoShadowDialog::AutoShadowDialog(Editor* editor, QWidget* parent)
         if (mCurrentLight < mLights.size())
             mLights[mCurrentLight].intensity = qRound(value);
     });
+    mParamColumn->addWidget(lightBox);
 
-    QDoubleSpinBox* thresholdSpin = nullptr;
-    QSlider* thresholdSlider = nullptr;
-    addSliderRow(tr("去色阈值："), 1, 254, 238,
-        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的山谷，形体阴影沿山谷两侧生长。"),
-        QString(), thresholdSpin, thresholdSlider);
-    mThresholdSpin = thresholdSpin;
+    // ── 形体阴影组（法线场）：法线来源 + 体积强度 + 各来源参数 + 圆滑度 ──
+    auto* formBox = new QGroupBox(tr("形体阴影（法线场）"), this);
+    auto* formLayout = new QVBoxLayout(formBox);
+    formLayout->setSpacing(2);
+
+    auto* sourceRow = new QGridLayout;
+    sourceRow->setHorizontalSpacing(8);
+    sourceRow->setContentsMargins(0, 0, 0, 0);
+    auto* sourceLabel = new QLabel(tr("法线来源："), formBox);
+    sourceRow->addWidget(sourceLabel, 0, 0);
+    mFormSourceCombo = new QComboBox(formBox);
+    mFormSourceCombo->addItem(tr("SDF 球冠（沿轮廓鼓包）"));
+    mFormSourceCombo->addItem(tr("分区四色渐变（纯色块）"));
+    mFormSourceCombo->setToolTip(tr("形体伪高度场的来源。\n"
+        "SDF 球冠：掩膜连通域各鼓一个球冠（描线稿适用——线稿是丘间山谷）。\n"
+        "分区四色渐变：先按颜色把白区分成色块，每块沿光向刷四段渐变当高度场（纯色块/扁平图适用——"
+        "纯色图掩膜全连通，球冠方向盲、整片鼓一个包；分区渐变才能横跨每个色块切出体积交界线）。"));
+    connect(mFormSourceCombo, &QComboBox::currentIndexChanged, this, [this](const int) {
+        syncFormModeEnabled();
+        schedulePreview();
+    });
+    sourceRow->addWidget(mFormSourceCombo, 0, 1);
+    formLayout->addLayout(sourceRow);
 
     QDoubleSpinBox* normalSpin = nullptr;
     QSlider* normalSlider = nullptr;
-    addSliderRow(tr("体积强度："), 0, 100, 11,
-        tr("SDF 伪法线 N·L 形体阴影（0..100，主阴影场）：掩膜距离变换当伪高度场——每个色块是一座圆润小丘、线稿是山谷，表面朝向决定明暗——脸颊出弧形交界线、发缕各自分块、贴线阴影自动成立。"),
+    addSliderRowTo(formLayout, tr("体积强度："), 0, 100, 11,
+        tr("形体法线 N·L 阴影（0..100，主阴影场）：伪高度场表面朝向决定明暗——交界线横切部件、贴线阴影自动成立。"),
         QString(), normalSpin, normalSlider);
     mNormalSpin = normalSpin;
 
+    QDoubleSpinBox* regionToleranceSpin = nullptr;
+    QSlider* regionToleranceSlider = nullptr;
+    addSliderRowTo(formLayout, tr("分区容差："), 0, 100, 26,
+        tr("分区颜色容差（Lab ΔE）：白区内色差≤容差的像素并入同一色块（种子锚定，防渐变漂移）。纯色稿默认即可；带压缩噪点/轻渐变的图适当调大。仅在「分区四色渐变」来源下有效。"),
+        QString(), regionToleranceSpin, regionToleranceSlider);
+    mRegionToleranceSpin = regionToleranceSpin;
+    mRegionToleranceSlider = regionToleranceSlider;
+
+    QDoubleSpinBox* regionDomeSpin = nullptr;
+    QSlider* regionDomeSlider = nullptr;
+    addSliderRowTo(formLayout, tr("圆顶混合："), 0, 100, 35,
+        tr("分区高度场里方向渐变与球冠的配比：0=纯方向渐变（斜面感、单向明暗），100=纯球冠（枕头感、轮廓圆角），中间值渐变切交界线+球冠补圆角，通常最自然。仅在「分区四色渐变」来源下有效。"),
+        tr("%"), regionDomeSpin, regionDomeSlider);
+    mRegionDomeSpin = regionDomeSpin;
+    mRegionDomeSlider = regionDomeSlider;
+
     QDoubleSpinBox* formHeightSpin = nullptr;
     QSlider* formHeightSlider = nullptr;
-    addSliderRow(tr("体积高度："), 1, 40, 1,
-        tr("伪高度场的斜率放大（倍）：球冠坡度已自带 ≥1，调大主要加深贴线谷壁的暗带，调小交界过渡更宽更柔。"),
+    addSliderRowTo(formLayout, tr("体积高度："), 1, 40, 1,
+        tr("伪高度场的斜率放大（倍）：坡度已自带 ≥1，调大主要加深贴线谷壁的暗带，调小交界过渡更宽更柔。"),
         QString(), formHeightSpin, formHeightSlider);
     mFormHeightSpin = formHeightSpin;
 
     QDoubleSpinBox* formRadiusSpin = nullptr;
     QSlider* formRadiusSlider = nullptr;
-    addSliderRow(tr("部件最大半径："), 8, 2000, 2000,
+    addSliderRowTo(formLayout, tr("部件最大半径："), 8, 2000, 2000,
         tr("每个色块按自身大小自动鼓成球冠（交界线横切任意大小的部件，无需手调）；此值只封顶过大的连通域（如背景大光晕），防止巨域被横切出一条明暗线。"),
         tr(" px"), formRadiusSpin, formRadiusSlider);
     mFormRadiusSpin = formRadiusSpin;
 
     QDoubleSpinBox* formSmoothSpin = nullptr;
     QSlider* formSmoothSlider = nullptr;
-    addSliderRow(tr("形体圆滑度："), 0, 40, 40,
-        tr("伪高度场的高斯模糊半径（px）：越大丘顶越圆、交界线越弧；过小会出棱角感。"),
+    addSliderRowTo(formLayout, tr("形体圆滑度："), 0, 40, 40,
+        tr("伪高度场的高斯模糊半径（px）：越大丘顶越圆、交界线越弧、渐变折点越柔；过小会出棱角感。"),
         tr(" px"), formSmoothSpin, formSmoothSlider);
     mFormSmoothSpin = formSmoothSpin;
+    mParamColumn->addWidget(formBox);
+    syncFormModeEnabled(); // SDF 模式下分区参数灰显常驻（防排版跳动）
+
+    // ── 掩膜与底场组：黑透白不透门控 + 渐变底场 + 遮挡 ──
+    auto* baseBox = new QGroupBox(tr("掩膜与底场"), this);
+    auto* baseLayout = new QVBoxLayout(baseBox);
+    baseLayout->setSpacing(2);
+
+    QDoubleSpinBox* thresholdSpin = nullptr;
+    QSlider* thresholdSlider = nullptr;
+    addSliderRowTo(baseLayout, tr("去色阈值："), 1, 254, 238,
+        tr("黑透白不透：图像去色后灰度≥该值为不透明白（受光填色面），低于为透明黑——线稿与深色区成为掩膜上的山谷，形体阴影沿山谷两侧生长。"),
+        QString(), thresholdSpin, thresholdSlider);
+    mThresholdSpin = thresholdSpin;
 
     QDoubleSpinBox* gradientSpin = nullptr;
     QSlider* gradientSlider = nullptr;
-    addSliderRow(tr("渐变强度："), 0, 100, 47,
+    addSliderRowTo(baseLayout, tr("渐变强度："), 0, 100, 47,
         tr("圆形渐变底场（0..100）：离光源越远整体越暗——叠加在形体阴影上的全局衰减，CSP 同款底感。"),
         QString(), gradientSpin, gradientSlider);
     mGradientSpin = gradientSpin;
 
     QDoubleSpinBox* occlusionSpin = nullptr;
     QSlider* occlusionSlider = nullptr;
-    addSliderRow(tr("遮挡强度："), 0, 100, 84,
+    addSliderRowTo(baseLayout, tr("遮挡强度："), 0, 100, 84,
         tr("径向遮挡（像素半径）：沿射向光源采样掩膜，线稿洞/前层挡在光路上时其背光侧投出遮挡阴影——洞在体积场里是山谷，这里再补「投影」式的洞后暗带。"),
         tr(" px"), occlusionSpin, occlusionSlider);
     mOcclusionSpin = occlusionSpin;
+    mParamColumn->addWidget(baseBox);
 
-    QSlider* featherSlider = nullptr;
-    addSliderRow(tr("边缘羽化："), 0, 50, 0,
-        tr("色调分离模式下色阶边界的过渡带宽（场值单位）：0=硬边赛璐璐，越大越软。平滑阴影模式下无效。"),
-        QString(), mFeatherSpin, featherSlider);
-    mFeatherSlider = featherSlider;
+    // ── 输出组（CSP 色调设置）：类型 + 羽化 + 反转 ──
+    auto* outBox = new QGroupBox(tr("输出"), this);
+    auto* outLayout = new QVBoxLayout(outBox);
+    outLayout->setSpacing(2);
 
-    // ── 映射段参数（CSP 色调设置）──
     auto* typeRow = new QGridLayout;
     typeRow->setHorizontalSpacing(8);
     typeRow->setContentsMargins(0, 0, 0, 0);
-    auto* typeLabel = new QLabel(tr("阴影类型："), this);
+    auto* typeLabel = new QLabel(tr("阴影类型："), outBox);
     typeRow->addWidget(typeLabel, 0, 0);
-    mTypeCombo = new QComboBox(this);
+    mTypeCombo = new QComboBox(outBox);
     mTypeCombo->addItem(tr("色调分离阴影"));
     mTypeCombo->addItem(tr("平滑阴影"));
     mTypeCombo->setToolTip(tr("色调分离=按阈值切分硬边色阶（赛璐璐）；平滑=色带连续渐变映射。"));
     typeRow->addWidget(mTypeCombo, 0, 1);
-    mParamColumn->addLayout(typeRow);
+    outLayout->addLayout(typeRow);
 
-    mInvertCheck = new QCheckBox(tr("反转应用色阶的顺序"), this);
+    QSlider* featherSlider = nullptr;
+    addSliderRowTo(outLayout, tr("边缘羽化："), 0, 50, 0,
+        tr("色调分离模式下色阶边界的过渡带宽（场值单位）：0=硬边赛璐璐，越大越软。平滑阴影模式下无效。"),
+        QString(), mFeatherSpin, featherSlider);
+    mFeatherSlider = featherSlider;
+
+    mInvertCheck = new QCheckBox(tr("反转应用色阶的顺序"), outBox);
     mInvertCheck->setToolTip(tr("色带 1↔4 镜像：光源换到另一侧时无需重调四组颜色。"));
     connect(mInvertCheck, &QCheckBox::toggled, this, [this] { schedulePreview(); });
-    mParamColumn->addWidget(mInvertCheck);
+    outLayout->addWidget(mInvertCheck);
+    mParamColumn->addWidget(outBox);
 
     // 排线输出（漫画网点）：色阶改为固定角度斜线图案，线隙透出原图
     auto* hatchBox = new QGroupBox(tr("排线输出（漫画网点）"), this);
@@ -641,6 +698,9 @@ AutoShadowParams AutoShadowDialog::params() const
     p.formHeight = qRound(mFormHeightSpin->value());
     p.formRadius = qRound(mFormRadiusSpin->value());
     p.formSmooth = qRound(mFormSmoothSpin->value());
+    p.regionGradient = mFormSourceCombo != nullptr && mFormSourceCombo->currentIndex() == 1;
+    p.regionTolerance = qRound(mRegionToleranceSpin->value());
+    p.regionDomeWeight = qRound(mRegionDomeSpin->value());
     p.occlusionStrength = qRound(mOcclusionSpin->value());
     for (int i = 0; i < 3; ++i)
         p.thresholds[i] = mLevelsBar->thresholds(i);
@@ -790,6 +850,22 @@ void AutoShadowDialog::syncHatchEnabled()
     {
         mHatchSpacingSpin->setEnabled(on);
         mHatchSpacingSlider->setEnabled(on);
+    }
+}
+
+void AutoShadowDialog::syncFormModeEnabled()
+{
+    // 分区四色渐变来源才需要分区参数；SDF 模式灰显常驻（防排版跳动）
+    const bool region = mFormSourceCombo != nullptr && mFormSourceCombo->currentIndex() == 1;
+    if (mRegionToleranceSpin != nullptr)
+    {
+        mRegionToleranceSpin->setEnabled(region);
+        mRegionToleranceSlider->setEnabled(region);
+    }
+    if (mRegionDomeSpin != nullptr)
+    {
+        mRegionDomeSpin->setEnabled(region);
+        mRegionDomeSlider->setEnabled(region);
     }
 }
 
