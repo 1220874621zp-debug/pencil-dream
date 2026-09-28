@@ -420,6 +420,7 @@ void TimeLineCells::showCameraMenu(QPoint pos)
  *  盖印在时间指针处执行，与右键点中的帧格位置无关 */
 void TimeLineCells::showTrackFrameMenu(QPoint pos)
 {
+    qDebug() << "[stamp] 帧格右键菜单（轨道）";
     QMenu menu(this);
     QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
 
@@ -464,6 +465,7 @@ void TimeLineCells::showInstanceMenu(QPoint pos)
 
     if (chosen == stampVisibleAction)
     {
+        qDebug() << "[stamp] 实例菜单选择盖印";
         Q_EMIT stampVisibleRequested();
         return;
     }
@@ -3039,10 +3041,14 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
         }
         break;
     case TIMELINE_CELL_TYPE::Tracks:
-        // 组头行轨道区：仅换当前帧（不选层、不可编辑帧）
+        // 组头行轨道区：左键仅换当前帧（不选层、不可编辑帧）；右键给帧格菜单
         if (headerGroupIdAt(event->pos()) >= 0)
         {
-            if (event->button() == Qt::LeftButton || event->button() == Qt::RightButton)
+            if (event->button() == Qt::RightButton)
+            {
+                showTrackFrameMenu(event->pos());
+            }
+            else if (event->button() == Qt::LeftButton)
             {
                 const int fn = getFrameNumber(event->pos().x());
                 if (fn >= 1) { mEditor->scrubTo(fn); }
@@ -3108,6 +3114,12 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
 
             if (frameNumber == mEditor->currentFrame() && mStartY < mOffsetY)
             {
+                if (event->button() == Qt::RightButton)
+                {
+                    // 顶部帧号标尺右键：同一份帧格菜单（盖印在时间指针处执行）
+                    showTrackFrameMenu(event->pos());
+                    break;
+                }
                 if (mEditor->playback()->isPlaying())
                 {
                     mEditor->playback()->stop();
@@ -3183,8 +3195,8 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         // ... or we show the frame context menu, if it is the right button
                         if (event->button() == Qt::RightButton)
                         {
-                            // 相机层维持键格菜单（缓动等）；其余层给帧格菜单（盖印等）
-                            if (currentLayer->type() == Layer::CAMERA)
+                            // 相机键格维持相机菜单（缓动等）；其余（含相机空格）给帧格菜单
+                            if (currentLayer->type() == Layer::CAMERA && currentLayer->keyExists(frameNumber))
                             {
                                 showCameraMenu(event->pos());
                             }
@@ -3209,7 +3221,7 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         // If selected they can also be interpolated
                         if (event->button() == Qt::RightButton)
                         {
-                            if (currentLayer->type() == Layer::CAMERA)
+                            if (currentLayer->type() == Layer::CAMERA && currentLayer->keyExists(frameNumber))
                             {
                                 showCameraMenu(event->pos());
                             }
@@ -3239,6 +3251,12 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 {
                     if (frameNumber > 0)
                     {
+                        if (event->button() == Qt::RightButton)
+                        {
+                            // 标尺（非当前帧列）右键：同一份帧格菜单
+                            showTrackFrameMenu(event->pos());
+                            break;
+                        }
                         if (mEditor->playback()->isPlaying())
                         {
                             mEditor->playback()->stop();
