@@ -986,6 +986,18 @@ QDomElement Layer::createBaseDomElement(QDomDocument& doc) const
     {
         layerTag.setAttribute("loopMode", static_cast<int>(mLoopMode));
     }
+    if (!mStoryboardAction.isEmpty())
+    {
+        layerTag.setAttribute("sbAction", mStoryboardAction);
+    }
+    if (!mStoryboardDialog.isEmpty())
+    {
+        layerTag.setAttribute("sbDialog", mStoryboardDialog);
+    }
+    if (!mStoryboardNotes.isEmpty())
+    {
+        layerTag.setAttribute("sbNotes", mStoryboardNotes);
+    }
     return layerTag;
 }
 
@@ -1005,4 +1017,7 @@ void Layer::loadBaseDomElement(const QDomElement& elem)
     mColorIndex = elem.attribute("colorIndex", "-1").toInt();
     mGroupId = elem.attribute("group", "-1").toInt();
     mLoopMode = static_cast<LoopMode>(qBound(0, elem.attribute("loopMode", "0").toInt(), 2));
+    mStoryboardAction = elem.attribute("sbAction", "");
+    mStoryboardDialog = elem.attribute("sbDialog", "");
+    mStoryboardNotes = elem.attribute("sbNotes", "");
 }

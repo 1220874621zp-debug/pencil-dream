@@ -80,6 +80,7 @@ GNU General Public License for more details.
 #include "brushpresetpanel.h"
 #include "referencecardpanel.h"
 #include "exposuresheetpanel.h"
+#include "storyboardpanel.h"
 #include "builtinworkspaces.h"
 #include "scriptmanager.h"
 #include "tooloptionwidget.h"
@@ -268,6 +269,9 @@ void MainWindow2::createDockWidgets()
     mExposureSheetPanel = new ExposureSheetPanel(this);
     mExposureSheetPanel->setObjectName("ExposureSheet");
 
+    mStoryboardPanel = new StoryboardPanel(this);
+    mStoryboardPanel->setObjectName("Storyboard");
+
     mToolOptions = new ToolOptionWidget(this);
     mToolOptions->setObjectName("ToolOption");
 
@@ -283,6 +287,7 @@ void MainWindow2::createDockWidgets()
         << mOnionSkinWidget
         << mReferenceCardPanel
         << mExposureSheetPanel
+        << mStoryboardPanel
         << mToolOptions
         << mToolBox;
 
@@ -321,6 +326,9 @@ void MainWindow2::createDockWidgets()
     // 摄影表（律表）：默认停靠右侧隐藏，窗口菜单勾选打开
     addDockWidget(Qt::RightDockWidgetArea, mExposureSheetPanel);
     mExposureSheetPanel->hide();
+    // 分镜面板：TVP式镜头卡墙，默认停靠右侧隐藏，窗口菜单勾选打开
+    addDockWidget(Qt::RightDockWidgetArea, mStoryboardPanel);
+    mStoryboardPanel->hide();
     setDockNestingEnabled(true);
     // give the timeline a generous share of the window height
     resizeDocks({ mTimeLine }, { 340 }, Qt::Vertical);
@@ -580,7 +588,8 @@ void MainWindow2::createMenus()
         mColorInspector->toggleViewAction(),
         mOnionSkinWidget->toggleViewAction(),
         mReferenceCardPanel->toggleViewAction(),
-        mExposureSheetPanel->toggleViewAction()
+        mExposureSheetPanel->toggleViewAction(),
+        mStoryboardPanel->toggleViewAction()
     };
 
     for (QAction* action : actions)

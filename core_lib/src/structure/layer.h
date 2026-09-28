@@ -81,6 +81,15 @@ public:
     int colorIndex() const { return mColorIndex; }
     void setColorIndex(int colorIndex) { mColorIndex = colorIndex; }
 
+    /** 分镜注释三字段（TVP Action/Dialog/Notes）：存于图层（组镜头挂首成员层），
+     *  随工程 XML 持久化；修改不入撤销栈（与 TVP 语义一致） */
+    QString storyboardAction() const { return mStoryboardAction; }
+    void setStoryboardAction(const QString& text) { mStoryboardAction = text; }
+    QString storyboardDialog() const { return mStoryboardDialog; }
+    void setStoryboardDialog(const QString& text) { mStoryboardDialog = text; }
+    QString storyboardNotes() const { return mStoryboardNotes; }
+    void setStoryboardNotes(const QString& text) { mStoryboardNotes = text; }
+
     /** 所属图层组（-1 = 不在组；声音/相机层恒不进组，由操作入口保证） */
     int groupId() const { return mGroupId; }
     void setGroupId(int groupId) { mGroupId = groupId; }
@@ -298,6 +307,9 @@ private:
     QString    mName;
     int        mColorIndex = -1;
     int        mGroupId = -1;
+    QString    mStoryboardAction;
+    QString    mStoryboardDialog;
+    QString    mStoryboardNotes;
 
     std::map<int, KeyFrame*, std::greater<int>> mKeyFrames;
 

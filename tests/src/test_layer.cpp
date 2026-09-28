@@ -776,3 +776,38 @@ TEST_CASE("Layer loopMode DOM round-trip", "[Layer]")
     plain.loadDomElement(elem, "", []() {});
     REQUIRE(plain.loopMode() == Layer::LoopMode::None);
 }
+
+TEST_CASE("Layer storyboard annotations DOM round-trip", "[Layer]")
+{
+    Object obj;
+    LayerBitmap* layer = obj.addNewBitmapLayer();
+    layer->setStoryboardAction(QStringLiteral("角色入画，从左向右走"));
+    layer->setStoryboardDialog(QStringLiteral("你好！"));
+    layer->setStoryboardNotes(QStringLiteral("接上镜，音效：脚步"));
+
+    QDomDocument doc;
+    QDomElement elem = layer->createDomElement(doc);
+    REQUIRE(elem.attribute("sbAction") == QStringLiteral("角色入画，从左向右走"));
+    REQUIRE(elem.attribute("sbDialog") == QStringLiteral("你好！"));
+    REQUIRE(elem.attribute("sbNotes") == QStringLiteral("接上镜，音效：脚步"));
+
+    LayerBitmap restored(2);
+    restored.loadDomElement(elem, "", []() {});
+    REQUIRE(restored.storyboardAction() == QStringLiteral("角色入画，从左向右走"));
+    REQUIRE(restored.storyboardDialog() == QStringLiteral("你好！"));
+    REQUIRE(restored.storyboardNotes() == QStringLiteral("接上镜，音效：脚步"));
+
+    // 空字段不写属性；旧工程（无三属性）加载为空串
+    LayerBitmap fresh(4);
+    layer->setStoryboardAction("");
+    layer->setStoryboardDialog("");
+    layer->setStoryboardNotes("");
+    QDomElement emptyElem = layer->createDomElement(doc);
+    REQUIRE(emptyElem.attribute("sbAction").isEmpty());
+    REQUIRE(emptyElem.attribute("sbDialog").isEmpty());
+    REQUIRE(emptyElem.attribute("sbNotes").isEmpty());
+    fresh.loadDomElement(emptyElem, "", []() {});
+    REQUIRE(fresh.storyboardAction().isEmpty());
+    REQUIRE(fresh.storyboardDialog().isEmpty());
+    REQUIRE(fresh.storyboardNotes().isEmpty());
+}

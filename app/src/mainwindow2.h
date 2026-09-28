@@ -42,6 +42,7 @@ class ColorInspector;
 class BrushPresetPanel;
 class ReferenceCardPanel;
 class ExposureSheetPanel;
+class StoryboardPanel;
 class RecentFileMenu;
 class ScriptManager;
 class ActionCommands;
@@ -219,6 +220,7 @@ private:
     OnionSkinWidget*      mOnionSkinWidget = nullptr;
     ReferenceCardPanel*   mReferenceCardPanel = nullptr;
     ExposureSheetPanel*   mExposureSheetPanel = nullptr;
+    StoryboardPanel*      mStoryboardPanel = nullptr;
     QToolBar*             mMainToolbar = nullptr;
     QToolBar*             mViewToolbar = nullptr;
     QToolBar*             mOverlayToolbar = nullptr;

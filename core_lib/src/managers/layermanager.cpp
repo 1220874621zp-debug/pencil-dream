@@ -808,3 +808,62 @@ bool LayerManager::moveLayerGroup(int groupId, int toIndex)
     finishGroupOp(this, editor(), orderBefore, before, tr("移动图层组"));
     return ok;
 }
+
+bool LayerManager::reorderLayerRange(int fromIndex, int count, int toIndex)
+{
+    if (count <= 0 || fromIndex < 0 || fromIndex + count > object()->getLayerCount()) { return false; }
+
+    const auto before = captureGroupSnapshot(object());
+    const QList<int> orderBefore = object()->layerIdOrder();
+
+    const bool ok = object()->moveLayerRange(fromIndex, count, toIndex);
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("调整分镜顺序"));
+    return ok;
+}
+
+bool LayerManager::mergeShots(int srcIndex, int srcCount, int dstIndex)
+{
+    Object* obj = object();
+    if (srcCount <= 0 || srcIndex < 0 || srcIndex + srcCount > obj->getLayerCount()) { return false; }
+    Layer* dstLayer = obj->getLayer(dstIndex);
+    if (dstLayer == nullptr || !dstLayer->isGroupable()) { return false; }
+    // 源段内不能混入目标层（自身并入自身）
+    if (dstIndex >= srcIndex && dstIndex < srcIndex + srcCount) { return false; }
+
+    const auto before = captureGroupSnapshot(obj);
+    const QList<int> orderBefore = obj->layerIdOrder();
+
+    // 目标散层 → 先建组（组名沿用目标层名），组镜头 → 直接用现组
+    int dstGid = dstLayer->groupId();
+    if (dstGid < 0)
+    {
+        dstGid = obj->createLayerGroup(dstLayer->name());
+        dstLayer->setGroupId(dstGid);
+    }
+
+    // 记住源段层 id（移动后索引失效），整块插到组块正上方（末成员槽位+1）——
+    // 组底部员（锚点层，注释挂它身上）保持不动，目标镜头的注释不漂移
+    QList<int> srcIds;
+    for (int i = 0; i < srcCount; ++i)
+    {
+        srcIds.append(obj->getLayer(srcIndex + i)->id());
+    }
+    const QList<int> members = obj->layerGroupMemberIndices(dstGid);
+    if (members.isEmpty()) { return false; }
+
+    obj->moveLayerRange(srcIndex, srcCount, members.last() + 1);
+
+    for (int id : srcIds)
+    {
+        Layer* layer = obj->findLayerById(id);
+        if (layer != nullptr)
+        {
+            layer->setGroupId(dstGid);
+        }
+    }
+    // 源若是空组，条目由连续性修复清除
+
+    finishGroupOp(this, editor(), orderBefore, before, tr("合并分镜"));
+    return true;
+}

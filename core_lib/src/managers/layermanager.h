@@ -111,6 +111,14 @@ public:
     /** 整组块移动到 toIndex（insert 语义） */
     bool moveLayerGroup(int groupId, int toIndex);
 
+    // ---- 分镜面板操作（单步撤销） ----
+    /** 把连续层段 [fromIndex, fromIndex+count) 整块移动到 toIndex（insert 语义，
+     *  toIndex 为移动前坐标系槽位）；散层镜头与组镜头统一走此口 */
+    bool reorderLayerRange(int fromIndex, int count, int toIndex);
+    /** 分镜并组：把连续层段 [srcIndex, srcIndex+srcCount) 并入 dstIndex 所在镜头；
+     *  目标为散层时自动建组（组名=目标层名）。空源组条目由连续性修复自动清除 */
+    bool mergeShots(int srcIndex, int srcCount, int dstIndex);
+
 signals:
     void layerSelectionChanged();
     void currentLayerWillChange(int index);
