@@ -30,6 +30,9 @@ GNU General Public License for more details.
 #include <QFileInfo>
 #include <QWheelEvent>
 #include <QTimer>
+#include <QDateTime>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrentMap>
 #include <algorithm>
 #include <QThreadPool>
 #include <QRunnable>
@@ -61,13 +64,21 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     mTimeLine = parent;
     mEditor = editor;
     mPrefs = editor->preference();
-    // frame contents changed -> thumbnails must be regenerated
+    // frame contents changed -> thumbnails must be regenerated.
+    // 单帧信号(笔画/贴图/帧编辑)→只失效该帧位;多帧/布局信号→全清。
+    // 原实现只连 framesModified:画一笔并不发射它,缩略图会陈旧到下一次
+    // 布局操作才刷新
+    connect(mEditor, &Editor::frameModified, this, &TimeLineCells::invalidateThumbsForFrame);
     connect(mEditor, &Editor::framesModified, this, [this]()
     {
-        mThumbCache.clear();
-        mThumbLru.clear();
-        mThumbQueue.clear();
-        mThumbQueued.clear();
+        invalidateAllThumbs();
+    });
+    // 换工程:layerId 会重新从小编号分配,旧键必然撞车,必须全清
+    connect(mEditor, &Editor::objectLoaded, this, [this]()
+    {
+        invalidateAllThumbs();
+        mFilmWanted.clear();
+        mFilmPendingAt.clear();
     });
     // 图层多选变化 -> 整列重绘
     connect(mEditor->layers(), &LayerManager::layerSelectionChanged, this, [this]()
@@ -78,6 +89,10 @@ TimeLineCells::TimeLineCells(TimeLine* parent, Editor* editor, TIMELINE_CELL_TYP
     mThumbTimer = new QTimer(this);
     mThumbTimer->setSingleShot(true);
     connect(mThumbTimer, &QTimer::timeout, this, &TimeLineCells::processThumbQueue);
+    // 视频胶片条补帧防抖(dream-cut 式):滚动/缩放手势只结算一轮
+    mFilmTimer = new QTimer(this);
+    mFilmTimer->setSingleShot(true);
+    connect(mFilmTimer, &QTimer::timeout, this, [this]() { flushFilmRequests(); });
     mType = type;
 
     mFrameLength = mPrefs->getInt(SETTING::TIMELINE_SIZE);
@@ -1068,9 +1083,60 @@ static inline qint64 thumbCacheKey(int layerId, int framePos)
     return (static_cast<qint64>(layerId) << 32) | static_cast<quint32>(framePos);
 }
 
+// 实例帧共享键：最高位置 1 与普通键分流（layerId 是小整数占不到符号位），
+// 同一共享块的所有引用位置共用一张缩略图（dream-cut 媒体级键的思路）
+static constexpr qint64 kThumbSharedBit = static_cast<qint64>(1) << 63;
+
+// 帧位上的位图帧（与生成侧同一回退语义：曝光中段落在前一个关键帧上）
+static BitmapImage* bitmapFrameAt(const Layer* layer, int framePos)
+{
+    LayerBitmap* bitmapLayer = const_cast<LayerBitmap*>(dynamic_cast<const LayerBitmap*>(layer));
+    if (bitmapLayer == nullptr) { return nullptr; }
+    BitmapImage* img = bitmapLayer->getBitmapImageAtFrame(framePos);
+    if (img == nullptr) { img = bitmapLayer->getLastBitmapImageAtFrame(framePos); }
+    return img;
+}
+
+// 解析帧位的生效缓存键：实例帧 → 共享块身份；普通帧 → layerId|framePos。
+// 入队/交付/失效三处必须走同一解析，否则键错位。
+static qint64 thumbKeyFor(const Layer* layer, int framePos)
+{
+    const BitmapImage* img = bitmapFrameAt(layer, framePos);
+    if (img != nullptr && img->isInstanceShared())
+    {
+        return static_cast<qint64>(reinterpret_cast<quintptr>(img->sharedDataId())) | kThumbSharedBit;
+    }
+    return thumbCacheKey(layer->id(), framePos);
+}
+
+// 工作线程缩略图任务：纯数据。src 以隐式共享带入（深拷贝随 detach 发生在
+// 工作线程），主线程侧有人改图只会分离引用，不产生数据竞争
+struct ThumbJob
+{
+    qint64 key = 0;
+    QImage src;
+    QRect bounds;
+};
+
+// 在 QtConcurrent 工作线程跑：内容框裁剪 + letterbox 进 160x90 卡
+static QImage renderThumbCard(const ThumbJob& job)
+{
+    if (job.src.isNull() || !job.bounds.isValid()) { return QImage(); }
+    const QImage content = job.src.copy(job.bounds);
+    if (content.isNull()) { return QImage(); }
+    QImage card(160, 90, QImage::Format_ARGB32_Premultiplied);
+    card.fill(Qt::transparent);
+    QPainter cp(&card);
+    const QSize scaled = content.size().scaled(160, 90, Qt::KeepAspectRatio);
+    cp.drawImage(QRect((160 - scaled.width()) / 2, (90 - scaled.height()) / 2,
+                       scaled.width(), scaled.height()), content);
+    cp.end();
+    return card;
+}
+
 QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
 {
-    const qint64 key = thumbCacheKey(layer->id(), framePos);
+    const qint64 key = thumbKeyFor(layer, framePos);
     const auto it = mThumbCache.constFind(key);
     if (it != mThumbCache.constEnd())
     {
@@ -1084,7 +1150,7 @@ QPixmap TimeLineCells::thumbnailFor(const Layer* layer, int framePos) const
     if (!mThumbQueued.contains(key))
     {
         mThumbQueued.insert(key);
-        mThumbQueue.append({ layer->id(), framePos });
+        mThumbQueue.append({ layer->id(), framePos, key });
         if (!mThumbTimer->isActive())
             mThumbTimer->start(30);
     }
@@ -1099,54 +1165,127 @@ void TimeLineCells::processThumbQueue()
         mThumbQueued.clear();
         return;
     }
-
-    int generated = 0;
-    while (!mThumbQueue.isEmpty() && generated < 8)
+    // 折叠/隐藏时不烧 CPU；showEvent 续跑
+    if (!isVisible()) { return; }
+    // 播放让行：缩略图生成不与回放抢 UI/工作线程
+    if (mEditor->playback()->isPlaying())
     {
-        const ThumbRequest request = mThumbQueue.takeFirst();
-        const qint64 key = thumbCacheKey(request.layerId, request.framePos);
-        mThumbQueued.remove(key);
-        if (mThumbCache.contains(key)) { continue; }
-
-        const Layer* layer = mEditor->layers()->findLayerById(request.layerId);
-        if (layer == nullptr) { continue; }
-
-        QPixmap thumb;
-        LayerBitmap* bitmapLayer = const_cast<LayerBitmap*>(dynamic_cast<const LayerBitmap*>(layer));
-        if (bitmapLayer != nullptr)
-        {
-            BitmapImage* img = bitmapLayer->getBitmapImageAtFrame(request.framePos);
-            if (img == nullptr)
-                img = bitmapLayer->getLastBitmapImageAtFrame(request.framePos);
-            if (img != nullptr && !img->image()->isNull())
-            {
-                // crop to actual content, then letterbox into a 16:9 card
-                const QImage src = img->image()->copy(img->bounds());
-                QImage card(160, 90, QImage::Format_ARGB32_Premultiplied);
-                card.fill(Qt::transparent);
-                QPainter cp(&card);
-                const QSize scaled = src.size().scaled(160, 90, Qt::KeepAspectRatio);
-                const int dx = (160 - scaled.width()) / 2;
-                const int dy = (90 - scaled.height()) / 2;
-                cp.drawImage(QRect(dx, dy, scaled.width(), scaled.height()), src);
-                cp.end();
-                thumb = QPixmap::fromImage(card);
-            }
-        }
-        mThumbCache.insert(key, thumb);
-        mThumbLru.append(key);
-        // LRU 驱逐最久未用（原来 erase(begin()) 是任意序，可能踢掉正在显示的）
-        while (mThumbCache.size() > 400 && !mThumbLru.isEmpty())
-        {
-            mThumbCache.remove(mThumbLru.takeFirst());
-        }
-        ++generated;
+        mThumbTimer->start(250);
+        return;
     }
 
+    QVector<ThumbJob> jobs;
+    while (!mThumbQueue.isEmpty() && jobs.size() < 16)
+    {
+        const ThumbRequest request = mThumbQueue.takeFirst();
+        const Layer* layer = mEditor->layers()->findLayerById(request.layerId);
+        if (layer == nullptr) { mThumbQueued.remove(request.key); continue; }
+        if (mThumbCache.contains(request.key)) { mThumbQueued.remove(request.key); continue; }
+
+        // 视口裁剪：滚出可视区的请求静默丢弃，滚回来时绘制 miss 会重新入队
+        // （左缘留一张卡宽余量：块跨左缘时首格出屏但卡片仍可见）
+        const int frameX = getFrameX(request.framePos);
+        if (frameX < -96 || frameX - mFrameSize > width())
+        {
+            mThumbQueued.remove(request.key);
+            continue;
+        }
+
+        BitmapImage* img = bitmapFrameAt(layer, request.framePos);
+        if (img == nullptr || img->image() == nullptr || img->image()->isNull())
+        {
+            // 非位图层/无内容：白卡占位进缓存，避免反复排队
+            mThumbQueued.remove(request.key);
+            mThumbCache.insert(request.key, QPixmap());
+            mThumbLru.append(request.key);
+            while (mThumbCache.size() > 400 && !mThumbLru.isEmpty())
+                mThumbCache.remove(mThumbLru.takeFirst());
+            continue;
+        }
+        jobs.append({ request.key, *img->image(), img->bounds() });
+    }
     if (!mThumbQueue.isEmpty())
         mThumbTimer->start(30);
-    else
-        update();
+
+    if (jobs.isEmpty()) { return; }
+
+    const int gen = mThumbGeneration;
+    const auto jobsPtr = QSharedPointer<QVector<ThumbJob>>::create(std::move(jobs));
+    const auto watcher = new QFutureWatcher<QImage>(this);
+    connect(watcher, &QFutureWatcher<QImage>::finished,
+            this, [this, watcher, jobsPtr, gen]()
+    {
+        watcher->deleteLater();
+        // 失效发生在途：旧批次结果直接弃（queued 已被失效清空，允许重请求）
+        if (gen != mThumbGeneration) { return; }
+        const auto results = watcher->future().results();
+        const int n = qMin(results.size(), jobsPtr->size());
+        for (int i = 0; i < n; i++)
+        {
+            const qint64 key = jobsPtr->at(i).key;
+            mThumbQueued.remove(key);
+            if (mThumbCache.contains(key)) { continue; }
+            mThumbCache.insert(key, QPixmap::fromImage(results.at(i)));
+            mThumbLru.append(key);
+        }
+        // LRU 驱逐最久未用（原来 erase(begin()) 是任意序，可能踢掉正在显示的）
+        while (mThumbCache.size() > 400 && !mThumbLru.isEmpty())
+            mThumbCache.remove(mThumbLru.takeFirst());
+        // 必须走 updateContent(置 mRedrawContent):裸 update() 只会原样
+        // 贴回旧内容缓存,新缩略图永远上不了屏
+        updateContent();
+    });
+    watcher->setFuture(QtConcurrent::mapped(*jobsPtr, &renderThumbCard));
+}
+
+void TimeLineCells::invalidateThumbsForFrame(int framePos)
+{
+    if (mType != TIMELINE_CELL_TYPE::Tracks) { return; }
+    ++mThumbGeneration;          // 在途批次作废
+    mThumbQueued.clear();        // 允许下一帧绘制重新入队
+    for (auto it = mThumbCache.begin(); it != mThumbCache.end();)
+    {
+        const qint64 key = it.key();
+        // 共享键的帧位含义与普通键不同，由下面的实例帧解析单独处理
+        if (!(key & kThumbSharedBit) && static_cast<quint32>(key) == static_cast<quint32>(framePos))
+        {
+            mThumbLru.removeOne(key);
+            it = mThumbCache.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    // 实例帧：该帧位上若是实例帧，按共享块身份再删一键即覆盖全体成员
+    // （另一成员在别的帧位引用同一块，同键删除后一并重生）
+    if (mEditor && mEditor->object())
+    {
+        for (Layer* layer : mEditor->object()->getLayersByType<Layer>())
+        {
+            if (layer->type() != Layer::BITMAP) { continue; }
+            const BitmapImage* img = bitmapFrameAt(layer, framePos);
+            if (img != nullptr && img->isInstanceShared())
+            {
+                const qint64 key = static_cast<qint64>(
+                            reinterpret_cast<quintptr>(img->sharedDataId())) | kThumbSharedBit;
+                if (mThumbCache.contains(key))
+                {
+                    mThumbLru.removeOne(key);
+                    mThumbCache.remove(key);
+                }
+            }
+        }
+    }
+}
+
+void TimeLineCells::invalidateAllThumbs()
+{
+    ++mThumbGeneration;
+    mThumbCache.clear();
+    mThumbLru.clear();
+    mThumbQueue.clear();
+    mThumbQueued.clear();
 }
 
 void TimeLineCells::paintPlusPreview(QPainter& painter) const
@@ -1450,7 +1589,9 @@ void TimeLineCells::paintVideoBand(QPainter& painter, const Layer* layer, int re
     painter.drawRoundedRect(QRectF(recLeft + 1.0, recTop + 1.0, recWidth - 2.0, recHeight - 2.0), 6.0, 6.0);
 
     // 文件名:左上一行,过长中段省略
-    const auto* videoLayer = static_cast<const LayerVideo*>(layer);
+    auto* videoLayer = const_cast<LayerVideo*>(static_cast<const LayerVideo*>(layer));
+    // 帧到达即重画本组件(幂等;换工程后图层重建,下轮绘制自动重挂)
+    videoLayer->attachTimelineRepaintTarget(const_cast<TimeLineCells*>(this));
     const QString clipName = QFileInfo(videoLayer->videoPath()).fileName();
     if (!clipName.isEmpty())
     {
@@ -1460,19 +1601,84 @@ void TimeLineCells::paintVideoBand(QPainter& painter, const Layer* layer, int re
         painter.drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter, shown);
     }
 
-    // 胶片孔纹:名称下方,上下两排小矩形,间距随帧宽呼吸
     const qreal bandTop = recTop + 18.0;
     const qreal bandBottom = recTop + recHeight - 4.0;
-    const qreal centerY = (bandTop + bandBottom) / 2.0;
-    const qreal holeH = qMax(2.0, (bandBottom - bandTop) / 2.0 - 3.0);
-    const int holeStep = 7; // 4px 孔 + 3px 隙
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0x70, 0x8A, 0xFF, 140));
-    for (int x = 0; recWidth > 16 && x + 4 <= static_cast<int>(recWidth) - 8; x += holeStep)
+
+    const VideoClip* clip = (layer->keyFrameCount() > 0)
+            ? static_cast<const VideoClip*>(layer->getKeyFrameAt(layer->firstKeyFramePosition()))
+            : nullptr;
+    const bool stripReady = clip != nullptr
+            && videoLayer->decoderReady()
+            && videoLayer->videoFrameCount() > 0
+            && videoLayer->videoFps() > 0.0
+            && bandBottom - bandTop > 14.0;
+
+    if (stripReady)
     {
-        const qreal hx = recLeft + 6.0 + x;
-        painter.drawRect(QRectF(hx, centerY - holeH - 1.5, 4.0, holeH));
-        painter.drawRect(QRectF(hx, centerY + 1.5, 4.0, holeH));
+        // 真实帧胶片条:帧画面钉在各自的帧位上,上下各留一条胶片孔带
+        const qreal holeH = 3.0;
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x70, 0x8A, 0xFF, 140));
+        for (int x = 0; recWidth > 16 && x + 4 <= static_cast<int>(recWidth) - 8; x += 7)
+        {
+            const qreal hx = recLeft + 6.0 + x;
+            painter.drawRect(QRectF(hx, bandTop + 1.0, 4.0, holeH));
+            painter.drawRect(QRectF(hx, bandBottom - 1.0 - holeH, 4.0, holeH));
+        }
+
+        const qreal frameTop = bandTop + holeH + 3.0;
+        const qreal frameBottom = bandBottom - holeH - 3.0;
+        const qreal tileH = frameBottom - frameTop;
+        if (tileH < 4.0) { painter.restore(); return; }
+
+        // 采样密度跟随缩放(dream-cut 式):一格瓦片宽对应的帧数为步距,
+        // 拉远时请求帧数恒约等于视口内瓦片数,与视频时长无关
+        const double aspect = 16.0 / 9.0;
+        const int tileW = qMax(2, qRound(tileH * aspect));
+        const int interval = qMax(1, qRound(static_cast<qreal>(tileW) / mFrameSize));
+        const int projectFps = qMax(1, mEditor->playback()->fps());
+
+        const int clipPos = clip->pos();
+        const int clipEnd = clip->pos() + qMax(1, clip->length());
+        bool hasGap = false;
+        for (int p = clipPos; p < clipEnd; p += interval)
+        {
+            const qreal tileX = recLeft + static_cast<qreal>(p - clipPos) * mFrameSize;
+            if (tileX + tileW < 0.0 || tileX > static_cast<qreal>(width())) { continue; }  // 视口外:不画也不请求
+            const int videoIdx = qBound(0, LayerVideo::videoFrameIndexForRel(
+                        p - clipPos, videoLayer->videoFps(), projectFps),
+                        videoLayer->videoFrameCount() - 1);
+            const QImage img = videoLayer->cachedFrameAt(videoIdx);
+            if (!img.isNull())
+            {
+                // 按帧自身宽高比出瓦片宽(非 16:9 素材不拉伸)
+                const qreal w = tileH * static_cast<qreal>(img.width()) / img.height();
+                painter.drawImage(QRectF(tileX, frameTop, w, tileH), img);
+                mFilmPendingAt[videoLayer->id()].remove(videoIdx);
+            }
+            else
+            {
+                mFilmWanted[videoLayer->id()].insert(videoIdx);
+                hasGap = true;
+            }
+        }
+        if (hasGap && mFilmTimer != nullptr && !mFilmTimer->isActive())
+            mFilmTimer->start(200);
+    }
+    else
+    {
+        // 解码未就绪/块太矮:原装饰胶片孔纹(上下两排,夹中带)
+        const qreal centerY = (bandTop + bandBottom) / 2.0;
+        const qreal holeH = qMax(2.0, (bandBottom - bandTop) / 2.0 - 3.0);
+        const int holeStep = 7; // 4px 孔 + 3px 隙
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x70, 0x8A, 0xFF, 140));
+        for (int x = 0; recWidth > 16 && x + 4 <= static_cast<int>(recWidth) - 8; x += holeStep)
+        {
+            const qreal hx = recLeft + 6.0 + x;
+            painter.drawRect(QRectF(hx, centerY - holeH - 1.5, 4.0, holeH));
+            painter.drawRect(QRectF(hx, centerY + 1.5, 4.0, holeH));
+        }
     }
     painter.restore();
 }
@@ -2789,6 +2995,79 @@ void TimeLineCells::resizeEvent(QResizeEvent* event)
     updateContent();
     event->accept();
     emit lengthChanged(getFrameLength());
+}
+
+void TimeLineCells::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+    // 隐藏期冻结的缩略图/胶片条队列恢复续跑
+    if (!mThumbQueue.isEmpty() && mThumbTimer != nullptr && !mThumbTimer->isActive())
+        mThumbTimer->start(30);
+    if (!mFilmPendingAt.isEmpty() && mFilmTimer != nullptr && !mFilmTimer->isActive())
+        mFilmTimer->start(200);
+}
+
+void TimeLineCells::flushFilmRequests()
+{
+    if (mType != TIMELINE_CELL_TYPE::Tracks)
+    {
+        mFilmWanted.clear();
+        return;
+    }
+    // 播放让行:胶片条解码不与回放预取抢解码线程,停播后自动续跑
+    if (mEditor->playback()->isPlaying())
+    {
+        mFilmTimer->start(250);
+        return;
+    }
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    // 已删图层/非视频层的 pending 残留清扫(层 id 同工程内不复用,残留只占内存)
+    for (auto pit = mFilmPendingAt.begin(); pit != mFilmPendingAt.end();)
+    {
+        LayerVideo* vl = dynamic_cast<LayerVideo*>(
+                    mEditor->layers()->findLayerById(pit.key()));
+        if (vl == nullptr || !vl->decoderReady()) { pit = mFilmPendingAt.erase(pit); }
+        else { ++pit; }
+    }
+    bool anyPending = false;
+    for (auto lit = mFilmWanted.begin(); lit != mFilmWanted.end(); ++lit)
+    {
+        const int layerId = lit.key();
+        LayerVideo* videoLayer = dynamic_cast<LayerVideo*>(
+                    mEditor->layers()->findLayerById(layerId));
+        auto& pendingAt = mFilmPendingAt[layerId];
+        if (videoLayer == nullptr || !videoLayer->decoderReady())
+        {
+            pendingAt.clear();
+            continue;
+        }
+        QList<int> frames;
+        for (int videoIdx : lit.value())
+        {
+            if (!videoLayer->cachedFrameAt(videoIdx).isNull())
+            {
+                pendingAt.remove(videoIdx);   // 绘制与 flush 之间帧已到达
+                continue;
+            }
+            const qint64 last = pendingAt.value(videoIdx, 0);
+            // 在途帧耐心等(worker 串行,重发只添乱);3s 未回帧 = 被 scrub
+            // 整队重置丢弃,重发自愈
+            if (last > 0 && now - last < 3000) { continue; }
+            pendingAt.insert(videoIdx, now);
+            frames.append(videoIdx);
+            if (frames.size() >= 12) { break; }   // 单轮限量,别压过画布预取
+        }
+        if (!frames.isEmpty())
+        {
+            videoLayer->requestTimelineFrames(frames);
+        }
+        anyPending = anyPending || !pendingAt.isEmpty();
+    }
+    mFilmWanted.clear();
+    // 仍有在途帧 → 定时复查(3s 自愈重发的驱动节拍)
+    if (anyPending && mFilmTimer != nullptr && !mFilmTimer->isActive())
+        mFilmTimer->start(500);
 }
 
 bool TimeLineCells::event(QEvent* event)

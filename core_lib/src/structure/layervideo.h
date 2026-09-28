@@ -111,6 +111,19 @@ public:
     // 找不到槽回退 update);setObject 每帧重新挂接。
     void attachRepaintTarget(QWidget* target);
 
+    // ---- 时间轴胶片条(dream-cut 式缓存共享:绘制只读缓存,解码独立入队) ----
+    /** 缓存同步取视频帧(未命中/未就绪回空图;绝不触发解码) */
+    QImage cachedFrameAt(int videoFrameIdx) const;
+    /** 解码器就绪且已知总帧数(胶片条可用性总开关) */
+    bool decoderReady() const { return mDecoderReady; }
+    int videoFrameCount() const { return mFrameCount; }
+    /** 胶片条解码请求:绕过预取窗/整队重置逻辑,直接追加 worker 队尾
+     *  (worker 侧自带去重)。scrub 跳变的 reset 会丢弃它们,调用方须
+     *  自行超时重发自愈。 */
+    void requestTimelineFrames(const QList<int>& frames);
+    /** 时间轴重绘目标(帧到达即 update;与画布目标并存,绘制期幂等重挂) */
+    void attachTimelineRepaintTarget(QWidget* target);
+
 private:
     void ensureAudioPlayer();
     void ensureDecoder();
@@ -147,6 +160,7 @@ private:
     qint64 mCacheBytes = 0;
 
     QWidget* mRepaintTarget = nullptr;
+    QWidget* mTimelineRepaintTarget = nullptr;   // 胶片条宿主(Tracks cells);widget 生命周期长于图层
 };
 
 #endif

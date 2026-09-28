@@ -325,6 +325,7 @@ target_link_libraries(pencil2d PRIVATE
     Qt6::Svg
     Qt6::Network
     Qt6::Qml # QJSEngine（脚本系统）
+    Qt6::Concurrent # 时间轴缩略图工作线程生成
 )
 
 # Platform-specific libraries

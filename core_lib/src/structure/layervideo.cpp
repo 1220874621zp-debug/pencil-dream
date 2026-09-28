@@ -213,6 +213,36 @@ void LayerVideo::onFrameDecoded(int frameIndex, const QImage& image)
             mRepaintTarget->update();
         }
     }
+    // 时间轴胶片条:按名调 updateContent 槽(TimeLineCells 是整张内容缓存
+    // 架构,裸 update() 只贴旧缓存,新帧永远上不了屏);找不到槽回退 update()
+    if (mTimelineRepaintTarget)
+    {
+        if (!QMetaObject::invokeMethod(mTimelineRepaintTarget, "updateContent"))
+        {
+            mTimelineRepaintTarget->update();
+        }
+    }
+}
+
+QImage LayerVideo::cachedFrameAt(int videoFrameIdx) const
+{
+    return mFrameCache.value(videoFrameIdx);
+}
+
+void LayerVideo::requestTimelineFrames(const QList<int>& frames)
+{
+    if (!mDecoderReady || frames.isEmpty()) { return; }
+    // 不动 mPending(GUI 预取镜像):预取窗的重置检测看不到胶片条请求,
+    // scrub 跳变 reset 会把它们从 worker 队列清掉——由时间轴侧超时重发兜底
+    QMetaObject::invokeMethod(mWorker, [worker = mWorker, frames]()
+    {
+        worker->requestFrames(frames, false);
+    }, Qt::QueuedConnection);
+}
+
+void LayerVideo::attachTimelineRepaintTarget(QWidget* target)
+{
+    mTimelineRepaintTarget = target;
 }
 
 void LayerVideo::trimCache()

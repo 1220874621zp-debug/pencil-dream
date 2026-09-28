@@ -107,6 +107,7 @@ protected:
     bool event(QEvent *event) override;
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void showEvent(QShowEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -232,10 +233,14 @@ private:
     TIMELINE_CELL_TYPE mType;
 
     QPixmap* mCache = nullptr;
-    mutable QHash<qint64, QPixmap> mThumbCache;  // key = layerId<<32 | framePos
+    mutable QHash<qint64, QPixmap> mThumbCache;  // key = layerId<<32 | framePos；实例帧=共享块指针|符号位
     mutable QList<qint64> mThumbLru;             // 末尾=最近使用，驱逐从头取
+    // 缩略图批次代数：任何失效（全清/单帧/换工程）递增，在途异步结果代数不符即弃
+    mutable int mThumbGeneration = 0;
+    void invalidateThumbsForFrame(int framePos);
+    void invalidateAllThumbs();
     // async thumbnail generation: misses are queued and rendered in batches
-    struct ThumbRequest { int layerId; int framePos; };
+    struct ThumbRequest { int layerId; int framePos; qint64 key; };
     mutable QList<ThumbRequest> mThumbQueue;
     mutable QSet<qint64> mThumbQueued;
     // 图层行内图标（类型/clip/循环徽章）的一次性栅格化缓存：原来每行每次
@@ -243,6 +248,16 @@ private:
     mutable QHash<QString, QPixmap> mRowIconCache;
     QPixmap cachedRowIcon(const QString& key, const std::function<QPixmap()>& make) const;
     QTimer* mThumbTimer = nullptr;
+
+    // ---- 视频层胶片条（dream-cut 式：绘制只读解码缓存，缺帧防抖补请求） ----
+    // 200ms 单发防抖：滚动/缩放手势期间只结算一轮
+    QTimer* mFilmTimer = nullptr;
+    // layerId → 待补帧集合（视频帧号）；绘制期累积，flush 后清空
+    mutable QHash<int, QSet<int>> mFilmWanted;
+    // layerId → {视频帧号 → 上次请求时刻(ms)}；3s 未回帧视为被 scrub 整队
+    // 重置丢弃，重发自愈；帧到达（绘制期命中缓存）即移除
+    mutable QHash<int, QHash<int, qint64>> mFilmPendingAt;
+    void flushFilmRequests();
     QSet<int> mCollapsedLayerIds;
     bool mRedrawContent = false;
     bool mDrawFrameNumber = true;

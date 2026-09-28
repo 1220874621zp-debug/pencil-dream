@@ -37,6 +37,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Svg
     Network
     Qml
+    Concurrent
     LinguistTools
 )
 
