@@ -416,6 +416,20 @@ void TimeLineCells::showCameraMenu(QPoint pos)
     menu.exec(mapToGlobal(pos));
 }
 
+/** 轨道帧格右键菜单（非相机层、非位图关键帧格的普通帧格）：
+ *  盖印在时间指针处执行，与右键点中的帧格位置无关 */
+void TimeLineCells::showTrackFrameMenu(QPoint pos)
+{
+    QMenu menu(this);
+    QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
+
+    QAction* chosen = menu.exec(mapToGlobal(pos));
+    if (chosen == stampVisibleAction)
+    {
+        Q_EMIT stampVisibleRequested();
+    }
+}
+
 void TimeLineCells::showInstanceMenu(QPoint pos)
 {
     const int frameNumber = getFrameNumber(pos.x());
@@ -441,8 +455,18 @@ void TimeLineCells::showInstanceMenu(QPoint pos)
         jumpAction = menu.addAction(tr("跳到下一处实例"));
     }
 
+    // 盖印可见图层：在时间指针处合成全部可见层（帧格菜单常驻项）
+    menu.addSeparator();
+    QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
+
     update();
     QAction* chosen = menu.exec(mapToGlobal(pos));
+
+    if (chosen == stampVisibleAction)
+    {
+        Q_EMIT stampVisibleRequested();
+        return;
+    }
 
     if (chosen == createAction)
     {
@@ -3156,10 +3180,18 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             }
                         }
 
-                        // ... or we show the camera context menu, if it is the right button
+                        // ... or we show the frame context menu, if it is the right button
                         if (event->button() == Qt::RightButton)
                         {
-                            showCameraMenu(event->pos());
+                            // 相机层维持键格菜单（缓动等）；其余层给帧格菜单（盖印等）
+                            if (currentLayer->type() == Layer::CAMERA)
+                            {
+                                showCameraMenu(event->pos());
+                            }
+                            else
+                            {
+                                showTrackFrameMenu(event->pos());
+                            }
                         }
 
                         // 相机键：按住未选中的键直接进入拖动改位（免二次点击）；
@@ -3177,7 +3209,14 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         // If selected they can also be interpolated
                         if (event->button() == Qt::RightButton)
                         {
-                            showCameraMenu(event->pos());
+                            if (currentLayer->type() == Layer::CAMERA)
+                            {
+                                showCameraMenu(event->pos());
+                            }
+                            else
+                            {
+                                showTrackFrameMenu(event->pos());
+                            }
                         }
                         // We clicked on a selected frame, we can move it
                         qDebug() << "[ui] tracks click: drag selected frames at" << frameNumber << "layer" << layerNumber;
@@ -4098,9 +4137,6 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         }
     }
 
-    // 盖印可见图层：合成当前帧可见内容到最上方新层（与当前层类型无关，守卫在 ActionCommands）
-    QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
-
     // 填色图层 → 颜料（位图）图层：烘焙当前着色结果，脱离动态计算
     QAction* convertColorizeAction = nullptr;
     if (layer->type() == Layer::COLORIZE)
@@ -4161,12 +4197,6 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         // 与删除同链：先置为当前层，统一走 ActionCommands 的守卫与确认
         mEditor->layers()->setCurrentLayer(layerIndex);
         Q_EMIT mergeDownRequested(layerIndex);
-        return;
-    }
-
-    if (chosen == stampVisibleAction && stampVisibleAction != nullptr)
-    {
-        Q_EMIT stampVisibleRequested();
         return;
     }
 
