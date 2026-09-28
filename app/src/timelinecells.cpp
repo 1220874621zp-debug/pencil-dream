@@ -1927,6 +1927,7 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
       painter.save();
       QFont soloFont = painter.font();
       soloFont.setBold(true);
+      soloFont.setPixelSize(16); // 与旁边的锁/剪贴图标（16px 槽位）同视觉大小
       painter.setFont(soloFont);
       painter.setPen(layer->solo() ? Theme::Accent : QColor(0x66, 0x66, 0x6E));
       painter.drawText(soloR.adjusted(0, sliderY - 11, 0, sliderY + 11),
@@ -2961,8 +2962,27 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 const QRect soloHit = soloIconRect(width()).adjusted(0, ctrlY - 11, 0, ctrlY + 11);
                 if (soloHit.contains(event->pos().x(), event->pos().y()))
                 {
-                    hitLayer->setSolo(!hitLayer->solo());
-                    qDebug() << "[ui] layer" << layerNumber << "solo ->" << hitLayer->solo();
+                    // 多选批量：点击层在选中集内时整批统一到同一状态（以点击层取反为准）；
+                    // 不在选中集内只切本层
+                    const bool target = !hitLayer->solo();
+                    const QList<int> selection = mEditor->layers()->selectedLayerIds();
+                    if (selection.contains(hitLayer->id()))
+                    {
+                        for (int i = 0; i < mEditor->object()->getLayerCount(); ++i)
+                        {
+                            Layer* selected = mEditor->object()->getLayer(i);
+                            if (selected != nullptr && selection.contains(selected->id()))
+                            {
+                                selected->setSolo(target);
+                            }
+                        }
+                        qDebug() << "[ui] solo batch ->" << target << "layers" << selection.size();
+                    }
+                    else
+                    {
+                        hitLayer->setSolo(target);
+                        qDebug() << "[ui] layer" << layerNumber << "solo ->" << target;
+                    }
                     // 独显改变全局可见性合成：整画布缓存失效
                     mEditor->getScribbleArea()->onLayerChanged();
                     updateContent();
