@@ -309,7 +309,8 @@ void TimeLine::initUI()
 
     connect(mLayerList, &TimeLineCells::deleteLayerRequested, this, [this](int) { emit deleteCurrentLayerClick(); });
     connect(mLayerList, &TimeLineCells::mergeDownRequested, this, [this](int) { emit mergeLayerDownClick(); });
-    connect(mLayerList, &TimeLineCells::stampVisibleRequested, this, [this]() { emit stampVisibleClick(); });
+    // 帧格右键菜单（实例菜单/帧格菜单）在轨道面板实例里弹出，信号由 mTracks 发出
+    connect(mTracks, &TimeLineCells::stampVisibleRequested, this, [this]() { emit stampVisibleClick(); });
     connect(mHScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::hScrollChange);
     connect(mTracks, &TimeLineCells::offsetChanged, mHScrollbar, &QScrollBar::setValue);
     connect(mVScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::vScrollChange);
