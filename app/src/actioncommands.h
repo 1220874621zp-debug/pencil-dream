@@ -91,6 +91,9 @@ public:
     Status addNewSoundLayer();
     Status deleteCurrentLayer();
     Status mergeLayerDown();
+    /** 盖印可见图层：把时间指针处当前帧的可见图层内容合成为一张图，
+        新建位图图层置于最上方承载（原图层不动，单步可撤销） */
+    Status stampVisibleLayers();
     /** 镂空检测：一键检测并填充当前帧线稿的封闭镂空/细缝（各像素取最近不透明像素的颜色） */
     Status fillHolesOnCurrentFrame();
     /** 颜色转透明度（Krita Color to Alpha 移植）：接近目标色的像素转透明、按感知色差渐变；

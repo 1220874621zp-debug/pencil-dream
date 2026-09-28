@@ -1193,6 +1193,80 @@ Status ActionCommands::mergeLayerDown()
     return Status::OK;
 }
 
+Status ActionCommands::stampVisibleLayers()
+{
+    const QString tipTitle = tr("盖印可见图层");
+
+    Object* object = mEditor->object();
+    if (object == nullptr) { return Status::FAIL; }
+
+    LayerManager* layerMgr = mEditor->layers();
+    const int frame = mEditor->currentFrame();
+
+    // 盖印画幅 = 相机取景框（世界坐标）；无相机时退回 800x600
+    QRect worldRect(-400, -300, 800, 600);
+    LayerCamera* camera = layerMgr->getCameraLayerBelow(object->getLayerCount());
+    if (camera != nullptr)
+    {
+        worldRect = camera->getViewRect();
+    }
+
+    // 当前帧须有可见的位图/填色内容（经显示帧取关键帧，循环层语义与画布一致）
+    bool anyContent = false;
+    for (int i = 0; i < object->getLayerCount(); ++i)
+    {
+        Layer* layer = object->getLayer(i);
+        if (layer == nullptr || !object->isLayerRenderable(layer)) { continue; }
+        if (layer->type() != Layer::BITMAP && layer->type() != Layer::COLORIZE) { continue; }
+        if (layer->getKeyFrameWhichCovers(layer->displayFrameFor(frame)) != nullptr)
+        {
+            anyContent = true;
+            break;
+        }
+    }
+    if (!anyContent)
+    {
+        QMessageBox::information(mParent, tipTitle, tr("当前帧没有可见图层内容，无需盖印。"));
+        return Status::CANCELED;
+    }
+
+    // 与导出同源的离线合成：图层透明度/组可见性/循环层显示帧/剪贴蒙版/填色层全部生效
+    QImage stamp(worldRect.size(), QImage::Format_ARGB32_Premultiplied);
+    stamp.fill(Qt::transparent);
+    {
+        QPainter stampPainter(&stamp);
+        stampPainter.setTransform(QTransform::fromTranslate(-worldRect.left(), -worldRect.top()));
+        object->paintImage(stampPainter, frame, false, true);
+    }
+
+    // 新建承载层置于最上方（原图层全部不动）；整层增删由 SplitLayerCommand 托管 = 单步撤销
+    const LayerOrderCommand::GroupSnapshot undoGroups = LayerOrderCommand::captureGroups(object);
+    Layer* prevCurrent = layerMgr->currentLayer();
+
+    auto* stampLayer = new LayerBitmap(object->getUniqueLayerID());
+    stampLayer->setName(tr("盖印 帧%1").arg(frame + 1));
+    object->insertLayer(object->getLayerCount(), stampLayer);
+
+    BitmapImage* stampImage = new BitmapImage(worldRect.topLeft(), stamp);
+    stampImage->enableAutoCrop(true);
+    stampLayer->addKeyFrame(frame, stampImage);
+    stampImage->setModified(true);
+    mEditor->setModified(object->getIndex(stampLayer), frame);
+
+    mEditor->undoRedo()->pushUndoCommand(
+        new SplitLayerCommand(mEditor, QList<Layer*>() << stampLayer,
+                              prevCurrent != nullptr ? prevCurrent->id() : -1,
+                              false, undoGroups, tipTitle));
+
+    // 命令入栈的首次 redo 已跳过，界面刷新由动作侧完成（与拆分图层同式）
+    layerMgr->setCurrentLayer(stampLayer);
+    mEditor->scrubTo(frame);
+    emit mEditor->updateTimeLine();
+    mEditor->getScribbleArea()->onLayerChanged();
+    layerMgr->notifyAnimationLengthChanged();
+    return Status::OK;
+}
+
 Status ActionCommands::fillHolesOnCurrentFrame()
 {
     const QString tipTitle = tr("镂空检测");

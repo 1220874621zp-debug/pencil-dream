@@ -84,6 +84,8 @@ signals:
     /** 图层行右键菜单请求删除指定层（走 TimeLine::deleteCurrentLayerClick 确认链） */
     void deleteLayerRequested(int layerIndex);
     void mergeDownRequested(int layerIndex);
+    /** 图层行右键菜单请求盖印可见图层（合成当前帧可见内容到最上方新层） */
+    void stampVisibleRequested();
     void lengthChanged(int);
     void offsetChanged(int);
     void selectionChanged();

@@ -2100,6 +2100,7 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
     connect(mTimeLine, &TimeLine::playButtonTriggered, mCommands, &ActionCommands::PlayStop);
     connect(pTimeline, &TimeLine::deleteCurrentLayerClick, mCommands, &ActionCommands::deleteCurrentLayer);
     connect(pTimeline, &TimeLine::mergeLayerDownClick, mCommands, &ActionCommands::mergeLayerDown);
+    connect(pTimeline, &TimeLine::stampVisibleClick, mCommands, &ActionCommands::stampVisibleLayers);
 
     // 向下合并图层：菜单入口 + Ctrl+E（位图层专用，守卫在 ActionCommands）
     QAction* mergeLayerDownAct = new QAction(tr("向下合并图层"), this);

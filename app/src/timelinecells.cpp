@@ -4098,6 +4098,9 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         }
     }
 
+    // 盖印可见图层：合成当前帧可见内容到最上方新层（与当前层类型无关，守卫在 ActionCommands）
+    QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
+
     // 填色图层 → 颜料（位图）图层：烘焙当前着色结果，脱离动态计算
     QAction* convertColorizeAction = nullptr;
     if (layer->type() == Layer::COLORIZE)
@@ -4158,6 +4161,12 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
         // 与删除同链：先置为当前层，统一走 ActionCommands 的守卫与确认
         mEditor->layers()->setCurrentLayer(layerIndex);
         Q_EMIT mergeDownRequested(layerIndex);
+        return;
+    }
+
+    if (chosen == stampVisibleAction && stampVisibleAction != nullptr)
+    {
+        Q_EMIT stampVisibleRequested();
         return;
     }
 

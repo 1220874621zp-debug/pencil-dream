@@ -1418,7 +1418,9 @@ void Object::paintImage(QPainter& painter,int frameNumber,
         }
 
         LayerBitmap* layerBitmap = static_cast<LayerBitmap*>(layer);
-        BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(frameNumber));
+        // 循环层按显示帧取内容（与非剪贴分支/画布同语义，开放尾块区域回绕）
+        BitmapImage* bitmap = static_cast<BitmapImage*>(layerBitmap->getKeyFrameWhichCovers(
+            layerBitmap->displayFrameFor(frameNumber)));
         if (bitmap == nullptr)
         {
             continue;

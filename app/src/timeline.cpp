@@ -309,6 +309,7 @@ void TimeLine::initUI()
 
     connect(mLayerList, &TimeLineCells::deleteLayerRequested, this, [this](int) { emit deleteCurrentLayerClick(); });
     connect(mLayerList, &TimeLineCells::mergeDownRequested, this, [this](int) { emit mergeLayerDownClick(); });
+    connect(mLayerList, &TimeLineCells::stampVisibleRequested, this, [this]() { emit stampVisibleClick(); });
     connect(mHScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::hScrollChange);
     connect(mTracks, &TimeLineCells::offsetChanged, mHScrollbar, &QScrollBar::setValue);
     connect(mVScrollbar, &QScrollBar::valueChanged, mTracks, &TimeLineCells::vScrollChange);
