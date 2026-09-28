@@ -538,7 +538,7 @@ void StoryboardView::drawCard(QPainter& painter, int shotIndex, const QRect& rec
         const int dx = thumbRect.left() + (thumbRect.width() - scaled.width()) / 2;
         const int dy = thumbRect.top() + (thumbRect.height() - scaled.height()) / 2;
         const QRect dest(dx, dy, scaled.width(), scaled.height());
-        painter.setBrush(QColor(0x10, 0x10, 0x13));
+        painter.setBrush(Qt::white);
         painter.setPen(QPen(QColor(0x30, 0x30, 0x38), 1));
         painter.drawRect(thumbRect);
         painter.setBrush(Qt::NoBrush);
@@ -552,7 +552,7 @@ void StoryboardView::drawCard(QPainter& painter, int shotIndex, const QRect& rec
     }
     else
     {
-        painter.setBrush(QColor(0x14, 0x14, 0x18));
+        painter.setBrush(Qt::white);
         painter.setPen(QPen(QColor(0x2C, 0x2C, 0x33), 1));
         painter.drawRect(thumbRect);
         painter.setPen(QColor(0x55, 0x55, 0x60));
