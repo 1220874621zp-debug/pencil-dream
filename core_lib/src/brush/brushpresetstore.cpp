@@ -84,15 +84,13 @@ void BrushPresetStore::load()
         addBuiltin(QStringLiteral("圆头笔"), s);
     }
     {
-        BrushSettings s; // 铅笔：细、带压感淡出
+        BrushSettings s; // 铅笔：细、压实不透明（无压感浓淡，只随压感收放粗细）
         s.tipShape = BrushSettings::TipShape::Circle;
         s.diameter = 6.0;
         s.hardness = 0.5;
-        s.opacity = 0.85;
+        s.opacity = 1.0;
         s.pressureSize = true;
         s.sizeCurve = BrushCurve::fromString("0,0.08;1,1;");
-        s.pressureOpacity = true;
-        s.opacityCurve = BrushCurve::fromString("0,0.1;0.6,1;1,0.55;");
         addBuiltin(QStringLiteral("铅笔"), s);
     }
     {
