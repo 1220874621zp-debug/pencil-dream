@@ -30,6 +30,7 @@ GNU General Public License for more details.
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QCoreApplication>
 #include <QProgressDialog>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -418,6 +419,7 @@ void ShadowOptionsWidget::generateAllFrames()
     for (int i = 0; i < positions.size(); ++i)
     {
         progress.setValue(i);
+        QCoreApplication::processEvents(); // 同步计算循环中保持进度框响应
         if (progress.wasCanceled())
             break;
         const int frame = positions.at(i);

@@ -352,3 +352,63 @@ TEST_CASE("LayerShadow_XmlRoundtrip")
     // 关键帧内容由 loadDomElement 从 dataDir 数据文件恢复，
     // 裸 DOM 单测无数据文件，帧内容回读由 FileManager 全链测试覆盖
 }
+
+TEST_CASE("ShadowFill_OffsetBoundsCanvasSizedImages")
+{
+    // 引擎契约：画布级图像 + bounds 子矩形（原点非零）。
+    // 画布 200x400，方形在下半，bounds 只取 y>=200 的半幅
+    QImage lineArt = makeCanvas(200, 400);
+    drawSquareOutline(lineArt, QRect(10, 210, 180, 180));
+    QImage strokes = makeCanvas(200, 400);
+    drawStrokeLine(strokes, QLine(100, 208, 100, 392), QColor(255, 0, 0));
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(0, 200, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
+    // fill 为 bounds 尺寸、本地坐标：方形内部在本地 (12..188)
+    CHECK(isColor(result.fill, 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 150, 100));
+}
+
+TEST_CASE("ShadowFill_BoundsOutsideImageSafeEmpty")
+{
+    // 契约守卫：bounds 超出图像矩形 → 安全返回空，不越界崩溃
+    QImage lineArt = makeCanvas(100, 100);
+    QImage strokes = makeCanvas(100, 100);
+    drawSquareOutline(lineArt, QRect(10, 10, 80, 80));
+    drawStrokeLine(strokes, QLine(50, 8, 50, 92), QColor(255, 0, 0));
+
+    ShadowFill::Params params;
+    ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(50, 50, 100, 100), params);
+    CHECK(result.fill.isNull());
+}
+
+TEST_CASE("LayerShadow_OffsetContentNoCrash")
+{
+    // 内容远离画布原点（真实工程常态）：曾因把未原点化的 bounds 传给
+    // 引擎造成 compositeBarrier 越界写崩溃（合成测试贴原点没暴露）
+    // 用带画布偏移的裁剪内容（关键帧 bounds 原点非零）——整幅大图灌入
+    // 会令 bounds=整画布原点归零，踩不到崩溃路径
+    Object obj;
+    auto* lineLayer = obj.addNewBitmapLayer();
+    QImage square = makeCanvas(185, 185);
+    drawSquareOutline(square, QRect(2, 2, 180, 180));
+    *lineLayer->getLastBitmapImageAtFrame(1) = BitmapImage(QPoint(98, 298), square);
+    auto* shadowLayer = static_cast<LayerShadow*>(obj.addNewShadowLayer());
+    QImage strokes = makeCanvas(3, 189);
+    drawStrokeLine(strokes, QLine(1, 2, 1, 187), QColor(255, 0, 0));
+    *static_cast<BitmapImage*>(shadowLayer->getLastShadowImageAtFrame(1)) = BitmapImage(QPoint(189, 296), strokes);
+
+    LayerBitmap* source = obj.getColorizeSourceLayer(obj.getLayerCount() - 1, 1);
+    REQUIRE(source != nullptr);
+    REQUIRE(shadowLayer->updateShadowAtFrame(1, source, obj.layerStructureGeneration()));
+
+    ShadowImage* frame = shadowLayer->getShadowImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+    REQUIRE_FALSE(frame->shadowImage().isNull());
+    // fill 为 bounds 本地坐标：分割线在本地 x≈92，左半为阴影
+    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(frame->shadowImage(), 150, 100));
+}

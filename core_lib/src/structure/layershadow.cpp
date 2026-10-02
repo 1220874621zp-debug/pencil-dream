@@ -215,7 +215,9 @@ bool LayerShadow::updateShadowAtFrame(int frameNumber, LayerBitmap* sourceLayer,
     params.gapRadius = mGapRadius;
     params.fillColor = mFillColor;
 
-    ShadowFill::Result result = ShadowFill::computeShadow(lineImg, strokeImg, bounds, params,
+    // 引擎契约=画布级图像+bounds子矩形；输入已平铺到 bounds 尺寸，
+    // 必须传原点化矩形（曾传原始 bounds 造成 compositeBarrier 越界写崩溃）
+    ShadowFill::Result result = ShadowFill::computeShadow(lineImg, strokeImg, lineImg.rect(), params,
                                                           disabledMarkerColors());
     frame->setShadowResult(result.fill, bounds, structureGeneration);
     frame->setWarnings(result.warnings);

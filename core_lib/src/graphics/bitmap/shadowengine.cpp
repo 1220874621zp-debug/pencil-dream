@@ -194,6 +194,9 @@ Result computeShadow(const QImage& lineArt,
     Result result;
     if (bounds.isEmpty() || lineArt.size() != strokes.size())
         return result;
+    // 契约守卫：bounds 必须落在图像矩形内（越界=内部 scanLine 直接崩）
+    if (!QRect(QPoint(0, 0), lineArt.size()).contains(bounds))
+        return result;
 
     // ① 分割线蒙版 + 闭缝
     QImage divider = buildDividerMask(strokes, bounds, transparentMarkerColors);
