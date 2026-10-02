@@ -195,8 +195,8 @@ public:
     /** 双笔尖（Krita MaskingBrush）：开笔时启用合成路由，副笔尖 dab 走 drawMaskDab */
     void beginMaskedStroke(BrushMaskSettings::Mode mode);
     void endMaskedStroke();
-    /** 副笔尖覆盖 dab（白色 union 累积进蒙版，随后增量重合成显示区） */
-    void drawMaskDab(const QImage& dab, const QPoint& topLeft);
+    /** 副笔尖覆盖 dab（白色按副笔刷自己的 opacity/flow/涂料模式累积进蒙版，随后增量重合成显示区） */
+    void drawMaskDab(const QImage& dab, const QPoint& topLeft, qreal opacity, qreal flow, bool buildup);
     /** 混合笔刷：图层+缓冲采样回写（工具每笔缓存图层图与原点，避免逐 dab autoCrop） */
     void drawSmudgeDab(const QImage& mask, const QPoint& topLeft, const QPointF& delta,
                        qreal rate, const QImage& layerImage, const QPoint& layerOrigin);

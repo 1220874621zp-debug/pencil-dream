@@ -965,6 +965,36 @@ TEST_CASE("MaskedStrokeCompositor stroke integration")
         const QImage region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
         REQUIRE(qAlpha(region.pixel(3, 3)) > 100); // 函数式合成：始终从累积态重算
     }
+
+    SECTION("mask band is local: main stroke between mask dabs survives")
+    {
+        // 两枚小副 dab 分居左右、中间留缝：缝隙在包围盒内但不在任何蒙版
+        // dab 矩形内——burn 的 src=0 清零不得越出蒙版矩形（Krita 带状语义）
+        QImage smallMask(2, 2, QImage::Format_ARGB32_Premultiplied);
+        smallMask.fill(qPremultiply(qRgba(255, 255, 255, 255)));
+        MaskedStrokeCompositor compositor;
+        compositor.begin(BrushMaskSettings::Mode::Burn);
+        compositor.mainDab(mainDab, QPoint(0, 0), params);
+        compositor.maskDab(smallMask, QPoint(0, 0));
+        compositor.maskDab(smallMask, QPoint(8, 0));
+        QPoint origin;
+        const QImage region = compositor.composedRegion(QRect(0, 0, 10, 2), origin);
+        REQUIRE(qAlpha(region.pixel(1, 1)) > 100);  // 覆盖处：burn(1, dst)=dst
+        REQUIRE(qAlpha(region.pixel(5, 1)) > 100);  // 缝隙：蒙版矩形外原样保留
+    }
+
+    SECTION("mask dab opacity passes through (low-opacity cover deepens the carve)")
+    {
+        // 5% 不透明度副笔尖（霓裳染TD类）：wash 蒙版覆盖度≈13/255 →
+        // burn(0.05, 0.5)≈0，覆盖处被深切；满不透明度时同点保留
+        MaskedStrokeCompositor compositor;
+        compositor.begin(BrushMaskSettings::Mode::Burn);
+        compositor.mainDab(mainDab, QPoint(0, 0), params);
+        compositor.maskDab(maskDabImg, QPoint(2, 2), 0.05, 1.0, false);
+        QPoint origin;
+        const QImage region = compositor.composedRegion(QRect(0, 0, 10, 10), origin);
+        REQUIRE(qAlpha(region.pixel(4, 4)) < 15);
+    }
 }
 
 TEST_CASE("Pattern color source recolors dabs by canvas position")

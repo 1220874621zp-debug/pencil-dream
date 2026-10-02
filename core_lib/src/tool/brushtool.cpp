@@ -358,6 +358,8 @@ BrushEngine::DabPainter BrushTool::dabPainter() const
 BrushEngine::DabPainter BrushTool::maskDabPainter() const
 {
     return [this](const BrushEngine::DabRequest& dab) {
-        mScribbleArea->drawMaskDab(dab.dab, dab.topLeft);
+        // 副笔刷自身的 opacity/flow/涂料模式照常生效（Krita 蒙版投影用副
+        // 预设完整语义；低不透明度副笔尖的深飞白 carving 依赖于此）
+        mScribbleArea->drawMaskDab(dab.dab, dab.topLeft, dab.opacity, dab.flow, dab.buildup);
     };
 }

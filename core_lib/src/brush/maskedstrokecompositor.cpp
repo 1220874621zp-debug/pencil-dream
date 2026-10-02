@@ -62,7 +62,7 @@ void MaskedStrokeCompositor::begin(BrushMaskSettings::Mode mode)
     mMain = QImage();
     mCover = QImage();
     mOrigin = QPoint(0, 0);
-    mExtent = QRect();
+    mExtent = QRegion();
 }
 
 void MaskedStrokeCompositor::end()
@@ -76,7 +76,7 @@ void MaskedStrokeCompositor::clear()
     mMain = QImage();
     mCover = QImage();
     mOrigin = QPoint(0, 0);
-    mExtent = QRect();
+    mExtent = QRegion();
 }
 
 void MaskedStrokeCompositor::ensureBuffers(const QRect& rect)
@@ -121,21 +121,27 @@ void MaskedStrokeCompositor::mainDab(const QImage& dab, const QPoint& topLeft,
     washBlendImage(mMain, dab, topLeft - mOrigin, params);
 }
 
-void MaskedStrokeCompositor::maskDab(const QImage& dab, const QPoint& topLeft)
+void MaskedStrokeCompositor::maskDab(const QImage& dab, const QPoint& topLeft,
+                                     qreal opacity, qreal flow, bool buildup)
 {
     if (!mActive || dab.isNull()) {
         return;
     }
+    // 副笔刷自己的 opacity/flow/涂料模式（Krita 蒙版投影 = 副预设完整语义：
+    // 满不透明度饱和成并集；低不透明度形成低覆盖 → burn 深切出宽飞白）
+    DabPasteParams params;
+    params.opacity = qBound(0.0, opacity, 1.0);
+    params.flow = qBound(0.0, flow, 1.0);
+    params.buildup = buildup;
+    if (params.opacity <= 0.0 || params.flow <= 0.0) {
+        return; // 无墨不累积也不扩复合范围（Krita：零不透明度 dab 不产生 dirty rect）
+    }
     const QRect dabRect(topLeft, dab.size());
     ensureBuffers(dabRect);
-    // 蒙版范围 = 副笔尖 dab 矩形的并集（Krita 只在 mask extent 上跑复合：
-    // 范围外主笔迹原样保留；范围内但未覆盖处按公式处理——burn 类会清零）
-    mExtent = mExtent.isNull() ? dabRect : mExtent.united(dabRect);
-    // 白色 union 累积：buildup + 满流量 → alpha 朝并集演化（Krita 白漆 ALPHA_DARKEN）
-    DabPasteParams params;
-    params.opacity = 1.0;
-    params.flow = 1.0;
-    params.buildup = true;
+    // 复合范围 = 蒙版 dab 矩形逐个并入的局部并集（Krita：updateProjection 按
+    // 蒙版 dirty rect 跑）。不能用包围盒：burn/hard_mix 在 src=0 处清零半透明
+    // 像素，全包围盒复合会把蒙版带之外所有浓淡渐变/软边烧穿
+    mExtent += dabRect;
     washBlendImage(mCover, dab, topLeft - mOrigin, params);
 }
 
@@ -193,32 +199,25 @@ QImage MaskedStrokeCompositor::composedRegion(const QRect& rect, QPoint& outOrig
         }
     };
 
-    const QRect inExtent = mExtent.isNull() ? QRect() : clipped.intersected(mExtent);
+    // 先整块原样拷贝主笔迹（蒙版矩形并集之外永不复合——burn/hard_mix 的
+    // src=0 清零只允许发生在蒙版 dab 矩形内部，这是 Krita 的飞白语义边界）
     for (int y = 0; y < clipped.height(); ++y) {
-        const int canvasY = clipped.y() + y;
-        const bool rowInExtent = !inExtent.isEmpty()
-                                 && canvasY >= inExtent.top()
-                                 && canvasY <= inExtent.bottom();
-        if (!rowInExtent) {
-            fillRange(y, 0, clipped.width() - 1, false);
-            continue;
+        fillRange(y, 0, clipped.width() - 1, false);
+    }
+    // 蒙版 dab 矩形并集内逐像素复合（QRegion 的矩形互不重叠）
+    const QRegion inRegion = mExtent.intersected(clipped);
+    for (const QRect& r : inRegion) {
+        const QRect local(r.topLeft() - clipped.topLeft(), r.size());
+        for (int y = local.top(); y <= local.bottom(); ++y) {
+            fillRange(y, local.left(), local.right(), true);
         }
-        const int inLeft = qMax(0, inExtent.left() - clipped.x());
-        const int inRight = qMin(clipped.width() - 1, inExtent.right() - clipped.x());
-        if (inLeft > 0) {
-            fillRange(y, 0, inLeft - 1, false);
-        }
-        if (inRight < clipped.width() - 1) {
-            fillRange(y, inRight + 1, clipped.width() - 1, false);
-        }
-        fillRange(y, inLeft, inRight, true);
     }
     outOrigin = clipped.topLeft();
     return region;
 }
 
 void MaskedStrokeCompositor::applyMaskOpToImage(QImage& main, const QImage& cover,
-                                                BrushMaskSettings::Mode mode)
+                                                const QRegion& extent, BrushMaskSettings::Mode mode)
 {
     if (main.isNull() || cover.isNull()) {
         return;
@@ -226,30 +225,37 @@ void MaskedStrokeCompositor::applyMaskOpToImage(QImage& main, const QImage& cove
     Q_ASSERT(main.format() == QImage::Format_ARGB32_Premultiplied
              && cover.format() == QImage::Format_ARGB32_Premultiplied);
     const QRect overlap = main.rect().intersected(cover.rect());
-    for (int y = overlap.top(); y <= overlap.bottom(); ++y) {
-        QRgb* line = reinterpret_cast<QRgb*>(main.scanLine(y));
-        const QRgb* coverLine = reinterpret_cast<const QRgb*>(cover.constScanLine(y));
-        for (int x = overlap.left(); x <= overlap.right(); ++x) {
-            const int src = qAlpha(coverLine[x]);
-            const QRgb dp = line[x];
-            const int dst = qAlpha(dp);
-            if (src == 0 && dst == 0) {
-                continue;
-            }
-            const int newA = qRound(maskOp(mode, src / 255.0, dst / 255.0) * 255.0);
-            if (newA == dst || dst == 0) {
-                continue;
-            }
-            if (newA == 0) {
-                line[x] = 0;
-            } else {
-                const qreal s = newA / qreal(dst);
-                line[x] = qPremultiply(qRgba(qMin(255, qRound(qRed(dp) * s)),
-                                             qMin(255, qRound(qGreen(dp) * s)),
-                                             qMin(255, qRound(qBlue(dp) * s)),
-                                             newA));
+    // 只在蒙版 dab 矩形并集内复合（与 composedRegion 的带状语义一致）
+    const QRegion inRegion = extent.intersected(overlap);
+    const auto applyRect = [&](const QRect& rc) {
+        for (int y = rc.top(); y <= rc.bottom(); ++y) {
+            QRgb* line = reinterpret_cast<QRgb*>(main.scanLine(y));
+            const QRgb* coverLine = reinterpret_cast<const QRgb*>(cover.constScanLine(y));
+            for (int x = rc.left(); x <= rc.right(); ++x) {
+                const int src = qAlpha(coverLine[x]);
+                const QRgb dp = line[x];
+                const int dst = qAlpha(dp);
+                if (src == 0 && dst == 0) {
+                    continue;
+                }
+                const int newA = qRound(maskOp(mode, src / 255.0, dst / 255.0) * 255.0);
+                if (newA == dst || dst == 0) {
+                    continue;
+                }
+                if (newA == 0) {
+                    line[x] = 0;
+                } else {
+                    const qreal s = newA / qreal(dst);
+                    line[x] = qPremultiply(qRgba(qMin(255, qRound(qRed(dp) * s)),
+                                                 qMin(255, qRound(qGreen(dp) * s)),
+                                                 qMin(255, qRound(qBlue(dp) * s)),
+                                                 newA));
+                }
             }
         }
+    };
+    for (const QRect& r : inRegion) {
+        applyRect(r);
     }
 }
 

@@ -622,11 +622,13 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
     engine.mColor = QColor(238, 238, 238);
     runStroke(engine, painter);
 
-    // 双笔尖：副笔尖沿同一轨迹画白色 union 覆盖层，对主笔迹做 alpha 复合
+    // 双笔尖：副笔尖沿同一轨迹按副预设自己的 opacity/flow/涂料模式画白色
+    // 覆盖层，只在蒙版 dab 矩形并集内对主笔迹做 alpha 复合
     // （KisMaskingBrushRenderer::updateProjection 的预览版）
     if (settings.mask.enabled && settings.mask.sub) {
         QImage cover(size, QImage::Format_ARGB32_Premultiplied);
         cover.fill(Qt::transparent);
+        QRegion coverRegion;
         BrushEngine maskEngine;
         BrushSettings sub = *settings.mask.sub;
         sub.diameter = qMax(1.0, preview.diameter * settings.mask.sizeCoeff);
@@ -640,17 +642,19 @@ QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSi
         sub.mask.sub.reset();
         maskEngine.setSettings(sub);
 
-        const auto coverPainter = [&cover](const DabRequest& dab) {
+        const auto coverPainter = [&cover, &coverRegion](const DabRequest& dab) {
             DabPasteParams params;
-            params.opacity = 1.0;
-            params.flow = 1.0;
-            params.buildup = true;
+            params.opacity = dab.opacity;
+            params.flow = dab.flow;
+            params.buildup = dab.buildup;
             washBlendImage(cover, dab.dab, dab.topLeft, params);
+            coverRegion += QRect(dab.topLeft, dab.dab.size());
         };
         maskEngine.mColor = Qt::white;
         runStroke(maskEngine, coverPainter);
 
-        MaskedStrokeCompositor::applyMaskOpToImage(strokeLayer, cover, settings.mask.mode);
+        MaskedStrokeCompositor::applyMaskOpToImage(strokeLayer, cover, coverRegion,
+                                                   settings.mask.mode);
     }
 
     QPainter composer(&image);

@@ -1425,12 +1425,13 @@ void ScribbleArea::endMaskedStroke()
     mMaskCompositor.end();
 }
 
-void ScribbleArea::drawMaskDab(const QImage& dab, const QPoint& topLeft)
+void ScribbleArea::drawMaskDab(const QImage& dab, const QPoint& topLeft,
+                               qreal opacity, qreal flow, bool buildup)
 {
     if (!mMaskCompositor.active()) {
         return;
     }
-    mMaskCompositor.maskDab(dab, topLeft);
+    mMaskCompositor.maskDab(dab, topLeft, opacity, flow, buildup);
     composeRegionToTiles(QRect(topLeft, dab.size()));
 }
 
