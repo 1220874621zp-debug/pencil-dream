@@ -21,6 +21,7 @@ set(TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_filemanager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_bitmapimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_colorizeengine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_shadowengine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_mlswarp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_deformtool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/src/test_bitmapbucket.cpp
