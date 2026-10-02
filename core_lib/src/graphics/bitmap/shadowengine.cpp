@@ -273,8 +273,11 @@ Result computeShadow(const QImage& lineArt,
             }
             compQueue.clear();
         }
-    }    // ③ 方向判定：同图形子区域沿所选轴比较质心，取极端者；
-    //    极端者与次极端之差小于阈值 = 不好判断（整组歧义）
+    }
+    // ③ 方向判定：同图形子区域沿所选轴比较质心——阴影=极端组（与极端值
+    //    相差 ≤ 阈值的所有子区域，十字切割并列的整列一起中选）；极端组
+    //    =全部子区域（分割线与所选方向垂直/并列，方向无信息）→ 整组交给
+    //    空间邻近继承与兜底
     enum State
     {
         Unknown = 0,
@@ -286,35 +289,48 @@ Result computeShadow(const QImage& lineArt,
     const bool axisX = (params.direction == DirLeft || params.direction == DirRight);
     const bool takeMax = (params.direction == DirRight || params.direction == DirDown);
 
+    // (沿轴坐标, 次轴坐标, 子区域下标)——次轴用于兜底的确定性并列破缺
+    const auto buildCoords = [&](const QVector<int>& children)
+    {
+        QVector<QPair<QPair<qint64, qint64>, int>> coords;
+        for (int idx : children)
+        {
+            const QPoint c = subSeg.regions[idx].centroid;
+            const qint64 axisCoord = axisX ? c.x() : c.y();
+            const qint64 otherCoord = axisX ? c.y() : c.x();
+            coords.append(qMakePair(qMakePair(axisCoord, otherCoord), idx));
+        }
+        std::sort(coords.begin(), coords.end());
+        return coords;
+    };
+
     for (auto it = shapeChildren.constBegin(); it != shapeChildren.constEnd(); ++it)
     {
         const QVector<int>& children = it.value();
         if (children.size() < 2)
             continue;
 
-        QVector<QPair<qint64, int>> coords;
-        for (int idx : children)
-        {
-            const QPoint c = subSeg.regions[idx].centroid;
-            coords.append(qMakePair(axisX ? static_cast<qint64>(c.x()) : static_cast<qint64>(c.y()), idx));
-        }
-        std::sort(coords.begin(), coords.end());
-
-        const int extremeIdx = takeMax ? coords.size() - 1 : 0;
-        const int secondIdx = takeMax ? coords.size() - 2 : 1;
-        const qint64 diff = qAbs(coords[extremeIdx].first - coords[secondIdx].first);
-
+        const auto coords = buildCoords(children);
         const Colorize::RegionLabel& shape = shapeSeg.regions[it.key() - 1];
         const qint64 extent = axisX ? shape.bounds.width() : shape.bounds.height();
         const qreal threshold = qMax<qreal>(params.ambiguityMinPx, params.ambiguityRatio * extent);
-        if (diff < threshold)
-            continue; // 整组歧义，交给空间邻近继承
 
-        state[coords[extremeIdx].second] = IsShadow;
-        for (int i = 0; i < coords.size(); ++i)
+        const qint64 extremeCoord = takeMax ? coords.last().first.first : coords.first().first.first;
+        QVector<int> extremeGroup;
+        for (const auto& c : coords)
         {
-            if (i != extremeIdx)
-                state[coords[i].second] = IsNotShadow;
+            if (qAbs(c.first.first - extremeCoord) <= threshold)
+                extremeGroup.append(c.second);
+        }
+        if (extremeGroup.size() == coords.size())
+            continue; // 方向无信息，交给空间邻近继承与兜底
+
+        for (int idx : extremeGroup)
+            state[idx] = IsShadow;
+        for (const auto& c : coords)
+        {
+            if (!extremeGroup.contains(c.second))
+                state[c.second] = IsNotShadow;
         }
     }
 
@@ -369,6 +385,36 @@ Result computeShadow(const QImage& lineArt,
                 state[r] = state[best];
             else
                 unresolvedShapes.insert(parentOf[r]);
+        }
+    }
+
+    // ④b 兜底：方向无信息且同帧无可借鉴（邻近继承未覆盖）→ 按所选方向
+    //    取极端、并列按次轴字典序确定性选边——被切割的图形必有填充，
+    //    警告仍会提示用户核对
+    for (auto it = shapeChildren.constBegin(); it != shapeChildren.constEnd(); ++it)
+    {
+        const QVector<int>& children = it.value();
+        if (children.size() < 2 || !dividedShapes.contains(it.key()))
+            continue;
+        bool anyUnknown = false;
+        for (int idx : children)
+        {
+            if (state[idx] == Unknown)
+            {
+                anyUnknown = true;
+                break;
+            }
+        }
+        if (!anyUnknown)
+            continue;
+
+        const auto coords = buildCoords(children);
+        const int pickIdx = takeMax ? coords.last().second : coords.first().second;
+        state[pickIdx] = IsShadow;
+        for (const auto& c : coords)
+        {
+            if (c.second != pickIdx && state[c.second] == Unknown)
+                state[c.second] = IsNotShadow;
         }
     }
 

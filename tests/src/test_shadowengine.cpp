@@ -186,10 +186,10 @@ TEST_CASE("ShadowFill_TransparentMarkerDisablesLine")
     CHECK(isTransparent(result.fill, 120, 100));
 }
 
-TEST_CASE("ShadowFill_EnabledCrossMakesTieAmbiguous")
+TEST_CASE("ShadowFill_CrossDividersPickLeftFillsLeftColumn")
 {
-    // 同一画布，蓝线不标透明：十字切割出四个象限，选"左"时左右两列
-    // 质心成对并列 → 极端者与次极端差为 0 → 整组歧义，且同帧无可借鉴
+    // 十字切割出四个象限，选"左"：极端组规则把并列的整列一起判给
+    // 所选方向——左列两个象限均为阴影（横线对左右无信息，不拖累判定）
     QImage lineArt = makeCanvas(200, 200);
     drawSquareOutline(lineArt, QRect(10, 10, 180, 180));
     QImage strokes = makeCanvas(200, 200);
@@ -200,9 +200,29 @@ TEST_CASE("ShadowFill_EnabledCrossMakesTieAmbiguous")
     params.direction = ShadowFill::DirLeft;
     ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(0, 0, 200, 200), params);
 
-    CHECK(result.fill.isNull());
+    REQUIRE_FALSE(result.fill.isNull());
+    CHECK(result.warnings.isEmpty());
+    CHECK(isColor(result.fill, 30, 50, qRgb(0, 0, 0)));
+    CHECK(isColor(result.fill, 30, 150, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 120, 50));
+    CHECK(isTransparent(result.fill, 120, 150));
+}
+
+TEST_CASE("ShadowFill_UndecidableFallsBackDeterministic")
+{
+    // 全帧唯一图形且方向无信息（横线配"左"）、无可借鉴 → 兜底确定性
+    // 选边（并列按次轴字典序，取质心 y 最小的上侧）必有填充，警告保留
+    FramePair fp = makeSquareWithLine(QLine(8, 100, 192, 100));
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    ShadowFill::Result result = ShadowFill::computeShadow(fp.lineArt, fp.strokes, QRect(0, 0, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
     REQUIRE(result.warnings.size() == 1);
     CHECK(result.warnings[0].kind == ShadowFill::Warning::UnresolvedAmbiguous);
+    CHECK(isColor(result.fill, 100, 50, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 100, 150));
 }
 
 TEST_CASE("ShadowFill_ThreeStripsPickLeftmost")
@@ -313,8 +333,8 @@ TEST_CASE("LayerShadow_UpdateAtFrame")
     REQUIRE_FALSE(frame->shadowImage().isNull());
     CHECK(frame->needsUpdate() == false);
     CHECK(frame->computedStructureGeneration() == gen);
-    // 阴影填在左半（默认方向=左）
-    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(0, 0, 0)));
+    // 阴影填在左半（默认方向=左，层默认填充色=中灰）
+    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(128, 128, 128)));
     CHECK(isTransparent(frame->shadowImage(), 150, 100));
 
     // 结构代数变化后缓存应视为过期
@@ -409,6 +429,6 @@ TEST_CASE("LayerShadow_OffsetContentNoCrash")
     REQUIRE(frame != nullptr);
     REQUIRE_FALSE(frame->shadowImage().isNull());
     // fill 为 bounds 本地坐标：分割线在本地 x≈92，左半为阴影
-    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(0, 0, 0)));
+    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(128, 128, 128)));
     CHECK(isTransparent(frame->shadowImage(), 150, 100));
 }

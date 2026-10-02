@@ -90,7 +90,7 @@ protected:
 
 private:
     ShadowFill::Direction mDirection = ShadowFill::DirLeft;
-    QRgb mFillColor = qRgb(0, 0, 0);
+    QRgb mFillColor = qRgb(128, 128, 128); // 默认中灰：黑色色块在深色面板上看不出
     qreal mGapRadius = 4.0;
     QRgb mMarkerColors[kMarkerSlotCount] = { qRgb(255, 0, 0), qRgb(255, 255, 0), qRgb(0, 0, 255) };
     bool mMarkerTransparent[kMarkerSlotCount] = { false, false, false };

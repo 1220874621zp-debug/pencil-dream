@@ -56,10 +56,19 @@ QIcon makeSwatchIcon(QRgb color, bool transparentMarked)
         p2.setBrush(QColor(color));
         p2.drawRect(0, 14, 6, 6);
         p2.end();
+        QPainter p3(&pm);
+        p3.setPen(QPen(QColor(0x60, 0x60, 0x60), 1));
+        p3.drawRect(0, 0, 19, 19);
+        p3.end();
     }
     else
     {
         pm.fill(QColor(color));
+        // 1px 对比描边：黑/白按明度自动选，深色面板上黑色块也可辨
+        QPainter p(&pm);
+        p.setPen(QPen(qGray(color) < 128 ? QColor(0xE8, 0xE8, 0xE8) : QColor(0x20, 0x20, 0x20), 1));
+        p.drawRect(0, 0, 19, 19);
+        p.end();
     }
     return QIcon(pm);
 }
@@ -275,7 +284,7 @@ void ShadowOptionsWidget::refreshWarnings()
     if (unclosed > 0)
         parts << tr("%1 个图形的分割线未完全切开（线尾需搭到线稿，或调大闭缝半径）").arg(unclosed);
     if (unresolved > 0)
-        parts << tr("%1 个图形无法判定阴影侧且无可借鉴的邻近判定").arg(unresolved);
+        parts << tr("%1 个图形按所选方向无法判定（已取默认侧填充，建议核对）").arg(unresolved);
     mWarningLabel->setText(parts.join("；"));
     mWarningLabel->show();
 }
