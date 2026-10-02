@@ -69,6 +69,8 @@ set(CORE_LIB_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layerbitmap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercolorize.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layershadow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/shadowimage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/colorizeimage.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.h
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.h
@@ -189,6 +191,8 @@ set(CORE_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layerbitmap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercolorize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layershadow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/shadowimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/colorizeimage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layercamera.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/core_lib/src/structure/layersound.cpp

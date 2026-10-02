@@ -33,8 +33,10 @@ GNU General Public License for more details.
 #include "undoredomanager.h"
 #include "layerbitmap.h"
 #include "layercolorize.h"
+#include "layershadow.h"
 #include "colorizeupdatemanager.h"
 #include "colorizeimage.h"
+#include "shadowimage.h"
 #include "layercamera.h"
 #include "bitmapimage.h"
 #include "blitrect.h"
@@ -810,6 +812,14 @@ void ScribbleArea::pointerPressEvent(PointerEvent* event)
             event->ignore();
             return;
         }
+        // 智能阴影层：编辑模式关闭时只看阴影结果，分割线不可绘制
+        if (layer->type() == Layer::SHADOW
+            && !static_cast<LayerShadow*>(layer)->editLines()
+            && currentTool()->isDrawingTool())
+        {
+            event->ignore();
+            return;
+        }
     }
 
     if (event->buttons() & (Qt::MiddleButton | Qt::RightButton) &&
@@ -1006,6 +1016,19 @@ void ScribbleArea::paintBitmapBuffer()
         }
 
         // 广播 frameModified：选项面板颜色列表与时间轴待更新点据此刷新
+        mEditor->setModified(mEditor->layers()->currentLayerIndex(), frameNumber);
+    }
+
+    // 智能阴影层：分割线落帧即失效阴影填充缓存（同上覆盖帧情形）
+    if (layer->type() == Layer::SHADOW)
+    {
+        if (auto* shadowLayer = static_cast<LayerShadow*>(layer);
+            shadowLayer->getLastShadowImageAtFrame(frameNumber) != nullptr)
+        {
+            shadowLayer->getLastShadowImageAtFrame(frameNumber)->setNeedsUpdate(true);
+        }
+
+        // 广播 frameModified：选项面板警告行据此刷新
         mEditor->setModified(mEditor->layers()->currentLayerIndex(), frameNumber);
     }
 

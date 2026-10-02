@@ -35,6 +35,7 @@ class StrokeOptionsWidget;
 class TransformOptionsWidget;
 class OnionAlignOptionsWidget;
 class PantoOptionsWidget;
+class ShadowOptionsWidget;
 
 class ToolOptionWidget : public BaseDockWidget
 {
@@ -71,6 +72,7 @@ private:
     TransformOptionsWidget* mTransformOptionsWidget = nullptr;
     OnionAlignOptionsWidget* mOnionAlignOptionsWidget = nullptr;
     PantoOptionsWidget* mPantoOptionsWidget = nullptr;
+    ShadowOptionsWidget* mShadowOptionsWidget = nullptr;
 };
 
 #endif // TOOLOPTIONDOCKWIDGET_H

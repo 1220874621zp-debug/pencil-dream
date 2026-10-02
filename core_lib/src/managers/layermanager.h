@@ -68,6 +68,7 @@ public:
     Layer* createLayer(Layer::LAYER_TYPE type, const QString& strLayerName);
     LayerBitmap* createBitmapLayer(const QString& strLayerName);
     LayerBitmap* createColorizeLayer(const QString& strLayerName);
+    LayerBitmap* createShadowLayer(const QString& strLayerName);
     LayerCamera* createCameraLayer(const QString& strLayerName);
     LayerSound*  createSoundLayer(const QString& strLayerName);
     LayerVideo*  createVideoLayer(const QString& strLayerName);

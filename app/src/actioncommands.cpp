@@ -1085,6 +1085,13 @@ Status ActionCommands::addNewColorizeLayer()
     return Status::OK;
 }
 
+Status ActionCommands::addNewShadowLayer()
+{
+    // 静默建层（同填色层）：直接用建议名，不弹命名对话框打断流程
+    mEditor->layers()->createShadowLayer(mEditor->layers()->nameSuggestLayer(tr("Shadow Layer")));
+    return Status::OK;
+}
+
 Status ActionCommands::addNewCameraLayer()
 {
     bool ok;

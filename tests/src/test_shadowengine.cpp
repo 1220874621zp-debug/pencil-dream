@@ -263,3 +263,92 @@ TEST_CASE("ShadowFill_EmptyStrokeLayerNoFill")
     CHECK(result.fill.isNull());
     CHECK(result.warnings.isEmpty());
 }
+
+// ============== 层级集成（LayerShadow 接线） ==============
+
+#include "object.h"
+#include "layershadow.h"
+#include "shadowimage.h"
+#include "layerbitmap.h"
+#include <QDomDocument>
+#include <QTemporaryDir>
+
+namespace
+{
+
+// 位图层方形线稿 + 阴影层竖直分割线，跑一次 updateShadowAtFrame
+void makeLayerFixture(Object* obj, LayerShadow** outShadow)
+{
+    auto* lineLayer = obj->addNewBitmapLayer();
+    lineLayer->setName("line");
+    QImage square = makeCanvas(200, 200);
+    drawSquareOutline(square, QRect(10, 10, 180, 180));
+    *lineLayer->getLastBitmapImageAtFrame(1) = BitmapImage(QPoint(0, 0), square);
+
+    auto* shadowLayer = static_cast<LayerShadow*>(obj->addNewShadowLayer());
+    shadowLayer->setName("shadow");
+    QImage strokes = makeCanvas(200, 200);
+    drawStrokeLine(strokes, QLine(100, 8, 100, 192), QColor(255, 0, 0));
+    *static_cast<BitmapImage*>(shadowLayer->getLastShadowImageAtFrame(1)) = BitmapImage(QPoint(0, 0), strokes);
+
+    *outShadow = shadowLayer;
+}
+
+} // namespace
+
+TEST_CASE("LayerShadow_UpdateAtFrame")
+{
+    Object obj;
+    LayerShadow* shadowLayer = nullptr;
+    makeLayerFixture(&obj, &shadowLayer);
+    REQUIRE(shadowLayer != nullptr);
+
+    const quint32 gen = obj.layerStructureGeneration();
+    LayerBitmap* source = obj.getColorizeSourceLayer(obj.getLayerCount() - 1, 1);
+    REQUIRE(source != nullptr);
+
+    REQUIRE(shadowLayer->updateShadowAtFrame(1, source, gen));
+    ShadowImage* frame = shadowLayer->getShadowImageAtFrame(1);
+    REQUIRE(frame != nullptr);
+    REQUIRE_FALSE(frame->shadowImage().isNull());
+    CHECK(frame->needsUpdate() == false);
+    CHECK(frame->computedStructureGeneration() == gen);
+    // 阴影填在左半（默认方向=左）
+    CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(frame->shadowImage(), 150, 100));
+
+    // 结构代数变化后缓存应视为过期
+    obj.addNewBitmapLayer();
+    CHECK(frame->computedStructureGeneration() != obj.layerStructureGeneration());
+}
+
+TEST_CASE("LayerShadow_XmlRoundtrip")
+{
+    Object obj;
+    LayerShadow* shadowLayer = nullptr;
+    makeLayerFixture(&obj, &shadowLayer);
+    shadowLayer->setDirection(ShadowFill::DirRight);
+    shadowLayer->setFillColor(qRgb(30, 40, 50));
+    shadowLayer->setGapRadius(6.0);
+    shadowLayer->setMarkerColor(1, qRgb(10, 200, 30));
+    shadowLayer->setMarkerTransparent(2, true);
+    shadowLayer->setEditLines(false);
+    shadowLayer->setShowFill(false);
+
+    QDomDocument doc;
+    QDomElement elem = shadowLayer->createDomElement(doc);
+
+    LayerShadow restored(999);
+    restored.loadDomElement(elem, QDir::temp().absolutePath(), []() {});
+
+    CHECK(restored.direction() == ShadowFill::DirRight);
+    CHECK(restored.fillColor() == qRgb(30, 40, 50));
+    CHECK(restored.gapRadius() == 6.0);
+    CHECK(restored.markerColor(1) == qRgb(10, 200, 30));
+    CHECK(restored.markerTransparent(2) == true);
+    CHECK(restored.markerTransparent(0) == false);
+    CHECK(restored.editLines() == false);
+    CHECK(restored.showFill() == false);
+    // 关键帧内容由 loadDomElement 从 dataDir 数据文件恢复，
+    // 裸 DOM 单测无数据文件，帧内容回读由 FileManager 全链测试覆盖
+}

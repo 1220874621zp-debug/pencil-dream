@@ -28,6 +28,7 @@ GNU General Public License for more details.
 #include "transformoptionswidget.h"
 #include "onionalignoptionswidget.h"
 #include "pantooptionswidget.h"
+#include "shadowoptionswidget.h"
 #include "spinslider.h"
 #include "editor.h"
 #include "util.h"
@@ -72,6 +73,8 @@ void ToolOptionWidget::initUI()
     mOnionAlignOptionsWidget->setHidden(true);
     mPantoOptionsWidget = new PantoOptionsWidget(editor(), this);
     mPantoOptionsWidget->setHidden(true);
+    mShadowOptionsWidget = new ShadowOptionsWidget(editor(), this);
+    mShadowOptionsWidget->setHidden(true);
     ui->scrollAreaWidgetContents->layout()->addWidget(mBucketOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mCameraOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mColorizeOptionsWidget);
@@ -80,6 +83,7 @@ void ToolOptionWidget::initUI()
     ui->scrollAreaWidgetContents->layout()->addWidget(mTransformOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mOnionAlignOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addWidget(mPantoOptionsWidget);
+    ui->scrollAreaWidgetContents->layout()->addWidget(mShadowOptionsWidget);
     ui->scrollAreaWidgetContents->layout()->addItem(new QSpacerItem(0, 0, QSizePolicy::MinimumExpanding, QSizePolicy::Expanding));
 
     makeConnectionToEditor(editor());
@@ -117,6 +121,8 @@ void ToolOptionWidget::updateUIForTool(BaseTool* tool)
     Layer* currentLayer = editor()->layers()->currentLayer();
     setWidgetVisibility(mColorizeOptionsWidget,
                         currentLayer != nullptr && currentLayer->type() == Layer::COLORIZE);
+    setWidgetVisibility(mShadowOptionsWidget,
+                        currentLayer != nullptr && currentLayer->type() == Layer::SHADOW);
     const bool isBrushLike = tool->type() == BRUSH || tool->type() == ERASER || tool->type() == SMUDGE;
     setWidgetVisibility(mBrushOptionsWidget, isBrushLike);
     setWidgetVisibility(mStrokeOptionsWidget, editor()->tools()->isStrokeTool(tool) && !isBrushLike);

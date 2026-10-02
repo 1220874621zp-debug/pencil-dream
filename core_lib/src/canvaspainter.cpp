@@ -25,6 +25,8 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "layercolorize.h"
 #include "colorizeimage.h"
+#include "layershadow.h"
+#include "shadowimage.h"
 #include "bitmapimage.h"
 #include "tile.h"
 #include "tiledbuffer.h"
@@ -691,6 +693,10 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
             paintCurrentColorizeFrame(painter, blitRect, layer, i, isCurrentLayer);
             break;
         }
+        case Layer::SHADOW: {
+            paintCurrentShadowFrame(painter, blitRect, layer, isCurrentLayer);
+            break;
+        }
         case Layer::MOVIE: {
             paintVideoFrame(painter, layer);
             break;
@@ -698,6 +704,53 @@ void CanvasPainter::paintCurrentFrame(QPainter& painter, const QRect& blitRect, 
         default: break;
         }
     }
+}
+
+void CanvasPainter::paintCurrentShadowFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer)
+{
+    auto shadowLayer = static_cast<LayerShadow*>(layer);
+    ShadowImage* frame = shadowLayer->getLastShadowImageAtFrame(mFrameNumber);
+    if (frame == nullptr) { return; }
+    frame->loadFile();
+
+    const bool isDrawing = mTiledBuffer && !mTiledBuffer->bounds().isEmpty();
+
+    QPainter currentShadowPainter;
+    initializePainter(currentShadowPainter, mCurrentLayerPixmap, blitRect);
+
+    painter.setWorldMatrixEnabled(false);
+
+    // 1) 阴影填充垫底（渲染于线稿之下的层序由图层栈保证，这里按层不透明度画）
+    if (shadowLayer->showFill() && !frame->shadowImage().isNull())
+    {
+        currentShadowPainter.setOpacity(frame->getOpacity() - (1.0 - painter.opacity()));
+        currentShadowPainter.drawImage(frame->shadowBounds().topLeft(), frame->shadowImage());
+    }
+
+    // 2) 分割线半透明显示（编辑模式开时可见——标记线不喧宾夺主）
+    if (shadowLayer->editLines() && frame->image() != nullptr && !frame->image()->isNull())
+    {
+        currentShadowPainter.setOpacity(qBound(0.0, painter.opacity() * 0.6, 1.0));
+        currentShadowPainter.drawImage(frame->topLeft(), *frame->image());
+    }
+
+    // 3) 当前层实时笔画缓冲（正在画）
+    if (isCurrentLayer && isDrawing)
+    {
+        currentShadowPainter.setOpacity(qBound(0.0, painter.opacity() * 0.6, 1.0));
+        currentShadowPainter.setCompositionMode(mOptions.cmBufferBlendMode);
+        if (!mSelectionClipPath.isEmpty()) {
+            currentShadowPainter.setClipPath(mSelectionClipPath);
+        }
+        const auto tiles = mTiledBuffer->tiles();
+        for (const Tile* tile : tiles) {
+            currentShadowPainter.drawPixmap(tile->posF(), tile->pixmap());
+        }
+    }
+
+    currentShadowPainter.end();
+
+    painter.drawPixmap(mPointZero, mCurrentLayerPixmap);
 }
 
 void CanvasPainter::paintVideoFrame(QPainter& painter, Layer* layer)

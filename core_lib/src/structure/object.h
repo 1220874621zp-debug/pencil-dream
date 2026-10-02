@@ -120,6 +120,7 @@ public:
     void syncVideoLayersTo(int frame, double projectFps, QWidget* repaintTarget = nullptr, bool playing = true);
     LayerCamera* addNewCameraLayer();
     LayerBitmap* addNewColorizeLayer();
+    LayerBitmap* addNewShadowLayer();
 
     int  getLayerCount() const;
     Layer* getLayer(int i) const;

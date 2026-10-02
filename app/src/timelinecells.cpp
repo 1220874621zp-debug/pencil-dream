@@ -39,6 +39,8 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "layervideo.h"
 #include "colorizeimage.h"
+#include "shadowimage.h"
+#include "layershadow.h"
 #include "bitmapimage.h"
 
 #include "camerapropertiesdialog.h"
@@ -880,7 +882,7 @@ void TimeLineCells::paintCollapsedTrack(QPainter& painter, const Layer* layer, i
 {
     QColor col;
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
-    if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::COLORIZE || layer->type() == Layer::SHADOW) col = Theme::LayerBitmap;
     if (layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
     painter.setPen(Qt::NoPen);
@@ -911,7 +913,7 @@ void TimeLineCells::paintTrack(QPainter& painter, const Layer* layer,
     // the layer type color only feeds the block cards / accents, the track
     // itself stays dark (TVP) so the label color reads clearly
     if (layer->type() == Layer::BITMAP) col = Theme::LayerBitmap;
-    if (layer->type() == Layer::COLORIZE) col = Theme::LayerBitmap;
+    if (layer->type() == Layer::COLORIZE || layer->type() == Layer::SHADOW) col = Theme::LayerBitmap;
     if (layer->type() == Layer::SOUND || layer->type() == Layer::MOVIE) col = Theme::LayerSound;
     if (layer->type() == Layer::CAMERA) col = Theme::LayerCamera;
 
@@ -1437,6 +1439,19 @@ void TimeLineCells::paintFrames(QPainter& painter, QColor trackCol, const Layer*
             auto colorizeFrame = static_cast<ColorizeImage*>(key);
             if (colorizeFrame->needsUpdate() ||
                 colorizeFrame->computedStructureGeneration() != mEditor->object()->layerStructureGeneration())
+            {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor(0xF5, 0x9E, 0x0B));
+                painter.drawEllipse(QRectF(recLeft + recWidth - 12.0, recTop + recHeight - 12.0, 5.0, 5.0));
+            }
+        }
+
+        // 智能阴影块：填充待更新标记（琥珀点，右下角）
+        if (layer->type() == Layer::SHADOW)
+        {
+            auto shadowFrame = static_cast<ShadowImage*>(key);
+            if (shadowFrame->needsUpdate() ||
+                shadowFrame->computedStructureGeneration() != mEditor->object()->layerStructureGeneration())
             {
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(QColor(0xF5, 0x9E, 0x0B));
@@ -2022,7 +2037,7 @@ void TimeLineCells::paintLabel(QPainter& painter, const Layer* layer,
     // 行类型图标：SVG 按 DPR 一次性栅格化后缓存（原来每行每次重绘都重新
     // 从资源加载并缩放；顺便补上 devicePixelRatio，高 DPI 下不再模糊）
     const char* typeIconRes = nullptr;
-    if (layer->type() == Layer::BITMAP || layer->type() == Layer::COLORIZE) typeIconRes = ":icons/themes/playful/timeline/cell-bitmap.svg";
+    if (layer->type() == Layer::BITMAP || layer->type() == Layer::COLORIZE || layer->type() == Layer::SHADOW) typeIconRes = ":icons/themes/playful/timeline/cell-bitmap.svg";
     else if (layer->type() == Layer::SOUND) typeIconRes = ":icons/themes/playful/timeline/cell-sound.svg";
     else if (layer->type() == Layer::MOVIE) typeIconRes = ":icons/themes/playful/timeline/cell-video.svg";
     else if (layer->type() == Layer::CAMERA) typeIconRes = ":icons/themes/playful/timeline/cell-camera.svg";

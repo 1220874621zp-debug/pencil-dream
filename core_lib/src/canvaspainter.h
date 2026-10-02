@@ -171,6 +171,9 @@ private:
 
     /** 智能填色层：着色缓存 + 笔画（含当前层实时笔画缓冲） */
     void paintCurrentColorizeFrame(QPainter& painter, const QRect& blitRect, Layer* layer, int layerIndex, bool isCurrentLayer);
+
+    /** 智能阴影层：阴影填充缓存 + 分割线（含当前层实时笔画缓冲） */
+    void paintCurrentShadowFrame(QPainter& painter, const QRect& blitRect, Layer* layer, bool isCurrentLayer);
     void paintVideoFrame(QPainter& painter, Layer* layer);
 
     // --- clipping-mask compositing ----------------------------------------

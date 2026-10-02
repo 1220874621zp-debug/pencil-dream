@@ -78,6 +78,7 @@ signals:
 
     void newBitmapLayer();
     void newColorizeLayer();
+    void newShadowLayer();
     void newSoundLayer();
     void newCameraLayer();
 

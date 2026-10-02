@@ -58,6 +58,7 @@ QString layerTypeName(Layer* layer)
     {
     case Layer::BITMAP:   return QStringLiteral("bitmap");
     case Layer::COLORIZE: return QStringLiteral("colorize");
+    case Layer::SHADOW:   return QStringLiteral("shadow");
     case Layer::VECTOR:   return QStringLiteral("vector");
     case Layer::SOUND:    return QStringLiteral("sound");
     case Layer::MOVIE:    return QStringLiteral("reference_video");
@@ -70,6 +71,7 @@ Layer::LAYER_TYPE layerTypeFromName(const QString& name)
 {
     if (name == "bitmap") return Layer::BITMAP;
     if (name == "colorize") return Layer::COLORIZE;
+    if (name == "shadow") return Layer::SHADOW;
     if (name == "camera") return Layer::CAMERA;
     if (name == "sound") return Layer::SOUND;
     if (name == "reference_video") return Layer::MOVIE;
@@ -476,6 +478,7 @@ McpDispatcher::ToolResult McpDispatcher::toolCreateLayer(const QJsonObject& args
         switch (type)
         {
         case Layer::COLORIZE: name = tr("填色层"); break;
+        case Layer::SHADOW:   name = tr("阴影层"); break;
         case Layer::CAMERA:   name = tr("相机层"); break;
         case Layer::SOUND:    name = tr("声音层"); break;
         case Layer::MOVIE:    name = tr("参考视频层"); break;

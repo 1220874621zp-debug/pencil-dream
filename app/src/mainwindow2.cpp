@@ -2090,6 +2090,7 @@ void MainWindow2::makeConnections(Editor* pEditor, TimeLine* pTimeline)
 
     connect(pTimeline, &TimeLine::newBitmapLayer, mCommands, &ActionCommands::addNewBitmapLayer);
     connect(pTimeline, &TimeLine::newColorizeLayer, mCommands, &ActionCommands::addNewColorizeLayer);
+    connect(pTimeline, &TimeLine::newShadowLayer, mCommands, &ActionCommands::addNewShadowLayer);
     connect(mEditor->colorizeUpdates(), &ColorizeUpdateManager::frameUpdated,
             pTimeline, QOverload<>::of(&QWidget::update));
     // 笔画落帧/参数变更 → 待更新琥珀点即时可见

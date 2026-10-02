@@ -34,6 +34,8 @@ GNU General Public License for more details.
 #include "layerbitmap.h"
 #include "layercolorize.h"
 #include "colorizeimage.h"
+#include "layershadow.h"
+#include "shadowimage.h"
 #include "layersound.h"
 #include "layervideo.h"
 #include "layercamera.h"
@@ -146,6 +148,9 @@ bool Object::loadXML(const QDomElement& docElem, ProgressCallback progressForwar
         case Layer::COLORIZE:
             newLayer = new LayerColorize(getUniqueLayerID());
             break;
+        case Layer::SHADOW:
+            newLayer = new LayerShadow(getUniqueLayerID());
+            break;
         default:
             Q_UNREACHABLE();
         }
@@ -204,6 +209,18 @@ LayerBitmap* Object::addNewColorizeLayer()
     ++mLayerStructureGeneration;
 
     return layerColorize;
+}
+
+LayerBitmap* Object::addNewShadowLayer()
+{
+    auto layerShadow = new LayerShadow(getUniqueLayerID());
+    mLayers.append(layerShadow);
+
+    layerShadow->addNewKeyFrameAt(1);
+
+    ++mLayerStructureGeneration;
+
+    return layerShadow;
 }
 
 LayerBitmap* Object::getBitmapLayerAbove(int i) const
@@ -419,7 +436,7 @@ int Object::getIndex(Layer* layer) const
 void Object::invalidateColorizeBelow(int layerIndex, int frameNumber)
 {
     // 从被编辑的位图层向下走：遇到下一个位图层即止（它挡住了线稿源关系），
-    // 途经的填色层都以被编辑层为线稿源
+    // 途经的填色/阴影层都以被编辑层为线稿源
     for (int i = layerIndex + 1; i < mLayers.size(); ++i)
     {
         Layer* layer = mLayers.at(i);
@@ -439,6 +456,23 @@ void Object::invalidateColorizeBelow(int layerIndex, int frameNumber)
             else
             {
                 if (auto* frame = colorizeLayer->getLastColorizeImageAtFrame(frameNumber))
+                    frame->setNeedsUpdate(true);
+            }
+        }
+        else if (layer->type() == Layer::SHADOW)
+        {
+            auto shadowLayer = static_cast<LayerShadow*>(layer);
+            if (frameNumber < 0)
+            {
+                shadowLayer->foreachKeyFrame([](KeyFrame* key)
+                {
+                    if (auto* frame = static_cast<ShadowImage*>(key))
+                        frame->setNeedsUpdate(true);
+                });
+            }
+            else
+            {
+                if (auto* frame = shadowLayer->getLastShadowImageAtFrame(frameNumber))
                     frame->setNeedsUpdate(true);
             }
         }
@@ -1409,6 +1443,32 @@ void Object::paintImage(QPainter& painter,int frameNumber,
                     {
                         painter.setOpacity(frame->getOpacity() - (1.0 - layer->opacity()));
                         painter.drawImage(frame->coloringBounds().topLeft(), frame->coloringImage());
+                    }
+                }
+            }
+            else if (layer->type() == Layer::SHADOW)
+            {
+                // 导出/渲染为最终观感：只画阴影填充（受显示开关控制），
+                // 分割线不进导出；离线路径上过期帧同步兜底重算
+                auto layerShadow = static_cast<LayerShadow*>(layer);
+                ShadowImage* frame = static_cast<ShadowImage*>(layerShadow->getKeyFrameWhichCovers(
+                    layerShadow->displayFrameFor(frameNumber)));
+                if (frame)
+                {
+                    frame->loadFile();
+                    if (frame->needsUpdate() ||
+                        frame->computedStructureGeneration() != layerStructureGeneration())
+                    {
+                        layerShadow->updateShadowAtFrame(frameNumber,
+                                                         getColorizeSourceLayer(layerIndex, frameNumber),
+                                                         layerStructureGeneration());
+                        frame = static_cast<ShadowImage*>(layerShadow->getKeyFrameWhichCovers(
+                            layerShadow->displayFrameFor(frameNumber)));
+                    }
+                    if (frame && layerShadow->showFill() && !frame->shadowImage().isNull())
+                    {
+                        painter.setOpacity(frame->getOpacity() - (1.0 - layer->opacity()));
+                        painter.drawImage(frame->shadowBounds().topLeft(), frame->shadowImage());
                     }
                 }
             }

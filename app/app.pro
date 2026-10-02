@@ -84,6 +84,7 @@ HEADERS += \
     src/layeropacitydialog.h \
     src/mainwindow2.h \
     src/colorizeoptionswidget.h \
+    src/shadowoptionswidget.h \
     src/onionskinwidget.h \
     src/predefinedsetmodel.h \
     src/pegbaralignmentdialog.h \
@@ -144,6 +145,7 @@ SOURCES += \
     src/basewidget.cpp \
     src/buttonappearancewatcher.cpp \
     src/colorizeoptionswidget.cpp \
+    src/shadowoptionswidget.cpp \
     src/importlayersdialog.cpp \
     src/importpositiondialog.cpp \
     src/layeropacitydialog.cpp \

@@ -62,6 +62,7 @@ public:
         SOUND = 4,
         CAMERA = 5,
         COLORIZE = 6, // 智能填色图层（继承位图行为）
+        SHADOW = 7,   // 智能阴影图层（继承位图行为，手画分割线+方向判定）
     };
 
     explicit Layer(int id, LAYER_TYPE eType);
@@ -71,8 +72,8 @@ public:
     void setId(int layerId) { mId = layerId; }
     LAYER_TYPE type() const { return meType; }
 
-    /** 位图族图层（位图/智能填色）：共享帧操作与位图编辑管线 */
-    bool isBitmapKind() const { return meType == BITMAP || meType == COLORIZE; }
+    /** 位图族图层（位图/智能填色/智能阴影）：共享帧操作与位图编辑管线 */
+    bool isBitmapKind() const { return meType == BITMAP || meType == COLORIZE || meType == SHADOW; }
 
     void setName(QString name) { mName = name; }
     QString name() const { return mName; }

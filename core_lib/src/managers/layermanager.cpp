@@ -201,6 +201,9 @@ Layer* LayerManager::createLayer(Layer::LAYER_TYPE type, const QString& strLayer
     case Layer::COLORIZE:
         layer = object()->addNewColorizeLayer();
         break;
+    case Layer::SHADOW:
+        layer = object()->addNewShadowLayer();
+        break;
     case Layer::SOUND:
         layer = object()->addNewSoundLayer();
         break;
@@ -240,6 +243,37 @@ LayerBitmap* LayerManager::createColorizeLayer(const QString& strLayerName)
 
     // 插到线稿层正下方（渲染于线稿之下）：索引小者渲染在下。
     // 当前层是位图层→插其下；否则向上找最近的位图层插其下；无位图层→垫底
+    const int currentIndex = currentLayerIndex();
+    int anchor = -1;
+    if (currentIndex >= 0 && object()->getLayer(currentIndex)->type() == Layer::BITMAP)
+        anchor = currentIndex;
+    else
+    {
+        for (int i = currentIndex + 1; i < count(); ++i)
+        {
+            if (object()->getLayer(i)->type() == Layer::BITMAP) { anchor = i; break; }
+        }
+    }
+    if (anchor < 0)
+        anchor = 0; // 垫底（新层在列表尾=最上层，移到 0）
+
+    const int newIndex = qMin(anchor, count() - 1);
+    if (newIndex != count() - 1)
+        object()->moveLayer(count() - 1, newIndex);
+
+    emit layerCountChanged(count());
+    setCurrentLayer(newIndex);
+
+    return layer;
+}
+
+LayerBitmap* LayerManager::createShadowLayer(const QString& strLayerName)
+{
+    LayerBitmap* layer = object()->addNewShadowLayer();
+    layer->setName(strLayerName);
+
+    // 插到线稿层正下方（渲染于线稿之下、填色层之上）：索引小者渲染在下。
+    // 当前层是位图层→插其下；否则向下找最近的位图层插其下；无位图层→垫底
     const int currentIndex = currentLayerIndex();
     int anchor = -1;
     if (currentIndex >= 0 && object()->getLayer(currentIndex)->type() == Layer::BITMAP)

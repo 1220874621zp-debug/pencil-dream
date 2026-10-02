@@ -61,6 +61,7 @@ QString layerTypeToString(Layer::LAYER_TYPE type)
     case Layer::SOUND:     return QStringLiteral("sound");
     case Layer::CAMERA:    return QStringLiteral("camera");
     case Layer::COLORIZE:  return QStringLiteral("colorize");
+    case Layer::SHADOW:    return QStringLiteral("shadow");
     default:               return QStringLiteral("undefined");
     }
 }
