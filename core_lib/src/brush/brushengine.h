@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include <QImage>
 #include <QPointF>
 #include <QSize>
+#include <QVector>
 
 #include "brushsettings.h"
 
@@ -97,10 +98,15 @@ private:
     /** 纹理/图案颜色源等"按画布位置"生效的效果（KisTextureOption/KoPatternColorSource） */
     QImage positionAppliedDab(const QImage& dab, const QPoint& topLeft) const;
     QPointF scatterOffset(qreal diameter) const;
+    /** 图像笔尖 mip 链（懒构建；tipMask 数据变更即重建） */
+    const QVector<QImage>& tipPyramid();
 
     BrushSettings mSettings;
     QColor mColor;
     QHash<quint32, QImage> mDabCache;
+
+    QVector<QImage> mTipPyramid;  // 图像笔尖 mip 金字塔（KisQImagePyramid 同思路）
+    qint64 mTipPyramidKey = 0;    // 构建时的 tipMask cacheKey
 
     QImage mCloneSource;        // 仿制源图（Format_ARGB32，非预乘通道直接采样）
     QPoint mCloneTopLeft;       // 源图原点（画布坐标）

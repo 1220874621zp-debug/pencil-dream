@@ -718,6 +718,106 @@ TEST_CASE("Image tip dab generation")
     }
 }
 
+TEST_CASE("Image tip mip pyramid and edge softening")
+{
+    // 大号硬边圆盘笔尖（故意关抗锯齿）：256→20 深下采样曾把羽化带几何压扁成
+    // 1px 硬边，相邻 dab 硬边包络出周期齿。修复后（mip 金字塔选级 + 1px
+    // 边缘软化）边界必有渐变、无 0↔255 直跳、无脱落碎块
+    QImage tip(256, 256, QImage::Format_ARGB32);
+    tip.fill(Qt::white);
+    {
+        QPainter p(&tip);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        p.setBrush(QBrush(Qt::black));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(48, 48, 160, 160);
+    }
+
+    BrushSettings s;
+    s.tipImage = tip;
+    s.tipShape = BrushSettings::TipShape::Image;
+    s.bakeTipMask();
+    s.pressureSize = false;
+    s.opacity = 1.0;
+    s.flow = 1.0;
+    s.diameter = 20.0; // 256→20 深下采样（原一步双线性的重灾区）
+
+    QImage layer(120, 120, QImage::Format_ARGB32_Premultiplied);
+    layer.fill(Qt::transparent);
+    renderSingleDab(s, QPointF(60, 60), 1.0, layer);
+
+    const QRect bbox = nonZeroBounds(layer);
+    REQUIRE(!bbox.isEmpty());
+    // 金字塔选级不改变几何：长边≈diameter（含软化外扩的余量）
+    REQUIRE(qMax(bbox.width(), bbox.height()) >= 14);
+    REQUIRE(qMax(bbox.width(), bbox.height()) <= 27);
+
+    // 边界渐变：[1,2,1]²软化核对硬边的最大相邻步长 ~143，留裕量断言；
+    // 未修复时深下采样会出现 0↔255 直跳
+    int maxStep = 0;
+    for (int y = bbox.top(); y <= bbox.bottom(); ++y) {
+        for (int x = bbox.left(); x <= bbox.right(); ++x) {
+            if (x < bbox.right()) {
+                maxStep = qMax(maxStep, qAbs(qAlpha(layer.pixel(x, y)) - qAlpha(layer.pixel(x + 1, y))));
+            }
+            if (y < bbox.bottom()) {
+                maxStep = qMax(maxStep, qAbs(qAlpha(layer.pixel(x, y)) - qAlpha(layer.pixel(x, y + 1))));
+            }
+        }
+    }
+    REQUIRE(maxStep <= 170);
+
+    // 连通：颗粒边缘不得有脱落碎块（BFS 数 alpha>0 的连通域）
+    {
+        const int w = layer.width(), h = layer.height();
+        std::vector<char> visited(static_cast<size_t>(w) * h, 0);
+        QVector<QPoint> queue;
+        int components = 0;
+        for (int y = 0; y < h; ++y) {
+            for (int x = 0; x < w; ++x) {
+                if (visited[static_cast<size_t>(y) * w + x] || qAlpha(layer.pixel(x, y)) == 0) {
+                    continue;
+                }
+                ++components;
+                queue.clear();
+                queue.append(QPoint(x, y));
+                visited[static_cast<size_t>(y) * w + x] = 1;
+                while (!queue.isEmpty()) {
+                    const QPoint pt = queue.takeLast();
+                    const int dxs[] = {1, -1, 0, 0};
+                    const int dys[] = {0, 0, 1, -1};
+                    for (int k = 0; k < 4; ++k) {
+                        const int nx = pt.x() + dxs[k], ny = pt.y() + dys[k];
+                        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                        const size_t idx = static_cast<size_t>(ny) * w + nx;
+                        if (!visited[idx] && qAlpha(layer.pixel(nx, ny)) > 0) {
+                            visited[idx] = 1;
+                            queue.append(QPoint(nx, ny));
+                        }
+                    }
+                }
+            }
+        }
+        REQUIRE(components == 1);
+    }
+
+    // 中心保持：对称软化核不引入偏移，alpha 质心≈包围盒中心
+    {
+        qreal sumA = 0, sumX = 0, sumY = 0;
+        for (int y = bbox.top(); y <= bbox.bottom(); ++y) {
+            for (int x = bbox.left(); x <= bbox.right(); ++x) {
+                const qreal a = qAlpha(layer.pixel(x, y));
+                sumA += a; sumX += a * x; sumY += a * y;
+            }
+        }
+        const QPointF centroid(sumX / sumA, sumY / sumA);
+        const QPointF center((bbox.left() + bbox.right()) / 2.0,
+                             (bbox.top() + bbox.bottom()) / 2.0);
+        const QPointF offset = centroid - center;
+        REQUIRE(offset.manhattanLength() < 4.0);
+    }
+}
+
 TEST_CASE("BrushSettings v2 XML roundtrip with embedded images")
 {
     BrushSettings s;

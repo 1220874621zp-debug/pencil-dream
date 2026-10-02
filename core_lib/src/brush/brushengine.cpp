@@ -22,6 +22,8 @@ GNU General Public License for more details.
 #include <QtMath>
 #include <QRandomGenerator>
 
+#include <vector>
+
 #include "graphics/bitmap/washblend.h"
 #include "maskedstrokecompositor.h"
 
@@ -62,7 +64,76 @@ qreal normalizedDistanceAA(qreal dx, qreal dy, qreal rx, qreal ry,
 
 /** 图像笔尖 dab（定义见下；掩码经 QTransform 缩放/旋转后上色） */
 QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
-                         qreal diameter, qreal subPixelX, qreal subPixelY);
+                         qreal diameter, qreal subPixelX, qreal subPixelY,
+                         const QVector<QImage>& pyramid);
+
+/**
+ * KisQImagePyramid 同思路的 mip 链：逐级减半（Qt SmoothTransformation 的
+ * 面积平均）。深下采样 dab 若从原图一步双线性缩小，2x2 采样窗远小于缩小
+ * 倍数，边缘羽化带被几何压扁成 1px 硬边并欠采样出毛刺；从最近级别取样后
+ * 终绘残差缩放只有 0.5~1，配合终图边缘软化恢复平滑过渡。
+ */
+QVector<QImage> buildTipPyramid(const QImage& tip)
+{
+    QVector<QImage> levels;
+    if (tip.isNull()) {
+        return levels;
+    }
+    levels.append(tip);
+    QImage cur = tip;
+    while (qMax(cur.width(), cur.height()) >= 8) {
+        cur = cur.scaled(qMax(1, cur.width() / 2), qMax(1, cur.height() / 2),
+                         Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        levels.append(cur);
+    }
+    return levels;
+}
+
+/** 选"最小仍 ≥ 目标直径"的级别：终绘残差缩放落在 0.5~1（放大笔尖回退 level0） */
+QImage pickPyramidLevel(const QVector<QImage>& levels, qreal diameter)
+{
+    for (int i = levels.size() - 1; i > 0; --i) {
+        if (qMax(levels[i].width(), levels[i].height()) >= diameter) {
+            return levels[i];
+        }
+    }
+    return levels.first();
+}
+
+/**
+ * 终图 alpha 的 1px [1,2,1] 可分离软化（对称、中心保持、边缘复制）。
+ * tipMask 恒为"白色按掩码预乘"的 (a,a,a,a) 像素，双线性缩放保持该不变式，
+ * 因此只滤波 alpha 再写回四通道。作用：把深下采样压扁出的 1px 硬边恢复成
+ * 2~3px 过渡带，消除相邻 dab 硬边包络的周期齿，颗粒边缘碎块重新连回主体。
+ */
+QImage softenAlphaEdges(const QImage& src)
+{
+    const int w = src.width();
+    const int h = src.height();
+    QImage dst(src.size(), src.format());
+    std::vector<quint8> tmp(static_cast<size_t>(w) * h);
+    for (int y = 0; y < h; ++y) {
+        const QRgb* s = reinterpret_cast<const QRgb*>(src.constScanLine(y));
+        quint8* t = tmp.data() + static_cast<size_t>(y) * w;
+        for (int x = 0; x < w; ++x) {
+            const int a0 = qAlpha(s[x > 0 ? x - 1 : 0]);
+            const int a1 = qAlpha(s[x]);
+            const int a2 = qAlpha(s[x < w - 1 ? x + 1 : w - 1]);
+            t[x] = static_cast<quint8>((a0 + 2 * a1 + a2 + 2) / 4);
+        }
+    }
+    for (int y = 0; y < h; ++y) {
+        QRgb* d = reinterpret_cast<QRgb*>(dst.scanLine(y));
+        const quint8* up = tmp.data() + static_cast<size_t>(y > 0 ? y - 1 : 0) * w;
+        const quint8* mid = tmp.data() + static_cast<size_t>(y) * w;
+        const quint8* dn = tmp.data() + static_cast<size_t>(y < h - 1 ? y + 1 : h - 1) * w;
+        for (int x = 0; x < w; ++x) {
+            const int m = (up[x] + 2 * mid[x] + dn[x] + 2) / 4;
+            d[x] = qRgba(m, m, m, m);
+        }
+    }
+    return dst;
+}
 
 /**
  * 生成一个上好色的 dab 图。
@@ -74,10 +145,11 @@ QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
  * （Krita KisAutoBrush 的 subPixel 做法），合成侧因此整数对齐免重采样。
  */
 QImage makeDabImage(const BrushSettings& settings, const QColor& color,
-                    qreal diameter, qreal subPixelX, qreal subPixelY)
+                    qreal diameter, qreal subPixelX, qreal subPixelY,
+                    const QVector<QImage>& pyramid)
 {
     if (settings.tipShape == BrushSettings::TipShape::Image && !settings.tipMask.isNull()) {
-        return makeImageDabImage(settings, color, diameter, subPixelX, subPixelY);
+        return makeImageDabImage(settings, color, diameter, subPixelX, subPixelY, pyramid);
     }
     const qreal major = qMax<qreal>(1, diameter);
     const qreal minor = qMax<qreal>(1, qRound(diameter * settings.ratio));
@@ -148,9 +220,13 @@ QImage makeDabImage(const BrushSettings& settings, const QColor& color,
  * 尺寸（保持偶数对齐落点），上色 = 掩码 alpha × 笔色。
  */
 QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
-                         qreal diameter, qreal subPixelX, qreal subPixelY)
+                         qreal diameter, qreal subPixelX, qreal subPixelY,
+                         const QVector<QImage>& pyramid)
 {
-    const QImage& tip = settings.tipMask;
+    // 深下采样从 mip 链最接近的级别取样（终绘残差 0.5~1），原图一步双线性
+    // 会欠采样出毛边；级别选取只看长边，ratio 在终绘时按原比例压缩
+    const QImage& baked = settings.tipMask;
+    const QImage tip = pyramid.isEmpty() ? baked : pickPyramidLevel(pyramid, diameter);
     const qreal tipMax = qMax<qreal>(1, qMax(tip.width(), tip.height()));
     const qreal scale = qMax<qreal>(0.001, diameter) / tipMax;
     const qreal rad = qDegreesToRadians(settings.angle);
@@ -174,6 +250,10 @@ QImage makeImageDabImage(const BrushSettings& settings, const QColor& color,
         painter.scale(scale, scale * settings.ratio);
         painter.translate(-tip.width() * 0.5, -tip.height() * 0.5);
         painter.drawImage(QPointF(0.0, 0.0), tip);
+    }
+    // 缩小笔尖（相对烘焙原图）时补 1px 边缘软化；原大/放大保持设计原貌
+    if (diameter < qMax<qreal>(1, qMax(baked.width(), baked.height()))) {
+        alphaImg = softenAlphaEdges(alphaImg);
     }
 
     const int cr = color.red();
@@ -470,9 +550,22 @@ const QImage& BrushEngine::cachedDab(quint32 cacheKey, qreal diameter,
             mDabCache.clear();
         }
         it = mDabCache.insert(cacheKey,
-                              makeDabImage(mSettings, mColor, diameter, subPixelX, subPixelY));
+                              makeDabImage(mSettings, mColor, diameter, subPixelX, subPixelY,
+                                           tipPyramid()));
     }
     return it.value();
+}
+
+const QVector<QImage>& BrushEngine::tipPyramid()
+{
+    // 用 cacheKey 守卫：setSettings 的参数拷贝共享同一 tipMask 数据，不触发重建；
+    // 换笔尖（bakeTipMask 生成新数据）才重建
+    const qint64 key = mSettings.tipMask.cacheKey();
+    if (mTipPyramidKey != key || mTipPyramid.isEmpty()) {
+        mTipPyramid = buildTipPyramid(mSettings.tipMask);
+        mTipPyramidKey = key;
+    }
+    return mTipPyramid;
 }
 
 QImage BrushEngine::renderStrokePreview(const BrushSettings& settings, const QSize& size)
