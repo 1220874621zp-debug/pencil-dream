@@ -432,3 +432,51 @@ TEST_CASE("LayerShadow_OffsetContentNoCrash")
     CHECK(isColor(frame->shadowImage(), 50, 100, qRgb(128, 128, 128)));
     CHECK(isTransparent(frame->shadowImage(), 150, 100));
 }
+
+TEST_CASE("ShadowFill_OpenRegionNeverShadowed")
+{
+    // 分割线贯穿全画布（画过头伸进背景抵达画布边缘）→ 背景被切成两半，
+    // 但开放区域永不参与阴影——旧实现会把背景某半填成矩形溢出
+    QImage lineArt = makeCanvas(200, 200);
+    drawSquareOutline(lineArt, QRect(10, 10, 180, 180));
+    QImage strokes = makeCanvas(200, 200);
+    drawStrokeLine(strokes, QLine(100, 0, 100, 200), QColor(255, 0, 0));
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(0, 0, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
+    // 图形内部正常判定：左半阴影
+    CHECK(isColor(result.fill, 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 150, 100));
+    // 背景四角全透明（矩形溢出回归锁）
+    CHECK(isTransparent(result.fill, 5, 5));
+    CHECK(isTransparent(result.fill, 195, 5));
+    CHECK(isTransparent(result.fill, 5, 195));
+    CHECK(isTransparent(result.fill, 195, 195));
+}
+
+TEST_CASE("ShadowFill_GapMergedShapeExcluded")
+{
+    // 线稿右墙有缺口 → 图形内部与背景连通成开放区域 → 不参与阴影，
+    // 并提示分割线未生效
+    QImage lineArt = makeCanvas(200, 200);
+    drawSquareOutline(lineArt, QRect(10, 10, 180, 180));
+    {
+        QPainter p(&lineArt);
+        p.setCompositionMode(QPainter::CompositionMode_Clear);
+        p.fillRect(QRect(185, 90, 9, 20), Qt::black);
+        p.end();
+    }
+    QImage strokes = makeCanvas(200, 200);
+    drawStrokeLine(strokes, QLine(100, 8, 100, 192), QColor(255, 0, 0));
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(0, 0, 200, 200), params);
+
+    CHECK(result.fill.isNull());
+    REQUIRE(result.warnings.size() == 1);
+    CHECK(result.warnings[0].kind == ShadowFill::Warning::UnclosedDivider);
+}

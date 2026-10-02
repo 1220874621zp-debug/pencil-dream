@@ -233,6 +233,17 @@ Result computeShadow(const QImage& lineArt,
             shapeChildren[parent].append(r);
     }
 
+    // 被切割且参与阴影的图形：≥2 个子区域，且必须是封闭图形（区域不触
+    // 计算域边缘）。开放区域（背景 / 线稿缺口导致内外连通）即使被分割线
+    // 切开也不参与方向判定、邻近继承与填充——否则方向判定会把半个背景
+    // 矩形填满（"填充溢出成矩形边缘"的根源）
+    QSet<qint32> dividedShapes;
+    for (auto it = shapeChildren.constBegin(); it != shapeChildren.constEnd(); ++it)
+    {
+        if (it.value().size() >= 2 && !shapeSeg.regions[it.key() - 1].touchesEdge)
+            dividedShapes.insert(it.key());
+    }
+
     // 分割线连通域标注（8 连通）+（组件, 图形）像素计数：
     // "未切开"警告跟随线条主体所在图形——画过头的越界尾巴（方帽伸出
     // 轮廓几像素、线穿过墙探进邻图形）不单独告警
@@ -307,7 +318,7 @@ Result computeShadow(const QImage& lineArt,
     for (auto it = shapeChildren.constBegin(); it != shapeChildren.constEnd(); ++it)
     {
         const QVector<int>& children = it.value();
-        if (children.size() < 2)
+        if (children.size() < 2 || !dividedShapes.contains(it.key()))
             continue;
 
         const auto coords = buildCoords(children);
@@ -337,13 +348,6 @@ Result computeShadow(const QImage& lineArt,
     // ④ 空间邻近继承：歧义子区域继承同帧质心最近已判定子区域的状态。
     //    继承目标只限"被分割的图形"的子区域——没画分割线的图形（含
     //    开放背景）永不参与阴影，也不能从邻居继承状态。
-    QSet<qint32> dividedShapes;
-    for (auto it = shapeChildren.constBegin(); it != shapeChildren.constEnd(); ++it)
-    {
-        if (it.value().size() >= 2)
-            dividedShapes.insert(it.key());
-    }
-
     QVector<int> determined;
     for (int r = 0; r < nSub; ++r)
     {
@@ -436,9 +440,9 @@ Result computeShadow(const QImage& lineArt,
         }
         if (dominant == 0)
             continue;
-        const auto childIt = shapeChildren.constFind(dominant);
-        if (childIt != shapeChildren.constEnd() && childIt.value().size() >= 2)
-            continue; // 主体图形已被切开，越界尾巴不告警
+        if (dividedShapes.contains(dominant))
+            continue; // 主体图形已被切开且参与阴影，越界尾巴不告警；
+                      // 未切开/开放区域（含被切开的背景）仍提示
         if (warnedShapes.contains(dominant))
             continue;
         warnedShapes.insert(dominant);
@@ -502,7 +506,8 @@ Result computeShadow(const QImage& lineArt,
                         nearShadow = true;
                 }
             }
-            if (nearShadow)
+            if (nearShadow && dividedShapes.contains(
+                    labelA(bounds.left() + x, bounds.top() + y)))
             {
                 seamDist[y * w + x] = 1;
                 queue.append(QPoint(x, y));
@@ -525,6 +530,9 @@ Result computeShadow(const QImage& lineArt,
             if (divider.constScanLine(ny)[nx] == 0)
                 continue;
             if (seamDist[ny * w + nx] != 0)
+                continue;
+            // 不越线稿扩散：出轮廓的线尾属于开放区域，不涂
+            if (!dividedShapes.contains(labelA(bounds.left() + nx, bounds.top() + ny)))
                 continue;
             seamDist[ny * w + nx] = d + 1;
             queue.append(QPoint(nx, ny));

@@ -282,7 +282,7 @@ void ShadowOptionsWidget::refreshWarnings()
     }
     QStringList parts;
     if (unclosed > 0)
-        parts << tr("%1 个图形的分割线未完全切开（线尾需搭到线稿，或调大闭缝半径）").arg(unclosed);
+        parts << tr("%1 个图形的分割线未完全切开，或图形不封闭/线画在了开放区域（阴影只生成于封闭图形内）").arg(unclosed);
     if (unresolved > 0)
         parts << tr("%1 个图形按所选方向无法判定（已取默认侧填充，建议核对）").arg(unresolved);
     mWarningLabel->setText(parts.join("；"));
