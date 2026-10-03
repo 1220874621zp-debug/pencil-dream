@@ -545,3 +545,41 @@ TEST_CASE("ShadowFill_SoftFeatherSealedToLineCore")
     // 右半区（非阴影）照旧不填
     CHECK(isTransparent(result.fill, 150, 100));
 }
+
+TEST_CASE("ShadowFill_MarkInRegionDecidesSide")
+{
+    // 区域标记规则：分割线一侧的区域内涂一笔填充色=指定该侧为阴影，
+    // 覆盖方向按钮（此处方向故意选反侧）；涂块本身不充当分割线
+    FramePair fp = makeSquareWithLine(QLine(100, 8, 100, 192));
+    drawStrokeLine(fp.strokes, QLine(40, 60, 70, 60), QColor(0, 0, 0)); // 左侧涂黑=填充色
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirRight; // 方向与标记相反
+    params.fillColor = qRgb(0, 0, 0);
+    ShadowFill::Result result = ShadowFill::computeShadow(fp.lineArt, fp.strokes, QRect(0, 0, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
+    CHECK(isColor(result.fill, 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 150, 100));
+    CHECK(result.warnings.isEmpty());
+}
+
+TEST_CASE("ShadowFill_MarkOutsideDividedShapeIgnored")
+{
+    // 标记涂在背景（开放区域，不属于被切割的封闭图形）→ 不生效并提示，
+    // 方向判定照旧
+    FramePair fp = makeSquareWithLine(QLine(100, 8, 100, 192));
+    drawStrokeLine(fp.strokes, QLine(4, 4, 40, 4), QColor(0, 0, 0)); // 背景里涂黑
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    params.fillColor = qRgb(0, 0, 0);
+    ShadowFill::Result result = ShadowFill::computeShadow(fp.lineArt, fp.strokes, QRect(0, 0, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
+    CHECK(isColor(result.fill, 50, 100, qRgb(0, 0, 0)));
+    CHECK(isTransparent(result.fill, 150, 100));
+    REQUIRE(result.warnings.size() == 1);
+    CHECK(result.warnings[0].kind == ShadowFill::Warning::IgnoredMark);
+    CHECK(result.warnings[0].area.contains(20, 4));
+}

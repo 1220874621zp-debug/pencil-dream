@@ -114,7 +114,7 @@ void ShadowOptionsWidget::initUI()
     fillRow->addWidget(new QLabel(tr("阴影填充色："), this));
     mFillColorButton = new QToolButton(this);
     mFillColorButton->setIconSize(QSize(20, 20));
-    mFillColorButton->setToolTip(tr("点击更换阴影填充颜色"));
+    mFillColorButton->setToolTip(tr("点击更换阴影填充颜色；在分割线一侧的区域内涂一笔填充色=指定该侧为阴影"));
     connect(mFillColorButton, &QToolButton::clicked, this, &ShadowOptionsWidget::onFillColorClicked);
     fillRow->addWidget(mFillColorButton);
     fillRow->addStretch(1);
@@ -272,11 +272,13 @@ void ShadowOptionsWidget::refreshWarnings()
         return;
     }
 
-    int unclosed = 0, unresolved = 0;
+    int unclosed = 0, unresolved = 0, ignoredMark = 0;
     for (const ShadowFill::Warning& wv : warnings)
     {
         if (wv.kind == ShadowFill::Warning::UnclosedDivider)
             ++unclosed;
+        else if (wv.kind == ShadowFill::Warning::IgnoredMark)
+            ++ignoredMark;
         else
             ++unresolved;
     }
@@ -285,6 +287,8 @@ void ShadowOptionsWidget::refreshWarnings()
         parts << tr("%1 个图形的分割线未完全切开，或图形不封闭/线画在了开放区域（阴影只生成于封闭图形内）").arg(unclosed);
     if (unresolved > 0)
         parts << tr("%1 个图形按所选方向无法判定（已取默认侧填充，建议核对）").arg(unresolved);
+    if (ignoredMark > 0)
+        parts << tr("%1 处区域标记未生效：请在分割线一侧的封闭区域内涂填充色（当前涂在了图形外或未被切开的图形上）").arg(ignoredMark);
     mWarningLabel->setText(parts.join("；"));
     mWarningLabel->show();
 }
@@ -324,6 +328,8 @@ void ShadowOptionsWidget::onFillColorClicked()
         return;
     layer->setFillColor(picked.rgba());
     mFillColorButton->setIcon(makeSwatchIcon(layer->fillColor(), false));
+    // 选中填充色 = 当前笔刷色：可直接在分割线一侧区域内涂一笔指定阴影侧
+    mEditor->color()->setFrontColor(picked);
     invalidateAllFrames(layer);
     repaintCanvas();
 }

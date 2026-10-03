@@ -198,8 +198,48 @@ Result computeShadow(const QImage& lineArt,
     if (!QRect(QPoint(0, 0), lineArt.size()).contains(bounds))
         return result;
 
-    // ① 分割线蒙版 + 闭缝
+    const int w = bounds.width();
+
+    // ① 分割线蒙版 + 闭缝；先扫描"区域标记"（分割线一侧区域内涂一笔
+    //    填充色=指定该侧为阴影）：命中像素从分割线蒙版剔除（涂块绝不
+    //    充当屏障），没有标记时一切照旧走方向判定
     QImage divider = buildDividerMask(strokes, bounds, transparentMarkerColors);
+    QImage markerMask(bounds.size(), QImage::Format_Grayscale8);
+    markerMask.fill(0);
+    bool hasMark = false;
+    QRect markBounds;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y)
+    {
+        const QRgb* srcLine = reinterpret_cast<const QRgb*>(strokes.constScanLine(y));
+        uchar* mLine = markerMask.scanLine(y - bounds.top());
+        for (int x = bounds.left(); x <= bounds.right(); ++x)
+        {
+            const QRgb px = srcLine[x];
+            const int a = qAlpha(px);
+            if (a == 0)
+                continue;
+            // 反预乘后比较：涂块自身的抗锯齿边缘颜色不变，只有 alpha 变
+            const QRgb c = qRgb(qBound(0, qRed(px) * 255 / a, 255),
+                                qBound(0, qGreen(px) * 255 / a, 255),
+                                qBound(0, qBlue(px) * 255 / a, 255));
+            if (Colorize::colorDistanceSq(c, params.fillColor) > DISABLED_COLOR_DIST_SQ)
+                continue;
+            mLine[x - bounds.left()] = static_cast<uchar>(a);
+            hasMark = true;
+            markBounds = markBounds.united(QRect(x, y, 1, 1));
+        }
+    }
+    if (hasMark)
+    {
+        for (int y = 0; y < bounds.height(); ++y)
+        {
+            const uchar* mLine = markerMask.constScanLine(y);
+            uchar* dLine = divider.scanLine(y);
+            for (int x = 0; x < w; ++x)
+                if (mLine[x] > 0)
+                    dLine[x] = 0;
+        }
+    }
     const int closeR = qRound(params.gapRadius);
     if (closeR >= 1)
         morphCloseGray8(divider, closeR);
@@ -211,7 +251,6 @@ Result computeShadow(const QImage& lineArt,
     const QImage combined = compositeBarrier(lineArt, divider, bounds);
     const Colorize::RegionSegmentation subSeg = Colorize::segmentRegions(combined, bounds);
 
-    const int w = bounds.width();
     const auto labelA = [&](int x, int y) -> qint32 {
         if (!bounds.contains(x, y))
             return 0;
@@ -297,6 +336,43 @@ Result computeShadow(const QImage& lineArt,
     };
     QVector<State> state(nSub, Unknown);
 
+    // ②.5 标记落区：涂块所在子区域=阴影、同图形其余子区域=非阴影
+    //     （显式标记即显式意图，覆盖方向判定）；涂块落在未被切开的
+    //     图形/背景/线稿像素上时不生效，统一提示
+    QSet<qint32> markedRegions; // 命中的子区域标签（1-based）
+    QSet<qint32> markedShapes;
+    if (hasMark)
+    {
+        for (int y = 0; y < bounds.height(); ++y)
+        {
+            const uchar* mLine = markerMask.constScanLine(y);
+            const qint32* lLine = subSeg.labelOf.constData() + static_cast<size_t>(y * w);
+            for (int x = 0; x < w; ++x)
+            {
+                if (mLine[x] == 0)
+                    continue;
+                const qint32 l = lLine[x];
+                if (l > 0 && dividedShapes.contains(parentOf[l - 1]))
+                {
+                    markedRegions.insert(l);
+                    markedShapes.insert(parentOf[l - 1]);
+                }
+            }
+        }
+        for (int r = 0; r < nSub; ++r)
+        {
+            if (markedShapes.contains(parentOf[r]))
+                state[r] = markedRegions.contains(r + 1) ? IsShadow : IsNotShadow;
+        }
+        if (markedRegions.isEmpty())
+        {
+            Warning wv;
+            wv.kind = Warning::IgnoredMark;
+            wv.area = markBounds;
+            result.warnings.append(wv);
+        }
+    }
+
     const bool axisX = (params.direction == DirLeft || params.direction == DirRight);
     const bool takeMax = (params.direction == DirRight || params.direction == DirDown);
 
@@ -320,6 +396,8 @@ Result computeShadow(const QImage& lineArt,
         const QVector<int>& children = it.value();
         if (children.size() < 2 || !dividedShapes.contains(it.key()))
             continue;
+        if (markedShapes.contains(it.key()))
+            continue; // 已由区域标记裁决，方向判定不再介入
 
         const auto coords = buildCoords(children);
         const Colorize::RegionLabel& shape = shapeSeg.regions[it.key() - 1];
