@@ -33,7 +33,6 @@ GNU General Public License for more details.
 
 UndoRedoCommand::UndoRedoCommand(Editor* editor, QUndoCommand* parent) : QUndoCommand(parent)
 {
-    qDebug() << "backupElement created";
     mEditor = editor;
 }
 

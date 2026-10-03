@@ -1208,7 +1208,6 @@ Status ActionCommands::stampVisibleLayers()
 
     LayerManager* layerMgr = mEditor->layers();
     const int frame = mEditor->currentFrame();
-    qDebug() << "[stamp] 盖印请求：帧" << frame << "图层数" << object->getLayerCount();
 
     // 盖印画幅 = 相机取景框（世界坐标）；无相机时退回 800x600
     // getLayerBelow 从传入索引本身起扫，必须传有效索引（传 count 会 getLayer 越界得 nullptr）
@@ -1234,7 +1233,6 @@ Status ActionCommands::stampVisibleLayers()
     }
     if (!anyContent)
     {
-        qDebug() << "[stamp] 当前帧无可见内容，取消";
         QMessageBox::information(mParent, tipTitle, tr("当前帧没有可见图层内容，无需盖印。"));
         return Status::CANCELED;
     }
@@ -1273,7 +1271,6 @@ Status ActionCommands::stampVisibleLayers()
     emit mEditor->updateTimeLine();
     mEditor->getScribbleArea()->onLayerChanged();
     layerMgr->notifyAnimationLengthChanged();
-    qDebug() << "[stamp] 完成：新层" << stampLayer->name() << "索引" << object->getIndex(stampLayer);
     return Status::OK;
 }
 

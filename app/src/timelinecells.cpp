@@ -338,7 +338,6 @@ void TimeLineCells::toggleLayerCollapsed(int layerNumber)
 {
     Layer* l = mEditor->object()->getLayer(layerNumber);
     if (l == nullptr) return;
-    qDebug() << "[ui] layer" << layerNumber << "collapse toggle";
     const int id = l->id();
     const bool nowCollapsed = !mCollapsedLayerIds.contains(id);
     setLayerCollapsed(id, nowCollapsed);
@@ -437,7 +436,6 @@ void TimeLineCells::showCameraMenu(QPoint pos)
  *  盖印在时间指针处执行，与右键点中的帧格位置无关 */
 void TimeLineCells::showTrackFrameMenu(QPoint pos)
 {
-    qDebug() << "[stamp] 帧格右键菜单（轨道）";
     QMenu menu(this);
     QAction* stampVisibleAction = menu.addAction(tr("盖印可见图层"));
 
@@ -482,7 +480,6 @@ void TimeLineCells::showInstanceMenu(QPoint pos)
 
     if (chosen == stampVisibleAction)
     {
-        qDebug() << "[stamp] 实例菜单选择盖印";
         Q_EMIT stampVisibleRequested();
         return;
     }
@@ -3236,7 +3233,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 if (lock.contains(event->pos().x(), event->pos().y()))
                 {
                     hitLayer->setLocked(!hitLayer->locked());
-                    qDebug() << "[ui] layer" << layerNumber << "locked ->" << hitLayer->locked();
                     updateContent();
                     break;
                 }
@@ -3246,7 +3242,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     if (hitLayer->type() == Layer::BITMAP)
                     {
                         hitLayer->setClipMask(!hitLayer->clipMask());
-                        qDebug() << "[ui] layer" << layerNumber << "clipMask ->" << hitLayer->clipMask();
                         // clipping changes how pre/post layers composite: drop all caches
                         mEditor->getScribbleArea()->onLayerChanged();
                         updateContent();
@@ -3270,12 +3265,10 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                                 selected->setSolo(target);
                             }
                         }
-                        qDebug() << "[ui] solo batch ->" << target << "layers" << selection.size();
                     }
                     else
                     {
                         hitLayer->setSolo(target);
-                        qDebug() << "[ui] layer" << layerNumber << "solo ->" << target;
                     }
                     // 独显改变全局可见性合成：整画布缓存失效
                     mEditor->getScribbleArea()->onLayerChanged();
@@ -3332,7 +3325,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                 // cycle the 8-color label: -1 -> 0 -> ... -> 7 -> -1
                 Layer* labelLayer = mEditor->object()->getLayer(layerNumber);
                 labelLayer->setColorIndex((labelLayer->colorIndex() + 2) % 9 - 1);
-                qDebug() << "[ui] layer" << layerNumber << "label color ->" << labelLayer->colorIndex();
                 mTimeLine->updateContent(); // both the layer list and the track tint
             }
             else if (event->pos().x() > width() - 24)
@@ -3350,7 +3342,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
             }
             else if (event->pos().x() < 30)
             {
-                qDebug() << "[ui] layer" << layerNumber << "toggle visible";
                 mEditor->switchVisibilityOfLayer(layerNumber);
             }
             else
@@ -3416,7 +3407,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     }
                     mPlusCreating = true;
                     mPlusPreviewCount = 0;
-                    qDebug() << "[ui] create-drag start: layer" << plusLayer;
                     update();
                     break;
                 }
@@ -3433,7 +3423,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     KeyFrame* trimKey = trimLayer->getKeyFrameAt(trimPos);
                     if (trimKey != nullptr)
                     {
-                        qDebug() << "[ui] trim-drag start: block" << trimPos << "layer" << layerNumber;
                         if (mEditor->currentLayerIndex() != layerNumber)
                         {
                             mEditor->layers()->currentLayer()->deselectAll();
@@ -3506,8 +3495,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                     // Check if we are clicking on a non selected frame
                     else if (!currentLayer->isFrameSelected(frameNumber))
                     {
-                        qDebug() << "[ui] tracks click: select frame" << frameNumber << "layer" << layerNumber
-                                 << "mods" << event->modifiers();
                         // If it is the case, we select it if it is the left button...
                         mCanBoxSelect = true;
                         mClickSelecting = true;
@@ -3573,7 +3560,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                             }
                         }
                         // We clicked on a selected frame, we can move it
-                        qDebug() << "[ui] tracks click: drag selected frames at" << frameNumber << "layer" << layerNumber;
                         mCanMoveFrame = true;
                     }
 
@@ -3612,7 +3598,6 @@ void TimeLineCells::mousePressEvent(QMouseEvent* event)
                         mEditor->scrubTo(frameNumber);
 
                         mTimeLine->scrubbing = true;
-                        qDebug() << "[ui] scrub to" << frameNumber;
                     }
                 }
             }
@@ -3832,7 +3817,6 @@ void TimeLineCells::mouseMoveEvent(QMouseEvent* event)
                             }
 
                             // If it is the case, we move the selected frames in the layer
-                            if (!mMovingFrames) { qDebug() << "[ui] frames drag begin"; } // 只记首次，勿逐 move 刷屏
                             mMovingFrames = true;
 
                             // Vertical drag onto another row of the same type = cross-layer move
@@ -3969,7 +3953,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     layer->foreachKeyFrame([&](KeyFrame* k) { lastPos = qMax(lastPos, k->pos()); });
                     const int blockLen = (lastPos >= 0) ? blockLengthFor(layer, layer->getKeyFrameAt(lastPos)) : 1;
                     const int startFrame = (lastPos >= 0) ? lastPos + blockLen : getFrameNumber(mMousePressX);
-                    qDebug() << "[ui] plus-create" << n << "frames from" << startFrame;
 
                     // one transaction = one undo step for the whole batch
                     mEditor->beginLayerLayoutEdit(layer);
@@ -4042,9 +4025,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                     trimKey->setLength(mTrimPreviewLength);
                     trimKey->setLengthExplicit(true);
                 }
-                qDebug() << "[ui] trim-drag end: block" << mTrimKeyPos
-                         << "len" << mTrimOriginalLength << "->" << mTrimPreviewLength
-                         << (isTrailingBlock ? "(trailing)" : "(ripple)");
                 currentLayer->markFrameAsDirty(mTrimKeyPos);
                 mEditor->endLayerLayoutEdit(tr("拉伸帧块"));
                 // 仅真变更才通知：空点击若发射 framesModified 会白清缩略图缓存
@@ -4078,7 +4058,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                 const QList<int> vacated = currentLayer->selectedKeyFramesPositions();
                 mEditor->beginLayerLayoutEdit(currentLayer);
 
-                qDebug() << "[ui] frames moved by" << offset;
                 currentLayer->moveSelectedFrames(offset);
                 currentLayer->absorbGapsAt(vacated);
 
@@ -4116,7 +4095,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             // De-selecting if we didn't move, scrub nor select anything
             bool multipleSelection = (event->modifiers() == Qt::ControlModifier);
 
-            qDebug() << "[ui] tracks release: toggle frame" << frameNumber << "multi" << multipleSelection;
             // Add/remove from already selected
             currentLayer->toggleFrameSelected(frameNumber, multipleSelection);
             emit mEditor->selectedFramesChanged();
@@ -4125,9 +4103,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
     }
     if (mType == TIMELINE_CELL_TYPE::Layers && mStartLayerNumber != -1)
     {
-        qDebug() << "[ui] layer-release: start=" << mStartLayerNumber << "at=" << layerNumber
-                 << "scroll=" << mScrollingVertically << "moveY=" << mMouseMoveY
-                 << "groupDrag=" << mGroupDragId;
         if (!mScrollingVertically)
         {
         if (mGroupDragId >= 0 && didDetachLayer())
@@ -4164,10 +4139,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
                                     && mRows.at(dropRow).isHeader
                                     && fromLayerObj != nullptr && fromLayerObj->isGroupable();
 
-            qDebug() << "[ui] layer-release: dropRow=" << dropRow
-                     << "target=" << (dropTarget ? dropTarget->name() : QString("null"))
-                     << "ontoCenter=" << ontoCenter << "ontoHeader=" << ontoHeader;
-
             if (ontoHeader)
             {
                 // ---- 组头中心区 = 加入该组（插到组块上方紧邻位 b+1） ----
@@ -4193,7 +4164,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             else if (ontoCenter)
             {
                 // ---- 拖到层上（中心）= 成组/入组，单步撤销 ----
-                qDebug() << "[ui] group-drop: 成组/入组" << fromLayerObj->name() << "->" << dropTarget->name();
                 const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
                 const QList<int> orderBefore = mEditor->object()->layerIdOrder();
 
@@ -4223,7 +4193,6 @@ void TimeLineCells::mouseReleaseEvent(QMouseEvent* event)
             {
                 // ---- 常规插入式重排（含 Alt 出组），单步撤销；mToLayer 只管这一分支 ----
                 mToLayer = getInbetweenLayerNumber(event->pos().y());
-                qDebug() << "[ui] layer-release: insert to=" << mToLayer << "from=" << mFromLayer;
                 if (mToLayer != mFromLayer && mToLayer > -1 && mToLayer < mEditor->layers()->count())
                 {
                     const auto groupsBefore = LayerOrderCommand::captureGroups(mEditor->object());
@@ -4545,7 +4514,6 @@ void TimeLineCells::showLayerGroupMenu(QPoint pos, int layerIndex)
     if (newLoopMode != layer->loopMode())
     {
         layer->setLoopMode(newLoopMode);
-        qDebug() << "[ui] layer" << layerIndex << "loopMode ->" << static_cast<int>(newLoopMode);
         // 取帧方式变化影响整段显示与渲染缓存
         mEditor->getScribbleArea()->onLayerChanged();
         updateContent();
@@ -4683,7 +4651,6 @@ bool TimeLineCells::moveSelectedFramesAcrossLayers(int sourceIndex, int targetIn
     {
         if (target->keyExists(pos + dx))
         {
-            qDebug() << "[ui] cross-layer drop aborted: target occupied at" << pos + dx;
             return false;
         }
     }

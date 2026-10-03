@@ -98,7 +98,6 @@ bool PlaybackManager::isPlaying()
 
 void PlaybackManager::play()
 {
-    qDebug() << "[ui] playback play";
     updateStartFrame();
     updateEndFrame();
 
@@ -130,7 +129,6 @@ void PlaybackManager::play()
 
 void PlaybackManager::stop()
 {
-    qDebug() << "[ui] playback stop";
     mTimer->stop();
     stopSounds();
     // 参考视频层跟随停止(否则画布上的视频连同声音会继续自己播)
@@ -390,7 +388,6 @@ bool PlaybackManager::skipFrame()
     int t = qRound((mPlayingFrameCounter - 1) * playbackInterval());
     if (mElapsedTimer->elapsed() < t)
     {
-        qDebug() << "skip";
         return true;
     }
 

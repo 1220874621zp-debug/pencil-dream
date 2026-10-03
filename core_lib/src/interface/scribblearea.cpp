@@ -445,14 +445,8 @@ bool ScribbleArea::event(QEvent *event)
     {
         editor()->tools()->clearTemporaryTool();
         processed = true;
-    } else if (event->type() == QEvent::CursorChange)
-    {
-        qInfo() << "[cursor] CursorChange shape" << int(cursor().shape())
-                << "pmNull" << cursor().pixmap().isNull()
-                << "tool" << int(currentTool()->type());
     } else if (event->type() == QEvent::Enter)
     {
-        qInfo() << "[cursor] canvas enter, tool" << int(currentTool()->type());
         emit requestFocus(this);
 
         // Windows 光标缓存陈旧问题：弹窗/拖拽/后台忙之后系统显示箭头，
@@ -465,7 +459,6 @@ bool ScribbleArea::event(QEvent *event)
         processed = currentTool()->enterEvent(static_cast<QEnterEvent*>(event)) || processed;
     } else if (event->type() == QEvent::Leave)
     {
-        qInfo() << "[cursor] canvas leave, tool" << int(currentTool()->type());
         if (mPenHoverOverrideInstalled)
         {
             mPenHoverOverrideInstalled = false;
@@ -496,12 +489,6 @@ void ScribbleArea::keyPressEvent(QKeyEvent *event)
 {
     // Don't handle this event on auto repeat
     if (event->isAutoRepeat()) { return; }
-
-    if (event->key() == Qt::Key_Space || event->modifiers() != Qt::NoModifier)
-    {
-        qInfo() << "[cursor] keyPress" << event->key() << "mods" << int(event->modifiers())
-                << "pointerInUse" << isPointerInUse();
-    }
 
     if (isPointerInUse()) { return; } // prevents shortcuts calls while drawing
 
@@ -611,12 +598,6 @@ void ScribbleArea::keyReleaseEvent(QKeyEvent *event)
     //
     if (event->isAutoRepeat()) {
         return;
-    }
-
-    if (event->key() == Qt::Key_Space || event->modifiers() != Qt::NoModifier)
-    {
-        qInfo() << "[cursor] keyRelease" << event->key() << "mods" << int(event->modifiers())
-                << "pointerInUse" << isPointerInUse();
     }
 
     if (event->key() == 0)
@@ -780,12 +761,6 @@ void ScribbleArea::pointerPressEvent(PointerEvent* event)
     unsetCursor();
     updateToolCursor();
 
-    {
-        Layer* l = mEditor->layers()->currentLayer();
-        qDebug() << "[ui] canvas press:" << (l ? l->name() : QString("?"))
-                 << "frame" << mEditor->currentFrame()
-                 << "button" << event->button();
-    }
     bool isCameraLayer = mEditor->layers()->currentLayer()->type() == Layer::CAMERA;
     if ((currentTool()->type() != HAND || isCameraLayer) && (event->button() != Qt::RightButton) && (event->button() != Qt::MiddleButton || isCameraLayer))
     {
@@ -842,9 +817,6 @@ void ScribbleArea::pointerReleaseEvent(PointerEvent* event)
     currentTool()->pointerReleaseEvent(event);
 
     editor()->tools()->tryClearTemporaryTool(event->button());
-    qInfo() << "[cursor] pointerRelease btn" << int(event->button())
-            << "tool now" << int(currentTool()->type())
-            << "cursorShape" << int(cursor().shape());
 }
 
 void ScribbleArea::handleDoubleClick()

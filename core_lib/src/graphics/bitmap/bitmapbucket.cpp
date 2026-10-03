@@ -19,7 +19,6 @@ GNU General Public License for more details.
 #include <QtMath>
 #include <QDebug>
 #include <QPainter>
-#include <QElapsedTimer>
 
 #include "editor.h"
 #include "layermanager.h"
@@ -185,9 +184,6 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         fillRegion = fillRegion.united(QRect(point, QSize(1, 1)));
     }
 
-    QElapsedTimer fillTimer;
-    fillTimer.start();
-
     if (!targetImage->isLoaded())
     {
         // A keyframe nobody has drawn into yet keeps a null image, and the
@@ -336,11 +332,6 @@ void BitmapBucket::paint(const QPointF& updatedPoint, std::function<void(BucketS
         return;
     }
     const QRect maskBounds(minX, minY, maxX - minX + 1, maxY - minY + 1);
-
-    qDebug() << "[bucket] mask bounds=" << maskBounds.translated(workRect.topLeft())
-             << " regionMode=" << regionMode << " tol=" << mTolerance
-             << " grow=" << growValue << " feather=" << featherValue
-             << " closeGap=" << closeGapValue << " took" << fillTimer.elapsed() << "ms";
 
     // === Paint the fill color through the mask ===
 
