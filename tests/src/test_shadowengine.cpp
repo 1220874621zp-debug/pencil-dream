@@ -76,6 +76,23 @@ FramePair makeSquareWithLine(const QLine& divider, const QColor& color = Qt::red
     drawStrokeLine(fp.strokes, divider, color);
     return fp;
 }
+
+// 软边圆环线稿：半径 r0、羽化半宽 fw，alpha 从核心 255 线性降到 0
+//（模拟软边笔刷线条：墙=alpha≥6% 的整条羽化坡）
+QImage makeSoftRing(int size, double r0, double fw)
+{
+    QImage img = makeCanvas(size, size);
+    const double c = size / 2.0;
+    for (int y = 0; y < size; ++y)
+        for (int x = 0; x < size; ++x)
+        {
+            const double d = qSqrt((x + 0.5 - c) * (x + 0.5 - c) + (y + 0.5 - c) * (y + 0.5 - c));
+            const int a = qBound(0, qRound((1.0 - qAbs(d - r0) / fw) * 255), 255);
+            if (a > 0)
+                img.setPixel(x, y, qPremultiply(qRgba(255, 255, 255, a)));
+        }
+    return img;
+}
 } // namespace
 
 TEST_CASE("ShadowFill_VerticalDividerPickLeft")
@@ -479,4 +496,49 @@ TEST_CASE("ShadowFill_GapMergedShapeExcluded")
     CHECK(result.fill.isNull());
     REQUIRE(result.warnings.size() == 1);
     CHECK(result.warnings[0].kind == ShadowFill::Warning::UnclosedDivider);
+}
+
+TEST_CASE("ShadowFill_SoftFeatherSealedToLineCore")
+{
+    // 软边笔刷线稿：羽化坡（alpha 6%~100%）整条被划成墙，涂色若停在坡脚，
+    // 半透明羽化边下方纸色透出 = 填色与线稿之间的白缝（用户实测）。
+    // 修复=涂色从填区向羽化带扩展、停在实心线芯（alpha≥50%·max）
+    QImage lineArt = makeSoftRing(200, 60.0, 3.0);
+    QImage strokes = makeCanvas(200, 200);
+    drawStrokeLine(strokes, QLine(100, 8, 100, 192), QColor(255, 0, 0));
+
+    ShadowFill::Params params;
+    params.direction = ShadowFill::DirLeft;
+    ShadowFill::Result result = ShadowFill::computeShadow(lineArt, strokes, QRect(0, 0, 200, 200), params);
+
+    REQUIRE_FALSE(result.fill.isNull());
+
+    // 密封闭包：羽化带内（alpha<50% 的墙像素）只要贴着已填像素就必须被填，
+    // 不允许残留未填的贴边羽化带（修复前内坡 d∈[57.2,58.5] 整条欠填）
+    int sealedMiss = 0;
+    for (int y = 1; y < 199 && sealedMiss == 0; ++y)
+        for (int x = 1; x < 96 && sealedMiss == 0; ++x)
+        {
+            const int a = qAlpha(lineArt.pixel(x, y));
+            if (a == 0 || a >= 128)
+                continue; // 区域像素与实心线芯不属羽化带
+            bool nearFill = false;
+            for (int dy = -1; dy <= 1 && !nearFill; ++dy)
+                for (int dx = -1; dx <= 1 && !nearFill; ++dx)
+                    if (qAlpha(result.fill.pixel(x + dx, y + dy)) > 0)
+                        nearFill = true;
+            if (nearFill && qAlpha(result.fill.pixel(x, y)) == 0)
+                ++sealedMiss;
+        }
+    CHECK(sealedMiss == 0);
+
+    // 非空洞校验：内坡具体的羽化像素（(42,100) alpha≈43，修复前=墙欠填）
+    // 必须已被填上
+    CHECK(qAlpha(result.fill.pixel(42, 100)) > 0);
+
+    // 不越实心线芯：环外坡（线芯之外的羽化带）保持不填——扩展被线芯挡住
+    CHECK(isTransparent(result.fill, 162, 100));
+    CHECK(isTransparent(result.fill, 37, 100));
+    // 右半区（非阴影）照旧不填
+    CHECK(isTransparent(result.fill, 150, 100));
 }

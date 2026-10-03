@@ -549,6 +549,59 @@ Result computeShadow(const QImage& lineArt,
         }
     }
 
+    // 羽化带密封：屏障=任何非零高度（线稿 alpha≥6% 即墙），软边笔刷的
+    // 线有一条羽化坡（alpha 从 6% 渐到 100%），整条坡都算墙——涂色停在
+    // 坡脚，半透明羽化边下方无填色，纸色透出成填色与线稿之间的白缝。
+    // 从已涂色像素向坡上 BFS 扩展，填进羽化带、停在实心线芯；分割线
+    // 像素不越出参与阴影的图形（与接缝同守卫，防越界尾巴带色）
+    constexpr uchar kCoreHeight = 64; // 高度 v'^2/255≥64 ↔ alpha≥50%·max
+    const QImage height = Colorize::buildHeightMap(combined, bounds, Colorize::FilteringOptions());
+    QVector<uchar> band(static_cast<size_t>(w) * bounds.height(), 0);
+    QVector<QPoint> bandQueue;
+    for (int y = 0; y < bounds.height(); ++y)
+    {
+        const QRgb* fLine = reinterpret_cast<const QRgb*>(fill.constScanLine(y));
+        for (int x = 0; x < w; ++x)
+        {
+            if (fLine[x] != 0)
+            {
+                band[y * w + x] = 1;
+                bandQueue.append(QPoint(x, y));
+            }
+        }
+    }
+    static const int kBandDx[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+    static const int kBandDy[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+    for (int head = 0; head < bandQueue.size(); ++head)
+    {
+        const QPoint pt = bandQueue[head];
+        for (int k = 0; k < 8; ++k)
+        {
+            const int nx = pt.x() + kBandDx[k], ny = pt.y() + kBandDy[k];
+            if (nx < 0 || ny < 0 || nx >= w || ny >= bounds.height())
+                continue;
+            if (band[ny * w + nx] != 0)
+                continue;
+            const uchar h = height.constScanLine(ny)[nx];
+            if (h == 0 || h >= kCoreHeight)
+                continue; // 0=区域像素（不侵入他区领地）；实心线芯=填色边界
+            if (divider.constScanLine(ny)[nx] > 0 && !dividedShapes.contains(
+                    labelA(bounds.left() + nx, bounds.top() + ny)))
+                continue;
+            band[ny * w + nx] = 1;
+            bandQueue.append(QPoint(nx, ny));
+        }
+    }
+    for (int y = 0; y < bounds.height(); ++y)
+    {
+        QRgb* fLine = reinterpret_cast<QRgb*>(fill.scanLine(y));
+        for (int x = 0; x < w; ++x)
+        {
+            if (band[y * w + x] != 0)
+                fLine[x] = shadowPx;
+        }
+    }
+
     result.fill = fill;
     return result;
 }

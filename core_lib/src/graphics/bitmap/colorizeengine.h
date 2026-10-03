@@ -256,6 +256,13 @@ RegionSegmentation segmentRegions(const QImage& lineArt, const QRect& bounds,
                                   const FilteringOptions& options = FilteringOptions());
 
 /*
+ * 高度图（Format_Grayscale8，bounds 大小）：线稿 alpha 归一化+平方，
+ * 255=实心屏障、0=无线稿。与 segmentRegions 的屏障同源——阴影引擎
+ * 涂色扩展需按同一高度语义停在实心线芯上。
+ */
+QImage buildHeightMap(const QImage& lineArt, const QRect& bounds, const FilteringOptions& options);
+
+/*
  * 色点跨帧搬运（区域对应 + 众数色）：
  * 落点 = 目标帧各分割区域锚点（屏障净空最大像素为圆心，标记点随净空
  * 收缩——窄条/碎区域的小点不越线稿屏障外溢污染邻区）；
