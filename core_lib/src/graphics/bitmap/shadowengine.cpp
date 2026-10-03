@@ -552,52 +552,51 @@ Result computeShadow(const QImage& lineArt,
     // 羽化带密封：屏障=任何非零高度（线稿 alpha≥6% 即墙），软边笔刷的
     // 线有一条羽化坡（alpha 从 6% 渐到 100%），整条坡都算墙——涂色停在
     // 坡脚，半透明羽化边下方无填色，纸色透出成填色与线稿之间的白缝。
-    // 从已涂色像素向坡上 BFS 扩展，填进羽化带、停在实心线芯；分割线
-    // 像素不越出参与阴影的图形（与接缝同守卫，防越界尾巴带色）
+    // 修=多源洪泛把墙带像素划归最近区域（全部区域同时入队、先到先得），
+    // 只画归属阴影子区域的墙带像素：非阴影侧/背景侧的坡被各自区域先
+    // 认领，天然不会越过分割线或轮廓；实心线芯（高度≥kCoreHeight）不填
+    // 也不穿越，线芯里的岛状缺口由"最近区域"裁决，不依赖线芯连续封闭
     constexpr uchar kCoreHeight = 64; // 高度 v'^2/255≥64 ↔ alpha≥50%·max
     const QImage height = Colorize::buildHeightMap(combined, bounds, Colorize::FilteringOptions());
-    QVector<uchar> band(static_cast<size_t>(w) * bounds.height(), 0);
+    QVector<qint32> bandOwner(static_cast<size_t>(w) * bounds.height(), 0);
     QVector<QPoint> bandQueue;
     for (int y = 0; y < bounds.height(); ++y)
     {
-        const QRgb* fLine = reinterpret_cast<const QRgb*>(fill.constScanLine(y));
+        const qint32* lLine = subSeg.labelOf.constData() + static_cast<size_t>(y * w);
         for (int x = 0; x < w; ++x)
-        {
-            if (fLine[x] != 0)
-            {
-                band[y * w + x] = 1;
+            if (lLine[x] > 0)
                 bandQueue.append(QPoint(x, y));
-            }
-        }
     }
     static const int kBandDx[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
     static const int kBandDy[8] = { -1, -1, -1, 0, 0, 1, 1, 1 };
     for (int head = 0; head < bandQueue.size(); ++head)
     {
         const QPoint pt = bandQueue[head];
+        const size_t pIdx = static_cast<size_t>(pt.y()) * w + pt.x();
+        const qint32 pLabel = subSeg.labelOf[pIdx];
+        const qint32 owner = pLabel > 0 ? pLabel : bandOwner[pIdx];
         for (int k = 0; k < 8; ++k)
         {
             const int nx = pt.x() + kBandDx[k], ny = pt.y() + kBandDy[k];
             if (nx < 0 || ny < 0 || nx >= w || ny >= bounds.height())
                 continue;
-            if (band[ny * w + nx] != 0)
-                continue;
+            const size_t nIdx = static_cast<size_t>(ny) * w + nx;
+            if (bandOwner[nIdx] != 0 || subSeg.labelOf[nIdx] > 0)
+                continue; // 已认领 / 他人区域领地不侵入
             const uchar h = height.constScanLine(ny)[nx];
             if (h == 0 || h >= kCoreHeight)
-                continue; // 0=区域像素（不侵入他区领地）；实心线芯=填色边界
-            if (divider.constScanLine(ny)[nx] > 0 && !dividedShapes.contains(
-                    labelA(bounds.left() + nx, bounds.top() + ny)))
-                continue;
-            band[ny * w + nx] = 1;
+                continue; // 墙带之外无线稿；实心线芯=填色边界不穿越
+            bandOwner[nIdx] = owner;
             bandQueue.append(QPoint(nx, ny));
         }
     }
     for (int y = 0; y < bounds.height(); ++y)
     {
         QRgb* fLine = reinterpret_cast<QRgb*>(fill.scanLine(y));
+        const qint32* bLine = bandOwner.constData() + static_cast<size_t>(y * w);
         for (int x = 0; x < w; ++x)
         {
-            if (band[y * w + x] != 0)
+            if (bLine[x] > 0 && state[bLine[x] - 1] == IsShadow)
                 fLine[x] = shadowPx;
         }
     }

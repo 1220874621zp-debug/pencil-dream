@@ -539,6 +539,9 @@ TEST_CASE("ShadowFill_SoftFeatherSealedToLineCore")
     // 不越实心线芯：环外坡（线芯之外的羽化带）保持不填——扩展被线芯挡住
     CHECK(isTransparent(result.fill, 162, 100));
     CHECK(isTransparent(result.fill, 37, 100));
+    // 非阴影半区（分割线右侧）的内坡照旧不填——多源洪泛把它划归右侧
+    // 区域，不允许顺着墙带越过分割线（曾因线芯岛状缺口漏染非阴影侧）
+    CHECK(isTransparent(result.fill, 157, 100));
     // 右半区（非阴影）照旧不填
     CHECK(isTransparent(result.fill, 150, 100));
 }
