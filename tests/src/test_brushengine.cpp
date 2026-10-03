@@ -874,6 +874,92 @@ TEST_CASE("BrushSettings v2 XML roundtrip with embedded images")
     REQUIRE(legacyOut.texture.enabled == false);
 }
 
+TEST_CASE("BrushSettings graftHeavyParts restores texture brush after lite persist")
+{
+    // 重启场景：persistUserOptions 剥掉图像存 lite，重启恢复后从预设嫁接回
+    // 笔尖图/纹理/颜色源——纹理笔刷（如佛金T）重启首笔必须仍是纹理笔刷
+    BrushSettings preset;
+    preset.name = "纹理笔";
+    preset.tipImage = makeCalligraphyTip(20, 50, 8);
+    preset.tipShape = BrushSettings::TipShape::Image;
+    preset.bakeTipMask();
+    preset.diameter = 118.0;
+    preset.texture.pattern = QImage(16, 16, QImage::Format_ARGB32);
+    preset.texture.pattern.fill(QColor(120, 130, 140));
+    preset.texture.mode = 15;
+    preset.texture.strength = 1.0;
+    preset.texture.bake();
+    preset.texture.enabled = true;
+    preset.colorSource = BrushSettings::ColorSource::Pattern;
+    preset.mask.enabled = true;
+    preset.mask.sizeCoeff = 0.242;
+    preset.mask.mode = BrushMaskSettings::Mode::Burn;
+    preset.mask.sub = std::make_unique<BrushSettings>();
+    preset.mask.sub->diameter = 17.0;
+    preset.mask.sub->spacing = 0.08;
+    preset.mask.sub->tipShape = BrushSettings::TipShape::Image;
+    preset.mask.sub->tipImage = makeCalligraphyTip(12, 30, 6);
+    preset.mask.sub->bakeTipMask();
+
+    // 与 BrushTool::persistUserOptions 相同的 lite 剥离
+    BrushSettings lite = preset;
+    lite.tipImage = QImage();
+    lite.tipMask = QImage();
+    if (lite.tipShape == BrushSettings::TipShape::Image) {
+        lite.tipShape = BrushSettings::TipShape::Circle;
+    }
+    lite.texture = BrushTextureSettings();
+    lite.colorSource = BrushSettings::ColorSource::Plain;
+    BrushSettings& lsub = *lite.mask.sub;
+    lsub.tipImage = QImage();
+    lsub.tipMask = QImage();
+    if (lsub.tipShape == BrushSettings::TipShape::Image) {
+        lsub.tipShape = BrushSettings::TipShape::Circle;
+    }
+    lsub.texture = BrushTextureSettings();
+    lsub.colorSource = BrushSettings::ColorSource::Plain;
+
+    // 重启恢复：lite XML 往返后确认退化态（裸圆头、无纹理）
+    BrushSettings restored;
+    REQUIRE(BrushSettings::fromXMLString(lite.toXMLString(), restored));
+    REQUIRE(restored.tipShape == BrushSettings::TipShape::Circle);
+    REQUIRE(restored.tipImage.isNull());
+    REQUIRE(restored.texture.enabled == false);
+    REQUIRE(restored.colorSource == BrushSettings::ColorSource::Plain);
+    REQUIRE(restored.mask.enabled == true); // 双笔尖开关/系数在存档里
+    REQUIRE(restored.mask.sub != nullptr);
+    REQUIRE(restored.mask.sub->tipImage.isNull());
+
+    // 嫁接后恢复笔刷性格，数值参数仍来自存档
+    restored.graftHeavyParts(preset);
+    REQUIRE(restored.tipShape == BrushSettings::TipShape::Image);
+    REQUIRE(!restored.tipImage.isNull());
+    REQUIRE(!restored.tipMask.isNull());
+    REQUIRE(restored.tipMask.size() == preset.tipMask.size());
+    REQUIRE(restored.tipMask.pixel(10, 25) == preset.tipMask.pixel(10, 25));
+    REQUIRE(restored.texture.enabled == true);
+    REQUIRE(restored.texture.mode == 15);
+    REQUIRE(restored.texture.strength == Approx(1.0));
+    REQUIRE(!restored.texture.bakedMask.isNull());
+    REQUIRE(restored.colorSource == BrushSettings::ColorSource::Pattern);
+    REQUIRE(restored.mask.sub->tipShape == BrushSettings::TipShape::Image);
+    REQUIRE(!restored.mask.sub->tipMask.isNull());
+    REQUIRE(restored.mask.sub->spacing == Approx(0.08));
+
+    // 圆头笔预设嫁接：笔尖不被改成图像（预设无图可回填），
+    // 纹理/颜色源恒随预设（圆头笔没有纹理 → 关闭）
+    BrushSettings roundPreset;
+    roundPreset.name = "圆头笔";
+    roundPreset.tipShape = BrushSettings::TipShape::Circle;
+    BrushSettings plain = restored; // 已嫁接的纹理态
+    const QImage maskBefore = plain.tipMask;
+    plain.graftHeavyParts(roundPreset);
+    REQUIRE(plain.tipShape == BrushSettings::TipShape::Image);
+    REQUIRE(plain.tipMask == maskBefore);
+    REQUIRE(plain.texture.enabled == false);
+    REQUIRE(plain.colorSource == BrushSettings::ColorSource::Plain);
+}
+
 TEST_CASE("MaskedStrokeCompositor formulas")
 {
     using Mode = BrushMaskSettings::Mode;

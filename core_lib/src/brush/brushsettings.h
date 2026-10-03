@@ -170,6 +170,9 @@ struct BrushSettings
     ColorSource colorSource = ColorSource::Plain; // 颜色源（Pattern 用 texture.pattern）
 
     void bakeTipMask();         // tipImage + 调整参数 -> tipMask（fromXML/UI 导入后调用）
+    /** 重启恢复辅助：轻量存档刻意不含 MB 级图像（笔尖图/纹理图案），
+     *  这里从选中预设把重型部件回填到已恢复的数值参数上（见 persistUserOptions） */
+    void graftHeavyParts(const BrushSettings& from);
 
     QDomElement toXML(QDomDocument& doc) const;
     void fromXML(const QDomElement& element);

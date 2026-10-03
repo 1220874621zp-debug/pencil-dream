@@ -258,6 +258,12 @@ void BrushTool::initPresetExtras(const BrushSettings& preset)
     syncEngineSettings();
 }
 
+void BrushTool::graftPresetHeavyParts(const BrushSettings& preset)
+{
+    mPresetExtras.graftHeavyParts(preset);
+    syncEngineSettings();
+}
+
 void BrushTool::applyBrushOptions(const BrushSettings& options)
 {
     mPresetExtras = options;

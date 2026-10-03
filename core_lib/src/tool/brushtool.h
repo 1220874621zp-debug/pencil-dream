@@ -52,6 +52,9 @@ public:
     void applyBrushPreset(const BrushSettings& preset);
     /** 启动恢复用：只装载预设参数，不覆盖用户上次调过的宽度/羽化属性 */
     void initPresetExtras(const BrushSettings& preset);
+    /** 有用户选项存档时的启动恢复：数值参数沿用存档，笔尖图/纹理/颜色源
+     *  从选中预设回填（存档刻意不含图像，否则纹理笔刷重启首笔退化裸圆头） */
+    void graftPresetHeavyParts(const BrushSettings& preset);
     /** 工具选项面板编辑：整套参数生效并持久化（Krita 式选项面板的数据入口） */
     void applyBrushOptions(const BrushSettings& options);
     /** 启动时是否恢复了用户保存过的选项（预设面板据此跳过预设回灌） */

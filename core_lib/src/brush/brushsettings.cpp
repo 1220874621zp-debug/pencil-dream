@@ -180,6 +180,44 @@ void BrushSettings::bakeTipMask()
     }
 }
 
+// 轻量存档把图像笔尖降级成圆头、清空纹理/颜色源（persistUserOptions），
+// 恢复侧无从区分"用户关了纹理"与"存档本来就没有"——预设的笔刷性格
+// （图像笔尖/纹理/图案色源）整体回填，数值参数仍以存档为准
+void BrushSettings::graftHeavyParts(const BrushSettings& from)
+{
+    if (from.tipShape == TipShape::Image && !from.tipImage.isNull()) {
+        tipShape = TipShape::Image;
+        tipImage = from.tipImage;
+        tipAutoMidPoint = from.tipAutoMidPoint;
+        tipMidPoint = from.tipMidPoint;
+        tipBrightness = from.tipBrightness;
+        tipContrast = from.tipContrast;
+        bakeTipMask();
+    }
+    texture = from.texture;
+    colorSource = from.colorSource;
+
+    if (mask.enabled && from.mask.sub) {
+        if (!mask.sub) {
+            mask.sub = std::make_unique<BrushSettings>(*from.mask.sub);
+        } else {
+            BrushSettings& sub = *mask.sub;
+            const BrushSettings& fsub = *from.mask.sub;
+            if (fsub.tipShape == TipShape::Image && !fsub.tipImage.isNull()) {
+                sub.tipShape = TipShape::Image;
+                sub.tipImage = fsub.tipImage;
+                sub.tipAutoMidPoint = fsub.tipAutoMidPoint;
+                sub.tipMidPoint = fsub.tipMidPoint;
+                sub.tipBrightness = fsub.tipBrightness;
+                sub.tipContrast = fsub.tipContrast;
+                sub.bakeTipMask();
+            }
+            sub.texture = fsub.texture;
+            sub.colorSource = fsub.colorSource;
+        }
+    }
+}
+
 void BrushTextureSettings::bake()
 {
     bakedMask = QImage();

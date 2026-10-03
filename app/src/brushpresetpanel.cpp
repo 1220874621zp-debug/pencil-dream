@@ -134,7 +134,9 @@ void BrushPresetPanel::initUI()
     if (!name.isEmpty()) {
         selectPreset(name);
         // 用户调过工具选项（QSettings 有整套存档）则跳过预设回灌，
-        // 保持上次会话的完整工作状态；首次启动才应用预设默认值
+        // 保持上次会话的完整工作状态；首次启动才应用预设默认值。
+        // 有存档时画笔仍需把预设的笔尖图/纹理/颜色源嫁接回来（存档刻意
+        // 不含图像），否则重启后面板高亮着的纹理笔刷首笔退化成裸圆头
         const BrushSettings& preset = mStore.presets()[mStore.indexOf(name)].settings;
         if (preset.eraser) {
             EraserTool* tool = dynamic_cast<EraserTool*>(editor()->tools()->getTool(ERASER));
@@ -143,8 +145,12 @@ void BrushPresetPanel::initUI()
             }
         } else {
             BrushTool* tool = dynamic_cast<BrushTool*>(editor()->tools()->getTool(BRUSH));
-            if (tool && !tool->hasUserOptions()) {
-                tool->initPresetExtras(preset);
+            if (tool) {
+                if (!tool->hasUserOptions()) {
+                    tool->initPresetExtras(preset);
+                } else {
+                    tool->graftPresetHeavyParts(preset);
+                }
             }
         }
         // Panto 同步装载预设参数（仿制图章的笔尖/压感/纹理 = 当前选中笔刷）
