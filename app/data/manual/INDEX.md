@@ -9,3 +9,7 @@
 ### 智能填色
 
 - [填色图层（智能填色）使用指南](colorize/colorize-layer.md)
+
+### 智能阴影
+
+- [阴影图层（智能阴影）使用指南](shadow/shadow-layer.md)

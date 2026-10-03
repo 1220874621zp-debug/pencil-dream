@@ -3,5 +3,6 @@
         <file>INDEX.md</file>
         <file>import-export/import-image-sequence.md</file>
         <file>colorize/colorize-layer.md</file>
+        <file>shadow/shadow-layer.md</file>
     </qresource>
 </RCC>
